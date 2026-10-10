@@ -2,7 +2,7 @@
 
 Anthropicの[Code Migration Kit](https://github.com/anthropics/code-migration-kit-with-claude-code)を、GitHub Copilot CLIを中心に使える形へ変更した非公式版です。言語間移植の「事前調査 → ルール固定 → 変換 → 独立レビュー → ビルド → 新旧比較」を扱います。
 
-**0.1.4** はCLIのJSON出力、レビュー入力の範囲、検索ツールの互換性を修正した版です。[修正と検証](docs/reviews/2026-10-10-copilot-fixes.md)、[既存版からの更新](docs/UPGRADING.md)を参照してください。
+**0.1.5** は再レビューで見つかった暗黙指示の混入、inventory先頭BOM、依存マップの解析ルートの扱いを修正した版です。[今回の修正と再レビュー](docs/reviews/2026-10-10-copilot-rereview-fixes.md)、[0.1.4の修正記録](docs/reviews/2026-10-10-copilot-fixes.md)、[既存版からの更新](docs/UPGRADING.md)を参照してください。
 
 参照したCLIは **1.0.93**、VS Codeは **1.141.0** です。固定した元コミットとSDK参照版は [UPSTREAM.json](UPSTREAM.json) に記録しています。Anthropic/GitHubの公式配布物ではありません。
 
@@ -12,11 +12,11 @@ Anthropicの[Code Migration Kit](https://github.com/anthropics/code-migration-ki
 
 | 項目 | この版の動作 |
 |---|---|
-| 指示・スキル | `.github/copilot-instructions.md` と `.github/skills/code-migration/SKILL.md` |
+| 指示・スキル | 対話の入口は `.github/copilot-instructions.md` と `.github/skills/code-migration/SKILL.md`。自動ワーカーは暗黙の指示読み込みを無効化 |
 | 役割分担 | orchestrator / implementer / 独立reviewer 2種 / arbiter / fixer の6プロファイル |
 | モデル | 5種類のワーカーに明示指定。利用できるモデルIDをユーザーが設定 |
 | 変換 | 実装・修正・裁定担当は `view,grep,glob` のみ。CLIのJSONLから応答を取り出し、Nodeの調整役が対象ファイルだけを書き込む |
-| 独立レビュー | 2担当に同じ固定入力を渡す。レビュー担当はツールなしで、他担当の記録を検索できない |
+| 独立レビュー | 2担当に同じ固定入力を渡す。レビュー担当はツールなし。全ワーカーに `--no-custom-instructions` を指定 |
 | 完了判定 | 出力、入力、2件のレビュー、必要な裁定結果のハッシュを保存。ファイルが存在するだけでは完了にしない |
 | 再開 | 中断した工程から再開。失われたレビューや変更された出力は再レビュー |
 | 工程の承認 | 入力・出力・前工程の実行IDに結び付ける。上流の再実行で下流結果・承認は失効 |
@@ -83,7 +83,9 @@ manifestに明示した元ファイルと変換先は走査除外ディレクト
 
 生成物のディレクトリは元ソース・変換後ソース・検証ルート・明示入力・キットの管理領域と重ねられません。実際に読み込む設定やスクリプトは生成物のディレクトリ外に置き、必要に応じて `verificationInputs` へ登録します。`doctor` に入力一覧と生成物のディレクトリを別々に表示します。生成物の内容は承認ハッシュで追跡しないため、build・smoke・parityの各コマンドでその正しさを検証してください。Node/Python/POSIX shellの認識したインラインコードはファイル扱いしませんが、`cc -c FILE` と `node -c FILE` のFILEは追跡します。
 
-レビュー入力は対象の元ファイルと宣言した依存の推移的な閉包、当該候補ファイル、RULEBOOK全文、その範囲に一致するinventory行と全体注記、指定した診断です。同じ内容を両担当へ渡し、ツールを無効化します。inventoryは `file` を先頭列とし、リポジトリ相対パスの完全一致で選びます。不正な行や未知の先頭列は停止します。入力ファイルはUTF-8のテキストに限定し、不正なUTF-8やNULを含むファイルは名前を示して停止します。静的な元資料は実装・修正担当の呼び出し前にも検査します。他の変換後ファイルとの統合はbuild/smoke/parityで確認します。必要な閉包が大きい場合はモデルの入力上限を確認して `maxReviewInputBytes` を調整するか、module adapterを用意してください。変更追跡のための全ソース走査は維持します。
+レビュー入力は対象の元ファイルと宣言した依存の推移的な閉包、当該候補ファイル、RULEBOOK全文、その範囲に一致するinventory行と全体注記、指定した診断です。同じ内容を両担当へ渡し、ツールを無効化します。inventoryは `file` を先頭列とし、リポジトリ相対パスの完全一致で選びます。ファイル先頭のUTF-8 BOMはコメント・空行・ヘッダーの判定前に一度だけ除去します。不正な行や未知の先頭列は停止します。入力ファイルはUTF-8のテキストに限定し、不正なUTF-8やNULを含むファイルは名前を示して停止します。静的な元資料は実装・修正担当の呼び出し前にも検査します。他の変換後ファイルとの統合はbuild/smoke/parityで確認します。必要な閉包が大きい場合はモデルの入力上限を確認して `maxReviewInputBytes` を調整するか、module adapterを用意してください。変更追跡のための全ソース走査は維持します。
+
+CLIの全5ワーカーは `--no-custom-instructions` を付けて新しいプロセスを起動します。`AGENTS.md`、リポジトリ・個人のCopilot指示などの自動注入を止め、指定した役割プロファイルとランナーの契約を使います。案件固有の移植方針は、承認対象の `migration/RULEBOOK.md` とinventoryへ取り込んでください。暗黙の指示ファイルを変更してもワーカーの方針は変わりません。通常の対話セッションでは引き続きCopilot指示を使えます。
 
 既存の `edges.tsv` が解析器の `--root src` に対する相対パスなら、次のコマンドで依存宣言の草案を作ります。
 
@@ -92,7 +94,18 @@ node migration-kit/scripts/make_review_dependencies.mjs \
   --source-root src --edges migration/depmap/edges.tsv
 ```
 
-JSON形式は `{"schemaVersion":1,"dependencies":{"src/a.py":["src/b.py"],"src/b.py":[]}}` です。生成器は孤立ファイルも列挙しますが、解析器の対応構文・除外・未解決importを監査し、inventoryのevidence等に必要な意味上の参照も追加してください。複数の解析rootがある場合は別々の `--out migration/PATH.json` へ生成して1つのmapへ統合します。独立ファイルは監査後に `[]` を明示します。閉包に必要なキーやファイルが欠けていれば停止します。mapと明示依存の変更で承認・完了記録が失効します。
+解析器の `--root` と列挙する元ソースのディレクトリが違う場合は `--depmap-root` を指定します。Pythonの `from pkg import b` 等を解決するためにリポジトリルートで解析したTSVなら、次の例を使います。`.` を許可するのは解析ルートだけです。
+
+```bash
+python3 migration-kit/scripts/depmap_python.py --root . --out migration/depmap
+node migration-kit/scripts/make_review_dependencies.mjs \
+  --source-root pkg --depmap-root . --edges migration/depmap/edges.tsv
+# 複数のソースルートをまたぐ依存がある場合（config.sourceRootsも同じ範囲に設定）
+node migration-kit/scripts/make_review_dependencies.mjs \
+  --source-roots pkg,shared --depmap-root . --edges migration/depmap/edges.tsv
+```
+
+JSON形式は `{"schemaVersion":1,"dependencies":{"src/a.py":["src/b.py"],"src/b.py":[]}}` です。`--depmap-root` 省略時は単一の `--source-root` を解析ルートとみなすため、従来のコマンドも使えます。列挙は指定したソースルート内に限定し、孤立ファイルにも `[]` を作ります。対象外ファイルから始まる辺（例：tests → pkg）は除外し、標準出力の `ignoredEdges` に列挙します。対象ソースから範囲外への依存（例：pkg → shared）は停止し、必要なルートの追加を求めます。解析器の対応構文・除外・未解決import・除外された辺を監査し、inventoryのevidence等に必要な意味上の参照も追加してください。解析ルートが複数なら別々の `--out migration/PATH.json` へ生成して1つのmapへ統合します。閉包に必要なキーやファイルが欠けていれば停止します。mapと明示依存の変更で承認・完了記録が失効します。
 
 ```json
 {
@@ -165,7 +178,7 @@ node migration-kit/scripts/run_migration.mjs repair \
 
 ## 任意：Dynamic Workflows
 
-導入コマンドに `--with-workflow` を付けると `.github/extensions/code-migration/extension.mjs` も配置します。SDKの `defineWorkflow` / `joinSession` / `ctx.agent` を使い、通常CLIと同じ実行エンジン・承認・完了判定を利用します。
+導入コマンドに `--with-workflow` を付けると `.github/extensions/code-migration/extension.mjs` も配置します。SDKの `defineWorkflow` / `joinSession` で工程を登録し、ワーカーは通常CLIと同じアダプターから起動します。ホストセッションの文脈を受け継ぐ `ctx.agent` は使いません。再開・承認・完了判定はランナーの記録を利用します。
 
 ```bash
 copilot --experimental --allow-tool read workflow run code-migration --args '{"stage":"translate"}'

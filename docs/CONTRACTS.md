@@ -1,10 +1,15 @@
 # Worker and state contracts
 
 Every model reply must be one JSON object (a single fenced JSON block is also
-accepted). The local validator checks required values independently of SDK
-schema enforcement. Unknown/invalid results never become completed units.
+accepted). The local validator checks required values. Unknown/invalid results
+never become completed units; SDK schema enforcement is not used.
 
-Ordinary CLI workers use --output-format json. stdout is a JSONL event stream,
+All workers, including those launched by Dynamic Workflows, use fresh CLI
+processes with --no-custom-instructions. Automatic repository, ancestor and
+personal instruction discovery is disabled; selected --agent profiles still
+apply. Project migration policy must be in the reviewed RULEBOOK/inventory.
+The workflow host does not call ctx.agent or supply its conversation to workers.
+Workers use --output-format json. stdout is a JSONL event stream,
 not presentation text. The adapter selects the final main-agent assistant.message
 content (no tool requests), excluding agentId/legacy parentToolCallId child
 messages, and requires a successful terminal result. Malformed JSONL, session
@@ -38,7 +43,9 @@ inventory and the optional diagnostic. The dependencies artifact uses schemaVers
 dependency arrays. [] is an explicit audited declaration. All reachable nodes
 must be declared, exist under sourceRoots and satisfy the path/text checks.
 Dependency cycles are included once. Inventory requires a first column named file;
-rows match the source closure exactly. Header/global # notes remain. Malformed
+rows match the source closure exactly. A single leading inventory BOM is removed
+before classifying comments, empty lines and the header; other text is preserved.
+Header/global # notes remain. Malformed
 rows and unsupported headers are rejected even outside the selected scope.
 Include semantic evidence references as dependencies when auditing the map.
 Reviewer profiles

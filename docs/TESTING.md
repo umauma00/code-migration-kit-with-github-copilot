@@ -1,6 +1,6 @@
 # 検証記録（2026-10-08 JST）
 
-0.1.4の2026-10-10検証は [Copilot互換性の修正](reviews/2026-10-10-copilot-fixes.md) を参照してください。以下は0.1.3までの歴史的記録です。
+0.1.5の2026-10-10検証は [再レビュー3件の修正](reviews/2026-10-10-copilot-rereview-fixes.md)、0.1.4は [Copilot互換性の修正](reviews/2026-10-10-copilot-fixes.md) を参照してください。以下は0.1.3までの歴史的記録です。
 
 この記録は本Copilot対応版の検証です。元の `RUN-NOTES.md` はAnthropic版の過去の実験で、本版の実績を示すものではありません。
 

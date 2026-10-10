@@ -1,3 +1,19 @@
+# 0.1.5 — 2026-10-10
+
+- Disable ambient custom instructions for all CLI workers and require the flag
+  in doctor. Keep explicit role profiles and put project migration policy in the
+  reviewed rulebook/inventory. Verify request contents with discoverable canaries.
+- Use the same isolated CLI adapter from Dynamic Workflows; retain runner-based
+  resume, cancellation, limits and result validation. SDK agent journals/schema
+  calls are no longer used. Workflow args may select the Copilot executable.
+- Strip only the initial inventory BOM before comment/header classification.
+- Separate parser depmap-root from enumerated source roots, accepting repo-root
+  paths and cross-package edges. Report edges originating outside the selected
+  roots; reject required dependencies outside the scope without replacing a map.
+- Add rereview regressions and CLI/workflow worker transport validation. See
+  [fixes and rereview](docs/reviews/2026-10-10-copilot-rereview-fixes.md) and
+  [upgrading](docs/UPGRADING.md).
+
 # 0.1.4 — 2026-10-10
 
 - Read CLI JSONL machine output and require a successful terminal result plus
