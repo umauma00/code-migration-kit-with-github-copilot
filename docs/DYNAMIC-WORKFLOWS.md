@@ -28,7 +28,7 @@ keys: disk receipts decide what remains after a restart. An SDK retry may reuse 
 result only for the same role and input hash. Cancellation reaches the shared runner.
 
 Reviewer profiles must retain `tools: []`; other worker profiles must retain
-`tools: ["read", "search"]`. No worker may override its model. Both reviewers
+`tools: ["view", "grep", "glob"]`. No worker may override its model. Both reviewers
 receive the same frozen JSON input from the shared coordinator. Isolation no
 longer depends on a per-worker environment variable reaching SDK subagents.
 Workflow concurrency/total-subagent limits are derived from config; the shared
@@ -38,7 +38,7 @@ Observed usage and actual served model remain null in current receipts. Do not
 interpret this adapter as measured cost control.
 
 Before use, verify registration, schema output, no tools for reviewers and
-read/search-only tools for other workers, an
+view/grep/glob-only tools for other workers, an
 interrupted run, and the absence of an unapproved next-stage execution in your
 account's CLI. The SDK extension entrypoint is CLI-specific; VS Code prompt files
 are a separate conversational entrypoint, not a native workflow runtime.

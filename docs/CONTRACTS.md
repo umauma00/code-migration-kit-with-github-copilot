@@ -4,6 +4,16 @@ Every model reply must be one JSON object (a single fenced JSON block is also
 accepted). The local validator checks required values independently of SDK
 schema enforcement. Unknown/invalid results never become completed units.
 
+Ordinary CLI workers use --output-format json. stdout is a JSONL event stream,
+not presentation text. The adapter selects the final main-agent assistant.message
+content (no tool requests), excluding agentId/legacy parentToolCallId child
+messages, and requires a successful terminal result. Malformed JSONL, session
+errors, aborts, unfinished tool requests and events after result fail closed.
+Informational/unknown event types may be ignored; they never supply a reply.
+Implementer, fixer and arbiter profiles use the concrete CLI tools view,grep,glob.
+The read/search aliases are not accepted for these workers because the reference
+CLI loses search tools with those aliases. VS Code launches the same CLI workers.
+
 ## Implementation and fix
 
 ```json
@@ -21,13 +31,23 @@ coordinator chooses the destination from the manifest, not from model text.
 
 `pass` requires an empty findings array. `changes` requires findings. IDs must
 be unique inside a review. Reviewers cite source/rule evidence and work in
-fresh contexts. Both receive identical frozen JSON containing source files,
-one candidate, RULEBOOK, inventory and the optional diagnostic. Reviewer profiles
+fresh contexts. Both receive identical frozen JSON containing the current source
+and its declared transitive dependencies, one candidate, full RULEBOOK, scoped
+inventory and the optional diagnostic. The dependencies artifact uses schemaVersion
+1 and a dependencies object mapping project-relative source paths to direct
+dependency arrays. [] is an explicit audited declaration. All reachable nodes
+must be declared, exist under sourceRoots and satisfy the path/text checks.
+Dependency cycles are included once. Inventory requires a first column named file;
+rows match the source closure exactly. Header/global # notes remain. Malformed
+rows and unsupported headers are rejected even outside the selected scope.
+Include semantic evidence references as dependencies when auditing the map.
+Reviewer profiles
 have `tools: []`; they cannot read/search the repository. Their input hash is
 recorded with each review. No reviewer outcome is supplied to the other reviewer.
 Oversized input, NUL-containing files and invalid UTF-8 block the unit instead
 of silently omitting or replacing evidence. Files must be UTF-8 text; the runner
-does not guess encodings. An invalid file is named before either reviewer runs.
+does not guess encodings. Static input is checked at its serialized JSON size
+before implementer/fixer calls; the final candidate is checked after generation.
 
 ## Arbitration
 
@@ -54,7 +74,8 @@ restoring one old successful JSON file cannot revive a stale chain. This is a
 latest-result store, not a complete event journal.
 
 Input context includes all explicit manifest sources regardless of traversal
-exclusions, conventional root build/dependency files, directly named repository
+exclusions, the review dependency map and every explicitly declared dependency,
+conventional root build/dependency files, directly named repository
 command input files and required `verificationInputs`, including scripts/configuration
 under migration/. Known Node/Python/POSIX-shell inline programs before their
 entrypoint are treated as data; compiler `-c` and Node syntax-check `-c` file

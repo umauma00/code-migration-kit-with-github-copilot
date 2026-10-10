@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { loadConfig, readManifest, contextHash, unitState, done, safePath, readJSON, parseArgs, verificationFiles } from '../lib/core.mjs';
+import { loadConfig, readManifest, contextHash, unitState, done, safePath, readJSON, parseArgs, verificationFiles, loadReviewDependencies, reviewSources } from '../lib/core.mjs';
 import { validateWorkerProfile } from '../lib/review.mjs';
 import { runProcess } from '../lib/process.mjs';
 import { approve, runStage, translate } from '../lib/pipeline.mjs';
@@ -32,6 +32,11 @@ export async function doctor(root, config, { checkCLI = false, command = 'copilo
   }
   try { checks.push({ check: 'verification input files', ok: true, files: verificationFiles(root, config), note: 'Add transitive build scripts, nested dependency/config files and environment descriptions to verificationInputs. This list is not an automatic dependency graph.' }); }
   catch (e) { checks.push({ check: 'verification input files', ok: false, detail: e.message }); }
+  try {
+    const graph = loadReviewDependencies(root, config);
+    const units = fs.existsSync(safePath(root, 'migration/manifest.tsv')) ? readManifest(root, config) : [];
+    checks.push({ check: 'review dependency map', ok: true, units: units.map(u => ({ source: u.source, files: reviewSources(root, config, u.source, graph) })), note: 'Declared evidence scope; audit parser coverage and semantic dependencies in phase 01.' });
+  } catch (e) { checks.push({ check: 'review dependency map', ok: false, detail: e.message }); }
   checks.push({ check: 'build artifact roots', ok: true, roots: config.buildArtifactRoots ?? [], note: 'Declare generated binaries, objects and reports here. Their file contents are excluded from command-input fingerprints; actual inputs must stay outside these roots.' });
   checks.push({ check: 'worker hook installed', ok: fs.existsSync(safePath(root, '.github/hooks/code-migration.json')) });
   if (checkCLI) {
@@ -40,7 +45,7 @@ export async function doctor(root, config, { checkCLI = false, command = 'copilo
       const help = await runProcess(command, ['--help'], { cwd: root, timeoutMs: 20000 });
       const text = help.stdout + help.stderr;
       checks.push({ check: 'Copilot executable', ok: version.code === 0, detail: version.stdout.trim() });
-      checks.push({ check: 'required flags', ok: help.code === 0 && ['--agent', '--model', '--available-tools', '--deny-tool'].every(s => text.includes(s)) });
+      checks.push({ check: 'required flags', ok: help.code === 0 && ['--agent', '--model', '--available-tools', '--deny-tool', '--output-format'].every(s => text.includes(s)) });
     } catch (e) { checks.push({ check: 'Copilot executable', ok: false, detail: e.message }); }
   }
   return { ok: checks.every(x => x.ok), checks, requestedModels: config.models,

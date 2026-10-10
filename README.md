@@ -2,11 +2,11 @@
 
 Anthropicの[Code Migration Kit](https://github.com/anthropics/code-migration-kit-with-claude-code)を、GitHub Copilot CLIを中心に使える形へ変更した非公式版です。言語間移植の「事前調査 → ルール固定 → 変換 → 独立レビュー → ビルド → 新旧比較」を扱います。
 
-**0.1.3** はAstraレビューで見つかったコマンド入力の追跡漏れと、生成物を入力と誤認する問題を修正した版です。[変更と検証](docs/REVIEW-FIXES.md)、[既存版からの更新](docs/UPGRADING.md)を参照してください。
+**0.1.4** はCLIのJSON出力、レビュー入力の範囲、検索ツールの互換性を修正した版です。[修正と検証](docs/reviews/2026-10-10-copilot-fixes.md)、[既存版からの更新](docs/UPGRADING.md)を参照してください。
 
 参照したCLIは **1.0.93**、VS Codeは **1.141.0** です。固定した元コミットとSDK参照版は [UPSTREAM.json](UPSTREAM.json) に記録しています。Anthropic/GitHubの公式配布物ではありません。
 
-**検証状況：自動テストとオフライン題材は検証済みです。実際のCopilot認証・モデル呼び出し、VS Code上の操作、Dynamic Workflowsの実セッションは未検証です。** 実案件の前に [LIVE-SMOKE.md](docs/LIVE-SMOKE.md) の小規模確認を実施してください。
+**検証状況：自動テスト、オフライン題材、macOSでの実CLIと疑似プロバイダー間の通信は検証済みです。実際のCopilot認証・AIによる移植品質、VS Code上の操作、Dynamic Workflowsの実セッションは未検証です。** 実案件の前に [LIVE-SMOKE.md](docs/LIVE-SMOKE.md) の小規模確認を実施してください。
 
 ## 主な変更
 
@@ -15,7 +15,7 @@ Anthropicの[Code Migration Kit](https://github.com/anthropics/code-migration-ki
 | 指示・スキル | `.github/copilot-instructions.md` と `.github/skills/code-migration/SKILL.md` |
 | 役割分担 | orchestrator / implementer / 独立reviewer 2種 / arbiter / fixer の6プロファイル |
 | モデル | 5種類のワーカーに明示指定。利用できるモデルIDをユーザーが設定 |
-| 変換 | 実装・修正・裁定担当はread/searchのみ。JSONでコードを返し、Nodeの調整役が対象ファイルだけを書き込む |
+| 変換 | 実装・修正・裁定担当は `view,grep,glob` のみ。CLIのJSONLから応答を取り出し、Nodeの調整役が対象ファイルだけを書き込む |
 | 独立レビュー | 2担当に同じ固定入力を渡す。レビュー担当はツールなしで、他担当の記録を検索できない |
 | 完了判定 | 出力、入力、2件のレビュー、必要な裁定結果のハッシュを保存。ファイルが存在するだけでは完了にしない |
 | 再開 | 中断した工程から再開。失われたレビューや変更された出力は再レビュー |
@@ -28,7 +28,7 @@ Anthropicの[Code Migration Kit](https://github.com/anthropics/code-migration-ki
 - Node.js 22以上。ランナー本体は外部npm依存なし。
 - 自分の環境でログイン済みのCopilot CLIと、指定モデルを利用できる契約・組織設定。
 - 対象言語の実行環境・ビルドツール。付属デモとPython/C依存解析にはPython 3が必要です。
-- 本版はLinuxで検証しています。macOS/Windowsでの実行は未検証です。WindowsではNodeから直接起動できるCopilot実行ファイルを使ってください。
+- Linuxの既存検証とmacOSでの自動テスト・CLI通信検証があります。Windowsでの実行は未検証です。WindowsではNodeから直接起動できるCopilot実行ファイルを使ってください。
 
 ## 対象リポジトリへ導入する
 
@@ -52,7 +52,7 @@ VS Code **Local** のhooksを使う場合は、両方のコマンドに `--harne
 node migration-kit/scripts/run_migration.mjs doctor --check-cli
 ```
 
-`doctor` は設定、プロファイル、CLIバージョンと必要なオプションを確認します。モデルの利用可否やhooksの実動作を保証するものではありません。
+`doctor` は設定、プロファイル、CLIバージョンと必要なオプションを確認します。新規導入直後はphase 01で作る依存宣言が不足と表示されます。作成・監査後に再実行してください。モデルの利用可否やhooksの実動作を保証するものではありません。
 
 ## 設定する
 
@@ -66,6 +66,7 @@ node migration-kit/scripts/run_migration.mjs doctor --check-cli
 | `verificationInputs` | 追加で変更を追跡するビルド設定・依存設定等のファイル。例：`["build/config.json", "packages/api/tsconfig.json"]` |
 | `buildArtifactRoots` | コマンドが生成するバイナリ・オブジェクト・レポートのディレクトリ。例：`["artifacts", "dist"]`。既定は空配列 |
 | `maxReviewInputBytes` | 固定レビュー入力のJSONサイズ上限。既定65536 bytes。超過は省略せず停止 |
+| `reviewDependencyMap` | 監査した依存宣言JSON。既定 `migration/review-dependencies.json`。phase 01で作成する必須成果物 |
 | `sourceLanguage`, `targetLanguage` | 対象言語。テンプレートのPython/JavaScriptを変更可能 |
 | `mode` | 自動ファイル変換は `preserve`。`redesign` は設計・試行プロンプトまで対応 |
 | `models` | implementer、reviewer-semantics、reviewer-rules、arbiter、fixerの各ID |
@@ -82,7 +83,16 @@ manifestに明示した元ファイルと変換先は走査除外ディレクト
 
 生成物のディレクトリは元ソース・変換後ソース・検証ルート・明示入力・キットの管理領域と重ねられません。実際に読み込む設定やスクリプトは生成物のディレクトリ外に置き、必要に応じて `verificationInputs` へ登録します。`doctor` に入力一覧と生成物のディレクトリを別々に表示します。生成物の内容は承認ハッシュで追跡しないため、build・smoke・parityの各コマンドでその正しさを検証してください。Node/Python/POSIX shellの認識したインラインコードはファイル扱いしませんが、`cc -c FILE` と `node -c FILE` のFILEは追跡します。
 
-レビュー入力は元ソース群、当該候補ファイル、RULEBOOK、inventory、指定した診断です。同じ内容を両担当へ渡し、ツールを無効化します。入力ファイルはUTF-8のテキストに限定し、不正なUTF-8やNULを含むファイルは名前を示してレビュー前に停止します。文字コードの自動推定はしません。他の変換後ファイルとの統合はbuild/smoke/parityで確認します。大きな案件はモデルの入力上限を確認して `maxReviewInputBytes` を調整するか、移行範囲を分割してください。
+レビュー入力は対象の元ファイルと宣言した依存の推移的な閉包、当該候補ファイル、RULEBOOK全文、その範囲に一致するinventory行と全体注記、指定した診断です。同じ内容を両担当へ渡し、ツールを無効化します。inventoryは `file` を先頭列とし、リポジトリ相対パスの完全一致で選びます。不正な行や未知の先頭列は停止します。入力ファイルはUTF-8のテキストに限定し、不正なUTF-8やNULを含むファイルは名前を示して停止します。静的な元資料は実装・修正担当の呼び出し前にも検査します。他の変換後ファイルとの統合はbuild/smoke/parityで確認します。必要な閉包が大きい場合はモデルの入力上限を確認して `maxReviewInputBytes` を調整するか、module adapterを用意してください。変更追跡のための全ソース走査は維持します。
+
+既存の `edges.tsv` が解析器の `--root src` に対する相対パスなら、次のコマンドで依存宣言の草案を作ります。
+
+```bash
+node migration-kit/scripts/make_review_dependencies.mjs \
+  --source-root src --edges migration/depmap/edges.tsv
+```
+
+JSON形式は `{"schemaVersion":1,"dependencies":{"src/a.py":["src/b.py"],"src/b.py":[]}}` です。生成器は孤立ファイルも列挙しますが、解析器の対応構文・除外・未解決importを監査し、inventoryのevidence等に必要な意味上の参照も追加してください。複数の解析rootがある場合は別々の `--out migration/PATH.json` へ生成して1つのmapへ統合します。独立ファイルは監査後に `[]` を明示します。閉包に必要なキーやファイルが欠けていれば停止します。mapと明示依存の変更で承認・完了記録が失効します。
 
 ```json
 {
@@ -105,7 +115,7 @@ Copilotに該当プロンプトを読ませ、各工程の成果物を確認し�
 |---|---|---|
 | 適否・範囲の調査 | [00-feasibility](prompts/00-feasibility.md) | `migration/feasibility.md` |
 | 比較器の設計 | [00b-judge-setup](prompts/00b-judge-setup.md) | 元テスト、比較器、mutation自己検証 |
-| 依存関係 | [01-dependency-map](prompts/01-dependency-map.md) | depmap、`migration/manifest.tsv` |
+| 依存関係 | [01-dependency-map](prompts/01-dependency-map.md) | depmap、`migration/manifest.tsv`、`review-dependencies.json` |
 | 意味の差・方針 | [02-gap-inventory](prompts/02-gap-inventory.md) | `migration/RULEBOOK.md`、`inventory.tsv` |
 | 事前試行 | [03-stress-test](prompts/03-stress-test.md) | `migration/stress-test/report.md` |
 | 変換・レビュー | [04-translation-kickoff](prompts/04-translation-kickoff.md) | 変換後ソース、レビュー記録 |

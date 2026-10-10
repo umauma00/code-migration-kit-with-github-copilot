@@ -1,7 +1,8 @@
 # 04 — Translation and independent review
 
 Prerequisites: reviewed feasibility/stress reports, RULEBOOK, inventory,
-manifest, validated judge, installed profiles and explicit translation approval.
+manifest, audited review dependency map, validated judge, installed profiles and
+explicit translation approval.
 
 Use `node migration-kit/scripts/run_migration.mjs translate` from the target
 repository. Use the path without `migration-kit/` only when running this kit itself.
@@ -14,7 +15,7 @@ receive identical frozen inputs; other workers have read/search-only tools.
 Only the coordinator writes the assigned manifest target. Existing output files
 without reviewed receipts are unfinished and must be reviewed.
 
-Keep source, judge, rulebook, inventory and execution settings immutable inside
+Keep source, judge, rulebook, inventory, review dependency map and execution settings immutable inside
 the run. Missing decisions get TODO(port), BUG(port) or PERF(port) markers.
 No source “improvement” is mixed into faithful translation. Expensive compiler
 and test commands wait for their phases; an explicitly configured cheap

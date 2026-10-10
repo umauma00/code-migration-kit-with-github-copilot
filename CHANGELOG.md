@@ -1,3 +1,22 @@
+# 0.1.4 — 2026-10-10
+
+- Read CLI JSONL machine output and require a successful terminal result plus
+  the final main-agent response; preserve long code strings without text wrapping.
+- Scope frozen reviews to the unit's declared transitive source dependencies and
+  matching inventory rows, retaining full rules and global notes. Require an
+  audited dependency-map artifact, include it in fingerprints and preflight
+  static serialized input before implementation/fix calls.
+- Add an edges.tsv conversion script that includes isolated source files. Missing
+  declarations/evidence and malformed inventory fail instead of being omitted.
+- Use concrete view/grep/glob tools for implementer, fixer and arbiter; reviewers
+  remain tool-free. Check the machine-output CLI flag in doctor.
+- Add compatibility regressions and an opt-in real-CLI/local-provider integration
+  check. See [fix verification](docs/reviews/2026-10-10-copilot-fixes.md).
+
+Existing installations must create/audit the review dependency map and update
+worker profiles. See [upgrading](docs/UPGRADING.md). Actual AI migration quality,
+account authentication, VS Code and SDK sessions remain unverified.
+
 # 0.1.3 — 2026-10-08
 
 - Independently reproduce and confirm both Astra findings with a real C compiler.

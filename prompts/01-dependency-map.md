@@ -20,7 +20,28 @@ Reject duplicate targets, source overlap and unsafe paths. The current runner
 supports one file per unit and must not be used for many writers to one output.
 Cycles/shared helpers may need manual preparation or an atomic module adapter.
 
-Report graph counts, cycles, unresolved imports, rule decisions and the manifest.
+Generate the review evidence dependency declaration. Starter edges.tsv paths are
+relative to the parser's --root; specify that same directory as --source-root:
+
+```bash
+node migration-kit/scripts/make_review_dependencies.mjs --source-root src --edges migration/depmap/edges.tsv
+```
+
+The default artifact is migration/review-dependencies.json, selected by
+config.reviewDependencyMap. Schema: {"schemaVersion":1,"dependencies":{"src/a.py":["src/b.py"],"src/b.py":[]}}.
+The generator enumerates isolated files too. This is a draft, not proof of
+completeness: audit parser coverage, exclusions and unresolved imports. Add
+semantic evidence references needed by the rulebook/inventory, not just imports.
+For multiple parser roots, generate separate --out migration/PATH.json drafts
+and merge their project-relative dependencies. Every reachable file must have a
+declaration; [] explicitly means audited independent. Missing declarations fail.
+Both reviewers receive the current source and this transitive closure, full
+rulebook, matching inventory rows/global notes and one candidate. They cannot
+fetch missing evidence. Include the map in the phase review; after gap inventory
+is written, revisit semantic dependencies before translation approval.
+
+Report graph counts, cycles, unresolved imports, rule decisions, manifest and the
+audited review dependency map.
 Do not begin production translation. Stop for review.
 
 <!-- Copilot adaptation: migration control and instructions updated on 2026-10-08; see NOTICE. -->

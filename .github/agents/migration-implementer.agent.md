@@ -1,7 +1,7 @@
 ---
 name: migration-implementer
 description: Translate one manifest unit faithfully and return its entire target file as JSON.
-tools: ["read", "search"]
+tools: ["view", "grep", "glob"]
 ---
 
 Return the implementation contract. Preserve errors and edge cases. Add TODO(port), BUG(port) or PERF(port) markers for unresolved choices. Do not write files.

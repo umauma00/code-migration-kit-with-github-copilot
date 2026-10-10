@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { prepare, ready, result, fake, finding } from './helpers.mjs';
+import { prepare, ready, result, fake, finding, cliOutput } from './helpers.mjs';
 import { approve, requireGate, runStage, translate } from '../lib/pipeline.mjs';
 import { safePath, atomicWrite, readJSON, writeJSON, fileHash, loadConfig, contextHash,
   readManifest, done, unitState, statePath, lockRun, roles } from '../lib/core.mjs';
@@ -273,7 +273,7 @@ test('CLI transport pins model/tools and validates JSON without authenticating',
   assert.equal(args[args.indexOf('--model') + 1], 'chosen-model');
   assert.equal(args[args.indexOf('--available-tools') + 1], 'view,grep,glob');
   assert.equal(args[args.indexOf('--deny-tool') + 1], 'write,shell');
-  write(f.root, 'cli-double.mjs', `console.log(${JSON.stringify(JSON.stringify(result('implementer', unit)))});`);
+  write(f.root, 'cli-double.mjs', `console.log(${JSON.stringify(cliOutput(result('implementer', unit)))});`);
   const adapter = createCopilotAdapter({ command: process.execPath, prefixArgs: [path.join(f.root, 'cli-double.mjs')] });
   assert.equal((await adapter({ ...f, role: 'implementer', unit })).result.target, unit.target);
   write(f.root, 'cli-double.mjs', 'console.log("not JSON");');

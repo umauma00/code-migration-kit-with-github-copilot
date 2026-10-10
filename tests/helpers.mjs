@@ -22,7 +22,10 @@ export function prepare(t, { realCommands = false, count = 1, model = 'test-doub
   const names = ['math_ops', 'text_ops', 'main'].slice(0, count);
   atomicWrite(safePath(root, 'migration/manifest.tsv'), 'source\ttarget\n' + names.map(n => `src/${n}.py\tported/${n}.mjs\n`).join(''));
   atomicWrite(safePath(root, 'migration/RULEBOOK.md'), '# Fixture rules\nPreserve floor division, remainder signs, zero-division errors and Unicode code-point lengths. Keep one-to-one filenames; use .mjs imports. Inputs are safe-range integers and Unicode strings. End each file with a PORT STATUS comment.\n');
-  atomicWrite(safePath(root, 'migration/inventory.tsv'), 'source\tissue\tdecision\nsrc/math_ops.py\tnegative division\tfloor, not truncate\nsrc/text_ops.py\tUnicode length\tcode points\n');
+  atomicWrite(safePath(root, 'migration/inventory.tsv'), 'file\tissue\tdecision\nsrc/math_ops.py\tnegative division\tfloor, not truncate\nsrc/text_ops.py\tUnicode length\tcode points\n');
+  writeJSON(safePath(root, 'migration/review-dependencies.json'), { schemaVersion: 1, dependencies: {
+    'src/math_ops.py': [], 'src/text_ops.py': [], 'src/main.py': ['src/math_ops.py', 'src/text_ops.py']
+  } });
   atomicWrite(safePath(root, 'migration/feasibility.md'), 'Fixture only: three files, finite integer/string contract; no architecture redesign.\n');
   atomicWrite(safePath(root, 'migration/stress-test/report.md'), 'TEST FIXTURE: numeric boundaries and Unicode cases are checked by tests/judge.py. This canned setup is not an AI bakeoff or a production approval.\n');
   return { root, config, units: readManifest(root, config) };
@@ -40,6 +43,10 @@ export function result(role, unit, { findings = [], decisions = [], content } = 
   return { ...common, kind: 'review', verdict: findings.length ? 'changes' : 'pass', findings };
 }
 export const finding = { id: 'F1', message: 'Wrong division rounding', evidence: 'src/math_ops.py:4 uses floor division', rule: 'Fixture rules: preserve negative division' };
+export const cliOutput = value => [
+  { type: 'assistant.message', data: { content: JSON.stringify(value), toolRequests: [] } },
+  { type: 'result', exitCode: 0 }
+].map(e => JSON.stringify(e)).join('\n');
 export const fake = async ({ role, unit, extra }) => ({ result: result(role, unit,
   role === 'arbiter' ? { decisions: extra.findings.map(f => ({ finding: f.reference, confirmed: true, reason: f.evidence })) } : {}),
   requestedModel: 'test-double', observedModel: null, tokens: null, aiCredits: null });

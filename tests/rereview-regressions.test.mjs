@@ -77,14 +77,14 @@ test('RR2: validation fails if any explicitly mapped output under an excluded di
   }
 });
 
-test('RR3: non-UTF-8 source blocks before reviewers and names the offending file', async t => {
+test('RR3: non-UTF-8 source blocks before model calls and names the offending file', async t => {
   const f = prepare(t), unit = f.units[0], calls = [];
   write(f.root, unit.source, Buffer.from("# coding: latin-1\nvalue = 'caf\xe9'\n", 'latin1'));
   persist(f);
   await runStage(f.root, f.config, 'judge');
   approve(f.root, f.config, 'translation', 'Encoding rejection fixture');
   await assert.rejects(translate(f.root, f.config, args => { calls.push(args.role); return fake(args); }), /valid UTF-8: src\/math_ops\.py/);
-  assert.deepEqual(calls, ['implementer']);
+  assert.deepEqual(calls, []);
   assert.equal(unitState(f.root, unit).status, 'blocked');
   assert.equal(done(f.root, unit, contextHash(f.root, f.config)), false);
 });

@@ -9,6 +9,7 @@
   "verificationInputs": [],
   "buildArtifactRoots": [],
   "maxReviewInputBytes": 65536,
+  "reviewDependencyMap": "migration/review-dependencies.json",
   "models": {
     "implementer": "SELECT_MODEL_ID",
     "reviewer-semantics": "SELECT_MODEL_ID",

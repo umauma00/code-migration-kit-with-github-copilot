@@ -13,7 +13,7 @@
 
    setupは元ソース3ファイル、比較器、設定のたたき台だけを配置します。AI呼び出し・自動承認はしません。`test-double` はテスト専用名で、実モデルIDではありません。
 
-3. `src/`、`tests/judge.py`、`migration/RULEBOOK.md`、manifest、inventoryを確認します。事前試行報告のテンプレートを実際の試行結果で置き換えます。12ケースの範囲外は未検証です。
+3. `src/`、`tests/judge.py`、`migration/RULEBOOK.md`、manifest、inventory、`migration/review-dependencies.json` を確認します。mainからmath_ops/text_opsへの依存宣言と、独立ファイルの空配列を確認してください。事前試行報告のテンプレートを実際の試行結果で置き換えます。12ケースの範囲外は未検証です。
 4. `judge` を実行します。originalは12ケース成功、mutationは意図的な負数・Unicodeの差分を検出し、いずれも終了0になることを確認します。
 5. 確認後に `approve translation --note "実際に確認した内容"`、続いて `translate` を実行します。Copilot API・権限・モデル・JSON形式で失敗した場合はエラーとして止まることを確認します。安易に権限を広げて回避しないでください。
 6. 各単位について、独立した2レビュー、必要なら裁定と修正後の再レビュー、要求モデル、出力ハッシュを確認します。2レビューの `reviewInputHash` が同じこと、レビュー担当の `tools: []` が実際に適用されることを確認します。`status` が `3/3` に相当する結果を返すことを確認します。

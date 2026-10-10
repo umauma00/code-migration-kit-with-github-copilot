@@ -15,6 +15,10 @@ Have independent reviewers check disjoint samples and the highest-risk classes.
 Findings cite source lines and rule sections. Unknown cases get a searchable
 marker and an amendment proposal, not invented policy. Do not read the entire
 inventory into every worker context; workers query their unit's relevant rows.
+Use the template's first column `file` with exact project-relative paths. Revisit
+the review dependency map from phase 01: evidence that depends on another source
+file requires that file in the unit's declared dependency closure. Global rules
+belong in RULEBOOK; # inventory notes are retained for all reviewers.
 
 Report coverage, missing decisions and proposed amendments. Keep the rulebook
 read-only during worker loops. Stop at the inventory gate.

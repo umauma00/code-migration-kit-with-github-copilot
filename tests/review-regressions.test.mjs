@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { prepare, ready, fake, result } from './helpers.mjs';
+import { prepare, ready, fake, result, cliOutput } from './helpers.mjs';
 import { approve, requireGate, runStage, translate } from '../lib/pipeline.mjs';
 import { safePath, atomicWrite, writeJSON, readJSON, contextHash, readManifest, done, verificationFiles, filesUnder, loadConfig, unitState } from '../lib/core.mjs';
 import { runProcess } from '../lib/process.mjs';
@@ -34,6 +34,9 @@ test('R1: explicit manifest source under a normally excluded directory invalidat
   const f = prepare(t);
   write(f.root, 'src/node_modules/dependency.py', 'value = 1\n');
   write(f.root, 'migration/manifest.tsv', 'source\ttarget\nsrc/node_modules/dependency.py\tported/math_ops.mjs\n');
+  const map = readJSON(safePath(f.root, 'migration/review-dependencies.json'));
+  map.dependencies['src/node_modules/dependency.py'] = [];
+  writeJSON(safePath(f.root, 'migration/review-dependencies.json'), map);
   await start(f);
   const unit = readManifest(f.root, f.config)[0], before = contextHash(f.root, f.config);
   assert.ok(done(f.root, unit, before));
@@ -149,7 +152,7 @@ test('R4: review tools deny direct, directory and repo-wide reads; CLI uses stdi
   const args = copilotArgs('reviewer-rules', 'test-model');
   assert.equal(args[args.indexOf('--deny-tool') + 1], 'read,write,shell');
   assert.ok(!args.includes('--allow-tool'));
-  write(f.root, 'transport-double.mjs', `let input=''; for await(const c of process.stdin) input+=c; if(!input.includes('Frozen review input')) process.exit(8); console.log(${JSON.stringify(JSON.stringify(result('reviewer-rules', unit)))});`);
+  write(f.root, 'transport-double.mjs', `let input=''; for await(const c of process.stdin) input+=c; if(!input.includes('Frozen review input')) process.exit(8); console.log(${JSON.stringify(cliOutput(result('reviewer-rules', unit)))});`);
   const adapter = createCopilotAdapter({ command: process.execPath, prefixArgs: [path.join(f.root, 'transport-double.mjs')] });
   assert.equal((await adapter({ ...f, role: 'reviewer-rules', unit, reviewInput: snapshot.text })).result.verdict, 'pass');
   const p = safePath(f.root, '.github/agents/migration-reviewer-rules.agent.md');
@@ -175,12 +178,13 @@ test('R4: SDK reviewers receive frozen input and reject a profile that re-enable
   await assert.rejects(run(), /tools: \[\]/);
 });
 
-test('R4: oversized review input blocks before either reviewer is invoked; metadata cannot become a source root', async t => {
+test('R4: oversized static review input blocks before model calls; metadata cannot become a source root', async t => {
   const f = prepare(t); f.config.maxReviewInputBytes = 1024;
+  write(f.root, 'migration/RULEBOOK.md', '# Required global rules\n' + 'X'.repeat(1024));
   persist(f); await runStage(f.root, f.config, 'judge'); approve(f.root, f.config, 'translation', 'Limit fixture');
   const calls = [];
   await assert.rejects(translate(f.root, f.config, args => { calls.push(args.role); return fake(args); }), /maxReviewInputBytes/);
-  assert.deepEqual(calls, ['implementer']);
+  assert.deepEqual(calls, []);
   f.config.sourceRoots = ['migration']; persist(f);
   assert.throws(() => loadConfig(f.root), /metadata/);
 });
