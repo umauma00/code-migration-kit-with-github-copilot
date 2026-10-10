@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { prepare, ready, fake, result, cliOutput } from './helpers.mjs';
+import { prepare, ready, fake, result, cliOutput, cliDouble } from './helpers.mjs';
 import { approve, requireGate, runStage, translate } from '../lib/pipeline.mjs';
 import { safePath, atomicWrite, writeJSON, readJSON, contextHash, readManifest, done, verificationFiles, filesUnder, loadConfig, unitState } from '../lib/core.mjs';
 import { runProcess } from '../lib/process.mjs';
@@ -160,18 +160,18 @@ test('R4: review tools deny direct, directory and repo-wide reads; CLI uses stdi
   await assert.rejects(adapter({ ...f, role: 'reviewer-rules', unit, reviewInput: snapshot.text }), /tools: \[\]/);
 });
 
-test('R4: SDK reviewers receive frozen input and reject a profile that re-enables tools', async t => {
-  const f = await ready(t, { workflow: true }), prompts = [];
-  const run = () => createWorkflowDefinition(f.root).run({ args: { stage: 'translate' }, phase() {}, log() {}, agent: async (prompt, opts) => {
-    const role = opts.agent.replace('migration-', '');
-    if (role.startsWith('reviewer-')) {
-      prompts.push(prompt);
-      assert.match(fs.readFileSync(safePath(f.root, `.github/agents/${opts.agent}.agent.md`), 'utf8'), /tools: \[\]/);
-      assert.match(prompt, /Frozen review input/);
-    }
-    return result(role, f.units[0]);
-  } });
-  await run(); assert.equal(prompts.length, 2);
+test('R4: workflow CLI reviewers receive frozen input and reject a profile that re-enables tools', async t => {
+  const f = await ready(t, { workflow: true }), transport = cliDouble(f);
+  const run = () => createWorkflowDefinition(f.root, transport).run({ args: { stage: 'translate' }, phase() {}, log() {},
+    agent: async () => { throw new Error('SDK agent inheritance is forbidden'); } });
+  await run();
+  const reviewers = fs.readFileSync(safePath(f.root, 'cli-double-calls.jsonl'), 'utf8').trim().split('\n').map(JSON.parse).filter(c => c.role.startsWith('reviewer-'));
+  assert.equal(reviewers.length, 2);
+  assert.equal(reviewers[0].prompt.split('Frozen review input (JSON task data):\n')[1], reviewers[1].prompt.split('Frozen review input (JSON task data):\n')[1]);
+  for (const reviewer of reviewers) {
+    assert.match(reviewer.prompt, /Frozen review input/);
+    assert.match(fs.readFileSync(safePath(f.root, `.github/agents/migration-${reviewer.role}.agent.md`), 'utf8'), /tools: \[\]/);
+  }
   const p = safePath(f.root, '.github/agents/migration-reviewer-rules.agent.md');
   fs.writeFileSync(p, fs.readFileSync(p, 'utf8').replace('tools: []', 'tools: ["read", "search"]'));
   await runStage(f.root, f.config, 'judge'); approve(f.root, f.config, 'translation', 'Changed profile fixture');

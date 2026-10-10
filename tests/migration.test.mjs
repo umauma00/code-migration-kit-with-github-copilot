@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { prepare, ready, result, fake, finding, cliOutput } from './helpers.mjs';
+import { prepare, ready, result, fake, finding, cliOutput, cliDouble } from './helpers.mjs';
 import { approve, requireGate, runStage, translate } from '../lib/pipeline.mjs';
 import { safePath, atomicWrite, readJSON, writeJSON, fileHash, loadConfig, contextHash,
   readManifest, done, unitState, statePath, lockRun, roles } from '../lib/core.mjs';
@@ -296,20 +296,27 @@ test('CLI and Local hook payloads deny worker writes without changing normal ses
   assert.equal(JSON.parse(local.stdout).hookSpecificOutput.permissionDecision, 'deny');
 });
 
-test('experimental workflow uses schemas and explicit role models through the shared engine', async t => {
-  const f = await ready(t, { workflow: true }); const options = [];
-  const definition = createWorkflowDefinition(f.root);
-  assert.equal(definition.meta.limits.maxConcurrentSubagents, f.config.concurrency);
-  const output = await definition.run({ args: { stage: 'translate' }, phase() {}, log() {},
-    agent: async (prompt, opts) => { options.push(opts); return result(opts.agent.replace('migration-', ''), f.units[0]); } });
-  assert.equal(output.done, 1); assert.equal(new Set(options.map(x => x.label)).size, 3);
-  assert.ok(options.every(x => x.model === 'test-double' && x.schema.properties.target.const === f.units[0].target));
+test('experimental workflow uses isolated CLI workers and resumes from shared receipts', async t => {
+  const f = await ready(t, { workflow: true });
+  const definition = createWorkflowDefinition(f.root, cliDouble(f));
+  const ctx = { args: { stage: 'translate', copilot: process.execPath }, phase() {}, log() {},
+    agent: async () => { throw new Error('The host SDK agent must not run'); } };
+  const output = await definition.run(ctx);
+  assert.equal(output.done, 1); assert.equal(output.agentCalls, 3);
+  const calls = fs.readFileSync(safePath(f.root, 'cli-double-calls.jsonl'), 'utf8').trim().split('\n').map(JSON.parse);
+  assert.deepEqual(calls.map(x => x.role).sort(), ['implementer', 'reviewer-rules', 'reviewer-semantics']);
+  for (const call of calls) {
+    assert.ok(call.argv.includes('--no-custom-instructions'));
+    assert.equal(call.argv[call.argv.indexOf('--model') + 1], 'test-double');
+    assert.equal(call.argv[call.argv.indexOf('--agent') + 1], `migration-${call.role}`);
+  }
+  assert.equal((await definition.run(ctx)).agentCalls, 0);
   assert.equal(fs.existsSync(safePath(f.root, 'migration/gates/build.json')), false);
 });
 
-test('workflow null result is an error and never marks a unit complete', async t => {
+test('workflow invalid CLI result fails closed and never marks a unit complete', async t => {
   const f = await ready(t);
-  await assert.rejects(createWorkflowDefinition(f.root).run({ args: { stage: 'translate' }, phase() {}, log() {}, agent: async () => null }), /no usable result/);
+  await assert.rejects(createWorkflowDefinition(f.root, cliDouble(f, { empty: true })).run({ args: { stage: 'translate' }, phase() {}, log() {} }), /schemaVersion\/target mismatch/);
   assert.equal(receipt(f).status, 'blocked');
 });
 

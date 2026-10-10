@@ -47,6 +47,22 @@ export const cliOutput = value => [
   { type: 'assistant.message', data: { content: JSON.stringify(value), toolRequests: [] } },
   { type: 'result', exitCode: 0 }
 ].map(e => JSON.stringify(e)).join('\n');
+// Exercise the process/JSONL adapter from workflow tests, including stdin and
+// actual argv. The host SDK agent must never supply worker responses.
+export function cliDouble(f, { empty = false } = {}) {
+  const responses = Object.fromEntries(f.units.flatMap(unit => roles.map(role => [`${role}:${unit.target}`, result(role, unit)])));
+  const file = safePath(f.root, 'cli-double.mjs');
+  atomicWrite(file, `import fs from 'node:fs';
+let prompt = ''; for await (const c of process.stdin) prompt += c;
+const argv = process.argv.slice(2), role = process.env.MIGRATION_KIT_ROLE;
+const target = prompt.match(/Set target to "([^"]+)"/)?.[1];
+fs.appendFileSync('cli-double-calls.jsonl', JSON.stringify({role, target, argv, prompt}) + '\\n');
+const value = ${empty ? 'null' : `${JSON.stringify(responses)}[role + ':' + target]`};
+console.log(JSON.stringify({type: 'assistant.message', data: {content: JSON.stringify(value), toolRequests: []}}));
+console.log(JSON.stringify({type: 'result', exitCode: 0}));
+`);
+  return { command: process.execPath, prefixArgs: [file] };
+}
 export const fake = async ({ role, unit, extra }) => ({ result: result(role, unit,
   role === 'arbiter' ? { decisions: extra.findings.map(f => ({ finding: f.reference, confirmed: true, reason: f.evidence })) } : {}),
   requestedModel: 'test-double', observedModel: null, tokens: null, aiCredits: null });

@@ -4,7 +4,9 @@ import { parseResult, validateResult } from '../lib/results.mjs';
 import { isReviewer, validateWorkerProfile } from '../lib/review.mjs';
 
 export function copilotArgs(role, model, prompt) {
-  return [...(prompt === undefined ? [] : ['-p', prompt]), '-s', '--output-format', 'json', '--stream', 'off', '--no-color', '--no-auto-update', '--no-ask-user', '--disable-builtin-mcps', '--agent', `migration-${role}`, '--model', model,
+  // A CLI worker is a fresh session agent: tools: [] alone does not prevent
+  // automatic repository/personal instructions from entering its system prompt.
+  return [...(prompt === undefined ? [] : ['-p', prompt]), '-s', '--output-format', 'json', '--stream', 'off', '--no-color', '--no-auto-update', '--no-ask-user', '--no-custom-instructions', '--disable-builtin-mcps', '--agent', `migration-${role}`, '--model', model,
     '--available-tools', 'view,grep,glob', ...(isReviewer(role) ? ['--deny-tool', 'read,write,shell'] : ['--allow-tool', 'read', '--deny-tool', 'write,shell'])];
 }
 // Text output is presentation data: the CLI may wrap even JSON string values.

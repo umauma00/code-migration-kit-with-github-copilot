@@ -45,7 +45,8 @@ export async function doctor(root, config, { checkCLI = false, command = 'copilo
       const help = await runProcess(command, ['--help'], { cwd: root, timeoutMs: 20000 });
       const text = help.stdout + help.stderr;
       checks.push({ check: 'Copilot executable', ok: version.code === 0, detail: version.stdout.trim() });
-      checks.push({ check: 'required flags', ok: help.code === 0 && ['--agent', '--model', '--available-tools', '--deny-tool', '--output-format'].every(s => text.includes(s)) });
+      const missing = ['--agent', '--model', '--available-tools', '--deny-tool', '--output-format', '--no-custom-instructions'].filter(s => !text.includes(s));
+      checks.push({ check: 'required flags', ok: help.code === 0 && missing.length === 0, missing });
     } catch (e) { checks.push({ check: 'Copilot executable', ok: false, detail: e.message }); }
   }
   return { ok: checks.every(x => x.ok), checks, requestedModels: config.models,
