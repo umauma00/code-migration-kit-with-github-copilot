@@ -1,0 +1,109 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import { prepare, fake, result } from './helpers.mjs';
+import { approve, runStage, translate } from '../lib/pipeline.mjs';
+import { safePath, atomicWrite, writeJSON, readJSON, contextHash, readManifest, done, loadConfig, unitState } from '../lib/core.mjs';
+import { reviewInput } from '../lib/review.mjs';
+
+const write = (root, name, content) => atomicWrite(safePath(root, name), content);
+const persist = f => writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+async function start(f) {
+  persist(f);
+  f.config = loadConfig(f.root);
+  await runStage(f.root, f.config, 'judge');
+  approve(f.root, f.config, 'translation', 'Rereview regression fixture');
+  await translate(f.root, f.config, fake);
+}
+async function build(f) {
+  approve(f.root, f.config, 'build', 'Rereview regression fixture');
+  await runStage(f.root, f.config, 'build');
+}
+
+test('RR1: changing a command script under migration invalidates receipts and downstream approval', async t => {
+  const f = prepare(t);
+  write(f.root, 'migration/build.mjs', 'process.exit(0);\n');
+  f.config.commands.build = [process.execPath, 'migration/build.mjs'];
+  await start(f); await build(f);
+  const unit = readManifest(f.root, f.config)[0], before = contextHash(f.root, f.config);
+  assert.ok(done(f.root, unit, before));
+  write(f.root, 'migration/build.mjs', 'process.exit(9);\n');
+  assert.notEqual(contextHash(f.root, f.config), before);
+  assert.equal(done(f.root, unit, contextHash(f.root, f.config)), false);
+  assert.throws(() => approve(f.root, f.config, 'smoke', 'Old build must be rejected'), /current reviewed receipts/);
+  await assert.rejects(runStage(f.root, f.config, 'build'), /stale/);
+});
+
+test('RR1: explicit verification inputs under migration are accepted and invalidate approval when changed', async t => {
+  const f = prepare(t);
+  write(f.root, 'migration/build-settings.json', '{"mode":"a"}\n');
+  f.config.verificationInputs = ['migration/build-settings.json'];
+  await start(f); await build(f);
+  const before = contextHash(f.root, f.config);
+  write(f.root, 'migration/build-settings.json', '{"mode":"b"}\n');
+  assert.notEqual(contextHash(f.root, f.config), before);
+  assert.throws(() => approve(f.root, f.config, 'smoke', 'Changed input must revoke old results'), /current reviewed receipts/);
+});
+
+test('RR1: generated runtime paths cannot become command files or explicit verification inputs', async t => {
+  const f = prepare(t);
+  for (const name of ['migration/state/script.mjs', 'migration/results/script.mjs', 'migration/gates/config.json', 'migration/runs/script.mjs', 'migration/run.lock']) {
+    f.config.verificationInputs = [name]; persist(f);
+    assert.throws(() => loadConfig(f.root), /overlaps outputs or runtime state/, name);
+    delete f.config.verificationInputs;
+    f.config.commands.original = [process.execPath, name]; persist(f);
+    await assert.rejects(runStage(f.root, f.config, 'judge'), /generated migration state/, name);
+    assert.equal(fs.existsSync(safePath(f.root, 'migration/results/judge.json')), false);
+    assert.equal(fs.existsSync(safePath(f.root, 'migration/run.lock')), false);
+  }
+});
+
+test('RR2: validation fails if any explicitly mapped output under an excluded directory is changed', async t => {
+  for (const directory of ['node_modules', '__pycache__', '.git']) {
+    const f = prepare(t), target = `ported/${directory}/math_ops.mjs`;
+    write(f.root, 'migration/manifest.tsv', `source\ttarget\nsrc/math_ops.py\t${target}\n`);
+    f.config.commands.build = [process.execPath, '-e', `require('node:fs').appendFileSync(${JSON.stringify(target)}, '\\nthrow new Error("Changed during validation");\\n');`];
+    await start(f);
+    const unit = readManifest(f.root, f.config)[0];
+    assert.ok(done(f.root, unit, contextHash(f.root, f.config)));
+    approve(f.root, f.config, 'build', 'Mapped source outputs must not change');
+    await assert.rejects(runStage(f.root, f.config, 'build'), /Output source tree changed/, directory);
+    const record = readJSON(safePath(f.root, 'migration/results/build.json'));
+    assert.equal(record.success, false);
+    assert.equal(record.commands[0].code, 0, 'Command succeeds but validation must fail');
+    assert.match(record.error, /Output source tree changed/);
+    assert.equal(done(f.root, unit, contextHash(f.root, f.config)), false);
+    assert.throws(() => approve(f.root, f.config, 'smoke', 'Invalid build must not advance'), /current reviewed receipts/);
+  }
+});
+
+test('RR3: non-UTF-8 source blocks before reviewers and names the offending file', async t => {
+  const f = prepare(t), unit = f.units[0], calls = [];
+  write(f.root, unit.source, Buffer.from("# coding: latin-1\nvalue = 'caf\xe9'\n", 'latin1'));
+  persist(f);
+  await runStage(f.root, f.config, 'judge');
+  approve(f.root, f.config, 'translation', 'Encoding rejection fixture');
+  await assert.rejects(translate(f.root, f.config, args => { calls.push(args.role); return fake(args); }), /valid UTF-8: src\/math_ops\.py/);
+  assert.deepEqual(calls, ['implementer']);
+  assert.equal(unitState(f.root, unit).status, 'blocked');
+  assert.equal(done(f.root, unit, contextHash(f.root, f.config)), false);
+});
+
+test('RR3: non-UTF-8 repair diagnostics are rejected before model calls', async t => {
+  const f = prepare(t), calls = [];
+  await start(f);
+  const evidence = 'migration/build-diagnostic.txt';
+  write(f.root, evidence, Buffer.from('Error: caf\xe9\n', 'latin1'));
+  await assert.rejects(translate(f.root, f.config, args => { calls.push(args.role); return fake(args); }, { onlyTarget: f.units[0].target, evidence }), /valid UTF-8: migration\/build-diagnostic\.txt/);
+  assert.deepEqual(calls, []);
+  assert.equal(fs.existsSync(safePath(f.root, 'migration/run.lock')), false);
+});
+
+test('RR3: valid UTF-8 Unicode, BOM and an actual replacement character remain lossless', t => {
+  const f = prepare(t), unit = f.units[0];
+  const content = '\uFEFFvalue = "café 日本語 😀 \uFFFD"\n';
+  write(f.root, unit.source, content);
+  write(f.root, unit.target, result('implementer', unit).content);
+  const snapshot = JSON.parse(reviewInput(f.root, f.config, unit).text);
+  assert.equal(snapshot.files.find(file => file.path === unit.source).content, content);
+});

@@ -89,8 +89,9 @@ used visibly:
 
 ## 4. Naming and output paths
 
-Done-ness is detected by output files existing on disk, so these rules are
-what make the whole run resumable. They are not style preferences.
+Completion requires a current reviewed receipt binding the input context and
+output hash. File existence alone is not completion. Output mappings must be
+unique and remain inside config outputRoots.
 
 - Source `[path pattern]` → target `[path pattern]`. One source file, one
   target file, no exceptions without a rule here.
@@ -132,3 +133,5 @@ nobody approved — Run 1's skipped review pass is the model entry.
 | ID | Date | Deviation | Sanctioned by |
 |---|---|---|---|
 | DEV-001 | [date] | [e.g., Step 3 per-file review pass skipped — budget] | [who] |
+
+<!-- Copilot adaptation: migration control and instructions updated on 2026-10-08; see NOTICE. -->

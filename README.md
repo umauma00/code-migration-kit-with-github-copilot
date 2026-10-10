@@ -1,228 +1,188 @@
-# Claude Code Migration Kit
+# Code Migration Kit with GitHub Copilot
 
-A starter kit for running large-scale language migrations with Claude Code: the
-prompts, templates, and scripts behind the process described in
-**How Anthropic runs large-scale code migrations with Claude Code**.
+Anthropicの[Code Migration Kit](https://github.com/anthropics/code-migration-kit-with-claude-code)を、GitHub Copilot CLIを中心に使える形へ変更した非公式版です。言語間移植の「事前調査 → ルール固定 → 変換 → 独立レビュー → ビルド → 新旧比較」を扱います。
 
-This kit defaults to **structure-preserving migrations** — same architecture,
-same data structures, new language. That's the case where the process below is
-mechanical enough to template. If you're redesigning as you migrate, read
-[If you're redesigning](#if-youre-redesigning) first: parts of this kit change,
-and one part becomes invalid.
+**0.1.3** はAstraレビューで見つかったコマンド入力の追跡漏れと、生成物を入力と誤認する問題を修正した版です。[変更と検証](docs/REVIEW-FIXES.md)、[既存版からの更新](docs/UPGRADING.md)を参照してください。
 
-> **Provenance:** these prompts are reconstructions — generalized and reviewed
-> against real production migrations, including Bun's 1M+ line Zig→Rust port,
-> not transcripts. The real artifacts were messier and more specific: the Bun
-> port's "prompt" was a 576-line rulebook
-> ([PORTING.md](https://github.com/oven-sh/bun/commit/46d3bc29f270fa881dd5730ef1549e88407701a5))
-> and a one-sentence kickoff.
+参照したCLIは **1.0.93**、VS Codeは **1.141.0** です。固定した元コミットとSDK参照版は [UPSTREAM.json](UPSTREAM.json) に記録しています。Anthropic/GitHubの公式配布物ではありません。
 
-> **Status:** Reference code. This repo is a companion to the blog post and is
-> not actively maintained. Issues and PRs are not monitored.
+**検証状況：自動テストとオフライン題材は検証済みです。実際のCopilot認証・モデル呼び出し、VS Code上の操作、Dynamic Workflowsの実セッションは未検証です。** 実案件の前に [LIVE-SMOKE.md](docs/LIVE-SMOKE.md) の小規模確認を実施してください。
 
-## Quick start
+## 主な変更
 
-1. Clone the kit inside (or adjacent to) the repo you're migrating:
-   `git clone <kit> ./migration-kit`.
-2. Copy or `@`-import the kit's `CLAUDE.md` into the target repo's `CLAUDE.md`
-   before the six steps below begin — it's the operating manual every session
-   reads.
-3. Optional: install the skill —
-   `cp -r migration-kit/skill ~/.claude/skills/code-migration`, then replace `[kit path]` inside the installed SKILL.md.
-4. Open Claude Code in the target repo and paste `prompts/00-feasibility.md`
-   with its placeholders filled.
-5. Make sure you have a judge before Step 1. If your existing test suite hits
-   the public surface (or already lives in a third language), it's your judge —
-   carry it into Step 6. If it imports internals that die with the old language,
-   run `prompts/00b-judge-setup.md` to build a portable parity harness and
-   validate it (against the original *and* against deliberately broken code)
-   before any translation. No judge, no exit condition.
-6. Before any translation fan-out (prompt 03 onward): copy
-   `templates/settings.json` to the target repo's `.claude/settings.json`
-   (see `templates/settings.README.md`) — installed by you before prompt 03
-   (Step 2's pilot needs the denies live), active through Step 4 (prompt 05),
-   test denies re-activated for Step 6's fix loops. Prompts 03 and 04 verify
-   it exists and stop without it — in one early test run this step was silently
-   skipped and nothing caught it.
-7. Then work `prompts/01`–`06` in order, one gate at a time.
+| 項目 | この版の動作 |
+|---|---|
+| 指示・スキル | `.github/copilot-instructions.md` と `.github/skills/code-migration/SKILL.md` |
+| 役割分担 | orchestrator / implementer / 独立reviewer 2種 / arbiter / fixer の6プロファイル |
+| モデル | 5種類のワーカーに明示指定。利用できるモデルIDをユーザーが設定 |
+| 変換 | 実装・修正・裁定担当はread/searchのみ。JSONでコードを返し、Nodeの調整役が対象ファイルだけを書き込む |
+| 独立レビュー | 2担当に同じ固定入力を渡す。レビュー担当はツールなしで、他担当の記録を検索できない |
+| 完了判定 | 出力、入力、2件のレビュー、必要な裁定結果のハッシュを保存。ファイルが存在するだけでは完了にしない |
+| 再開 | 中断した工程から再開。失われたレビューや変更された出力は再レビュー |
+| 工程の承認 | 入力・出力・前工程の実行IDに結び付ける。上流の再実行で下流結果・承認は失効 |
+| VS Code | 10工程のprompt filesとLocal用hooksを用意 |
+| Dynamic Workflows | 共通実行エンジンを使う任意の実験的アダプター |
 
-## Should you migrate at all?
+## 必要なもの
 
-Start with `prompts/00-feasibility.md`. Paste it into Claude Code in your repo.
-It produces a read-only report: the case for leaving, three committed calls
-(structure-preserving or redesign, what verification costs, whether your tests
-survive), a sketch of the six steps for your repo, and a verdict. "Don't
-migrate" is a valid outcome. Nothing else in this kit matters until that
-report says go.
+- Node.js 22以上。ランナー本体は外部npm依存なし。
+- 自分の環境でログイン済みのCopilot CLIと、指定モデルを利用できる契約・組織設定。
+- 対象言語の実行環境・ビルドツール。付属デモとPython/C依存解析にはPython 3が必要です。
+- 本版はLinuxで検証しています。macOS/Windowsでの実行は未検証です。WindowsではNodeから直接起動できるCopilot実行ファイルを使ってください。
 
-## The six steps
+## 対象リポジトリへ導入する
 
-Every step below follows the same doctrine: **you don't fix the code — you fix
-the process that produced the code.** Individual failures get burned down by
-fixer agents; recurring failures indict a rule, and the rule gets amended.
+キットのルートで実行します。`MODEL_ID` は、利用するアカウントのCopilotで `/model` に表示される実際のIDへ置き換えてください。モデル名や料金は固定していません。
 
-| Step | What happens | Kit artifact |
+```bash
+# まず変更対象を確認
+node scripts/install.mjs --target /path/to/your-project --model MODEL_ID
+
+# 確認した内容を導入
+node scripts/install.mjs --target /path/to/your-project --model MODEL_ID --apply
+```
+
+スクリプト・文書は対象の `migration-kit/`、Copilotの入口は `.github/` に入ります。既存のCopilot指示には管理ブロックを追記します。内容が異なる既存ファイルは上書きせず停止し、既存の `migration/config.json` は保持します。同じ内容での再実行は変更を作りません。
+
+VS Code **Local** のhooksを使う場合は、両方のコマンドに `--harness vscode-local` を付けます。標準の `copilot` 設定とはイベント形式が異なります。CLIで実行するワーカーはコマンドラインでもツールを制限します。
+
+以降は対象リポジトリのルートで実行してください。
+
+```bash
+node migration-kit/scripts/run_migration.mjs doctor --check-cli
+```
+
+`doctor` は設定、プロファイル、CLIバージョンと必要なオプションを確認します。モデルの利用可否やhooksの実動作を保証するものではありません。
+
+## 設定する
+
+`migration/config.json` の最低限の設定は次のとおりです。
+
+| 設定 | 内容 |
+|---|---|
+| `sourceRoots` | 保護する元ソース。例：`["src"]` |
+| `outputRoots` | 変換後の**ソース**。例：`["ported"]`。ビルド生成物は別ディレクトリへ |
+| `verificationRoots` | 比較器・テスト・テストデータ。例：`["tests"]` |
+| `verificationInputs` | 追加で変更を追跡するビルド設定・依存設定等のファイル。例：`["build/config.json", "packages/api/tsconfig.json"]` |
+| `buildArtifactRoots` | コマンドが生成するバイナリ・オブジェクト・レポートのディレクトリ。例：`["artifacts", "dist"]`。既定は空配列 |
+| `maxReviewInputBytes` | 固定レビュー入力のJSONサイズ上限。既定65536 bytes。超過は省略せず停止 |
+| `sourceLanguage`, `targetLanguage` | 対象言語。テンプレートのPython/JavaScriptを変更可能 |
+| `mode` | 自動ファイル変換は `preserve`。`redesign` は設計・試行プロンプトまで対応 |
+| `models` | implementer、reviewer-semantics、reviewer-rules、arbiter、fixerの各ID |
+| `concurrency` | 同時AI呼び出し数。初期値2。レビューを含めてこの数以下 |
+| `maxFixRounds`, `maxAgentCalls` | 1単位の修正回数、1回の実行のAI呼び出し数の上限 |
+| `timeoutSeconds` | 通常CLIの1ワーカー呼び出しの時間上限 |
+| `commandTimeoutSeconds` | ビルド・比較コマンドの時間上限 |
+
+`commands` は、シェル文字列ではなく引数配列です。パイプや複数コマンドは別スクリプトにまとめます。設定したコマンドは信頼できるものを指定してください。
+
+manifestに明示した元ファイルと変換先は走査除外ディレクトリ内でも必ず追跡します。ルートの主要な依存・ビルド設定と、コマンド引数に直接指定したリポジトリ内のファイルも自動で追跡します。`migration/build.mjs` 等も対象です。間接的に読み込むスクリプトや入れ子の設定は `verificationInputs` に追加し、`doctor` の一覧で確認してください。`migration/build-settings.json` 等も明示できます。自動生成される `migration/state`、`results`、`gates`、`runs`、`run.lock` はコマンドの直接指定と `verificationInputs` に使えません。外部ツールや環境変数の変更は自動検出しません。環境変更時はjudgeから再検証します。
+
+コマンド引数に出力先も含める場合、生成物のディレクトリを `buildArtifactRoots` へ指定します。たとえば `cc -c native/shim.c -o artifacts/shim.o` では `"buildArtifactRoots": ["artifacts"]` を設定します。これにより入力の `native/shim.c` は追跡し、生成物の作成・削除・再生成は入力の変更とみなしません。`-o` 等の意味はツールごとに違うため、出力オプションからの自動推測はしません。未指定の出力ファイルは、作成後に入力とみなされて検証が停止する可能性があります。
+
+生成物のディレクトリは元ソース・変換後ソース・検証ルート・明示入力・キットの管理領域と重ねられません。実際に読み込む設定やスクリプトは生成物のディレクトリ外に置き、必要に応じて `verificationInputs` へ登録します。`doctor` に入力一覧と生成物のディレクトリを別々に表示します。生成物の内容は承認ハッシュで追跡しないため、build・smoke・parityの各コマンドでその正しさを検証してください。Node/Python/POSIX shellの認識したインラインコードはファイル扱いしませんが、`cc -c FILE` と `node -c FILE` のFILEは追跡します。
+
+レビュー入力は元ソース群、当該候補ファイル、RULEBOOK、inventory、指定した診断です。同じ内容を両担当へ渡し、ツールを無効化します。入力ファイルはUTF-8のテキストに限定し、不正なUTF-8やNULを含むファイルは名前を示してレビュー前に停止します。文字コードの自動推定はしません。他の変換後ファイルとの統合はbuild/smoke/parityで確認します。大きな案件はモデルの入力上限を確認して `maxReviewInputBytes` を調整するか、移行範囲を分割してください。
+
+```json
+{
+  "original": ["python3", "-B", "tests/judge.py", "original"],
+  "mutation": ["python3", "-B", "tests/judge.py", "mutation"],
+  "build": ["python3", "-B", "tests/judge.py", "build"],
+  "smoke": ["python3", "-B", "tests/judge.py", "smoke"],
+  "parity": ["python3", "-B", "tests/judge.py", "parity"],
+  "typecheck": ["node", "--check", "{target}"]
+}
+```
+
+これは付属題材の例です。実案件のコマンドに置き換えてください。`mutation` は「意図的に壊した実装を比較器が検出できたとき」に終了0を返します。`typecheck` は全体の変換前でも有効な軽量検査だけにし、それが難しければ `null` にします。
+
+## 工程を進める
+
+Copilotに該当プロンプトを読ませ、各工程の成果物を確認します。VS Codeでは対応する `/migrate-…` のprompt fileを使えます。
+
+| 工程 | プロンプト | 主な成果物 |
 |---|---|---|
-| 1. Create the map and the rules | Dependency map orders the work; gap inventory traces what the target language demands; the rulebook decides every translation question once | `scripts/depmap_*`, `prompts/01`, `prompts/02`, `templates/RULEBOOK.md`, `templates/inventory.tsv` |
-| 2. Stress-test the rules | Dual-translation bakeoff + pilot run on a handful of nasty files; the only surviving output is rule changes | `prompts/03-stress-test.md` |
-| 3. Translate everything | Implementer + two adversarial reviewers + fixer per unit, fanned out over a mechanical queue; the compiler waits | `prompts/04-translation-kickoff.md`, `scripts/queue_runner.mjs` |
-| 4. Compile | One survey build grades everything; error list becomes a machine queue sliced by module; fixers work without compiler access | `prompts/05-survey-build.md`, `templates/settings.json` (the bans) |
-| 5. Run it | Hello world, then smoke tests — the cheap end-to-end proof before the expensive one | — |
-| 6. Match behavior | Inherited test suite burndown, or build a parity referee against the old code | your existing test suite is the artifact; `prompts/06-post-parity.md` after the gate |
+| 適否・範囲の調査 | [00-feasibility](prompts/00-feasibility.md) | `migration/feasibility.md` |
+| 比較器の設計 | [00b-judge-setup](prompts/00b-judge-setup.md) | 元テスト、比較器、mutation自己検証 |
+| 依存関係 | [01-dependency-map](prompts/01-dependency-map.md) | depmap、`migration/manifest.tsv` |
+| 意味の差・方針 | [02-gap-inventory](prompts/02-gap-inventory.md) | `migration/RULEBOOK.md`、`inventory.tsv` |
+| 事前試行 | [03-stress-test](prompts/03-stress-test.md) | `migration/stress-test/report.md` |
+| 変換・レビュー | [04-translation-kickoff](prompts/04-translation-kickoff.md) | 変換後ソース、レビュー記録 |
+| 全体ビルド | [05-survey-build](prompts/05-survey-build.md) | 診断、修正記録 |
+| 基本動作 | [05b-smoke](prompts/05b-smoke.md) | 実操作を伴うsmoke結果 |
+| 新旧比較 | [05c-parity](prompts/05c-parity.md) | ケース数・差分・元テスト結果 |
+| 比較合格後の整理 | [06-post-parity](prompts/06-post-parity.md) | 残課題・採否・引き継ぎ |
 
-### Step 1 — Create the map and the rules
+manifestはタブ区切りの `source` / `target` の2列です。1元ファイル→1対象ファイルに対応します。同じ出力の重複、元ソースの上書き、管理対象内のsymlinkを拒否します。付属解析器はPython、JS/TS、Cの出発点です。Java/C#の解析器やフレームワーク固有規則は追加が必要です。
 
-Three artifacts, built in parallel, audited together:
+準備した比較器・manifest・ルール・報告を確認してから、工程ごとに実行します。以下をまとめて自動実行せず、各結果を読んで次の承認へ進んでください。
 
-1. **The rulebook** (`templates/RULEBOOK.md` — copy it to
-   `migration/RULEBOOK.md` in the target repo): every decision a translator could
-   make two ways, decided once. The meta-rule: *if two agents could answer
-   differently, it goes in the rulebook.* Draft it in a conversation with
-   Claude, then have agents survey the codebase for the facts ("how many struct
-   fields," "how many uses tree-wide") and adversarial reviewers audit it — one
-   mistake class each.
-2. **The dependency map** (`scripts/depmap_*.py|.mjs` + `prompts/01`): a
-   deterministic script, not agent judgment. Orders the work, finds the cycles
-   — at file granularity AND at the target's package granularity. (Bun's port
-   had a clean file graph and still hit ~16K compile errors from package-level
-   cycles nobody had checked.)
-3. **The gap inventory** (`prompts/02` + `templates/inventory.tsv`): one flat
-   table of every site where the target language demands something the source
-   let you keep in your head — ownership, lifetimes, nullability, interface
-   contracts. Implementers grep it; nobody reads it top to bottom.
+```bash
+# 元テストと比較器の自己検証
+node migration-kit/scripts/run_migration.mjs judge
 
-The sign-off gates in these prompts work like this: a workflow runs its phase
-to completion, returns the evidence, and exits. **Your sign-off is the act of
-kicking off the next one.** Every queue is defined by what exists on disk, so
-stopping is free and resuming is a re-invocation, not a recovery. When a
-prompt says "use a workflow," it means: run the phase as parallel subagents
-that complete and stop at the gate — in stock Claude Code, that's a Task/Agent
-fan-out.
+# 事前調査・ルール・比較器・試行結果を確認した後
+node migration-kit/scripts/run_migration.mjs approve translation --note "確認した範囲と判断理由"
+node migration-kit/scripts/run_migration.mjs translate
+node migration-kit/scripts/run_migration.mjs status
 
-### Step 2 — Stress-test the rules
+# 全単位のレビュー結果を確認した後
+node migration-kit/scripts/run_migration.mjs approve build --note "レビュー結果を確認"
+node migration-kit/scripts/run_migration.mjs build
 
-The rulebook has never met real code. Before any fan-out:
-**bakeoff** (two translators, separate contexts — one follows the rules, one
-never learns they exist; a diff inspector turns every difference into a verdict
-on a rule) and **pilot** (the production pipeline exactly as the fan-out will
-run it, graded on obedience, not output quality). Amendments are queued for
-you, never self-applied. See `prompts/03-stress-test.md`.
+# ビルド結果を確認した後
+node migration-kit/scripts/run_migration.mjs approve smoke --note "ビルド結果を確認"
+node migration-kit/scripts/run_migration.mjs smoke
 
-### Step 3 — Translate everything
-
-The kickoff prompt is deliberately short (`prompts/04`) because by now the
-rulebook is the prompt. The queue is mechanical: every manifest entry with no
-output file on disk yet (`scripts/queue_runner.mjs`) —
-`migration/manifest.tsv` is a Step 1 output, generated by prompt 01's
-closing action from the dependency map's order with
-`scripts/make_manifest.py`. Don't run the compiler — it grades everything next
-step. Ban the expensive operations by configuration, not request:
-`templates/settings.json`, copied to the target repo's `.claude/settings.json`
-by you before prompt 03 (Step 2's pilot needs the denies live), active
-through Step 4 (prompt 05), test denies re-activated for Step 6's fix loops
-(see `templates/settings.README.md`).
-
-### Step 4 — Compile
-
-One scripted **survey build** runs the compiler across everything and emits the
-error list as a machine queue, sliced by module, leaves-to-root. Parallel
-fixers work the queue **without compiler access** — the daemon that owns the
-build is the only process that runs it. Repeat until clean.
-`prompts/05-survey-build.md` runs this step. With denies active the standard
-transport is `scripts/build_daemon.sh`: the human starts it once, it reruns
-the build when the tree changes, and fixers consume the numbered
-`migration/build-output-rN.txt` files. In one early test a human relayed every
-build by hand — fine for a couple of rounds, not for fifty.
-
-**If your target's typecheck is cheap (TypeScript, Go), this step dissolves
-into Step 3** — run the typechecker inside every unit's loop instead of
-batching it. The rule: every referee has a price, and the price decides its
-position in the loop. Dissolving is an edit to the installed
-`.claude/settings.json` at the gate — remove the typecheck denies so the loop
-may run it. If settings.json was never installed there is nothing to edit,
-and the dissolve silently proceeds with no guardrails at all — one early run did
-exactly that, end to end. Install first, then dissolve.
-
-### Step 5 — Run it
-
-Hello world. Then the smallest end-to-end command your binary supports. Cheap
-proofs before expensive ones.
-
-### Step 6 — Match behavior
-
-This is where the judge you set up before Step 1 does its job. If your old tests
-hit the public surface (CLI, API, exported interface) they were your judge from
-the start — run them against the new code, triage every failure by also running
-it against the *old* code (regression / inherited / environment), and burn the
-queue down. If your tests import source-language internals, the portable parity
-harness you built with `prompts/00b-judge-setup.md` is the judge — run it against
-both old and new and diff the results. Either way the old code is the executable
-spec, the judge was validated against deliberately broken code before you trusted
-it, and you've kept it running the whole migration. **Keep it running until the
-end.**
-
-The done-gate is explicit: every test in the parity referee passes, AND the
-original suite has been re-run on the original code with zero inherited
-failures — both counts documented in the report. For redesign migrations with no inherited suite, the gate is the
-built parity referee's scenario list, signed off by the human. After the
-gate, `prompts/06-post-parity.md` burns down the deferred `BUG(port)` /
-`TODO(port)` / `PERF(port)` markers — each fix its own flagged change, proved
-by a parity re-run.
-
-One lesson from early testing: debug the referee before believing its verdicts.
-In one run, all reported divergences were false — traced to two comparator bugs
-(whitespace handling; JSON.stringify converting NaN/-Infinity to null), none to
-the port. A referee that fails everything is usually broken, not right.
-
-## If you're redesigning
-
-Three things change and one thing breaks:
-
-- The rulebook becomes a **design document** (what the new architecture is),
-  not a lookup table (how each construct translates).
-- The **bakeoff is invalid** — a diff between rule-following and native
-  translations measures your redesign, not your rules. Substitute: adversarial
-  review of the design doc itself, plus disposable full runs — run the whole
-  migration cheaply, review what came out, fix the rules, throw the run away.
-- The unit of work is a module or subsystem, not a file.
-- Behavior matching still works unchanged — it never sees your internals.
-
-## When you don't need this kit
-
-JavaScript→TypeScript is the most common migration by volume, and you mostly
-don't need any of this: TypeScript is a superset, adoption can be incremental,
-file by file, with no parallel codebase. Use this kit when the move is total —
-when every file must cross and the old language ends up deleted.
-
-## What's in the box
-
-```
-prompts/         eight paste-ready prompts (00-feasibility, 00b-judge-setup → 06-post-parity)
-templates/       RULEBOOK.md, inventory.tsv, settings.json (+ why each rule exists)
-scripts/         dependency mappers (Python, JS/TS, C headers) + queue runner + manifest builder + build daemon
-fixtures/        test trees + expected outputs for every script
-skill/           a Claude Code skill that walks the six steps
-examples/        a complete example run — filled-in rulebook, inventory, diff report, parity scripts
-CLAUDE.md        the operating manual Claude Code reads when opened here
-RUN-NOTES.md     receipts from this kit's own test runs
+# smokeの実動作を確認した後
+node migration-kit/scripts/run_migration.mjs approve parity --note "基本動作を確認"
+node migration-kit/scripts/run_migration.mjs parity
 ```
 
-## A note on cost and rate limits
+ビルドエラーは言語横断で自動解析しません。問題の単位と診断の抜粋を指定します。
 
-A production-scale port can consume billions of input tokens inside two weeks.
-The process
-works at any rate limit — the calendar doesn't. At standard API limits, expect
-the same steps across a longer wall clock. Budget with a visible
-multiplication: units of work × per-unit estimate, never a vibes number. And
-weigh the figure against what the spend buys: most of the multiplier is the
-review topology, and in testing that's where the catches came from (RUN-NOTES).
+```bash
+node migration-kit/scripts/run_migration.mjs repair \
+  --target ported/example.mjs --evidence migration/diagnostic-slice.txt
+```
 
-## Contributing
+修正はレビュー→裁定→確認された指摘の修正→再レビューを通ります。出力が変わると古いビルド以降の承認は無効になるため、改めて確認・承認してください。元ソース、設定、ルール、比較器が変わった場合は、judgeから再検証し、事前試行の更新を確認してtranslationを再承認します。
 
-This is reference code published as a blog companion and is not accepting
-contributions. You're welcome to fork it and adapt the dependency mappers for
-your ecosystem.
+同じ入力であっても、build等の再実行を開始すると下流の結果と承認は失効します。再実行が成功した場合も、smoke以降を改めて確認・承認・実行してください。judgeを再実行した場合はtranslationの承認からやり直します。
 
-## License
+中断後は `translate` を再実行します。異常終了でロックが残った場合のみ、所有プロセスの終了を確認して `unlock --pid OWNER_PID` を使います。稼働中のPIDでは解除できません。
 
-Apache-2.0 — see [LICENSE](LICENSE).
+## 任意：Dynamic Workflows
+
+導入コマンドに `--with-workflow` を付けると `.github/extensions/code-migration/extension.mjs` も配置します。SDKの `defineWorkflow` / `joinSession` / `ctx.agent` を使い、通常CLIと同じ実行エンジン・承認・完了判定を利用します。
+
+```bash
+copilot --experimental --allow-tool read workflow run code-migration --args '{"stage":"translate"}'
+```
+
+信頼済みの拡張としてCLIに読み込ませる必要があります。詳細は [Dynamic Workflows](docs/DYNAMIC-WORKFLOWS.md) を参照してください。**実験的な入口で、実際のCLIセッションでは未検証**です。1回のworkflowで1工程だけ実行し、次工程は別途承認します。
+
+## テストと制限
+
+**配布ZIPの展開先**で実行します。AI利用料・ログインなしで実行できます。
+
+```bash
+npm test
+npm run demo
+```
+
+対象プロジェクトへ配置した `migration-kit/` は実行用パッケージで、テスト・デモは含みません。このディレクトリでは `npm run check` で設定・プロファイル・追跡入力を診断します。`npm test` / `npm run demo` は配布元で使います。
+
+デモではワーカーの応答を用意済みコードに置き換え、Python/Nodeの比較・ビルドを実際に走らせます。モデルの生成品質を測るベンチマークではありません。詳しい記録は [TESTING.md](docs/TESTING.md) にあります。
+
+- 運用ルールは言語共通ですが、各言語の依存解析・ビルド・同等性判定を自動で用意する万能変換器ではありません。
+- 大規模実案件、巨大な1ファイル、複数ファイルを一体で書き換える単位、再設計の自動実行は未検証・未対応です。
+- CLI応答は1つのJSONです。ワーカー応答の取り込み上限は16 MiB。モデル自体の出力上限にも制約されます。
+- ログには要求モデルと時間を保存します。実測できないモデル・トークン・AI creditsは `null` です。呼び出し上限は料金上限ではありません。
+- 権限制限とhooksは作業上の制御であり、OSの隔離境界ではありません。SDK拡張と設定コマンドはローカルコードとして動作します。
+- Bashの旧 `build_daemon.sh` は互換用です。共通ランナーと同時実行せず、通常はNodeの `build` 工程を使ってください。
+
+原版の記録は [UPSTREAM-README.md](docs/UPSTREAM-README.md)、[UPSTREAM-CLAUDE.md](docs/UPSTREAM-CLAUDE.md)、元の `RUN-NOTES.md` に残しています。権利表記は [LICENSE](LICENSE) / [NOTICE](NOTICE)、実行時の規則は [OPERATING-MANUAL.md](docs/OPERATING-MANUAL.md)、JSON形式は [CONTRACTS.md](docs/CONTRACTS.md) を参照してください。
+
+<!-- Copilot adaptation: migration control and instructions updated on 2026-10-08; see NOTICE. -->

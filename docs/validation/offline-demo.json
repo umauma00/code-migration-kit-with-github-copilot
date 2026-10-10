@@ -1,0 +1,92 @@
+{
+  "version": "0.1.3",
+  "kind": "offline simulation, canned agent replies",
+  "date": "2026-10-08 JST",
+  "modules": 3,
+  "cannedAgentCalls": 9,
+  "stages": {
+    "judge": {
+      "success": true,
+      "commands": [
+        {
+          "name": "original",
+          "exitCode": 0,
+          "output": {
+            "mode": "original",
+            "cases": 12,
+            "mismatches": 0,
+            "skipped": 0,
+            "mutationDetected": false
+          }
+        },
+        {
+          "name": "mutation",
+          "exitCode": 0,
+          "output": {
+            "mode": "mutation",
+            "cases": 12,
+            "mismatches": 6,
+            "skipped": 0,
+            "mutationDetected": true
+          }
+        }
+      ]
+    },
+    "build": {
+      "success": true,
+      "commands": [
+        {
+          "name": "build",
+          "exitCode": 0,
+          "output": {
+            "mode": "build",
+            "checked": 3
+          }
+        }
+      ]
+    },
+    "smoke": {
+      "success": true,
+      "commands": [
+        {
+          "name": "smoke",
+          "exitCode": 0,
+          "output": {
+            "mode": "smoke",
+            "cases": 1,
+            "mismatches": 0,
+            "skipped": 0,
+            "mutationDetected": false
+          }
+        }
+      ]
+    },
+    "parity": {
+      "success": true,
+      "commands": [
+        {
+          "name": "original",
+          "exitCode": 0,
+          "output": {
+            "mode": "original",
+            "cases": 12,
+            "mismatches": 0,
+            "skipped": 0,
+            "mutationDetected": false
+          }
+        },
+        {
+          "name": "parity",
+          "exitCode": 0,
+          "output": {
+            "mode": "parity",
+            "cases": 12,
+            "mismatches": 0,
+            "skipped": 0,
+            "mutationDetected": false
+          }
+        }
+      ]
+    }
+  }
+}

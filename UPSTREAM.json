@@ -1,0 +1,9 @@
+{
+  "repository": "https://github.com/anthropics/code-migration-kit-with-claude-code",
+  "commit": "cf91c9d5068d9aaf95a36164169f08c3e636c909",
+  "adaptationDate": "2026-10-08",
+  "copilotCLI": "1.0.93",
+  "vscodeReference": "1.141.0",
+  "copilotSDKReferenceCommit": "cf245cdf76ced14d2f61dc3d908dd37cf12e0978",
+  "status": "Unofficial adaptation; not endorsed by Anthropic or GitHub"
+}

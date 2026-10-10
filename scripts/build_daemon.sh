@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Copilot adaptation: migration control and instructions updated on 2026-10-08; see NOTICE.
 # Copyright 2026 Anthropic PBC
 # SPDX-License-Identifier: Apache-2.0
 # Build-daemon transport for the Step 4 survey build (prompts/05-survey-build.md).
@@ -110,6 +111,8 @@ run_round() {
   sh -c "$CMD" 2>&1 | tee "$out"
   rc="${PIPESTATUS[0]}"
   echo "round ${round}: exit ${rc} -> ${out}"
+  printf '%s\n' "$rc" > "${out}.exit-code"
+  return "$rc"
 }
 
 LAST_HASH=""
@@ -118,7 +121,8 @@ while :; do
   if [ "$HASH" != "$LAST_HASH" ]; then
     LAST_HASH="$HASH"
     run_round
+    BUILD_RC=$?
   fi
-  [ "$ONCE" -eq 1 ] && exit 0
+  [ "$ONCE" -eq 1 ] && exit "${BUILD_RC:-0}"
   sleep "$INTERVAL"
 done

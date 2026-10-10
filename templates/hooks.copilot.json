@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "hooks": {
+    "preToolUse": [{
+      "type": "command",
+      "bash": "node migration-kit/scripts/migration_hook.mjs",
+      "powershell": "node migration-kit/scripts/migration_hook.mjs",
+      "timeoutSec": 5
+    }]
+  }
+}

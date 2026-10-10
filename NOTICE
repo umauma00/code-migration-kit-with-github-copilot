@@ -1,0 +1,7 @@
+Code Migration Kit — GitHub Copilot adaptation
+Contains code and documentation from Anthropic PBC's Claude Code Migration Kit,
+Copyright 2026 Anthropic PBC, licensed under Apache-2.0.
+This adaptation changes instructions, queue completion semantics, build exit
+handling and manifest validation, and adds the Copilot execution layer.
+See UPSTREAM.json for the source revision. Original test receipts remain in
+RUN-NOTES.md; they are not Copilot validation results.

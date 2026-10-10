@@ -1,0 +1,29 @@
+# 実アカウントでの小規模確認
+
+自動テストはCopilot認証やAI呼び出しを行いません。この手順は、自分の環境で通常CLI経路を確認するためのものです。モデル呼び出しには利用枠・料金が発生します。
+
+1. Copilot CLIのログインを自分の環境で済ませ、`copilot --version` と `/model` で利用可能なモデルIDを確認します。
+2. キットのルートから、**まだ存在しない**検証用ディレクトリを作ります。
+
+   ```bash
+   node scripts/demo.mjs setup --target /tmp/copilot-migration-live --model MODEL_ID
+   cd /tmp/copilot-migration-live
+   node migration-kit/scripts/run_migration.mjs doctor --check-cli
+   ```
+
+   setupは元ソース3ファイル、比較器、設定のたたき台だけを配置します。AI呼び出し・自動承認はしません。`test-double` はテスト専用名で、実モデルIDではありません。
+
+3. `src/`、`tests/judge.py`、`migration/RULEBOOK.md`、manifest、inventoryを確認します。事前試行報告のテンプレートを実際の試行結果で置き換えます。12ケースの範囲外は未検証です。
+4. `judge` を実行します。originalは12ケース成功、mutationは意図的な負数・Unicodeの差分を検出し、いずれも終了0になることを確認します。
+5. 確認後に `approve translation --note "実際に確認した内容"`、続いて `translate` を実行します。Copilot API・権限・モデル・JSON形式で失敗した場合はエラーとして止まることを確認します。安易に権限を広げて回避しないでください。
+6. 各単位について、独立した2レビュー、必要なら裁定と修正後の再レビュー、要求モデル、出力ハッシュを確認します。2レビューの `reviewInputHash` が同じこと、レビュー担当の `tools: []` が実際に適用されることを確認します。`status` が `3/3` に相当する結果を返すことを確認します。
+7. 各前工程を確認してからbuild → smoke → parityを個別承認・実行します。parityは12ケース、差分0、skip 0であることを確認します。
+8. `translate` の再実行でAI呼び出し0になること、レビュー記録を検証用に退避すると再レビューされること、中断した処理が再開できることを確認します。失敗した検証用ロックの解除は所有プロセス停止後だけにします。
+
+9. buildを再実行し、古いsmoke結果でparityへ進めないことを確認します。失敗時の試行記録にコマンド、要求モデル、stderr、時刻が残ることを確認します。設定したビルドスクリプトや `verificationInputs` を変えたら再承認が必要になることも確認します。
+
+権限確認は使い捨てディレクトリで実施します。レビュー担当がread/searchを含むツールを使えないこと、他のワーカーが編集・shellを使えないこと、通常セッションは役割環境変数なしで利用できることを確認してください。テストで確認したhookのJSON変換と、実際のCLI/IDEがそのhookを実行することは別の確認項目です。
+
+VS Codeを使う場合は、選択したLocal/Copilotの実行方式でagent/skill/prompt filesが見えることと、hooksの実動作を別途確認してください。Dynamic Workflowsは [専用の確認事項](DYNAMIC-WORKFLOWS.md) を追加してから試してください。
+
+結果の記録例：CLI版、OS、Node版、モデルID、工程、単位数、ケース数、差分数、所要時間、実測できた利用量、未確認事項。未実測の費用やモデル名を推定値で埋めないでください。

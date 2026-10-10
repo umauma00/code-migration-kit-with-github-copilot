@@ -1,0 +1,9 @@
+{
+  "hooks": {
+    "PreToolUse": [{
+      "type": "command",
+      "command": "node migration-kit/scripts/migration_hook.mjs --vscode",
+      "timeout": 5
+    }]
+  }
+}

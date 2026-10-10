@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "sourceLanguage": "Python",
+  "targetLanguage": "JavaScript",
+  "mode": "preserve",
+  "sourceRoots": ["src"],
+  "outputRoots": ["ported"],
+  "verificationRoots": ["tests"],
+  "verificationInputs": [],
+  "buildArtifactRoots": [],
+  "maxReviewInputBytes": 65536,
+  "models": {
+    "implementer": "SELECT_MODEL_ID",
+    "reviewer-semantics": "SELECT_MODEL_ID",
+    "reviewer-rules": "SELECT_MODEL_ID",
+    "arbiter": "SELECT_MODEL_ID",
+    "fixer": "SELECT_MODEL_ID"
+  },
+  "concurrency": 2,
+  "maxFixRounds": 2,
+  "maxAgentCalls": 100,
+  "timeoutSeconds": 600,
+  "commandTimeoutSeconds": 600,
+  "commands": {
+    "original": null,
+    "mutation": null,
+    "build": null,
+    "smoke": null,
+    "parity": null,
+    "typecheck": null
+  }
+}

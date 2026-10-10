@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Copilot adaptation: migration control and instructions updated on 2026-10-08; see NOTICE.
 # Copyright 2026 Anthropic PBC
 # SPDX-License-Identifier: Apache-2.0
 r"""Build migration/manifest.tsv from a depmap order.txt (stdlib only, deterministic).
@@ -64,6 +65,17 @@ def main():
                 sys.exit(1)
             rows.append((source, target))
 
+    seen_sources, seen_targets = set(), set()
+    for source, target in rows:
+        for value in (source, target):
+            if value.startswith('/') or any(part in ('', '.', '..') for part in value.split('/')) or any(c in value for c in ('\\', ':', '\n', '\r', '\x00')):
+                raise SystemExit(f"ERROR: invalid relative path: {value!r}")
+        if source.casefold() in seen_sources or target.casefold() in seen_targets:
+            raise SystemExit(f"ERROR: duplicate source/target mapping: {source} -> {target}")
+        seen_sources.add(source.casefold())
+        seen_targets.add(target.casefold())
+    if any(target.casefold() in seen_sources for _, target in rows):
+        raise SystemExit("ERROR: a target overlaps a source file")
     args.out.parent.mkdir(parents=True, exist_ok=True)
     with open(args.out, "w", encoding="utf-8") as f:
         f.write("source\ttarget\n")
