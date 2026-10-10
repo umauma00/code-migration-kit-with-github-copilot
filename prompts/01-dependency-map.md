@@ -21,16 +21,25 @@ supports one file per unit and must not be used for many writers to one output.
 Cycles/shared helpers may need manual preparation or an atomic module adapter.
 
 Generate the review evidence dependency declaration. Starter edges.tsv paths are
-relative to the parser's --root; specify that same directory as --source-root:
+relative to the parser's --root. --source-root selects files to enumerate;
+--depmap-root selects the parser base. If both are src, the latter may be omitted:
 
 ```bash
 node migration-kit/scripts/make_review_dependencies.mjs --source-root src --edges migration/depmap/edges.tsv
+# For repository-root parsing (e.g. Python absolute package imports):
+node migration-kit/scripts/make_review_dependencies.mjs --source-root pkg --depmap-root . --edges migration/depmap/edges.tsv
+# For cross-package source dependencies; align config.sourceRoots too:
+node migration-kit/scripts/make_review_dependencies.mjs --source-roots pkg,shared --depmap-root . --edges migration/depmap/edges.tsv
 ```
 
 The default artifact is migration/review-dependencies.json, selected by
 config.reviewDependencyMap. Schema: {"schemaVersion":1,"dependencies":{"src/a.py":["src/b.py"],"src/b.py":[]}}.
-The generator enumerates isolated files too. This is a draft, not proof of
-completeness: audit parser coverage, exclusions and unresolved imports. Add
+The generator enumerates only selected source roots, including isolated files.
+It reports edges originating outside them in ignoredEdges (e.g. tests -> pkg).
+Dependencies from selected sources to an unselected directory fail; add the
+required source root rather than dropping that evidence. Only depmap-root may be
+"."; source roots cannot include kit or migration metadata. This is a draft,
+not proof of completeness: audit parser coverage, exclusions, ignored edges and unresolved imports. Add
 semantic evidence references needed by the rulebook/inventory, not just imports.
 For multiple parser roots, generate separate --out migration/PATH.json drafts
 and merge their project-relative dependencies. Every reachable file must have a
