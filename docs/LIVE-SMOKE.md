@@ -24,6 +24,11 @@
 
 権限確認は使い捨てディレクトリで実施します。レビュー担当がread/searchを含むツールを使えないこと、他のワーカーが編集・shellを使えないこと、通常セッションは役割環境変数なしで利用できることを確認してください。テストで確認したhookのJSON変換と、実際のCLI/IDEがそのhookを実行することは別の確認項目です。
 
-VS Codeを使う場合は、選択したLocal/Copilotの実行方式でagent/skill/prompt filesが見えることと、hooksの実動作を別途確認してください。Dynamic Workflowsは [専用の確認事項](DYNAMIC-WORKFLOWS.md) を追加してから試してください。
+VS Codeを使う場合は、選択した実行方式で入口とhooksの実動作を別途確認してください。
+
+- **Copilot（Agent Host）**：agentと共通の `/code-migration` スキルが見え、指定した工程を起動できることを確認します。prompt filesは読み込まれないため、10個の `/migrate-…` が登録されることは期待しません。
+- **Local**：導入時に `--harness vscode-local` を指定し、VS Codeのチャットでも実行方式をLocalへ切り替えます。agent/skillに加え、工程の `/migrate-…` prompt filesが見えて起動できること、Local用hooksが実際に呼ばれることを確認します。導入時の `--harness` 指定だけではチャットの実行方式は変わりません。
+
+Dynamic Workflowsは [専用の確認事項](DYNAMIC-WORKFLOWS.md) を追加してから試してください。
 
 結果の記録例：CLI版、OS、Node版、モデルID、工程、単位数、ケース数、差分数、所要時間、実測できた利用量、未確認事項。未実測の費用やモデル名を推定値で埋めないでください。

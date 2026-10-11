@@ -36,4 +36,5 @@ These rules apply to running a language migration, not to maintaining this kit.
 
 Read [usage](../README.md), [contracts](CONTRACTS.md) and
 [permissions](../templates/settings.README.md) before a production run.
-The CLI is the automated reference path; VS Code prompt files are phase launchers.
+The CLI is the automated reference path. In VS Code, use the shared
+`code-migration` skill with the Copilot harness, or phase prompt files with Local.

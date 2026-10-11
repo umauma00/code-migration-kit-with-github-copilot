@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import { runProcess } from '../lib/process.mjs';
+import { roles } from '../lib/core.mjs';
 import { parseResult, validateResult } from '../lib/results.mjs';
 import { isReviewer, validateWorkerProfile } from '../lib/review.mjs';
 
@@ -8,6 +9,10 @@ export function copilotArgs(role, model, prompt) {
   // automatic repository/personal instructions from entering its system prompt.
   return [...(prompt === undefined ? [] : ['-p', prompt]), '-s', '--output-format', 'json', '--stream', 'off', '--no-color', '--no-auto-update', '--no-ask-user', '--no-custom-instructions', '--disable-builtin-mcps', '--agent', `migration-${role}`, '--model', model,
     '--available-tools', 'view,grep,glob', ...(isReviewer(role) ? ['--deny-tool', 'read,write,shell'] : ['--allow-tool', 'read', '--deny-tool', 'write,shell'])];
+}
+export function requiredCopilotFlags() {
+  // Diagnose the same stdin-based invocation used by every worker role.
+  return [...new Set(roles.flatMap(role => copilotArgs(role, 'diagnostic-model').filter(arg => arg.startsWith('-'))))];
 }
 // Text output is presentation data: the CLI may wrap even JSON string values.
 // Only accept a completed machine-output stream and the main agent's last reply.

@@ -6,7 +6,7 @@ import { prepare, fake, ready } from './helpers.mjs';
 import { safePath, atomicWrite, writeJSON, readJSON, loadReviewDependencies, reviewSources, roles } from '../lib/core.mjs';
 import { inventorySlice } from '../lib/review.mjs';
 import { runStage, approve, translate } from '../lib/pipeline.mjs';
-import { copilotArgs } from '../scripts/copilot_adapter.mjs';
+import { copilotArgs, requiredCopilotFlags } from '../scripts/copilot_adapter.mjs';
 import { doctor } from '../scripts/run_migration.mjs';
 import { makeReviewDependencies } from '../scripts/make_review_dependencies.mjs';
 import { createWorkflowDefinition } from '../lib/workflow.mjs';
@@ -19,7 +19,8 @@ const edges = 'migration/depmap/edges.tsv';
 test('rereview 1: every CLI role disables ambient instructions; doctor rejects an unsupported CLI', async t => {
   for (const role of roles) assert.ok(copilotArgs(role, 'chosen-model').includes('--no-custom-instructions'));
   const f = prepare(t), command = safePath(f.root, 'help-double');
-  write(f, 'help-double', '#!/bin/sh\nprintf "%s\\n" "--agent --model --available-tools --deny-tool --output-format"\n');
+  const advertised = requiredCopilotFlags().filter(flag => flag !== '--no-custom-instructions').join(' ');
+  write(f, 'help-double', `#!/bin/sh\nprintf '%s\\n' '${advertised}'\n`);
   fs.chmodSync(command, 0o755);
   const check = (await doctor(f.root, f.config, { checkCLI: true, command })).checks.find(c => c.check === 'required flags');
   assert.equal(check.ok, false); assert.deepEqual(check.missing, ['--no-custom-instructions']);

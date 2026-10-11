@@ -7,7 +7,7 @@ import { loadConfig, readManifest, contextHash, unitState, done, safePath, readJ
 import { validateWorkerProfile } from '../lib/review.mjs';
 import { runProcess } from '../lib/process.mjs';
 import { approve, runStage, translate } from '../lib/pipeline.mjs';
-import { createCopilotAdapter } from './copilot_adapter.mjs';
+import { createCopilotAdapter, requiredCopilotFlags } from './copilot_adapter.mjs';
 
 export const usage = `Usage: node migration-kit/scripts/run_migration.mjs COMMAND [options]
   doctor [--check-cli] [--copilot /path/to/copilot]
@@ -45,7 +45,8 @@ export async function doctor(root, config, { checkCLI = false, command = 'copilo
       const help = await runProcess(command, ['--help'], { cwd: root, timeoutMs: 20000 });
       const text = help.stdout + help.stderr;
       checks.push({ check: 'Copilot executable', ok: version.code === 0, detail: version.stdout.trim() });
-      const missing = ['--agent', '--model', '--available-tools', '--deny-tool', '--output-format', '--no-custom-instructions'].filter(s => !text.includes(s));
+      const advertised = new Set(text.match(/(?<![\w-])--?[A-Za-z][A-Za-z0-9-]*/g) ?? []);
+      const missing = requiredCopilotFlags().filter(flag => !advertised.has(flag));
       checks.push({ check: 'required flags', ok: help.code === 0 && missing.length === 0, missing });
     } catch (e) { checks.push({ check: 'Copilot executable', ok: false, detail: e.message }); }
   }
