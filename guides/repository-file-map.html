@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Code Migration Kit — ファイル構成</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M3 8h10l3 4h13v16H3z' fill='%23a34700'/%3E%3C/svg%3E">
+<style>
+:root{color-scheme:light dark;--bg:#f2f6fa;--surface:#fff;--border:#d6e0ea;--border-bright:#818f9e;--text:#0f1a26;--text-dim:#4d6074;--accent:#a34700;--ok:#1c7443;--warn:#776300;--risk:#b0341e;--info:#145f99;--t-label:.75rem;--t-small:.875rem;--t-body:1rem;--t-lead:1.25rem;--t-h2:1.625rem;--t-h1:clamp(2.25rem,5.5vw,4rem);--s-1:.25rem;--s-2:.5rem;--s-3:.75rem;--s-4:1rem;--s-5:1.5rem;--s-6:2rem;--s-7:3rem;--s-8:4.5rem;--r-1:4px;--r-2:10px;--lift:rgb(18 22 20/.12)}
+@media(prefers-color-scheme:dark){:root{--bg:#0d1520;--surface:#132031;--border:#22324a;--border-bright:#596b87;--text:#e3ecf5;--text-dim:#92a6bb;--accent:#ffb547;--ok:#6fd3a0;--warn:#e8d36a;--risk:#ff7b6b;--info:#7cc0f0;--lift:rgb(0 0 0/.45)}}
+*{box-sizing:border-box}html{font-size:17px}body{margin:0;background:var(--bg);color:var(--text);font-family:"IBM Plex Sans","Hiragino Sans","Yu Gothic",sans-serif;font-kerning:normal;font-synthesis:none;line-height:1.6}main{max-width:64rem;margin:auto;padding:var(--s-7) var(--s-5) var(--s-8)}h1,h2,h3,p,figure{margin:0}h1{font-size:var(--t-h1);font-weight:600;line-height:1.15;letter-spacing:-.03em;text-wrap:balance;margin:var(--s-3) 0 var(--s-4)}h2{font-size:var(--t-h2);font-weight:600;line-height:1.4;margin-bottom:var(--s-5)}h3{font-size:var(--t-lead);font-weight:600;line-height:1.5}p{max-width:65ch;text-wrap:pretty}.lead{font-size:var(--t-lead);color:var(--text-dim);max-width:50ch}code,.mono,button,input,.kicker{font-family:"IBM Plex Mono","SFMono-Regular",Consolas,monospace}code{font-size:.875em;overflow-wrap:anywhere}.kicker{font-size:var(--t-label);color:var(--text-dim)}.meta{margin-top:var(--s-4)}section{margin-top:var(--s-8)}figure{min-width:0}figcaption{margin-top:var(--s-3);font-size:var(--t-body);color:var(--text-dim)}figcaption .mono{font-size:var(--t-label);margin-right:var(--s-2)}.stage{margin-top:var(--s-5);padding:var(--s-5);border:1px solid var(--border);border-radius:var(--r-1);background-image:linear-gradient(color-mix(in srgb,var(--border) 50%,transparent) 1px,transparent 1px),linear-gradient(90deg,color-mix(in srgb,var(--border) 50%,transparent) 1px,transparent 1px);background-size:24px 24px}.flow{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1.25fr) auto minmax(0,1fr);gap:var(--s-4);align-items:center}.box{min-width:0;padding:var(--s-4);background:var(--surface);border:1px solid var(--border-bright);border-radius:var(--r-1);box-shadow:0 var(--s-1) var(--s-3) var(--lift)}.box strong{display:block;margin:var(--s-2) 0}.box code{display:block;margin-top:var(--s-1)}.box .kicker{display:block}.central{border:2px solid var(--accent)}.edge{text-align:center;color:var(--text-dim);font-size:var(--t-label)}.edge b{display:block;font-size:var(--t-h2);font-weight:400}.badge{display:inline-block;border:1px dashed var(--border-bright);padding:0 var(--s-2);border-radius:var(--r-1);font-size:var(--t-label);color:var(--text-dim);margin-top:var(--s-3)}.explorer{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.5fr);border:1px solid var(--border-bright);border-radius:var(--r-1);overflow:hidden;background:var(--surface)}.tree{padding:var(--s-4);border-right:1px solid var(--border)}.root{font-size:var(--t-small);font-weight:600;padding-bottom:var(--s-3);overflow-wrap:anywhere}.tree details{border-top:1px solid var(--border);padding:var(--s-2) 0}.tree summary{cursor:pointer;color:var(--text-dim);padding:var(--s-1) 0;font-size:var(--t-small);overflow-wrap:anywhere}.tree button{display:block;width:100%;text-align:left;min-height:2rem;margin:var(--s-1) 0;padding:var(--s-2);border:1px solid transparent;border-radius:var(--r-1);background:transparent;color:var(--text);font-size:var(--t-small);overflow-wrap:anywhere;cursor:pointer}.tree button[aria-pressed=true]{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,var(--surface));color:var(--text)}button:hover,summary:hover{color:var(--accent)}:focus-visible{outline:2px solid var(--accent);outline-offset:2px}.inspector{min-width:0;padding:var(--s-5);align-self:start;position:sticky;top:var(--s-4)}.inspector h3{margin-top:var(--s-3);overflow-wrap:anywhere}.inspector .desc{margin-top:var(--s-4)}.inspector dl{margin:var(--s-5) 0 0}.inspector dt{font-size:var(--t-label);color:var(--text-dim);font-family:"IBM Plex Mono",monospace;margin-top:var(--s-4)}.inspector dd{margin:var(--s-2) 0 0}.inspector ul{padding-left:var(--s-5);margin:var(--s-2) 0}.inspector li+li{margin-top:var(--s-2)}a{color:var(--info);text-underline-offset:.2em;overflow-wrap:anywhere}.inspector a{display:inline-block;margin-top:var(--s-5)}.duo{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--s-5)}.duo>*{min-width:0}.install{padding:var(--s-5);border:1px dashed var(--border-bright);border-radius:var(--r-1)}pre{font-family:"IBM Plex Mono","SFMono-Regular",Consolas,monospace;font-size:var(--t-small);line-height:1.9;margin:var(--s-4) 0 0;overflow:auto;color:var(--text)}.install h3{margin-bottom:var(--s-2)}.install p{color:var(--text-dim)}.reading{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--s-5);margin-top:var(--s-5)}.reading a{padding:var(--s-4) 0;border-top:1px solid var(--border-bright);text-decoration:none;color:var(--text);min-width:0}.reading code{display:block;color:var(--info);margin:var(--s-2) 0}.reading span{color:var(--text-dim);display:block}.sources{border-top:1px solid var(--border);margin-top:var(--s-8);padding-top:var(--s-5)}.sources ul{padding-left:var(--s-5);margin:var(--s-3) 0 0}.sources li+li{margin-top:var(--s-2)}noscript{display:block;padding:var(--s-4);border:1px dashed var(--border-bright);margin-bottom:var(--s-4)}
+.tree,.inspector{max-height:36rem;overflow:auto}.inspector{position:static}
+@media(max-width:736px){main{padding:var(--s-5) var(--s-4) var(--s-7)}h1{font-size:var(--t-h2)}.lead{font-size:var(--t-body)}section{margin-top:var(--s-7)}.stage{padding:var(--s-4)}.flow{grid-template-columns:minmax(0,1fr)}.edge b{transform:rotate(90deg)}.explorer,.duo,.reading{grid-template-columns:minmax(0,1fr)}.tree{border-right:0;border-bottom:1px solid var(--border);max-height:20rem;overflow:auto}.inspector{position:static;padding:var(--s-4);max-height:none;overflow:visible}.install{padding:var(--s-4)}}
+@media print{:root{--bg:#fff;--surface:#fff;--border:#d6e0ea;--border-bright:#818f9e;--text:#0f1a26;--text-dim:#4d6074;--accent:#a34700;--info:#145f99}main{max-width:none;padding:var(--s-4)}.stage{background-image:none}.box{box-shadow:none}.explorer{display:block}.tree{border-right:0;max-height:none}.inspector{position:static;max-height:none;overflow:visible}.reading{display:block}figure,.install{break-inside:avoid}a{color:var(--text)}}
+</style>
+</head>
+<body><main>
+<header><div class="kicker">CODE MIGRATION KIT / FILE MAP</div><h1>scripts/ が動かし、<br>lib/ が工程を管理する</h1><p class="lead">既存コードを別言語へ移すためのキット。実行コード、Copilotへの指示、設定のひな形、検証資料が分かれています。</p><div class="kicker meta">現在のチェックアウトを確認 · 2026-10-11 JST</div></header>
+<figure>
+<div class="stage"><div class="flow" role="img" aria-label="promptsと.githubが工程と役割を定義し、scriptsとlibが実行して、導入先migrationに記録を保存する">
+<div class="box"><span class="kicker">指示・設定</span><strong>工程と担当を定義</strong><code>prompts/</code><code>.github/</code><code>templates/</code></div>
+<div class="edge">渡す<b>→</b></div>
+<div class="box central"><span class="kicker">実行コード</span><strong>CLI → 共通エンジン</strong><code>scripts/run_migration.mjs</code><code>↓ lib/pipeline.mjs</code><code>↔ scripts/copilot_adapter.mjs</code></div>
+<div class="edge">保存する<b>→</b></div>
+<div class="box"><span class="kicker">導入先の成果物</span><strong>変換後ソースと記録</strong><code>設定した出力ディレクトリ</code><code>migration/</code><span class="badge">導入・実行時に作成</span></div>
+</div></div><figcaption><span class="mono">Fig. A</span>指示を定義するファイルと、実際に工程を動かすプログラムを分けて読むと、構成がつながります。</figcaption>
+</figure>
+<section><h2>ファイルを選ぶと、役割が分かる</h2>
+<noscript>JavaScriptを有効にすると、ファイルごとの説明を選択できます。全体の役割は上の構成図と下の配置図から確認できます。</noscript>
+<figure><div class="explorer"><nav class="tree" aria-label="主要ディレクトリとファイル"><div class="root">code-migration-kit-with-copilot/</div><div class="kicker">一覧はスクロールできます</div><div id="tree"></div></nav><div id="inspector" class="inspector" aria-live="polite"></div></div><figcaption><span class="mono">Fig. B</span>主要なファイルを役割ごとに表示しています。フォルダ名の下にある項目を選んでください。</figcaption></figure>
+</section>
+<section><h2>導入すると、対象プロジェクトに配置される</h2>
+<figure><div class="duo">
+<div class="install"><div class="kicker">このリポジトリ</div><h3>キットの配布・開発用</h3><pre>scripts/     実行・導入用ツール
+lib/         共通エンジン
+prompts/     工程ごとの指示
+.github/     Copilotとの接続
+templates/   設定のひな形
+docs/        仕様・検証記録
+guides/      視覚的な説明資料
+tests/       キットの自動テスト
+fixtures/    テスト用の小さな題材
+examples/    過去の移植記録
+skill/       スキルの入口</pre></div>
+<div class="install"><div class="kicker">install.mjs の導入先</div><h3>案件の実行用</h3><pre>対象プロジェクト/
+├─ .github/       Copilotの入口・役割
+├─ migration-kit/ キットの実行コード・文書
+├─ migration/
+│  ├─ config.json 設定
+│  ├─ RULEBOOK.md 移植ルール
+│  ├─ inventory.tsv 意味の差の一覧
+│  ├─ manifest.tsv 元→先の対応
+│  ├─ state/      各ファイルの進捗・完了記録
+│  ├─ runs/       AI呼び出し・レビュー記録
+│  ├─ gates/      工程の承認記録
+│  └─ results/    検証工程の結果
+└─ 変換後ソース   configで場所を指定</pre></div>
+</div><figcaption><span class="mono">Fig. C</span><code>migration/</code> は案件ごとの設定・成果物の領域です。一部は導入時に、残りは工程を進めると作成されます。</figcaption></figure>
+</section>
+<section><h2>最初に読むなら、この順番</h2>
+<figure><div class="reading" role="group" aria-label="README、CLI入口、pipelineの順に読む">
+<a href="../README.md"><strong>全体をつかむ →</strong><code>README.md</code><span>何をするキットか、導入と工程の進め方。</span></a>
+<a href="../scripts/run_migration.mjs"><strong>入口を追う →</strong><code>scripts/run_migration.mjs</code><span>コマンドと処理の振り分け。</span></a>
+<a href="../lib/pipeline.mjs"><strong>中心を読む</strong><code>lib/pipeline.mjs</code><span>承認、変換、独立レビュー、修正、検証。</span></a>
+</div><figcaption><span class="mono">Fig. D</span>利用方法から入り、CLIの入口と工程管理へ進むと、コードの役割を追えます。</figcaption></figure>
+</section>
+<footer class="sources"><div class="kicker">説明の根拠</div><ul>
+<li><a href="../README.md">README.md</a> — キットの目的・工程・配置</li>
+<li><a href="../scripts/install.mjs">scripts/install.mjs</a> — 導入先に作成するファイル</li>
+<li><a href="../docs/OPERATING-MANUAL.md">docs/OPERATING-MANUAL.md</a> — 実行ルール・完了記録</li>
+<li><a href="../examples/run1-toml/README.md">examples/run1-toml/README.md</a> — 使用例が過去の実行記録であること</li>
+</ul></footer>
+</main>
+<script>
+const root=new URL('../',location.href);
+const groups=[
+{name:'scripts/',role:'実行・導入用ツール',desc:'利用者がコマンドとして起動する入口と、Copilot・依存解析への接続をまとめています。',items:[
+['run_migration.mjs','CLIの入口','doctor、status、judge、approve、translate、repair、build、smoke、parityなどのコマンドを受け付け、共通エンジンに処理を渡します。',['設定とmanifestを読み込む','承認・検証はlib/pipeline.mjsへ渡す','変換時はcopilot_adapter.mjsを接続する']],
+['install.mjs','対象プロジェクトへの導入','キットの実行ファイルをmigration-kit/へ、Copilot向け定義を.github/へ配置し、migration/の初期設定を作成します。',['--applyなしで変更予定を表示する','既存の異なるファイルを上書きせず停止する','テスト題材とデモは導入先に含めない']],
+['copilot_adapter.mjs','Copilot CLIとの接続','ワーカーごとのモデルとツール権限を指定してCopilotを起動し、CLI出力からJSONの応答を取り出します。',['AIへの役割別プロンプトを組み立てる','--no-custom-instructionsで暗黙の指示注入を無効化する','応答をresults.mjsの契約で検査する']],
+['migration_hook.mjs','hooksから呼ばれる操作検査','Copilot CLIやVS Codeのhookイベントを受け取り、ワーカーの権限に応じて操作を検査します。',[]],
+['queue_runner.mjs','進捗・未完了の確認','完了記録とハッシュを確認し、status、next、verifyで移植単位の状態を調べる補助ツールです。',[]],
+['depmap_python.py','Pythonの依存解析','importなどから依存関係と処理順序・循環を調べる解析器です。',[]],
+['depmap_ts.mjs','TypeScriptの依存解析','import、export-from、requireから依存関係を調べる解析器です。',[]],
+['depmap_c.py','C/C++の依存解析','includeから依存関係を調べる解析器です。',[]],
+['make_manifest.py','移植対象の対応表を作る','ファイル一覧や順序から、元ソースと変換先を対応付けるmanifest.tsvを生成します。',[]],
+['make_review_dependencies.mjs','レビュー用の依存宣言','依存解析のedges.tsvから、レビューに渡す元ソースと依存ファイルを宣言するJSONの草案を作ります。',[]],
+['build_daemon.sh','ビルド監視','ソースの変更を検知してビルドを実行し、各ラウンドの診断をファイルに保存する補助ツールです。',[]],
+['test.mjs','自動テストの入口','tests/内の.test.mjsを集め、Nodeのテストランナーで実行します。',[]],
+['demo.mjs','オフラインデモ','fixtures/miniの題材と固定のAI応答を使って一連の工程を再現します。PythonとNodeの比較コマンドは実際に動かします。',[]]
+]},
+{name:'lib/',role:'共通の実行エンジン',desc:'CLIや任意のDynamic Workflowsアダプターから再利用する、移植処理の本体です。',items:[
+['pipeline.mjs','工程管理の中心','承認を確認し、変換・独立レビュー・裁定・修正を進め、judge/build/smoke/parityの検証結果を保存します。',['元ファイル→候補→2種類の独立レビュー','指摘を裁定し、必要な修正後に再レビュー','上流の再実行で下流の承認・結果を失効させる','完了は出力の存在ではなく、レビューとハッシュを結んだ記録で判定']],
+['core.mjs','設定・パス・記録の基盤','設定とmanifest、依存宣言を読み込み、安全なパス、入力ハッシュ、完了記録、排他ロックを扱います。',[]],
+['review.mjs','レビューに渡す固定入力','担当プロファイルを検査し、元ソースと依存、候補、RULEBOOK、対象inventory、診断を両レビュー担当に同じ内容で渡します。',[]],
+['results.mjs','AI応答のJSON契約','実装・レビュー・裁定・修正の応答を解析し、役割ごとに必要なフィールドを検査します。',[]],
+['process.mjs','外部プロセスの実行','Copilot、ビルド、比較コマンドなどを起動し、出力・終了コード・タイムアウト・中断を扱います。',[]],
+['text.mjs','入力テキストの検査','UTF-8のテキストを読み込み、不正な文字コードやNULを含むファイルを拒否します。',[]],
+['workflow.mjs','任意のWorkflowアダプター','Dynamic Workflowsから承認済みの1工程を共通エンジンに渡す実験的な接続部分です。',[]]
+]},
+{name:'.github/',role:'Copilot向けの入口と定義',desc:'通常のCopilot対話に適用する指示、工程を開始するprompt files、ワーカーの役割、hooksを置きます。',items:[
+['copilot-instructions.md','共通の対話指示','運用マニュアルと工程プロンプトへの入口です。元実装の維持、工程ごとの停止、ランナー経由の変換を指示します。',[]],
+['agents/','役割別のプロファイル','migration-orchestrator、implementer、reviewer-semantics、reviewer-rules、arbiter、fixerを定義します。',['orchestrator：工程を案内する','implementer：候補を作る','reviewer-semantics / reviewer-rules：振る舞いとルールを独立に調べる','arbiter：指摘を裁定する / fixer：確認済みの指摘を修正する']],
+['prompts/','VS Codeで工程を始める指示','migrate-*.prompt.mdは、prompts/の工程指示をVS Codeのprompt filesとして呼び出す入口です。',[]],
+['skills/code-migration/SKILL.md','Copilot向けスキル','現在の成果物と承認状態に応じて、次に読む工程プロンプトを案内します。',[]],
+['hooks/code-migration.json','ツール操作への制約','移植ワーカーの書き込みやコマンド実行などを制限するhooks設定です。scripts/migration_hook.mjsと連携します。',[]],
+['extensions/code-migration/extension.mjs','実験的なWorkflowの入口','Copilot SDKのDynamic Workflowsに共通エンジンを接続します。導入時は--with-workflowを指定した場合に配置されます。',[]]
+]},
+{name:'prompts/',role:'工程ごとの詳しい手順',desc:'調査から比較合格後の整理まで、各工程でAIに読ませる指示書です。',items:[
+['00-feasibility.md','適否と範囲','移植に適した対象か、どこまでを対象にするか調査します。',[]],
+['00b-judge-setup.md','比較器の設計','元実装と移植後を比較する仕組みを作り、意図的な破壊を検出できるか確かめます。',[]],
+['01-dependency-map.md','依存と移植順序','依存解析、manifest、レビュー用の依存宣言を準備します。',[]],
+['02-gap-inventory.md','意味の差とルール','言語間の差を一覧にし、RULEBOOKで移植方針を固定します。',[]],
+['03-stress-test.md','事前試行','難しいケースでルールや設計を試し、変換前に問題を見つけます。',[]],
+['04-translation-kickoff.md','変換と独立レビュー','承認した入力でランナーによる変換・レビューを開始します。',[]],
+['05-survey-build.md','全体ビルド','統合した変換後ソースをビルドし、診断と修正を進めます。',[]],
+['05b-smoke.md','基本動作の確認','実操作を伴う基本的な動作を確認します。',[]],
+['05c-parity.md','新旧の振る舞いを比較','元テストと比較ケースで動作の一致を確認します。',[]],
+['06-post-parity.md','比較合格後の整理','残課題、採否、引き継ぎを整理します。',[]]
+]},
+{name:'templates/',role:'設定とルールのひな形',desc:'導入先に作る設定やルールの出発点です。案件に合わせて編集します。',items:[
+['migration-config.json','ランナーの設定','元・出力・検証のルート、言語、モデル、同時実行数、修正回数、ビルド・比較コマンドを指定します。',[]],
+['RULEBOOK.md','移植方針のひな形','言語間の意味の差について、統一した移植方針を記述します。',[]],
+['inventory.tsv','意味の差の一覧','各ファイルの意味上の問題、参照するルール、根拠などを整理する表です。',[]],
+['hooks.copilot.json','Copilot CLI用hooks','標準の導入で使うhooks設定です。',[]],
+['hooks.vscode-local.json','VS Code Local用hooks','--harness vscode-localで選ぶhooks設定です。',[]],
+['settings.README.md','権限・hooksの説明','設定の役割と制約を説明します。claude-settings.reference.jsonは原版の参照資料です。',[]]
+]},
+{name:'tests/',role:'キットそのものの自動テスト',desc:'工程管理、承認の失効、完了記録、独立レビュー、Copilot互換性、再レビューで見つかった不具合を検証します。',items:[
+['migration.test.mjs','移植エンジンのテスト','設定・導入・工程管理などの基本動作を確認します。',[]],
+['copilot-compatibility.test.mjs','CLI互換性の回帰テスト','Copilotとの接続や関連する互換性修正を検証します。',[]],
+['helpers.mjs','テストの準備と疑似応答','一時的な対象プロジェクトや固定のAI応答を用意します。demo.mjsからも使います。',[]],
+['verify_cli_transport.mjs','実CLIの通信確認','実CLIと疑似プロバイダーを使い、応答・権限などの通信経路を確認する補助スクリプトです。',[]]
+]},
+{name:'fixtures/',role:'テスト・デモ用の題材',desc:'小さな元コードと期待結果をまとめます。c/、python/、ts/は依存解析、mini/はPython→JavaScriptの工程デモに使います。',items:[
+['mini/src/','デモの元ソース','main.py、math_ops.py、text_ops.pyの小さなPython実装です。',[]],
+['mini/expected/','期待する変換後ソース','オフラインデモなどで使うJavaScriptの期待結果です。',[]],
+['mini/tests/judge.py','デモの比較器','元実装、ビルド、smoke、parityと、意図的な破壊の検出を扱います。',[]]
+]},
+{name:'docs/',role:'運用・契約・検証の資料',desc:'READMEを補う詳しい仕様、更新手順、レビュー記録、検証ログ、原版の資料です。',items:[
+['OPERATING-MANUAL.md','実行時のルール','元実装を残すこと、工程ごとの承認、独立レビュー、完了記録、修正上限などを定めます。',[]],
+['CONTRACTS.md','JSONと記録の形式','ワーカーの応答やランナーが扱うデータ契約を説明します。',[]],
+['LIVE-SMOKE.md','実環境での小規模確認','Copilot認証や実際のモデルを使う前に行う確認手順です。',[]],
+['TESTING.md','検証範囲の説明','どの環境と動作を検証し、どの範囲が未確認かを記録します。',[]],
+['UPGRADING.md','既存導入からの更新','導入済みのキットを更新する際の手順です。',[]],
+['DYNAMIC-WORKFLOWS.md','実験的アダプターの説明','任意のDynamic Workflows連携について説明します。',[]],
+['reviews/','レビューと修正の記録','互換性レビュー、再レビュー、修正のMarkdown・JSON記録を保存しています。',[]],
+['validation/','検証の証跡','自動テスト、オフラインデモ、CLI通信のログやJSON結果を保存しています。',[]]
+]},
+{name:'guides/',role:'視覚的な説明資料',desc:'技術ガイドとファイル構成図をまとめるディレクトリです。README.mdから目的に合った説明を選べます。',items:[
+['README.md','ガイドの目次','各HTMLの内容と開き方をまとめます。',[]],
+['migration-guide.html','仕組みと仕様の技術ガイド','AI Agent・ランナー・人間の役割、移行フロー、データ、API、例外、設計判断を図で説明します。参照ソースはHTMLに埋め込まれています。',[]],
+['repository-file-map.html','ファイル構成図','ディレクトリと主要ファイルの役割を選んで確認できる、このHTMLです。ソースへのリンクはリポジトリ内の相対配置から解決します。',[]]
+]},
+{name:'examples/',role:'過去の移植で残した成果物',desc:'run1-toml/は、TOML処理の移植で使ったルール、差分、監査、比較用コードを保存した記録です。実行可能なデモはscripts/demo.mjsを読みます。',items:[
+['run1-toml/README.md','保存した実行記録の説明','比較用コードをローカルのTOMLソース・TypeScript出力につなぐための情報です。',[]]
+]},
+{name:'skill/',role:'スキルの入口文書',desc:'工程の状態から次の手順を案内するSKILL.mdを置きます。Copilot向けの配置版は.github/skills/code-migration/です。',items:[
+['SKILL.md','移植手順を選ぶ入口','READMEと運用マニュアルを読み、調査・比較器・ルール・変換・検証へ案内するスキル文書です。',[]]
+]},
+{name:'ルートのファイル',prefix:'',role:'概要・由来・開発情報',desc:'リポジトリ全体の入口と配布情報です。',items:[
+['README.md','最初に読む文書','目的、導入、設定、工程、検証範囲をまとめています。',[]],
+['package.json','Nodeのパッケージ設定','Node.js 22以上、ES Modules、npm testとnpm run demoを定義します。ランナー本体に外部npm依存はありません。',[]],
+['CLAUDE.md','共有指示への案内','現在の運用ルールはdocs/OPERATING-MANUAL.md、Copilot定義は.github/にあることを案内します。',[]],
+['UPSTREAM.json','原版と参照版の情報','原版の固定コミットや参照したCLI・SDKなどの版を記録します。',[]],
+['RUN-NOTES.md','原版の実行記録','実際の移植で得られた記録を残しています。',[]],
+['CHANGELOG.md','版ごとの変更','キットの修正・更新履歴です。',[]],
+['CONTRIBUTING.md','開発への参加方法','キットの開発・貢献に関する案内です。',[]],
+['LICENSE','ライセンス','Apache-2.0のライセンス本文です。権利表記と変更の由来はNOTICEも参照します。',[]]
+]}
+];
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const entries=new Map();
+document.getElementById('tree').innerHTML=groups.map((g,index)=>{
+const prefix=g.prefix??g.name;
+entries.set('group-'+index,{path:prefix||'リポジトリルート',role:g.role,desc:g.desc,points:g.items.map(x=>x[0]+' — '+x[1]),group:g.name});
+return `<details ${index<2?'open':''}><summary>${esc(g.name)}</summary><button data-id="group-${index}" aria-pressed="false">フォルダの役割</button>${g.items.map((f,j)=>{
+const id=index+'-'+j;entries.set(id,{path:prefix+f[0],role:f[1],desc:f[2],points:f[3],group:g.name});
+return `<button data-id="${id}" aria-pressed="false">${esc(f[0])}</button>`;
+}).join('')}</details>`;
+}).join('');
+function select(id){const e=entries.get(id);for(const b of document.querySelectorAll('[data-id]'))b.setAttribute('aria-pressed',String(b.dataset.id===id));
+document.getElementById('inspector').innerHTML=`<div class="kicker">${esc(e.group)} · ${esc(e.role)}</div><h3 class="mono">${esc(e.path)}</h3><p class="desc">${esc(e.desc)}</p>${e.points.length?'<dl><dt>主な内容</dt><dd><ul>'+e.points.map(p=>'<li>'+esc(p)+'</li>').join('')+'</ul></dd></dl>':''}${e.path==='リポジトリルート'?'':`<a href="${new URL(e.path,root).href}">ソースを開く ↗</a>`}`;}
+document.getElementById('tree').addEventListener('click',ev=>{const b=ev.target.closest('[data-id]');if(b)select(b.dataset.id)});
+select('0-0');
+</script>
+</body></html>
