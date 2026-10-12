@@ -1,5 +1,8 @@
 # 04 — Translation and independent review
 
+Read [phase reports and user decisions](../docs/PHASE-HANDOFF.md).
+End with its report; ask for the next decision only when needed.
+
 Prerequisites: reviewed feasibility/stress reports, RULEBOOK, inventory,
 manifest, audited review dependency map, validated judge, installed profiles and
 explicit translation approval.

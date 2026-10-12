@@ -1,3 +1,12 @@
+# Unreleased
+
+- Require interactive phase reports with artifact links, review points, the next
+  phase and a copyable reply. Use available question tools for missing decisions,
+  with chat fallback and explicit approval wording for production stages.
+- Reuse existing answers, keep unanswered questions pending, and preserve
+  noninteractive workers. Distinguish judge preparation from its later validation
+  receipt so early phase routing does not repeat judge setup unnecessarily.
+
 # 0.2.0 — 2026-10-11
 
 - Add an Agent Plugins 1.0 manifest, portable code-migration skill, six

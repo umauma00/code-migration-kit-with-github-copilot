@@ -1,6 +1,13 @@
 # 00b — Establish a trustworthy judge
 
+Read [phase reports and user decisions](../docs/PHASE-HANDOFF.md).
+End with its report; ask for the next decision only when needed.
+
 Prerequisite: feasibility reviewed. Stop after the judge report.
+
+Save the judge design and preparation results in `migration/judge-report.md`,
+including test/scenario paths, configured commands, coverage, failures and any
+deferred formal validation. This report is not the runner's validation receipt.
 
 Keep the old code executable. Decide whether inherited tests exercise the public
 surface (API, CLI, wire format, exported interface). If so, retain them. Otherwise

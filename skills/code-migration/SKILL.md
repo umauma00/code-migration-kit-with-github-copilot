@@ -27,11 +27,21 @@ Use the plugin's code-migration-plugin-orchestrator agent for phase planning.
 The Node runner selects private plugin worker profiles and explicitly mounts
 this plugin for each CLI worker.
 
+Follow [phase reports and user decisions](../../docs/PHASE-HANDOFF.md) at every
+phase boundary. Show the actual artifacts, review points and a copyable next
+instruction before asking. Use the available question tool for missing decisions;
+otherwise present the choices in chat and wait. Reuse answers already given.
+After a phase, resolve the next step from the user's instruction and current
+evidence, not just a report/template's existence.
+
 - No feasibility report: run [feasibility](../../prompts/00-feasibility.md), report, stop.
-- No validated judge: run [judge setup](../../prompts/00b-judge-setup.md), report, stop.
+- No judge preparation: run [judge setup](../../prompts/00b-judge-setup.md), save
+  migration/judge-report.md, report, stop. The formal judge receipt comes after
+  the manifest/rulebook/inventory are ready; its absence alone does not repeat 00b.
 - No map/rules: run [dependency map](../../prompts/01-dependency-map.md), then
   [gap inventory](../../prompts/02-gap-inventory.md), stopping at each gate.
-- Rules drafted: run [stress test](../../prompts/03-stress-test.md). Respect redesign mode.
+- Rules and inventory reviewed: run judge validation when its artifacts are ready,
+  then [stress test](../../prompts/03-stress-test.md). Respect redesign mode.
 - Translation approved: run [translation](../../prompts/04-translation-kickoff.md).
 - Translation complete: run [build](../../prompts/05-survey-build.md), then
   [smoke](../../prompts/05b-smoke.md), then [parity](../../prompts/05c-parity.md), one gate at a time.

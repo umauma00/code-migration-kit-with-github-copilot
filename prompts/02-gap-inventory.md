@@ -1,5 +1,8 @@
 # 02 — Semantic gap inventory
 
+Read [phase reports and user decisions](../docs/PHASE-HANDOFF.md).
+End with its report; ask for the next decision only when needed.
+
 Prerequisite: map and draft rulebook reviewed. Produce inventory and stop.
 
 Find every site where the target requires a decision the source leaves implicit:

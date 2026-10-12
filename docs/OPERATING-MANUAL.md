@@ -8,6 +8,11 @@ in executable paths below and in phase prompts with that absolute plugin root.
 Run commands from the target repository; project artifacts stay relative to it.
 See [plugin setup](PLUGIN.md). Repository-copy installations use the paths shown.
 
+The main interactive orchestrator must follow [phase reports and user decisions](PHASE-HANDOFF.md)
+at every phase boundary. Show artifacts, review points and a next-action example;
+use the available question tool when an answer is needed. This reporting format
+does not apply to automated workers, which keep their JSON-only contracts.
+
 1. Keep the original implementation runnable. It is the executable specification.
 2. Decide once in `migration/RULEBOOK.md`; consult `migration/inventory.tsv` for
    each semantic gap. Workers never modify either. Propose amendments at a gate.

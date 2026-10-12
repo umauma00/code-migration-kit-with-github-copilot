@@ -1,5 +1,8 @@
 # 05 — Survey build and repair
 
+Read [phase reports and user decisions](../docs/PHASE-HANDOFF.md).
+End with its report; ask for the next decision only when needed.
+
 Prerequisite: every translation unit has a current reviewed receipt. The user
 approves build for these outputs, then run `run_migration.mjs build` once.
 

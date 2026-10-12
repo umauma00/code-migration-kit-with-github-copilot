@@ -1,5 +1,8 @@
 # 06 — Post-parity cleanup
 
+Read [phase reports and user decisions](../docs/PHASE-HANDOFF.md).
+End with its report; ask for the next decision only when needed.
+
 Prerequisite: both suites pass in the current parity receipt and the user has
 reviewed the final evidence. Never mix this phase with reaching initial parity.
 

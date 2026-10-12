@@ -1,5 +1,8 @@
 # 03 — Stress-test the rules
 
+Read [phase reports and user decisions](../docs/PHASE-HANDOFF.md).
+End with its report; ask for the next decision only when needed.
+
 Prerequisite: reviewed rulebook, map, inventory and judge. Produce
 `migration/stress-test/report.md`; the user reviews it before translation.
 

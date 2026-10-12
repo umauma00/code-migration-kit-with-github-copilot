@@ -1,5 +1,8 @@
 # 05c — Prove behavioral equivalence
 
+Read [phase reports and user decisions](../docs/PHASE-HANDOFF.md).
+End with its report; ask for the next decision only when needed.
+
 Prerequisite: current smoke receipt, validated judge and explicit parity approval.
 Run `run_migration.mjs parity`; it reruns the original suite on the original
 implementation and then the new-vs-old public-surface parity suite.

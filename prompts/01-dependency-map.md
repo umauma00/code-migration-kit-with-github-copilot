@@ -1,5 +1,8 @@
 # 01 — Dependency map and translation rulebook
 
+Read [phase reports and user decisions](../docs/PHASE-HANDOFF.md).
+End with its report; ask for the next decision only when needed.
+
 Prerequisite: feasibility and judge design reviewed. Work one phase and stop.
 
 For plugin installations, replace `migration-kit/` in script paths with the

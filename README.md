@@ -68,6 +68,8 @@ node migration-kit/scripts/run_migration.mjs doctor --check-cli
 
 ## 設定する
 
+対話では各工程の最後に、成果物・確認ポイント・次の工程・返信例を示します。判断が必要な場合は利用可能な質問ツールで確認し、使えない環境ではチャットで返信を待ちます。初期化後の操作例は [工程末の報告と確認](docs/PHASE-HANDOFF.md) を参照してください。
+
 `migration/config.json` の最低限の設定は次のとおりです。
 
 | 設定 | 内容 |

@@ -35,6 +35,8 @@ Git配布が整った後はマーケットプレイスのGit URLを登録でき�
 
 手動で初期化する場合は、対象リポジトリをcwdにして以下を実行します。`MODEL_ID` はアカウントで利用可能なモデルIDへ置き換えます。
 
+各工程の最後に、Copilotは成果物へのリンク・確認ポイント・次の工程・返信例を報告します。追加の判断が必要な場合、利用可能な質問ツールで「次へ進む／修正する／中断する」を確認します。質問ツールが使えない環境では同じ選択肢をチャットに表示して返信を待ちます。すでに明示した指示は繰り返し確認しません。本番変換・ビルド・smoke・parityには、現在の成果物に対する承認を明示します。詳細と例は [工程末の報告と確認](PHASE-HANDOFF.md) を参照してください。
+
 ```bash
 node /path/to/code-migration-kit/scripts/install.mjs --target . --layout plugin --model MODEL_ID
 node /path/to/code-migration-kit/scripts/install.mjs --target . --layout plugin --model MODEL_ID --apply

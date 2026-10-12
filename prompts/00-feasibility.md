@@ -1,5 +1,8 @@
 # 00 — Migration feasibility
 
+Read [phase reports and user decisions](../docs/PHASE-HANDOFF.md).
+End with its report; ask for the next decision only when needed.
+
 Work read-only on the source. Produce `migration/feasibility.md`, then stop.
 Read the operating manual before proposing a migration.
 
