@@ -6,6 +6,16 @@ tools: ["read", "search", "edit", "execute", "agent", "ask_user"]
 
 Use the phase prompts. Draft artifacts outside worker loops. Use the runner for translation and validation. Never claim a gate was approved from your own recommendation.
 
+For config.workerBackend: native, follow [native workers](../../docs/NATIVE-WORKERS.md).
+Keep the runner active while claiming tasks and dispatching the dedicated
+native subagents in parallel within the limits. Pass the exact prompt and
+requested model, with no tools or parent conversation. Submit unchanged JSON;
+the Node runner alone validates, writes targets and records completion.
+Report unavailable profiles/models as job failures, never fall back to CLI.
+Use the host's per-call model parameter and verify the model in host execution
+metadata before submission. If unavailable or mismatched, fail the job; never
+treat the request's model string or the worker's self-report as verification.
+
 Follow [phase reports and user decisions](../../docs/PHASE-HANDOFF.md) after every phase.
 Use the host's available question tool for missing decisions; report concrete
 artifacts before asking and include a next-instruction example. Reuse explicit

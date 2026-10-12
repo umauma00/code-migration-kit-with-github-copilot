@@ -15,6 +15,9 @@ const persist = f => writeJSON(safePath(f.root, 'migration/config.json'), f.conf
 // Model directory aliases without requiring a particular host filesystem.
 // Real-filesystem coverage for the same assertions is still needed on macOS.
 function aliasDirectory(t, root, from, to, enabled = () => true, canonical = true) {
+  // safePath canonicalizes its root; macOS temp paths can use /var aliases of
+  // /private/var. Match that spelling so this mock actually intercepts writes.
+  root = fs.realpathSync(root);
   const alias = path.join(root, from), original = path.join(root, to);
   const resolve = value => enabled() && typeof value === 'string' &&
     (value === alias || value.startsWith(`${alias}${path.sep}`)) ? original + value.slice(alias.length) : value;

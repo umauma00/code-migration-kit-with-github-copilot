@@ -15,18 +15,31 @@ Anthropicの[Code Migration Kit](https://github.com/anthropics/code-migration-ki
 | 指示・スキル | プラグインの `skills/code-migration/SKILL.md`、またはコピー導入の `.github/skills/code-migration/SKILL.md`。自動ワーカーは暗黙の指示読み込みを無効化 |
 | 役割分担 | orchestrator / implementer / 独立reviewer 2種 / arbiter / fixer の6プロファイル |
 | モデル | 5種類のワーカーに明示指定。利用できるモデルIDをユーザーが設定 |
-| 変換 | 実装・修正・裁定担当は `view,grep,glob` のみ。CLIのJSONLから応答を取り出し、Nodeの調整役が対象ファイルだけを書き込む |
-| 独立レビュー | 2担当に同じ固定入力を渡す。レビュー担当はツールなし。全ワーカーに `--no-custom-instructions` を指定 |
+| 変換 | CLI担当は `view,grep,glob` のみ、native担当は固定入力・ツールなし。JSON応答を検証し、Nodeの調整役が対象ファイルだけを書き込む |
+| 独立レビュー | 2担当に同じ固定入力を渡す。レビュー担当はツールなし。CLIは `--no-custom-instructions`、nativeはホスト管理の指示環境 |
 | 完了判定 | 出力、入力、2件のレビュー、必要な裁定結果のハッシュを保存。ファイルが存在するだけでは完了にしない |
 | 再開 | 中断した工程から再開。失われたレビューや変更された出力は再レビュー |
 | 工程の承認 | 入力・出力・前工程の実行IDに結び付ける。上流の再実行で下流結果・承認は失効 |
 | VS Code | Copilotは共通スキル、Localは10工程のprompt filesとLocal用hooksを利用 |
 | Dynamic Workflows | 共通実行エンジンを使う任意の実験的アダプター |
 
+## VS Code内でサブエージェントを使う
+
+`workerBackend: "native"` を選ぶと、現在のVS Codeセッションの親エージェントが
+実装・レビュー・裁定・修正をサブエージェントへ委譲します。Copilot CLIは起動しません。
+Node runnerが仕事を発行し、親が結果を提出します。検証・ファイル反映・承認・再開は
+CLI方式と共通です。初期化には `--worker-backend native` を指定します。
+Localはコピー導入、Copilot（Agent Host）はプラグインまたはコピーに対応します。
+詳細は [VS Codeネイティブワーカー](docs/NATIVE-WORKERS.md) を参照してください。
+
+既存設定では `workerBackend` 省略時の `copilot-cli` を維持します。
+native接続は自動テストとオフライン題材で検証し、実VS CodeセッションのAI委譲は未検証です。
+CLIとnativeでは暗黙指示の扱いが異なり、同じ隔離保証とは扱いません。
+
 ## 必要なもの
 
 - Node.js 22以上。ランナー本体は外部npm依存なし。
-- 自分の環境でログイン済みのCopilot CLIと、指定モデルを利用できる契約・組織設定。
+- CLI方式ではログイン済みのCopilot CLI。native方式では委譲機能を使えるVS Codeセッション。いずれも指定モデルを利用できる契約・組織設定。
 - 対象言語の実行環境・ビルドツール。付属デモとPython/C依存解析にはPython 3が必要です。
 - Linuxの既存検証とmacOSでの自動テスト・CLI通信検証があります。Windowsでの実行は未検証です。WindowsではNodeから直接起動できるCopilot実行ファイルを使ってください。
 
@@ -84,6 +97,8 @@ node migration-kit/scripts/run_migration.mjs doctor --check-cli
 | `sourceLanguage`, `targetLanguage` | 対象言語。テンプレートのPython/JavaScriptを変更可能 |
 | `mode` | 自動ファイル変換は `preserve`。`redesign` は設計・試行プロンプトまで対応 |
 | `models` | implementer、reviewer-semantics、reviewer-rules、arbiter、fixerの各ID |
+| `workerBackend` | `copilot-cli`（省略時）または `native`。変更は承認を失効させる |
+| `nativeHarness` | native時に必須。`vscode-local` または `copilot`。現在のセッションと合わせる |
 | `concurrency` | 同時AI呼び出し数。初期値2。レビューを含めてこの数以下 |
 | `maxFixRounds`, `maxAgentCalls` | 1単位の修正回数、1回の実行のAI呼び出し数の上限 |
 | `timeoutSeconds` | 通常CLIの1ワーカー呼び出しの時間上限 |

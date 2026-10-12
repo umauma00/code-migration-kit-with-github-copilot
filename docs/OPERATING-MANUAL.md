@@ -19,8 +19,9 @@ does not apply to automated workers, which keep their JSON-only contracts.
 3. Complete one phase, report the evidence, then stop. The user's explicit next
    phase invocation authorizes that phase. Never self-issue `approve` without the
    user asking you to approve the concrete artifacts. Approval is bound to hashes.
-4. Translate through the runner. Implementers, fixers and arbiters use read/search
-   tools. Reviewers have no tools and receive the same frozen input. All return
+4. Translate through the runner. CLI implementers, fixers and arbiters use read/search
+   tools; native host workers all use tools: [] with self-contained inputs.
+   Reviewers have no tools and receive the same frozen input. All return
    JSON. The coordinator validates and writes only the manifest target.
    Never route around a tool denial or substitute an unrestricted agent session.
 5. Two independent reviewers examine every output: source behavior and rule
@@ -47,5 +48,9 @@ does not apply to automated workers, which keep their JSON-only contracts.
 
 Read [usage](../README.md), [contracts](CONTRACTS.md) and
 [permissions](../templates/settings.README.md) before a production run.
-The CLI is the automated reference path. In VS Code, use the shared
-`code-migration` skill with the Copilot harness, or phase prompt files with Local.
+The CLI remains the default automated path. In VS Code, select workerBackend:
+native and follow [native workers](NATIVE-WORKERS.md): keep the runner active,
+claim tasks, delegate to tool-free host subagents, and submit unchanged results.
+The same runner owns validation, writes, receipts and gates. Host-managed
+instruction isolation is recorded and is not equivalent to the CLI's isolation.
+Use the shared skill with Copilot, or the skill/phase prompt files with Local.

@@ -4,7 +4,7 @@ Every model reply must be one JSON object (a single fenced JSON block is also
 accepted). The local validator checks required values. Unknown/invalid results
 never become completed units; SDK schema enforcement is not used.
 
-All workers, including those launched by Dynamic Workflows, use fresh CLI
+In the default copilot-cli backend, all workers (including Dynamic Workflows) use fresh CLI
 processes with --no-custom-instructions. Automatic repository, ancestor and
 personal instruction discovery is disabled; selected --agent profiles still
 apply. Project migration policy must be in the reviewed RULEBOOK/inventory.
@@ -17,7 +17,18 @@ errors, aborts, unfinished tool requests and events after result fail closed.
 Informational/unknown event types may be ignored; they never supply a reply.
 Implementer, fixer and arbiter profiles use the concrete CLI tools view,grep,glob.
 The read/search aliases are not accepted for these workers because the reference
-CLI loses search tools with those aliases. VS Code launches the same CLI workers.
+CLI loses search tools with those aliases.
+
+With workerBackend: native, the host session launches tool-free subagents instead.
+The [native protocol](NATIVE-WORKERS.md) binds each request and one-time claim to
+the active runner, immutable inputs and candidate. The host submits unchanged
+JSON; the shared runner validates it and alone writes targets and receipts.
+All five roles receive self-contained input. Native receipts explicitly record
+host-managed instruction isolation and a host-reported (not observed) model.
+The parent must select the model through the host's per-call parameter and check
+host execution metadata before submission. Missing or mismatched execution
+metadata is a failed job, not permission to echo the requested model. The runner
+compares the submitted model string; it does not independently attest execution.
 
 ## Implementation and fix
 

@@ -13,10 +13,17 @@ repository for repository-copy installations. For plugin installations, use
 target repository as cwd. Resolve the plugin root from the loaded skill/agent.
 Do not replace the runner with fleet or an unrestricted chat loop.
 
+Select the execution path from config.workerBackend. For native, follow
+[native workers](../docs/NATIVE-WORKERS.md): keep the Node runner active, claim
+pending tasks, invoke the named tool-free host subagents with the requested model
+and exact prompt, and submit their unchanged JSON. Do not wait on the runner
+without servicing its tasks. Never silently fall back to Copilot CLI.
+
 The runner performs implementation → two independent reviews → arbitration of
 findings → confirmed fixes → re-review → hash-bound completion. Workers use
 explicit models from config and structured results. Reviewers have no tools and
-receive identical frozen inputs; other workers have read/search-only tools.
+receive identical frozen inputs; other CLI workers have read/search-only tools.
+Native workers all have no tools and receive self-contained frozen inputs.
 Only the coordinator writes the assigned manifest target. Existing output files
 without reviewed receipts are unfinished and must be reviewed.
 

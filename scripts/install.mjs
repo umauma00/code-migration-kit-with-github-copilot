@@ -13,9 +13,16 @@ function rewriteLinks(text, relativeFile) {
     return `](${path.posix.relative(path.posix.dirname(relativeFile), `migration-kit/${resolved}`)}${fragment})`;
   });
 }
-export function install(target, { apply = false, model, harness = 'copilot', withWorkflow = false, layout = 'repository' } = {}) {
+export function install(target, { apply = false, model, harness = 'copilot', withWorkflow = false, layout = 'repository', workerBackend = 'copilot-cli', nativeHarness = harness } = {}) {
   if (!['repository', 'plugin'].includes(layout)) throw new Error('layout must be repository or plugin');
   if (!['copilot', 'vscode-local'].includes(harness)) throw new Error('harness must be copilot or vscode-local');
+  if (!['copilot-cli', 'native'].includes(workerBackend)) throw new Error('workerBackend must be copilot-cli or native');
+  if (workerBackend === 'native' && (!['copilot', 'vscode-local'].includes(nativeHarness) || (layout === 'plugin' && nativeHarness !== 'copilot'))) throw new Error('Native harness must be copilot or vscode-local; vscode-local requires repository layout');
+  if (workerBackend === 'native' && withWorkflow) throw new Error('Native workers use the host session, not the experimental workflow');
+  const configureBackend = config => {
+    config.workerBackend = workerBackend;
+    if (workerBackend === 'native') config.nativeHarness = nativeHarness;
+  };
   if (layout === 'plugin' && (harness !== 'copilot' || withWorkflow)) throw new Error('Plugin layout uses Copilot hooks and does not include the experimental workflow extension');
   const root = fs.realpathSync(path.resolve(target));
   if (root === kitRoot || kitRoot.startsWith(`${root}${path.sep}`)) throw new Error('Install into a separate migration target repository');
@@ -28,6 +35,7 @@ export function install(target, { apply = false, model, harness = 'copilot', wit
     } else {
       const config = readJSON(path.join(kitRoot, 'templates/migration-config.json'));
       config.runtime = 'plugin';
+      configureBackend(config);
       if (model) for (const role of Object.keys(config.models)) config.models[role] = model;
       files.set('migration/config.json', `${JSON.stringify(config, null, 2)}\n`);
     }
@@ -65,6 +73,7 @@ export function install(target, { apply = false, model, harness = 'copilot', wit
     } else files.set(instructions, `${old.trimEnd()}\n\n${managed}`);
   } else files.set(instructions, managed);
   const config = readJSON(path.join(kitRoot, 'templates/migration-config.json'));
+  configureBackend(config);
   if (model) for (const role of Object.keys(config.models)) config.models[role] = model;
   if (!fs.existsSync(safePath(root, 'migration/config.json'))) files.set('migration/config.json', `${JSON.stringify(config, null, 2)}\n`);
   for (const rel of ['RULEBOOK.md', 'inventory.tsv']) if (!fs.existsSync(safePath(root, `migration/${rel}`))) files.set(`migration/${rel}`, fs.readFileSync(path.join(kitRoot, `templates/${rel}`), 'utf8'));
@@ -85,7 +94,7 @@ export function install(target, { apply = false, model, harness = 'copilot', wit
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
   try {
     const args = parseArgs(process.argv.slice(2));
-    if (!args.target) throw new Error('Usage: node scripts/install.mjs --target PATH [--layout repository|plugin] [--model MODEL_ID] [--harness copilot|vscode-local] [--with-workflow] [--apply]');
-    console.log(JSON.stringify(install(args.target, { apply: args.apply, model: args.model, harness: args.harness, withWorkflow: args['with-workflow'], layout: args.layout }), null, 2));
+    if (!args.target) throw new Error('Usage: node scripts/install.mjs --target PATH [--layout repository|plugin] [--model MODEL_ID] [--harness copilot|vscode-local] [--worker-backend copilot-cli|native] [--native-harness copilot|vscode-local] [--with-workflow] [--apply]');
+    console.log(JSON.stringify(install(args.target, { apply: args.apply, model: args.model, harness: args.harness, withWorkflow: args['with-workflow'], layout: args.layout, workerBackend: args['worker-backend'], nativeHarness: args['native-harness'] }), null, 2));
   } catch (e) { console.error(`ERROR: ${e.message}`); process.exitCode = 1; }
 }

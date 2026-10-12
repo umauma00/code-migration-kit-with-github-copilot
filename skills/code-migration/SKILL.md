@@ -15,8 +15,14 @@ In the shared prompts/manual, replace `migration-kit/` in executable paths with
 the resolved absolute plugin root; keep all project-relative inputs and outputs.
 
 If migration/config.json is missing, ask for the user's available model ID and
-migration languages, then preview:
-`node "<absolute-plugin-root>/scripts/install.mjs" --target . --layout plugin --model MODEL_ID`.
+migration languages, then choose the initialization command for the current host
+(reuse any explicit execution preference):
+
+- VS Code Copilot: `node "<absolute-plugin-root>/scripts/install.mjs" --target . --layout plugin --worker-backend native --native-harness copilot --model MODEL_ID`.
+- Copilot CLI: `node "<absolute-plugin-root>/scripts/install.mjs" --target . --layout plugin --worker-backend copilot-cli --model MODEL_ID`.
+
+VS Code Local requires the repository-copy layout described in
+[native workers](../../docs/NATIVE-WORKERS.md), not this plugin initialization.
 Apply with `--apply` once project initialization is authorized, and configure
 languages, source/output/test roots and validation commands. Initialization
 creates only migration/config.json, RULEBOOK.md and inventory.tsv; it does not
@@ -24,8 +30,9 @@ approve or run migration stages. An existing configuration with runtime other
 than plugin requires an explicit layout change rather than a silent overwrite.
 For initialized projects, require `"runtime": "plugin"` in migration/config.json.
 Use the plugin's code-migration-plugin-orchestrator agent for phase planning.
-The Node runner selects private plugin worker profiles and explicitly mounts
-this plugin for each CLI worker.
+For the CLI backend, the Node runner selects private plugin worker profiles and
+explicitly mounts this plugin. For native, use the dedicated native profiles
+already loaded in the host session, following the backend instructions below.
 
 Follow [phase reports and user decisions](../../docs/PHASE-HANDOFF.md) at every
 phase boundary. Show the actual artifacts, review points and a copyable next
@@ -46,6 +53,29 @@ evidence, not just a report/template's existence.
 - Translation complete: run [build](../../prompts/05-survey-build.md), then
   [smoke](../../prompts/05b-smoke.md), then [parity](../../prompts/05c-parity.md), one gate at a time.
 - Parity approved: run [post-parity](../../prompts/06-post-parity.md).
+
+## Worker execution backend
+
+For a new VS Code migration, initialize with `--worker-backend native` and
+`--native-harness copilot` for Copilot sessions, or `--harness vscode-local`
+for Local (repository-copy installation). For Copilot CLI, keep the default
+`copilot-cli` backend. Reuse the user's specified execution preference.
+Preserve existing config; changing backend requires fresh judge validation and
+translation approval, not a silent switch during a run.
+
+When config.workerBackend is native, follow [native workers](../../docs/NATIVE-WORKERS.md).
+Keep the runner active in a continuing terminal, claim pending jobs, delegate
+the exact prompt to the named tool-free host subagent with the requested model,
+and submit unchanged results. Dispatch independent jobs in parallel within the
+configured and host limits. The parent must service jobs while the runner waits.
+Do not inherit the parent conversation or add other reviewers' results.
+If the required model/profile/tools cannot be selected, report a failed job;
+never substitute the parent agent, edit the target, or fall back to CLI.
+Select the model through the host's actual per-call model parameter, not prompt
+text. Before submitting, check host execution metadata for the model used;
+if absent, different, or ambiguous, fail the job. Do not echo the requested
+model or ask the worker to identify itself as proof of execution.
+On cancellation stop host workers too; only the runner's receipts establish done.
 
 Use `run_migration.mjs status` for progress. Never silently install policies,
 change models, approve a stage, increase limits, weaken tests, or declare partial

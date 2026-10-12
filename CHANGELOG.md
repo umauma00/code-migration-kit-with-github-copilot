@@ -1,5 +1,16 @@
 # Unreleased
 
+- Add a native host-worker backend for VS Code Local and Copilot sessions: task
+  claim/submission, tool-free profiles, explicit models, stale-result rejection,
+  and cancellation/resume through the shared runner. Preserve the CLI default.
+- Record native host-managed instruction isolation separately from CLI isolation;
+  add installer options, host-driving instructions and offline transport tests.
+- Reserve native plugin worker names as well as qualified IDs, bind task listing
+  to the active run ID, and make VS Code plugin initialization select native.
+  Clarify per-call model selection and require host metadata checks before submission.
+- Publish complete runner locks atomically without replacing an existing lock,
+  preventing native clients from observing an empty lock during startup.
+
 - Require interactive phase reports with artifact links, review points, the next
   phase and a copyable reply. Use available question tools for missing decisions,
   with chat fallback and explicit approval wording for production stages.
