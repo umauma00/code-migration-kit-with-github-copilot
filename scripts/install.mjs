@@ -13,10 +13,34 @@ function rewriteLinks(text, relativeFile) {
     return `](${path.posix.relative(path.posix.dirname(relativeFile), `migration-kit/${resolved}`)}${fragment})`;
   });
 }
-export function install(target, { apply = false, model, harness = 'copilot', withWorkflow = false } = {}) {
+export function install(target, { apply = false, model, harness = 'copilot', withWorkflow = false, layout = 'repository' } = {}) {
+  if (!['repository', 'plugin'].includes(layout)) throw new Error('layout must be repository or plugin');
   if (!['copilot', 'vscode-local'].includes(harness)) throw new Error('harness must be copilot or vscode-local');
+  if (layout === 'plugin' && (harness !== 'copilot' || withWorkflow)) throw new Error('Plugin layout uses Copilot hooks and does not include the experimental workflow extension');
   const root = fs.realpathSync(path.resolve(target));
   if (root === kitRoot || kitRoot.startsWith(`${root}${path.sep}`)) throw new Error('Install into a separate migration target repository');
+  const existingConfig = safePath(root, 'migration/config.json');
+  if (layout === 'repository' && fs.existsSync(existingConfig) && readJSON(existingConfig).runtime === 'plugin') throw new Error('Existing configuration uses plugin layout; reconcile it explicitly before switching to repository layout');
+  if (layout === 'plugin') {
+    const files = new Map(), configPath = safePath(root, 'migration/config.json');
+    if (fs.existsSync(configPath)) {
+      if (readJSON(configPath).runtime !== 'plugin') throw new Error('Existing configuration uses repository layout; reconcile it explicitly before switching to plugin layout');
+    } else {
+      const config = readJSON(path.join(kitRoot, 'templates/migration-config.json'));
+      config.runtime = 'plugin';
+      if (model) for (const role of Object.keys(config.models)) config.models[role] = model;
+      files.set('migration/config.json', `${JSON.stringify(config, null, 2)}\n`);
+    }
+    for (const rel of ['RULEBOOK.md', 'inventory.tsv']) {
+      const name = `migration/${rel}`, file = safePath(root, name);
+      if (fs.existsSync(file)) {
+        if (!fs.statSync(file).isFile()) throw new Error(`Destination is not a regular file: ${name}`);
+      } else files.set(name, fs.readFileSync(path.join(kitRoot, `templates/${rel}`), 'utf8'));
+    }
+    if (apply) for (const [name, content] of files) atomicWrite(safePath(root, name), content);
+    return { applied: apply, target: root, layout, changes: [...files.keys()],
+      next: 'Edit migration/config.json (languages, paths, models and commands), then invoke the code-migration skill from the installed plugin. Existing configuration is retained.' };
+  }
   const files = new Map();
   for (const dir of ['lib', 'scripts', 'prompts', 'templates', 'docs']) for (const rel of filesUnder(kitRoot, dir)) {
     if (rel === 'scripts/demo.mjs') continue;
@@ -27,7 +51,7 @@ export function install(target, { apply = false, model, harness = 'copilot', wit
   runtimePackage.scripts = { check: 'node scripts/run_migration.mjs doctor --root ..' };
   files.set('migration-kit/package.json', `${JSON.stringify(runtimePackage, null, 2)}\n`);
   for (const rel of filesUnder(kitRoot, '.github')) {
-    if (rel.startsWith('.github/workflows/') || (!withWorkflow && rel.startsWith('.github/extensions/')) || rel.startsWith('.github/hooks/')) continue;
+    if (rel.startsWith('.github/plugin/') || rel.startsWith('.github/workflows/') || (!withWorkflow && rel.startsWith('.github/extensions/')) || rel.startsWith('.github/hooks/')) continue;
     files.set(rel, rewriteLinks(fs.readFileSync(safePath(kitRoot, rel), 'utf8'), rel));
   }
   files.set('.github/hooks/code-migration.json', fs.readFileSync(path.join(kitRoot, `templates/hooks.${harness}.json`), 'utf8'));
@@ -61,7 +85,7 @@ export function install(target, { apply = false, model, harness = 'copilot', wit
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
   try {
     const args = parseArgs(process.argv.slice(2));
-    if (!args.target) throw new Error('Usage: node scripts/install.mjs --target PATH [--model MODEL_ID] [--harness copilot|vscode-local] [--with-workflow] [--apply]');
-    console.log(JSON.stringify(install(args.target, { apply: args.apply, model: args.model, harness: args.harness, withWorkflow: args['with-workflow'] }), null, 2));
+    if (!args.target) throw new Error('Usage: node scripts/install.mjs --target PATH [--layout repository|plugin] [--model MODEL_ID] [--harness copilot|vscode-local] [--with-workflow] [--apply]');
+    console.log(JSON.stringify(install(args.target, { apply: args.apply, model: args.model, harness: args.harness, withWorkflow: args['with-workflow'], layout: args.layout }), null, 2));
   } catch (e) { console.error(`ERROR: ${e.message}`); process.exitCode = 1; }
 }

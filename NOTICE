@@ -5,3 +5,7 @@ This adaptation changes instructions, queue completion semantics, build exit
 handling and manifest validation, and adds the Copilot execution layer.
 See UPSTREAM.json for the source revision. Original test receipts remain in
 RUN-NOTES.md; they are not Copilot validation results.
+
+lib/vendor/yaml.mjs contains a bundled parser from yaml 2.8.1,
+Copyright Eemeli Aro <eemeli@gmail.com>, licensed under ISC.
+See lib/vendor/yaml.LICENSE for its copyright and permission notice.

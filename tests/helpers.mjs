@@ -6,10 +6,10 @@ import { loadConfig, roles, writeJSON, safePath, atomicWrite, readManifest } fro
 import { approve, runStage } from '../lib/pipeline.mjs';
 
 export const mini = path.join(kitRoot, 'fixtures/mini');
-export function prepare(t, { realCommands = false, count = 1, model = 'test-double', root, workflow = false } = {}) {
+export function prepare(t, { realCommands = false, count = 1, model = 'test-double', root, workflow = false, layout = 'repository' } = {}) {
   root ??= fs.mkdtempSync(path.join(os.tmpdir(), 'copilot-migration-test-'));
   t?.after(() => fs.rmSync(root, { recursive: true, force: true }));
-  install(root, { apply: true, model, withWorkflow: workflow });
+  install(root, { apply: true, model, withWorkflow: workflow, layout });
   fs.cpSync(path.join(mini, 'src'), path.join(root, 'src'), { recursive: true });
   fs.cpSync(path.join(mini, 'tests'), path.join(root, 'tests'), { recursive: true });
   const config = loadConfig(root);

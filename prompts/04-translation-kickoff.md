@@ -5,7 +5,9 @@ manifest, audited review dependency map, validated judge, installed profiles and
 explicit translation approval.
 
 Use `node migration-kit/scripts/run_migration.mjs translate` from the target
-repository. Use the path without `migration-kit/` only when running this kit itself.
+repository for repository-copy installations. For plugin installations, use
+`node "<absolute-plugin-root>/scripts/run_migration.mjs" translate` with the same
+target repository as cwd. Resolve the plugin root from the loaded skill/agent.
 Do not replace the runner with fleet or an unrestricted chat loop.
 
 The runner performs implementation → two independent reviews → arbitration of

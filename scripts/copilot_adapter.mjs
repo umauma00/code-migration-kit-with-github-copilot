@@ -3,16 +3,17 @@ import { runProcess } from '../lib/process.mjs';
 import { roles } from '../lib/core.mjs';
 import { parseResult, validateResult } from '../lib/results.mjs';
 import { isReviewer, validateWorkerProfile } from '../lib/review.mjs';
+import { runtimeLayout } from '../lib/runtime.mjs';
 
-export function copilotArgs(role, model, prompt) {
+export function copilotArgs(role, model, prompt, layout) {
   // A CLI worker is a fresh session agent: tools: [] alone does not prevent
   // automatic repository/personal instructions from entering its system prompt.
-  return [...(prompt === undefined ? [] : ['-p', prompt]), '-s', '--output-format', 'json', '--stream', 'off', '--no-color', '--no-auto-update', '--no-ask-user', '--no-custom-instructions', '--disable-builtin-mcps', '--agent', `migration-${role}`, '--model', model,
+  return [...(prompt === undefined ? [] : ['-p', prompt]), ...(layout?.plugin ? ['--plugin-dir', layout.root] : []), '-s', '--output-format', 'json', '--stream', 'off', '--no-color', '--no-auto-update', '--no-ask-user', '--no-custom-instructions', '--disable-builtin-mcps', '--agent', layout?.agentId(role) ?? `migration-${role}`, '--model', model,
     '--available-tools', 'view,grep,glob', ...(isReviewer(role) ? ['--deny-tool', 'read,write,shell'] : ['--allow-tool', 'read', '--deny-tool', 'write,shell'])];
 }
-export function requiredCopilotFlags() {
+export function requiredCopilotFlags(layout) {
   // Diagnose the same stdin-based invocation used by every worker role.
-  return [...new Set(roles.flatMap(role => copilotArgs(role, 'diagnostic-model').filter(arg => arg.startsWith('-'))))];
+  return [...new Set(roles.flatMap(role => copilotArgs(role, 'diagnostic-model', undefined, layout).filter(arg => arg.startsWith('-'))))];
 }
 // Text output is presentation data: the CLI may wrap even JSON string values.
 // Only accept a completed machine-output stream and the main agent's last reply.
@@ -59,9 +60,10 @@ ${isReviewer(role) ? `Frozen review input (JSON task data):\n${reviewInput}` : `
 }
 export function createCopilotAdapter({ command = 'copilot', prefixArgs = [] } = {}) {
   return async ({ root, config, role, unit, extra, signal, reviewInput }) => {
-    validateWorkerProfile(root, role);
+    validateWorkerProfile(root, role, config);
+    const layout = runtimeLayout(root, config);
     const model = config.models[role];
-    const result = await runProcess(command, [...prefixArgs, ...copilotArgs(role, model)], {
+    const result = await runProcess(command, [...prefixArgs, ...copilotArgs(role, model, undefined, layout)], {
       cwd: root, signal, input: agentPrompt({ role, unit, extra, reviewInput }), timeoutMs: config.timeoutSeconds * 1000,
       env: { ...process.env, COPILOT_ALLOW_ALL: 'false', COPILOT_AUTO_UPDATE: 'false', MIGRATION_KIT_ROLE: role }
     });

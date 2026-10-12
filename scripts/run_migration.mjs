@@ -8,6 +8,7 @@ import { validateWorkerProfile } from '../lib/review.mjs';
 import { runProcess } from '../lib/process.mjs';
 import { approve, runStage, translate } from '../lib/pipeline.mjs';
 import { createCopilotAdapter, requiredCopilotFlags } from './copilot_adapter.mjs';
+import { runtimeLayout } from '../lib/runtime.mjs';
 
 export const usage = `Usage: node migration-kit/scripts/run_migration.mjs COMMAND [options]
   doctor [--check-cli] [--copilot /path/to/copilot]
@@ -22,11 +23,12 @@ Options: --root PATH (default cwd), --copilot PATH (default copilot)
 Configuration: migration/config.json. No command commits or pushes changes.`;
 export async function doctor(root, config, { checkCLI = false, command = 'copilot' } = {}) {
   const checks = [{ check: 'configuration', ok: true }];
+  const layout = runtimeLayout(root, config);
   for (const role of ['orchestrator', 'implementer', 'reviewer-semantics', 'reviewer-rules', 'arbiter', 'fixer']) {
-    const p = `.github/agents/migration-${role}.agent.md`, file = safePath(root, p);
+    const p = layout.agentPath(role), file = safePath(layout.root, p);
     checks.push({ check: p, ok: fs.existsSync(file) });
     if (role !== 'orchestrator' && fs.existsSync(file)) {
-      try { validateWorkerProfile(root, role); checks.push({ check: `${role}: model and tools`, ok: true }); }
+      try { validateWorkerProfile(root, role, config); checks.push({ check: `${role}: model and tools`, ok: true }); }
       catch (e) { checks.push({ check: `${role}: model and tools`, ok: false, detail: e.message }); }
     }
   }
@@ -38,7 +40,7 @@ export async function doctor(root, config, { checkCLI = false, command = 'copilo
     checks.push({ check: 'review dependency map', ok: true, units: units.map(u => ({ source: u.source, files: reviewSources(root, config, u.source, graph) })), note: 'Declared evidence scope; audit parser coverage and semantic dependencies in phase 01.' });
   } catch (e) { checks.push({ check: 'review dependency map', ok: false, detail: e.message }); }
   checks.push({ check: 'build artifact roots', ok: true, roots: config.buildArtifactRoots ?? [], note: 'Declare generated binaries, objects and reports here. Their file contents are excluded from command-input fingerprints; actual inputs must stay outside these roots.' });
-  checks.push({ check: 'worker hook installed', ok: fs.existsSync(safePath(root, '.github/hooks/code-migration.json')) });
+  checks.push({ check: 'worker hook installed', ok: fs.existsSync(safePath(layout.root, layout.hookPath)) });
   if (checkCLI) {
     try {
       const version = await runProcess(command, ['--version'], { cwd: root, timeoutMs: 20000 });
@@ -46,7 +48,7 @@ export async function doctor(root, config, { checkCLI = false, command = 'copilo
       const text = help.stdout + help.stderr;
       checks.push({ check: 'Copilot executable', ok: version.code === 0, detail: version.stdout.trim() });
       const advertised = new Set(text.match(/(?<![\w-])--?[A-Za-z][A-Za-z0-9-]*/g) ?? []);
-      const missing = requiredCopilotFlags().filter(flag => !advertised.has(flag));
+      const missing = requiredCopilotFlags(layout).filter(flag => !advertised.has(flag));
       checks.push({ check: 'required flags', ok: help.code === 0 && missing.length === 0, missing });
     } catch (e) { checks.push({ check: 'Copilot executable', ok: false, detail: e.message }); }
   }

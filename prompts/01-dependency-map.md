@@ -2,6 +2,10 @@
 
 Prerequisite: feasibility and judge design reviewed. Work one phase and stop.
 
+For plugin installations, replace `migration-kit/` in script paths with the
+absolute plugin root resolved from the loaded skill/agent. Keep the target
+repository as cwd and all migration artifact paths relative to it.
+
 Use a deterministic dependency parser for the actual source ecosystem. Preserve
 `edges.tsv`, `order.txt`, `cycles.txt` under `migration/depmap/`. Review unresolved
 imports and generated/vendor exclusions. Check cycles at file AND target package

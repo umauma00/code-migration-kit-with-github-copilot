@@ -2,6 +2,12 @@
 
 These rules apply to running a language migration, not to maintaining this kit.
 
+For plugin installations (`migration/config.json` has `"runtime": "plugin"`),
+resolve the plugin root from the loaded skill/agent file. Replace `migration-kit/`
+in executable paths below and in phase prompts with that absolute plugin root.
+Run commands from the target repository; project artifacts stay relative to it.
+See [plugin setup](PLUGIN.md). Repository-copy installations use the paths shown.
+
 1. Keep the original implementation runnable. It is the executable specification.
 2. Decide once in `migration/RULEBOOK.md`; consult `migration/inventory.tsv` for
    each semantic gap. Workers never modify either. Propose amendments at a gate.

@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "hooks": {
+    "preToolUse": [
+      {
+        "type": "command",
+        "bash": "node \"${PLUGIN_ROOT}/scripts/migration_hook.mjs\"",
+        "powershell": "node \"${PLUGIN_ROOT}/scripts/migration_hook.mjs\"",
+        "timeoutSec": 5
+      }
+    ]
+  }
+}

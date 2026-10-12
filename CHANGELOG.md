@@ -1,3 +1,19 @@
+# 0.2.0 — 2026-10-11
+
+- Add an Agent Plugins 1.0 manifest, portable code-migration skill, six
+  Copilot-specific agent profiles, worker hook and local marketplace manifest.
+- Add `install --layout plugin`: keep runtime in the plugin, initialize only
+  project configuration/rulebook/inventory, and preserve existing project data.
+- Mount the plugin explicitly for CLI workers; diagnose mounting support and
+  reject personal/project worker profiles that would shadow plugin profiles.
+- Fingerprint bundled runtime content so plugin changes invalidate approvals
+  and reviewed completion receipts. Include project hooks and agent definitions;
+  preserve fingerprints across plugin relocation.
+- Resolve local agent YAML names and nested file IDs before CLI execution. Reject
+  aliases of reserved plugin selectors while allowing unqualified names to coexist.
+  Bundle the ISC-licensed yaml parser so plugin use requires no npm install.
+- Retain repository-copy installation and its existing default configuration.
+
 # 0.1.5 — 2026-10-10
 
 - Disable ambient custom instructions for all CLI workers and require the flag

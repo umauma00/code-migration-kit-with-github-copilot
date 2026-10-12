@@ -2,7 +2,7 @@
 
 Anthropicの[Code Migration Kit](https://github.com/anthropics/code-migration-kit-with-claude-code)を、GitHub Copilot CLIを中心に使える形へ変更した非公式版です。言語間移植の「事前調査 → ルール固定 → 変換 → 独立レビュー → ビルド → 新旧比較」を扱います。
 
-**0.1.5** は再レビューで見つかった暗黙指示の混入、inventory先頭BOM、依存マップの解析ルートの扱いを修正した版です。[今回の修正と再レビュー](docs/reviews/2026-10-10-copilot-rereview-fixes.md)、[0.1.4の修正記録](docs/reviews/2026-10-10-copilot-fixes.md)、[既存版からの更新](docs/UPGRADING.md)を参照してください。
+**0.2.0** はVS Code / Copilot CLIのAgent Plugins形式に対応しました。キット本体をプラグインとして導入し、案件側では設定と成果物を管理できます。[プラグイン導入手順](docs/PLUGIN.md)、[従来版の修正と再レビュー](docs/reviews/2026-10-10-copilot-rereview-fixes.md)、[既存版からの更新](docs/UPGRADING.md)を参照してください。
 
 参照したCLIは **1.0.93**、VS Codeは **1.141.0** です。固定した元コミットとSDK参照版は [UPSTREAM.json](UPSTREAM.json) に記録しています。Anthropic/GitHubの公式配布物ではありません。
 
@@ -12,7 +12,7 @@ Anthropicの[Code Migration Kit](https://github.com/anthropics/code-migration-ki
 
 | 項目 | この版の動作 |
 |---|---|
-| 指示・スキル | 対話の入口は `.github/copilot-instructions.md` と `.github/skills/code-migration/SKILL.md`。自動ワーカーは暗黙の指示読み込みを無効化 |
+| 指示・スキル | プラグインの `skills/code-migration/SKILL.md`、またはコピー導入の `.github/skills/code-migration/SKILL.md`。自動ワーカーは暗黙の指示読み込みを無効化 |
 | 役割分担 | orchestrator / implementer / 独立reviewer 2種 / arbiter / fixer の6プロファイル |
 | モデル | 5種類のワーカーに明示指定。利用できるモデルIDをユーザーが設定 |
 | 変換 | 実装・修正・裁定担当は `view,grep,glob` のみ。CLIのJSONLから応答を取り出し、Nodeの調整役が対象ファイルだけを書き込む |
@@ -30,7 +30,19 @@ Anthropicの[Code Migration Kit](https://github.com/anthropics/code-migration-ki
 - 対象言語の実行環境・ビルドツール。付属デモとPython/C依存解析にはPython 3が必要です。
 - Linuxの既存検証とmacOSでの自動テスト・CLI通信検証があります。Windowsでの実行は未検証です。WindowsではNodeから直接起動できるCopilot実行ファイルを使ってください。
 
-## 対象リポジトリへ導入する
+## プラグインとして導入する
+
+プラグイン対応ブランチを、移行対象とは別の場所にcloneします。
+
+```bash
+git clone --branch feat/github-copilot-migration-kit https://github.com/umauma00/code-migration-kit-with-github-copilot.git /path/to/code-migration-kit
+copilot plugin marketplace add /path/to/code-migration-kit
+copilot plugin install code-migration-kit@code-migration-kit-marketplace
+```
+
+この手順には0.2.0の変更を含むcheckoutが必要です。VS CodeはCLIでインストールしたプラグインを検出します。ローカルcheckoutを直接登録する設定、案件の初期化、更新方法は [PLUGIN.md](docs/PLUGIN.md) を参照してください。対象リポジトリをVS Codeで開き、Copilotチャットで `code-migration` スキルを使って移行開始を依頼します。
+
+## キットを対象リポジトリへコピーして導入する
 
 キットのルートで実行します。`MODEL_ID` は、利用するアカウントのCopilotで `/model` に表示される実際のIDへ置き換えてください。モデル名や料金は固定していません。
 
