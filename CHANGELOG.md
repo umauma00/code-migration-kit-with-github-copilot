@@ -1,5 +1,10 @@
 # Unreleased
 
+- Track the ten migration phases in the host TODO list from the parent
+  orchestrator, including approval waits, revisions, failures and resumption
+  from current evidence. Enable the `todo` alias in both orchestrator profiles
+  and retain a chat-checklist fallback when the host tool is unavailable.
+
 - Add a native host-worker backend for VS Code Local and Copilot sessions: task
   claim/submission, tool-free profiles, explicit models, stale-result rejection,
   and cancellation/resume through the shared runner. Preserve the CLI default.

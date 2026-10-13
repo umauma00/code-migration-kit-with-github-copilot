@@ -41,6 +41,12 @@ otherwise present the choices in chat and wait. Reuse answers already given.
 After a phase, resolve the next step from the user's instruction and current
 evidence, not just a report/template's existence.
 
+At start or resumption, follow the [ten-phase TODO tracking contract](../../docs/PHASE-HANDOFF.md#track-the-ten-phases-in-the-host-todo-list).
+Create or reconcile the host TODO list before starting phase work; update it on
+phase start, completion, approval waits, revisions, failures and resumption.
+Only the parent orchestrator updates it from actual evidence. If the tool is
+unavailable, show the same checklist in chat. TODO items never authorize a gate.
+
 - No feasibility report: run [feasibility](../../prompts/00-feasibility.md), report, stop.
 - No judge preparation: run [judge setup](../../prompts/00b-judge-setup.md), save
   migration/judge-report.md, report, stop. The formal judge receipt comes after

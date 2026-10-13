@@ -9,6 +9,12 @@ Read the [operating manual](../docs/OPERATING-MANUAL.md) and [usage](../README.m
 Locate the installed kit at `migration-kit/`; when maintaining the kit itself,
 its scripts and prompts are at repository root.
 
+At start or resumption, follow the [ten-phase TODO tracking contract](../docs/PHASE-HANDOFF.md#track-the-ten-phases-in-the-host-todo-list).
+Create or reconcile the host TODO list before starting phase work; update it on
+phase start, completion, approval waits, revisions, failures and resumption.
+Only the parent orchestrator updates it from actual evidence. If the tool is
+unavailable, show the same checklist in chat. TODO items never authorize a gate.
+
 - No feasibility report: run [feasibility](../prompts/00-feasibility.md), report, stop.
 - No validated judge: run [judge setup](../prompts/00b-judge-setup.md), report, stop.
 - No map/rules: run [dependency map](../prompts/01-dependency-map.md), then
