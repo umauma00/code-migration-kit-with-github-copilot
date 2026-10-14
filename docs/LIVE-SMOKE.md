@@ -38,3 +38,26 @@ VS Codeを使う場合は、選択した実行方式で入口とhooksの実動�
 Dynamic Workflowsは [専用の確認事項](DYNAMIC-WORKFLOWS.md) を追加してから試してください。
 
 結果の記録例：CLI版、OS、Node版、モデルID、工程、単位数、ケース数、差分数、所要時間、実測できた利用量、未確認事項。未実測の費用やモデル名を推定値で埋めないでください。
+
+## VS Code orchestration checklist (pending live verification)
+
+These checks require actual VS Code; offline fixtures do not establish UI behavior.
+
+- Start via plugin skill, repository skill and Local prompt: user-facing parent
+  shows all ten phases before long work; planning children return advice.
+- Confirm actual exposed TODO tool/schema, response and rendered list separately.
+  Preserve unrelated tasks, avoid duplicates; verify chat fallback on unavailable,
+  failed or reported invisible TODO. Local children never use TODO/question tools.
+- During native translate, confirm continuing terminal and responsive parent, exact
+  requested model metadata, frozen isolated prompts, slot refill and reviewer cap.
+- Invoke actual built-in Rubber Duck if exposed; record unavailable otherwise.
+  Save adoption/rejection and actual fix/reverification references.
+- Press VS Code Stop during implementation and between the two reviews. Inspect
+  runner process, terminal and host children. If still active, Ctrl+C the runner
+  and stop children; verify lock release and stale native result rejection.
+- Rerun translate: completed units reuse valid receipts, only missing reviews rerun,
+  blocked/stopped status matches evidence. Confirm changed inputs require fresh approval.
+- Walk source-only through judge, approval, reviewed implementation, actual build/smoke
+  and handoff: no original invocation, no passed parity, final equivalence unverified.
+
+Current repository automation does not claim these live checks have passed.

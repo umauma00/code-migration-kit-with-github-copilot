@@ -1,5 +1,18 @@
 # Unreleased
 
+- Enforce reviewed preparation order through phase records at the skill entry and runner gates; retain the ten existing phase IDs and explicit source-only parity applicability.
+- Export main-compatible migration/cost-log.tsv with measured timing, actual worker counts and unknown usage/model values, retaining existing rows and deduplicating exports.
+
+## Unreleased — VS Code orchestration
+
+- Parent-session TODO ownership, verified-tool/chat fallback and actionable 00/00b reports.
+- Read-only early status with Markdown, live lock/run roles, evidence and blockers.
+- Explicit source-only judge plan and smoke-to-handoff receipts; parity stays unverified.
+- Dependency-aware slot refilling under the existing global AI concurrency cap.
+- Host built-in Rubber Duck advisory records and existing repair/reverification routing.
+- Cancellation/resumption regressions and honest pending live VS Code checklist.
+
+
 - Track the ten migration phases in the host TODO list from the parent
   orchestrator, including approval waits, revisions, failures and resumption
   from current evidence. Enable the `todo` alias in both orchestrator profiles

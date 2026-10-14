@@ -22,18 +22,20 @@ phase start, completion, approval waits, revisions, failures and resumption.
 Only the parent orchestrator updates it from actual evidence. If the tool is
 unavailable, show the same checklist in chat. TODO items never authorize a gate.
 
-- No feasibility report: run [feasibility](../../../prompts/00-feasibility.md), report, stop.
-- No judge preparation: run [judge setup](../../../prompts/00b-judge-setup.md), save
-  migration/judge-report.md, report, stop. The formal judge receipt comes after
-  the manifest/rulebook/inventory are ready; its absence alone does not repeat 00b.
-- No map/rules: run [dependency map](../../../prompts/01-dependency-map.md), then
-  [gap inventory](../../../prompts/02-gap-inventory.md), stopping at each gate.
-- Rules and inventory reviewed: run judge validation when its artifacts are ready,
-  then [stress test](../../../prompts/03-stress-test.md). Respect redesign mode.
-- Translation approved: run [translation](../../../prompts/04-translation-kickoff.md).
-- Translation complete: run [build](../../../prompts/05-survey-build.md), then
-  [smoke](../../../prompts/05b-smoke.md), then [parity](../../../prompts/05c-parity.md), one gate at a time.
-- Parity approved: run [post-parity](../../../prompts/06-post-parity.md).
+The runner selects the first incomplete phase. Existing artifacts supply evidence
+for review; they do not route directly to a later phase. Respect redesign mode.
+
+## Ordered workflow entry
+
+Before routing a configured project, run `run_migration.mjs phase init`, then
+`phase next`. Follow [ordered workflow](../../../docs/ORDERED-WORKFLOW.md).
+Run only the first incomplete phase; use `phase start ID` before work. An explicit
+request for a later phase does not waive missing earlier reviews. Do not route
+from file existence. After user review, record early phases with `phase complete
+ID --note TEXT`; runner receipts determine implementation and validation phases.
+Keep all ten phases visible. Source-only 05c needs an explicit unverified-mode
+acknowledgment before handoff. Record known host usage with completion;
+[main-format cost logs](../../../docs/COST-LOG.md) use unknown where unavailable.
 
 ## Worker execution backend
 
@@ -61,3 +63,25 @@ On cancellation stop host workers too; only the runner's receipts establish done
 Use `run_migration.mjs status` for progress. Never silently install policies,
 change models, approve a stage, increase limits, weaken tests, or declare partial
 outputs complete. The user's explicit instruction can authorize a concrete gate.
+
+## Parent-session phase ownership
+
+The top-level user-facing session retains phase planning, TODO display, questions
+and native dispatch. Using an orchestrator agent for planning never transfers
+the whole migration to a child. If invoked as a subagent, it returns the plan,
+status and decisions to the parent; it does not update TODO or ask questions.
+Local subagents cannot use TODO/question tools. Before long work, show all ten
+phases and the current phase. Use the actual exposed TODO schema, check its
+response, preserve unrelated tasks and avoid duplicates. Success of a tool call
+does not prove the UI is visible; if unavailable, failed or reported invisible,
+show the same checklist in chat. Actual VS Code rendering needs live verification.
+
+Read [source-only verification](../../../docs/SOURCE-ONLY.md) for explicit source-only
+setup and smoke-to-handoff routing. Read [built-in Rubber Duck](../../../docs/RUBBER-DUCK.md)
+for milestone advisory review and adopted fix/reverification records.
+Use status --format markdown even before a manifest exists. Artifact candidates
+are not phase approval or validated completion.
+
+In source-only mode, after reviewed successful smoke mark 05c unverified and
+prepare/review 06 handoff; use approve handoff then handoff. Do not approve or
+execute parity or post-parity. Runtime projects keep those existing gates.

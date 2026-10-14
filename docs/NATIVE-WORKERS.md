@@ -150,3 +150,32 @@ node migration-kit/scripts/native_workers.mjs fail --task TASK_ID --claim CLAIM_
 
 実案件前に、小規模題材で全5役の選択、モデル指定、ツールが空であること、両reviewerの
 固定入力、キャンセル・再開、未承認の次工程へ進まないことを確認してください。
+
+## VS Code orchestration and verification modes
+
+The user-facing parent owns phase TODO, questions and native job dispatch.
+Status is read-only and available after initialization: `status --format markdown`
+shows artifact candidates separately from validation, current reviewed units,
+active lock/run roles, blockers and next actions. It never grants approval.
+Use [source-only verification](SOURCE-ONLY.md) when the original runtime
+is unavailable; runtime remains the default. Use [built-in Rubber Duck](RUBBER-DUCK.md)
+only through host capabilities, with advisory decisions and existing repair/review.
+Live VS Code rendering, native model dispatch and Stop behavior remain pending
+until checked on a real host. Models and existing execution limits are unchanged.
+
+## Dispatch, cancellation and resumption
+
+Start the runner in a continuing terminal. Keep servicing list/claim/delegate/submit
+from the top-level parent rather than awaiting terminal completion. All two-reviewer
+and implementation/fix/arbiter calls use the existing global concurrency cap.
+Available unit slots refill without waiting for an entire wave. Audited transitive
+manifest dependencies finish before dependent units start; non-manifest dependencies
+are fixed source. Cycles without unit typecheck consume fixed source as a group;
+cycles with unit typecheck fail with paths and a grouping/defer-check remedy.
+
+Use existing cancellation only. VS Code Stop does not guarantee continuing terminals
+or subagents have stopped. If runner activity continues, send Ctrl+C to its terminal
+and stop host children too. Check status/processes before rerunning translate.
+Never unlock a live runner. Resume via translate; valid completed receipts and the
+one successful independent review are reused, stale native submissions rejected.
+No pause/resume/timebox or batch-stop command is introduced.

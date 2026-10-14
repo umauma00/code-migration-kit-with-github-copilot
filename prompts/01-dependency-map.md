@@ -61,3 +61,5 @@ audited review dependency map.
 Do not begin production translation. Stop for review.
 
 <!-- Copilot adaptation: migration control and instructions updated on 2026-10-08; see NOTICE. -->
+
+Save the concrete phase report to `migration/depmap/report.md`. After its actual user review, record `phase complete 01 --note TEXT` as described in [ordered workflow](../docs/ORDERED-WORKFLOW.md).

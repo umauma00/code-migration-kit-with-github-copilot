@@ -24,7 +24,7 @@ answers already given. If no question tool is available, ask in chat and wait.
 At start/resumption and phase transitions, maintain the host's ten-phase TODO
 list following the [progress contract](../../docs/PHASE-HANDOFF.md#track-the-ten-phases-in-the-host-todo-list).
 Update it before phase reports and approval questions, including waiting,
-revision and blocked states. Only this parent orchestrator manages the list;
+revision and blocked states. Only the user-facing top-level parent manages the list;
 use chat fallback if the tool is unavailable. Completion requires actual
 artifacts/receipts, and a TODO check never grants approval.
 
@@ -33,3 +33,14 @@ Read [the operating manual](../../docs/OPERATING-MANUAL.md) and
 `migration/config.json`; do not add a `model` frontmatter override.
 
 Resolve runner and prompt paths from this plugin directory; execute commands with the migration target repository as cwd. Project configuration and artifacts belong in migration/.
+
+When invoked as a child, return phase plan, status, blockers and necessary
+decisions to the user-facing parent. Do not ask questions or update TODO from
+a child; Local subagents lack these tools. Keep user-facing ownership in the
+parent, which services native claim/delegate/submit without blocking on runner
+completion. Use the real exposed TODO schema and confirm the response; distinguish
+tool success from actual UI visibility and show a chat checklist on failure or
+reported invisibility. Read [source-only mode](../../docs/SOURCE-ONLY.md) and
+[built-in Rubber Duck](../../docs/RUBBER-DUCK.md). Workers never own phase TODO.
+
+The user-facing parent initializes ordered phase records with `phase init`, then reads `phase next` before routing. Use `phase start ID` to enforce prerequisites; review early reports before `phase complete ID --note TEXT`. Follow [ordered workflow](../../docs/ORDERED-WORKFLOW.md) and [cost logs](../../docs/COST-LOG.md). A planning child returns this required next action to its parent.

@@ -40,8 +40,9 @@ them, and keep future phases visible rather than replacing them with worker jobs
   the UI. Update again when an answer authorizes work or changes the plan.
 - For phase 04, show current reviewed done/total and blocked units at meaningful
   milestones using `run_migration.mjs status`; keep translation as one phase
-  item. Before manifest/dependency preparation, status may be unavailable: report
-  that limitation and use the preparation evidence instead of inventing counts.
+  item. Status is available after initialization even before manifest/dependency
+  preparation. Use status --format markdown for candidates, missing inputs,
+  current receipts, active calls and blockers; candidates do not prove completion.
 - On resumption or upstream changes, inspect the reports, current inputs, runner
   receipts and approvals before restoring completed items. Status alone reports
   translation units, not completion of all ten phases. Reset affected items and
@@ -109,7 +110,7 @@ Route translated-code revisions through the runner's repair/review flow. Handle
 rulebook or judge amendments at a phase boundary and refresh affected validation;
 the revise choice does not permit bypassing those existing controls.
 
-For translation/build/smoke/parity/post-parity, the proceed choice must explicitly
+For translation/build/smoke and runtime parity/post-parity or source-only handoff, the proceed choice must explicitly
 say **approve and run the named stage**, identifying the current artifacts in the
 question. Only after a real answer authorizes it, record the appropriate runner
 approval and execute that stage. Never issue every future approval in advance.
@@ -138,13 +139,13 @@ judge design solely to create the new report format.
 | 00b judge preparation | `migration/judge-report.md`, test/scenario paths and configured commands | 01 dependency map |
 | 01 dependency map | `migration/depmap/`, RULEBOOK, manifest and review-dependency draft | 02 gap inventory |
 | 02 gap inventory | Inventory coverage, resolved rules and audited review dependencies | Judge validation, then 03 stress test |
-| Judge validation | Current `migration/results/judge.json` and original/mutation command results | 03 stress test |
+| Judge validation | Current `migration/results/judge.json`: runtime original/mutation results; source-only validated source preparation and equivalence unverified | 03 stress test |
 | 03 stress test | `migration/stress-test/report.md`, pilot results and remaining decisions | Approve and start translation |
 | 04 translation | Output paths, reviewed done/total, blocked units and run summary | Approve and run build |
 | 05 build | `migration/results/build.json`, success or concrete diagnostics | Approve and run smoke |
-| 05b smoke | `migration/results/smoke.json`, asserted public scenario and outcome | Approve and run parity |
-| 05c parity | `migration/results/parity.json`, original/parity counts and differences | Approve post-parity cleanup |
-| 06 post-parity | Remaining markers, reviewed changes and final verification | User-chosen follow-up |
+| 05b smoke | `migration/results/smoke.json`, asserted target public scenario and outcome | Runtime: approve/run parity; source-only: prepare and review 06 handoff |
+| 05c parity | Runtime: current parity receipt and comparison results; source-only: unverified / not run, no passed parity receipt | Runtime: approve post-parity; source-only: 06 handoff |
+| 06 handoff | Runtime: approved post-parity changes and final verification; source-only: reviewed handoff.md, current smoke and separate approve handoff + handoff receipt, equivalence unverified | User-chosen follow-up |
 
 The formal judge command needs the rulebook, inventory, manifest and dependency
 map. Phase 00b prepares the judge and saves its design/results report; it may
@@ -152,7 +153,9 @@ defer the formal receipt until those artifacts exist. Do not loop back to 00b
 solely because `results/judge.json` is absent before phase 01. Judge validation
 does not require an `approve judge` command. Post-parity has an approval gate but
 no executable `run_migration.mjs post-parity` command; follow prompt 06 after
-approval instead.
+approval instead. Status labels a current runtime approval as approved with
+cleanup completion unconfirmed, and asks for the cleanup and a results report.
+Approval alone does not establish that prompt 06 work is complete.
 
 ## Example: feasibility finished
 
@@ -175,3 +178,30 @@ Show the actual reviewed done/total, output directory and run-summary link first
 Then ask "この変換結果のビルドを承認して実行しますか？" with choices
 "ビルドを承認して実行", "変換結果の修正を相談", "ここで中断する".
 Include the chat reply example: "この変換結果のビルドを承認します。実行してください。"
+
+## Parent session and evidence display
+
+The top-level user-facing parent retains this contract even when a skill uses an
+orchestrator agent. A child orchestrator returns plan/status/decisions; it never
+updates the user-facing TODO or asks questions. Local subagents have no TODO or
+question tools ([host contract](https://code.visualstudio.com/docs/agents/run/subagents)).
+At start/resumption and before long investigations, show all ten phases and the
+current phase. Confirm actual exposed TODO tool responses. Tool success and
+verified UI rendering are different: if the tool fails, is unavailable or the user
+reports no display, show the identical checklist in chat without changing settings.
+Live UI verification remains pending until performed on the user's host.
+
+00 is suitability/scope, 00b comparison preparation, 03 a disposable prototype,
+and 04 production implementation. In 00/00b reports use actionable findings:
+ID, severity, evidence/target, impact, proposed fix, owner (AI/user/environment),
+completion criterion and whether it blocks implementation. Mark deferrable checks.
+The parent performs authorized AI-owned fixes and groups only necessary decisions
+for the user. Missing judge receipt before 01 never alone repeats 00b.
+
+[Source-only](SOURCE-ONLY.md) keeps 05c unverified and routes current smoke to
+reviewed 06 handoff via approve handoff and handoff; runtime keeps parity and
+post-parity. [Rubber Duck](RUBBER-DUCK.md) is host-provided advisory only.
+
+## Ordered workflow and usage records
+
+The skill first initializes the [ordered workflow](ORDERED-WORKFLOW.md) and asks the runner for the first incomplete phase. Before work use phase start; review and record phases 00 through 03 explicitly. Existing files alone never select a later phase. Runtime phase 06 needs an actual final report and completion record; source-only 05c records its unverified applicability before handoff. [Cost logs](COST-LOG.md) preserve the main branch TSV format and unknown usage.

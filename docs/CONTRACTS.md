@@ -126,7 +126,14 @@ output during build/smoke/parity makes the stage fail, even if its command exits
 The global run lock prevents simultaneous runners/validation stages. A crash
 leaves the lock in place; unlock checks that the exact owner PID has stopped.
 Parallel workers operate on unique manifest outputs. The configured concurrency
-caps active agent calls; reviews cannot silently double the cap.
+caps active agent calls; reviews cannot silently double the cap. Fatal input or
+scheduler failures stop new calls and cancel active adapters, but retain the lock
+until every started worker settles and the failure summary is written.
+`agentCalls` in summaries and `calls` in progress count actual adapter invocations,
+including failed invocations; unused budget reservations do not count.
+With unit typecheck deferred, cycle membership is computed across the full
+manifest even for single-target repair; incomplete prerequisites outside that
+cycle still block the repair.
 
 A failed cheap typecheck blocks the unit. Repair with a diagnostic slice after
 checking dependencies. Build errors are not parsed generically across languages:
@@ -156,3 +163,15 @@ Hook output uses an explicit harness flag, never the input field naming style.
 The Local form contains both top-level CLI decisions and nested VS Code decisions
 because a Local hook template may also be read by CLI. The payload tests do not
 replace a live test of the consumer's hook handling.
+
+## VS Code orchestration and verification modes
+
+The user-facing parent owns phase TODO, questions and native job dispatch.
+Status is read-only and available after initialization: `status --format markdown`
+shows artifact candidates separately from validation, current reviewed units,
+active lock/run roles, blockers and next actions. It never grants approval.
+Use [source-only verification](SOURCE-ONLY.md) when the original runtime
+is unavailable; runtime remains the default. Use [built-in Rubber Duck](RUBBER-DUCK.md)
+only through host capabilities, with advisory decisions and existing repair/review.
+Live VS Code rendering, native model dispatch and Stop behavior remain pending
+until checked on a real host. Models and existing execution limits are unchanged.

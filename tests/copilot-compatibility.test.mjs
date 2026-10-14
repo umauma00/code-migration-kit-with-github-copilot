@@ -161,14 +161,14 @@ test('C2: dependency-map conversion keeps isolated nodes and refuses malformed i
   }
 });
 
-test('C2: fixer preflight rejects changed invalid evidence before another model call', async t => {
+test('C2: changed invalid evidence is rejected before another model call', async t => {
   const f = await ready(t), calls = [];
   await assert.rejects(translate(f.root, f.config, args => {
     calls.push(args.role);
     if (args.role.startsWith('reviewer-')) return { result: result(args.role, args.unit, { findings: [finding] }) };
     if (args.role === 'arbiter') write(f, args.unit.source, Buffer.from([255]));
     return fake(args);
-  }), /valid UTF-8/);
+  }), /valid UTF-8|Migration inputs changed during worker invocation/);
   assert.equal(calls.includes('arbiter'), true); assert.equal(calls.includes('fixer'), false);
 });
 

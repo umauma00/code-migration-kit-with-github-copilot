@@ -3,6 +3,8 @@
   "sourceLanguage": "Python",
   "targetLanguage": "JavaScript",
   "mode": "preserve",
+  "verificationMode": "runtime",
+  "phasePolicy": "strict",
   "sourceRoots": ["src"],
   "outputRoots": ["ported"],
   "verificationRoots": ["tests"],

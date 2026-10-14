@@ -42,3 +42,12 @@ Report reviewed done/total, blocked targets, measured time and actual usage when
 available. Unknown usage stays unknown. Stop before build approval.
 
 <!-- Copilot adaptation: migration control and instructions updated on 2026-10-08; see NOTICE. -->
+
+Keep orchestration in the user-facing parent. For native, launch translate in a
+continuing terminal and service claim/delegate/submit while it runs; do not block
+the parent waiting for the terminal to finish. The runner refills available slots
+and orders manifest jobs by audited dependencies. Non-manifest dependencies stay
+fixed source evidence. Cycles use fixed source when typecheck is deferred; with
+unit typecheck configured, resolve/group the cycle or explicitly defer that check
+with user authorization. All AI calls, including both reviewers, share concurrency.
+Read status --format markdown for blockers and actual active roles.

@@ -103,3 +103,15 @@ Astraの指摘A1・A2は親エージェントも実コンパイラで独立再�
 配布ZIPの展開先で `npm test`、`npm run demo` を実行します。導入先の `migration-kit/` は `npm run check` のみを公開します。外部npmパッケージやCopilot認証は不要です。Node 22以上とPython 3が必要です。
 
 参照した一次資料：[Copilot CLI v1.0.93](https://github.com/github/copilot-cli/releases/tag/v1.0.93)、[ツール制御](https://docs.github.com/en/copilot/how-tos/copilot-cli/use-copilot-cli/allowing-tools)、[custom agents](https://docs.github.com/en/copilot/reference/custom-agents-configuration)、[VS Code 1.141](https://code.visualstudio.com/updates/v1_141)、[SDK workflowsの固定参照](https://github.com/github/copilot-sdk/blob/cf245cdf76ced14d2f61dc3d908dd37cf12e0978/nodejs/docs/workflows.md)。
+
+## VS Code orchestration and verification modes
+
+The user-facing parent owns phase TODO, questions and native job dispatch.
+Status is read-only and available after initialization: `status --format markdown`
+shows artifact candidates separately from validation, current reviewed units,
+active lock/run roles, blockers and next actions. It never grants approval.
+Use [source-only verification](SOURCE-ONLY.md) when the original runtime
+is unavailable; runtime remains the default. Use [built-in Rubber Duck](RUBBER-DUCK.md)
+only through host capabilities, with advisory decisions and existing repair/review.
+Live VS Code rendering, native model dispatch and Stop behavior remain pending
+until checked on a real host. Models and existing execution limits are unchanged.

@@ -13,7 +13,8 @@ function rewriteLinks(text, relativeFile) {
     return `](${path.posix.relative(path.posix.dirname(relativeFile), `migration-kit/${resolved}`)}${fragment})`;
   });
 }
-export function install(target, { apply = false, model, harness = 'copilot', withWorkflow = false, layout = 'repository', workerBackend = 'copilot-cli', nativeHarness = harness } = {}) {
+export function install(target, { apply = false, model, harness = 'copilot', withWorkflow = false, layout = 'repository', workerBackend = 'copilot-cli', nativeHarness = harness, verificationMode } = {}) {
+  if (verificationMode !== undefined && !['runtime', 'source-only'].includes(verificationMode)) throw new Error('verificationMode must be runtime or source-only');
   if (!['repository', 'plugin'].includes(layout)) throw new Error('layout must be repository or plugin');
   if (!['copilot', 'vscode-local'].includes(harness)) throw new Error('harness must be copilot or vscode-local');
   if (!['copilot-cli', 'native'].includes(workerBackend)) throw new Error('workerBackend must be copilot-cli or native');
@@ -21,6 +22,7 @@ export function install(target, { apply = false, model, harness = 'copilot', wit
   if (workerBackend === 'native' && withWorkflow) throw new Error('Native workers use the host session, not the experimental workflow');
   const configureBackend = config => {
     config.workerBackend = workerBackend;
+    if (verificationMode !== undefined) config.verificationMode = verificationMode;
     if (workerBackend === 'native') config.nativeHarness = nativeHarness;
   };
   if (layout === 'plugin' && (harness !== 'copilot' || withWorkflow)) throw new Error('Plugin layout uses Copilot hooks and does not include the experimental workflow extension');
@@ -94,7 +96,7 @@ export function install(target, { apply = false, model, harness = 'copilot', wit
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
   try {
     const args = parseArgs(process.argv.slice(2));
-    if (!args.target) throw new Error('Usage: node scripts/install.mjs --target PATH [--layout repository|plugin] [--model MODEL_ID] [--harness copilot|vscode-local] [--worker-backend copilot-cli|native] [--native-harness copilot|vscode-local] [--with-workflow] [--apply]');
-    console.log(JSON.stringify(install(args.target, { apply: args.apply, model: args.model, harness: args.harness, withWorkflow: args['with-workflow'], layout: args.layout, workerBackend: args['worker-backend'], nativeHarness: args['native-harness'] }), null, 2));
+    if (!args.target) throw new Error('Usage: node scripts/install.mjs --target PATH [--layout repository|plugin] [--model MODEL_ID] [--harness copilot|vscode-local] [--worker-backend copilot-cli|native] [--native-harness copilot|vscode-local] [--verification-mode runtime|source-only] [--with-workflow] [--apply]');
+    console.log(JSON.stringify(install(args.target, { apply: args.apply, model: args.model, harness: args.harness, withWorkflow: args['with-workflow'], layout: args.layout, workerBackend: args['worker-backend'], nativeHarness: args['native-harness'], verificationMode: args['verification-mode'] }), null, 2));
   } catch (e) { console.error(`ERROR: ${e.message}`); process.exitCode = 1; }
 }

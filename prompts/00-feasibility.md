@@ -4,7 +4,11 @@ Read [phase reports and user decisions](../docs/PHASE-HANDOFF.md).
 End with its report; ask for the next decision only when needed.
 
 Work read-only on the source. Produce `migration/feasibility.md`, then stop.
-Read the operating manual before proposing a migration.
+Read the operating manual before proposing a migration. Resolve verificationMode
+first: runtime (default) requires the original executable environment; explicitly
+chosen source-only prepares source-derived contracts and unknowns without it,
+then reviews implementation and target build/smoke before an unverified-parity
+handoff. See [source-only requirements](../docs/SOURCE-ONLY.md).
 
 1. Identify the product reason to leave, alternatives, and the cost of doing
    nothing. “Do not migrate” is a valid recommendation.
@@ -14,11 +18,15 @@ Read the operating manual before proposing a migration.
 3. Inventory public entry points, data formats, dependencies, generated code and
    platform-specific behavior. Count units with scripts rather than guesses.
 4. Assess the judge: do existing tests survive the source language's removal?
-   Tests that import private source internals need a portable parity harness.
-5. Measure build/test prices and decide whether a cheap typecheck belongs inside
+   In runtime mode, tests that import private source internals need a portable
+   parity harness. Source-only records inferred scenarios and unverified behavior.
+5. Measure available build/test costs and decide whether a cheap typecheck belongs inside
    each unit loop. Keep expensive builds owned by the coordinator.
-6. Check Copilot CLI 1.0.93-compatible flags, Node >=22, source/target toolchains,
-   account model availability and organization policy. Use `doctor --check-cli`.
+6. Check Node >=22, required target toolchain, account model availability and
+   organization policy. Runtime also requires the source toolchain; source-only
+   records its absence as an equivalence limitation, not an implementation blocker.
+   CLI backends check compatible flags with `doctor --check-cli`; native backends
+   use `doctor` and verify host capability/model isolation in the disposable pilot.
    This check does not authenticate or make a model call.
 7. Choose explicit model IDs per worker role in config. Estimate work as units ×
    measured per-unit calls, tokens/credits and time. Keep unknowns explicit.
@@ -29,3 +37,9 @@ Report verdict, risks, verification cost, model plan, and proposed phase gates.
 Do not install policies, start translation, or approve the next phase yourself.
 
 <!-- Copilot adaptation: migration control and instructions updated on 2026-10-08; see NOTICE. -->
+
+Report every issue with ID, severity, source/target evidence, impact, proposed
+fix, owner (AI/user/environment), completion criterion, and whether it blocks
+implementation. Identify checks that can be deferred. Perform authorized AI fixes
+and group only necessary user decisions. 00 assesses suitability/scope; 00b
+prepares comparison evidence; 03 prototypes; 04 begins production implementation.

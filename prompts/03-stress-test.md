@@ -12,8 +12,9 @@ For preserve mode, run a dual translation experiment:
 - A follows the rulebook exactly in a disposable workspace.
 - B receives ONLY copied source files in a separate directory outside the repo
   and an instruction to port them idiomatically. No parent conversation, rulebook,
-  inventory or migration skill is passed to B. Use a fresh CLI session and
-  `--no-custom-instructions`; verify that personal customization does not leak.
+  inventory or migration skill is passed to B. Use a fresh isolated session: CLI projects use `--no-custom-instructions`;
+  native projects use host-native isolated tool-free dispatch with the requested
+  model verified in host metadata. Verify personal customization does not leak.
   The kit does not pretend that a second worktree alone provides this isolation.
 - A separate inspector formats both outputs and classifies differences:
   rulebook right, native right, both defensible or both wrong. Cite evidence.
@@ -34,3 +35,10 @@ Report timings, known usage, rule adherence and unresolved questions. Never star
 production fan-out based on your own favorable report.
 
 <!-- Copilot adaptation: migration control and instructions updated on 2026-10-08; see NOTICE. -->
+
+In source-only mode, prototype against source-derived contracts and adversarial
+target scenarios; do not require the original runtime. Clearly distinguish target
+execution from inferred parity, report unverified assumptions, and keep disposable
+receipts separate. Use the configured native backend for native pilots.
+Before resolving difficult prototype or test-design questions, follow
+[built-in Rubber Duck](../docs/RUBBER-DUCK.md); advice does not replace two reviews.

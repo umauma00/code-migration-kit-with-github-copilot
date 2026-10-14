@@ -27,3 +27,5 @@ Report coverage, missing decisions and proposed amendments. Keep the rulebook
 read-only during worker loops. Stop at the inventory gate.
 
 <!-- Copilot adaptation: migration control and instructions updated on 2026-10-08; see NOTICE. -->
+
+Save the concrete phase report to `migration/gap-report.md`. After its actual user review, record `phase complete 02 --note TEXT` as described in [ordered workflow](../docs/ORDERED-WORKFLOW.md).

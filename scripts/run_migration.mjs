@@ -9,16 +9,20 @@ import { runProcess } from '../lib/process.mjs';
 import { approve, runStage, translate } from '../lib/pipeline.mjs';
 import { createCopilotAdapter, requiredCopilotFlags } from './copilot_adapter.mjs';
 import { runtimeLayout } from '../lib/runtime.mjs';
+import { migrationStatus, statusMarkdown } from '../lib/status.mjs';
 import { createNativeAdapter } from '../lib/native-workers.mjs';
+import { phaseCommand } from './phase_cli.mjs';
 
 export const usage = `Usage: node migration-kit/scripts/run_migration.mjs COMMAND [options]
   doctor [--check-cli] [--copilot /path/to/copilot]
-  status
-  judge                       Run original suite and judge mutation self-test
-  approve STAGE --note TEXT   Review/approve translation, build, smoke, parity, post-parity
+  status [--format json|markdown]  Read-only preparation and execution evidence
+  phase init | next | check ID | start ID | complete ID --note TEXT
+                              Ordered workflow; optional --tokens N --subagents N --model ID
+  judge                       Runtime: original/mutation; source-only: validate preparation
+  approve STAGE --note TEXT   Review/approve translation, build, smoke, parity, post-parity, handoff
   translate                  Run/resume using config.workerBackend (copilot-cli or native)
   repair --target PATH --evidence migration/PATH
-  build | smoke | parity     Run one approved validation stage and stop
+  build | smoke | parity | handoff     Run one approved validation stage and stop
   unlock --pid PID           Remove a lock only after its owning process has stopped
 Options: --root PATH (default cwd), --copilot PATH (default copilot)
 Configuration: migration/config.json. No command commits or pushes changes.`;
@@ -71,18 +75,22 @@ export async function main(argv = process.argv.slice(2)) {
     if (alive) throw new Error('Lock owner is still running; refusing to unlock');
     fs.unlinkSync(file); console.log('Removed stale migration lock'); return;
   }
+  if (cmd === 'status') {
+    if (args.format && !['json', 'markdown'].includes(args.format)) throw new Error('status format must be json or markdown');
+    const report = migrationStatus(root);
+    if (!report.ok) process.exitCode = 1;
+    console.log(args.format === 'markdown' ? statusMarkdown(report) : JSON.stringify(report, null, 2));
+    return;
+  }
   const config = loadConfig(root), controller = new AbortController();
   const abort = () => controller.abort();
   process.once('SIGINT', abort); process.once('SIGTERM', abort);
   try {
     let result;
-    if (cmd === 'doctor') { result = await doctor(root, config, { checkCLI: args['check-cli'], command: args.copilot }); if (!result.ok) process.exitCode = 1; }
-    else if (cmd === 'status') {
-      const context = contextHash(root, config), units = readManifest(root, config);
-      result = { done: units.filter(u => done(root, u, context)).length, total: units.length,
-        units: units.map(u => ({ source: u.source, target: u.target, status: done(root, u, context) ? 'done' : unitState(root, u)?.status === 'blocked' ? 'blocked' : 'pending' })) };
-    } else if (cmd === 'approve') result = approve(root, config, args._[1], args.note);
-    else if (['judge', 'build', 'smoke', 'parity'].includes(cmd)) result = await runStage(root, config, cmd, { signal: controller.signal });
+    if (cmd === 'phase') result = phaseCommand(root,config,args._[1],args._[2],args);
+    else if (cmd === 'doctor') { result = await doctor(root, config, { checkCLI: args['check-cli'], command: args.copilot }); if (!result.ok) process.exitCode = 1; }
+    else if (cmd === 'approve') result = approve(root, config, args._[1], args.note);
+    else if (['judge', 'build', 'smoke', 'parity', 'handoff'].includes(cmd)) result = await runStage(root, config, cmd, { signal: controller.signal });
     else if (['translate', 'repair'].includes(cmd)) {
       if (cmd === 'repair' && !args.target) throw new Error('repair requires --target');
       const native = config.workerBackend === 'native';

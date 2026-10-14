@@ -95,7 +95,9 @@ node migration-kit/scripts/run_migration.mjs doctor --check-cli
 | `maxReviewInputBytes` | 固定レビュー入力のJSONサイズ上限。既定65536 bytes。超過は省略せず停止 |
 | `reviewDependencyMap` | 監査した依存宣言JSON。既定 `migration/review-dependencies.json`。phase 01で作成する必須成果物 |
 | `sourceLanguage`, `targetLanguage` | 対象言語。テンプレートのPython/JavaScriptを変更可能 |
+| `verificationMode` | `runtime`（省略時）：元環境と新旧比較を実行。`source-only`：ソース由来の準備と変換後build/smokeを検証し、動作同等性未検証として引き継ぐ。既存設定は自動変更しない |
 | `mode` | 自動ファイル変換は `preserve`。`redesign` は設計・試行プロンプトまで対応 |
+| `phasePolicy` | 新規は`strict`。既存の未設定は従来互換。スキル入口で`phase init`すると既存設定を保って工程順序を有効化 |
 | `models` | implementer、reviewer-semantics、reviewer-rules、arbiter、fixerの各ID |
 | `workerBackend` | `copilot-cli`（省略時）または `native`。変更は承認を失効させる |
 | `nativeHarness` | native時に必須。`vscode-local` または `copilot`。現在のセッションと合わせる |
@@ -136,6 +138,8 @@ node migration-kit/scripts/make_review_dependencies.mjs \
 
 JSON形式は `{"schemaVersion":1,"dependencies":{"src/a.py":["src/b.py"],"src/b.py":[]}}` です。`--depmap-root` 省略時は単一の `--source-root` を解析ルートとみなすため、従来のコマンドも使えます。列挙は指定したソースルート内に限定し、孤立ファイルにも `[]` を作ります。対象外ファイルから始まる辺（例：tests → pkg）は除外し、標準出力の `ignoredEdges` に列挙します。対象ソースから範囲外への依存（例：pkg → shared）は停止し、必要なルートの追加を求めます。解析器の対応構文・除外・未解決import・除外された辺を監査し、inventoryのevidence等に必要な意味上の参照も追加してください。解析ルートが複数なら別々の `--out migration/PATH.json` へ生成して1つのmapへ統合します。閉包に必要なキーやファイルが欠けていれば停止します。mapと明示依存の変更で承認・完了記録が失効します。
 
+以下は既定の **runtime方式** のコマンド例です。元環境が使えない案件は、明示的な [source-only方式](docs/SOURCE-ONLY.md) の準備記録とbuild/smoke→handoff経路を使います。
+
 ```json
 {
   "original": ["python3", "-B", "tests/judge.py", "original"],
@@ -157,6 +161,8 @@ VS Codeの **Copilot（Agent Host）** はprompt filesを読み込みません�
 
 開始・再開時には、親の調整エージェントがCopilotのTODOに下表の10工程を登録し、実行中・承認待ち・修正中・停止を表示します。初期設定は別枠です。工程末には「5/10工程完了、次は04の承認待ち」のように進捗を報告し、再開時は実際の成果物・検証記録に合わせて一覧を更新します。TODOが使えない環境では同じ一覧をチャットに表示します。詳細は [工程のTODO表示](docs/PHASE-HANDOFF.md#track-the-ten-phases-in-the-host-todo-list) を参照してください。
 
+下表と続くCLI例は **runtime方式** です。[source-only方式](docs/SOURCE-ONLY.md) では00bにソース由来のjudge-planを準備し、05cを未検証・実行なしと表示、05bの成功後に06の引き継ぎを承認・記録します。
+
 | 工程 | プロンプト | 主な成果物 |
 |---|---|---|
 | 適否・範囲の調査 | [00-feasibility](prompts/00-feasibility.md) | `migration/feasibility.md` |
@@ -172,7 +178,7 @@ VS Codeの **Copilot（Agent Host）** はprompt filesを読み込みません�
 
 manifestはタブ区切りの `source` / `target` の2列です。1元ファイル→1対象ファイルに対応します。同じ出力の重複、元ソースの上書き、管理対象内のsymlinkを拒否します。保護ルートとの重複は実在する親とファイル識別子でも確認し、大文字・小文字の別名が同じ実体を指す場合は拒否します。対象ファイルの書き込み直前にも再確認します。付属解析器はPython、JS/TS、Cの出発点です。Java/C#の解析器やフレームワーク固有規則は追加が必要です。
 
-準備した比較器・manifest・ルール・報告を確認してから、工程ごとに実行します。以下をまとめて自動実行せず、各結果を読んで次の承認へ進んでください。
+runtime方式では、準備した比較器・manifest・ルール・報告を確認してから、工程ごとに実行します。以下をまとめて自動実行せず、各結果を読んで次の承認へ進んでください。
 
 ```bash
 # 元テストと比較器の自己検証
@@ -242,3 +248,21 @@ npm run demo
 原版の記録は [UPSTREAM-README.md](docs/UPSTREAM-README.md)、[UPSTREAM-CLAUDE.md](docs/UPSTREAM-CLAUDE.md)、元の `RUN-NOTES.md` に残しています。権利表記は [LICENSE](LICENSE) / [NOTICE](NOTICE)、実行時の規則は [OPERATING-MANUAL.md](docs/OPERATING-MANUAL.md)、JSON形式は [CONTRACTS.md](docs/CONTRACTS.md) を参照してください。
 
 <!-- Copilot adaptation: migration control and instructions updated on 2026-10-08; see NOTICE. -->
+
+## VS Code orchestration and verification modes
+
+The user-facing parent owns phase TODO, questions and native job dispatch.
+Status is read-only and available after initialization: `status --format markdown`
+shows artifact candidates separately from validation, current reviewed units,
+active lock/run roles, blockers and next actions. It never grants approval.
+Use [source-only verification](docs/SOURCE-ONLY.md) when the original runtime
+is unavailable; runtime remains the default. Use [built-in Rubber Duck](docs/RUBBER-DUCK.md)
+only through host capabilities, with advisory decisions and existing repair/review.
+Live VS Code rendering, native model dispatch and Stop behavior remain pending
+until checked on a real host. Models and existing execution limits are unchanged.
+
+## 工程順序と利用量の記録
+
+`/code-migration` は [10工程の順序チェック](docs/ORDERED-WORKFLOW.md) を有効にし、最初の未完了工程から進めます。新規設定はphasePolicy=strictです。00〜03のレビュー記録が不足していると、正式judgeや本実装へ進めません。既存案件は実際の成果物を順番に確認して工程記録を作成します。
+
+mainと同じ [migration/cost-log.tsv](docs/COST-LOG.md) を出力します。取得できない利用量・実績モデルはunknownです。現在のmodels設定は5つのワーカー役割ごとにモデルを指定し、レビュー担当は独立2プロファイルです。01・02などの調査担当や任意のレビュープロファイルを工程別に選ぶ設定は、現在の自動runnerにはありません。

@@ -3,7 +3,12 @@
 Read [phase reports and user decisions](../docs/PHASE-HANDOFF.md).
 End with its report; ask for the next decision only when needed.
 
-Prerequisite: current smoke receipt, validated judge and explicit parity approval.
+For verificationMode source-only, mark parity unverified / not run in this mode.
+Never create a passed parity receipt. After successful reviewed smoke, follow
+[source-only handoff](../docs/SOURCE-ONLY.md) and prompt 06. Runtime keeps every
+original/parity requirement below.
+
+Runtime prerequisite: current smoke receipt, validated judge and explicit parity approval.
 Run `run_migration.mjs parity`; it reruns the original suite on the original
 implementation and then the new-vs-old public-surface parity suite.
 

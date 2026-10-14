@@ -13,7 +13,11 @@ at every phase boundary. Show artifacts, review points and a next-action example
 use the available question tool when an answer is needed. This reporting format
 does not apply to automated workers, which keep their JSON-only contracts.
 
-1. Keep the original implementation runnable. It is the executable specification.
+1. In runtime mode (the default), keep the original implementation runnable as
+   the executable specification and require original/mutation/parity validation.
+   Explicit source-only mode instead validates source-derived preparation, then
+   reviewed translation and actual target build/smoke. Handoff states behavioral
+   equivalence unverified; the original runtime and parity are not required.
 2. Decide once in `migration/RULEBOOK.md`; consult `migration/inventory.tsv` for
    each semantic gap. Workers never modify either. Propose amendments at a gate.
 3. Complete one phase, report the evidence, then stop. The user's explicit next
@@ -54,3 +58,17 @@ claim tasks, delegate to tool-free host subagents, and submit unchanged results.
 The same runner owns validation, writes, receipts and gates. Host-managed
 instruction isolation is recorded and is not equivalent to the CLI's isolation.
 Use the shared skill with Copilot, or the skill/phase prompt files with Local.
+
+## VS Code orchestration and verification modes
+
+The user-facing parent owns phase TODO, questions and native job dispatch.
+Status is read-only and available after initialization: `status --format markdown`
+shows artifact candidates separately from validation, current reviewed units,
+active lock/run roles, blockers and next actions. It never grants approval.
+Use [source-only verification](SOURCE-ONLY.md) when the original runtime
+is unavailable; runtime remains the default. Use [built-in Rubber Duck](RUBBER-DUCK.md)
+only through host capabilities, with advisory decisions and existing repair/review.
+Live VS Code rendering, native model dispatch and Stop behavior remain pending
+until checked on a real host. Models and existing execution limits are unchanged.
+
+The [ordered workflow](ORDERED-WORKFLOW.md) records reviewed preparation before judge and implementation. The main skill starts with phase init/next; future phase requests return to missing prerequisites. Use [cost logs](COST-LOG.md) for main-compatible TSV output.

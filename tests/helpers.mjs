@@ -13,6 +13,9 @@ export function prepare(t, { realCommands = false, count = 1, model = 'test-doub
   fs.cpSync(path.join(mini, 'src'), path.join(root, 'src'), { recursive: true });
   fs.cpSync(path.join(mini, 'tests'), path.join(root, 'tests'), { recursive: true });
   const config = loadConfig(root);
+  // Existing engine fixtures exercise runner behavior independently of the
+  // interactive phase workflow; strict sequencing has its own integration tests.
+  config.phasePolicy = 'legacy';
   config.concurrency = 2;
   for (const name of ['original', 'mutation', 'build', 'smoke', 'parity']) {
     config.commands[name] = realCommands ? ['python3', '-B', 'tests/judge.py', name] : [process.execPath, '-e', 'console.log("test command OK")'];
