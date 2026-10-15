@@ -10,10 +10,14 @@ Anthropicの[Code Migration Kit](https://github.com/anthropics/code-migration-ki
 
 ## 主な変更
 
+レビュー1・2を反映し、03前の[隔離pilot](docs/PILOT.md)、比較器の早期検証と
+[準備工程の監査契約](docs/PREPARATION-AUDITS.md)、[翻訳batch・並列repair・TODO件数検査](docs/EXECUTION-SCOPES.md)
+を追加しています。[変更の対応範囲と残る実機検証](docs/plans/2026-10-15-review-implementation.md)も参照してください。
+
 | 項目 | この版の動作 |
 |---|---|
-| 指示・スキル | プラグインの `skills/code-migration/SKILL.md`、またはコピー導入の `.github/skills/code-migration/SKILL.md`。自動ワーカーは暗黙の指示読み込みを無効化 |
-| 役割分担 | orchestrator / implementer / 独立reviewer 2種 / arbiter / fixer の6プロファイル |
+| 指示・スキル | プラグインの `skills/code-migration/SKILL.md`、またはコピー導入の `.github/skills/code-migration/SKILL.md`。CLIワーカーは暗黙の指示読み込みを無効化。nativeはhost管理 |
+| 役割分担 | orchestrator / implementer / 独立reviewer 2種 / arbiter / fixerに、準備監査用のtool-free profileを追加 |
 | モデル | 5種類のワーカーに明示指定。利用できるモデルIDをユーザーが設定 |
 | 変換 | CLI担当は `view,grep,glob` のみ、native担当は固定入力・ツールなし。JSON応答を検証し、Nodeの調整役が対象ファイルだけを書き込む |
 | 独立レビュー | 2担当に同じ固定入力を渡す。レビュー担当はツールなし。CLIは `--no-custom-instructions`、nativeはホスト管理の指示環境 |
@@ -99,6 +103,10 @@ node migration-kit/scripts/run_migration.mjs doctor --check-cli
 | `mode` | 自動ファイル変換は `preserve`。`redesign` は設計・試行プロンプトまで対応 |
 | `phasePolicy` | 新規は`strict`。既存の未設定は従来互換。スキル入口で`phase init`すると既存設定を保って工程順序を有効化 |
 | `models` | implementer、reviewer-semantics、reviewer-rules、arbiter、fixerの各ID |
+| `phaseModels` | rulebook、judgeAudit、dependencyAudit、inventoryAudit、stressA/B、stressInspector、designAuditの明示的なhost model指定。準備監査は親が実行し、自動runnerへの暗黙継承はしない |
+| `designInputs` | 全文を固定入力へ含め、保護する設計文書のパス配列。リンクだけでは本文を渡した扱いにしない。redesignのmodule runnerを有効化する設定ではない |
+| `packageMap` | 任意のsource→target package宣言JSON。指定時は01で別のpackage cycle監査を記録 |
+| `markerPolicy` | 新規は`todo-lines-v1`：TODO(port)のある行数と末尾todosを照合。未指定の既存案件は従来契約を維持 |
 | `workerBackend` | `copilot-cli`（省略時）または `native`。変更は承認を失効させる |
 | `nativeHarness` | native時に必須。`vscode-local` または `copilot`。現在のセッションと合わせる |
 | `concurrency` | 同時AI呼び出し数。初期値2。レビューを含めてこの数以下 |

@@ -30,6 +30,11 @@ handoff. See [source-only requirements](../docs/SOURCE-ONLY.md).
    This check does not authenticate or make a model call.
 7. Choose explicit model IDs per worker role in config. Estimate work as units ×
    measured per-unit calls, tokens/credits and time. Keep unknowns explicit.
+   Also plan explicit phaseModels for rulebook, judge/dependency/inventory/design
+   audits and stress A/B/inspector as applicable. The parent selects these via
+   real host APIs; requested values are not observed execution models. Missing
+   availability/metadata remains unknown, without implicit fallback. See
+   [preparation audits](../docs/PREPARATION-AUDITS.md).
 8. Identify unsupported parser features or languages; JS/TS aliases and C macro
    dependencies require more than the bundled starter scanners.
 

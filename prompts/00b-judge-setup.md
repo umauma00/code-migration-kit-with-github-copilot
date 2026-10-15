@@ -30,8 +30,14 @@ build a language-neutral parity harness before any production translation.
   them invalidates approvals and receipts.
 - In runtime mode, configure `commands.original`, `commands.mutation` and `commands.parity` as argv
   arrays. The mutation command exits zero only when the judge catches the defects.
-- Use `run_migration.mjs judge` after the rulebook, inventory and manifest exist;
-  this saves the validation receipt required before translation approval.
+- Use `run_migration.mjs judge-prepare` now, before maps/rules exist, and record
+  existing-judge reuse where adequate. Later `judge` binds the complete 01/02
+  inputs, explicitly reusing unchanged early command evidence where available.
+- Follow the [preparation audit contract](../docs/PREPARATION-AUDITS.md): when
+  assertions are ported, two independent hostile auditors compare disjoint
+  assertion batches against the old assertions and narrow normalization rules.
+  Confirm weaknesses, repair and re-audit with fresh contexts. Mutation detection
+  is an additional check, not a substitute for assertion comparison.
 
 Report scenario counts, mutation detection, inherited failures and environment
 failures separately. Resolve inherited failures before the final clean gate;

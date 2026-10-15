@@ -1,5 +1,24 @@
 # Unreleased
 
+- Preserve every admitted diagnostic repair job across Stop/resume, including
+  undispatched dependencies; bind fresh reviews to immutable intent evidence and
+  refuse downstream approval until all repair obligations are reviewed.
+- Reject fixed inventory receipt/input collisions before any publication; correct
+  executable examples and distinguish paired inventory reviews from extra sampling.
+
+- Add sealed, disposable preserve-mode pilot grants before production phase 03,
+  without importing experiment receipts or weakening production approval.
+- Add early comparator validation/reuse, explicit preparation model plans and
+  fixed audit task/result transport; restore source-map and inventory audit
+  contracts with deterministic diff/sample/shard tools and package cycle checks.
+- Add exact translation batch scopes and a single-lock multi-target diagnostic
+  repair queue under the existing AI cap and fresh build approval policy.
+- Fix plugin worker documentation links; show native host capabilities as unknown
+  instead of verified, and keep manually reported models out of measured costs.
+- Add protected complete design inputs/architecture template and explicit optional
+  TODO line-count receipts. The generic redesign module runner and native host
+  metadata/event bridge remain unimplemented.
+
 - Enforce reviewed preparation order through phase records at the skill entry and runner gates; retain the ten existing phase IDs and explicit source-only parity applicability.
 - Export main-compatible migration/cost-log.tsv with measured timing, actual worker counts and unknown usage/model values, retaining existing rows and deduplicating exports.
 

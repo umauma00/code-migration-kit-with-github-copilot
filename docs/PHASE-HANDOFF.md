@@ -1,5 +1,12 @@
 # Phase reports and user decisions
 
+For intermediate translation batches, show the exact approved targets and
+reviewed scope completion, then await the next batch instruction. maxAgentCalls
+is a budget, not batch size. See [execution scopes](EXECUTION-SCOPES.md).
+Pilot reports explicitly identify disposable purpose and grant; they cannot
+authorize production. Map the ten internal IDs to the six macro stages without
+removing preparation or cleanup evidence.
+
 This contract applies to the main interactive migration orchestrator. Automated
 implementers, reviewers, arbiters and fixers keep their JSON contracts and never
 ask the user questions. Use the user's language for reports and questions.

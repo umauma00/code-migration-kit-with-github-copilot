@@ -1,5 +1,19 @@
 # 0.1.0〜0.1.4から0.1.5への更新
 
+## 2026-10-15のレビュー反映
+
+既存configを保持します。markerPolicy、phaseModels、designInputs、packageMapは
+既存案件へ自動追加しません。新規テンプレートはtodo-lines-v1を選びます。
+既存案件で採用する場合はRULEBOOKの件数規則を確認し、設定変更後にjudge/承認を取り直します。
+batch指定のない既存translation gateは全manifestとして扱い、古いreceiptのpurpose省略はproductionです。
+新しい00b記録はjudge入力にも結び付きます。runtime更新で既存の承認/完了は失効するため再検証します。
+native doctorは実host能力をunknownとして非ゼロ終了する仕様へ変更しています。
+inventory-merge.jsonは生成receiptとして予約し、保護入力への登録を拒否します。
+衝突する既存の入力は別のパスへ移して設定を更新してください。自動上書きはしません。
+repair queueは全jobのjournalとレビューbindingを保持します。中断後はtranslateで再開し、
+未着手jobを含む全診断のレビュー完了までbuild承認は通りません。
+詳細は[今回の対応表](plans/2026-10-15-review-implementation.md)を参照してください。
+
 新規導入はREADMEの手順を使います。既存の導入先に0.1.5のinstallerを実行すると、内容が違うファイルは上書きせず停止します。これは意図した動作です。
 
 既に案件へ導入している場合は、作業をコミットまたはバックアップしてから、次の差分を確認して取り込んでください。旧配布物のpatchは0.1.5の差分を含みません。一時導入先との比較で更新してください。

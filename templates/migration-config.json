@@ -5,6 +5,8 @@
   "mode": "preserve",
   "verificationMode": "runtime",
   "phasePolicy": "strict",
+  "markerPolicy": "todo-lines-v1",
+  "phaseModels": {},
   "sourceRoots": ["src"],
   "outputRoots": ["ported"],
   "verificationRoots": ["tests"],

@@ -1,5 +1,11 @@
 # Migration operating manual
 
+Preparation follows [independent audit contracts](PREPARATION-AUDITS.md), including
+early comparator validation, scanner regeneration and joint inventory/rule audit.
+Use [sealed pilot grants](PILOT.md) before production 03 and
+[explicit execution scopes](EXECUTION-SCOPES.md) for batches and parallel repair.
+The six macro stages remain distinct from the ten internal evidence IDs.
+
 These rules apply to running a language migration, not to maintaining this kit.
 
 For plugin installations (`migration/config.json` has `"runtime": "plugin"`),

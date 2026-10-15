@@ -7,6 +7,14 @@ Prerequisites: reviewed feasibility/stress reports, RULEBOOK, inventory,
 manifest, audited review dependency map, validated judge, installed profiles and
 explicit translation approval.
 
+Use [bounded translation batches](../docs/EXECUTION-SCOPES.md) where the human
+wants intermediate gates: approve translation --batch N or --targets CSV binds
+concrete units, separate from maxAgentCalls. Stop after that approved scope,
+report burndown/unknown timing and wait for the next batch instruction. Never
+convert a completed batch into permission for build or remaining translation.
+When markerPolicy is configured, both reviews receive measured TODO line counts;
+the coordinator rejects a mismatched final trailer before recording done.
+
 Use `node migration-kit/scripts/run_migration.mjs translate` from the target
 repository for repository-copy installations. For plugin installations, use
 `node "<absolute-plugin-root>/scripts/run_migration.mjs" translate` with the same

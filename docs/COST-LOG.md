@@ -1,5 +1,10 @@
 # main形式の利用量記録
 
+要求modelと実modelを分けます。native submitのhostReportedModelは親からの入力であり、
+それだけでは実測として集計しません。正式adapterの観測がない間はunknownです。
+pilotのAI呼出しは03、production repairは05、通常翻訳は04として記録します。
+judge-prepareと正式judgeの再利用は別の実行行ですが、再利用時に新しいAI呼出しは計上しません。
+
 mainと同じ `migration/cost-log.tsv` を出力する。ヘッダーは次の6列。
 
 ```text

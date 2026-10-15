@@ -126,7 +126,10 @@ test('native arbitration, confirmed fixing and re-review use the shared pipeline
   });
   assert.equal(report.done, 1); assert.equal(report.agentCalls, 7);
   assert.ok(report.seen.every(t => t.agent.startsWith('code-migration-kit:code-migration-plugin-native-')));
-  assert.equal((await doctor(f.root, f.config, { checkCLI: true, command: '/does/not/exist/copilot' })).ok, true);
+  const check = await doctor(f.root, f.config, { checkCLI: true, command: '/does/not/exist/copilot' });
+  assert.equal(check.staticValid, true); assert.equal(check.ok, false);
+  assert.equal(check.executionReady, 'unknown');
+  assert.equal(check.checks.some(c => c.check === 'Copilot executable'), false);
 });
 
 test('claims and submissions bind the task, model and result and reject duplicate writers', async t => {

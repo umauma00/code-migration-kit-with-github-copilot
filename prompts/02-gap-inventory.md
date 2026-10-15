@@ -1,5 +1,13 @@
 # 02 — Semantic gap inventory
 
+Follow [preparation audits](../docs/PREPARATION-AUDITS.md): show the first 20
+rows to the human before fan-out, give every batch to two independent auditors
+of the SAME batch, and keep classification workers on separately owned category
+shards. Only the coordinator merges against a complete site census using the
+file/symbol/source_construct key. Confirm findings, fix and independently
+re-audit. Finish with a joint RULEBOOK/inventory audit citing rule, row and a
+concrete wrong translation example. Do not silently authorize rule amendments.
+
 Read [phase reports and user decisions](../docs/PHASE-HANDOFF.md).
 End with its report; ask for the next decision only when needed.
 
@@ -14,7 +22,9 @@ location, the risk, the chosen rule and evidence. Distinguish allocation failure
 from structural/precondition failures; one shared sentinel is not one policy.
 
 Count relevant constructs mechanically and reconcile the inventory coverage.
-Have independent reviewers check disjoint samples and the highest-risk classes.
+Have two independent reviewers check the same classifier batch, including its
+highest-risk classes. Supplementary disjoint sampling may follow those paired
+batch reviews; it never replaces either review of a batch.
 Findings cite source lines and rule sections. Unknown cases get a searchable
 marker and an amendment proposal, not invented policy. Do not read the entire
 inventory into every worker context; workers query their unit's relevant rows.

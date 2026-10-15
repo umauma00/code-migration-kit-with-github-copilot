@@ -1,5 +1,15 @@
 # 検証記録（2026-10-08 JST）
 
+## 2026-10-15 レビュー1・2の反映
+
+- Node v24.19.0 / Python 3.12.14のLinux環境で `npm test`：170/170成功、失敗・skip・cancel 0。
+- `npm run demo`：固定worker応答で3単位を翻訳し、実Node/Pythonコマンドのbuild・smoke・12ケースのparity成功。
+- 初回追加19件は、plugin/copyリンク、strictの03前pilot、限定許可・失効・中断再開・source-only、早期judge再利用、batch境界、測定したTODO件数、単一lockの独立/依存repair、inventory merge、依存diff/package cycle、監査task/入力/モデルの分離、設計本文の固定、live setupのstrict経路を検証。
+- Astra指摘への追加7件は、依存待ち/一部完了/worker前/最終検査中のStop、全repair intentの保存と旧doneの拒否、journal改変、固定receiptと保護入力の衝突・alias、掲載CLIの実引数を検証。全jobの診断を再開後の独立2レビューへ渡し、未処理のままbuild承認へ進めないことを確認。
+- 認証済みCopilot AI、実VS CodeのUI・model metadata・完成順dispatch・子cancel、大規模移行、redesign module runnerの実行は未実施。fixtureのレビューや承認記録を実AI品質・人間承認の実績に含めない。
+
+[変更対応表と残る実装](plans/2026-10-15-review-implementation.md)を参照。以下は以前の検証記録です。
+
 nativeホスト接続の仕様・検証範囲は [VS Codeネイティブワーカー](NATIVE-WORKERS.md#検証範囲)、
 追加テストは [native-workers.test.mjs](../tests/native-workers.test.mjs) を参照してください。
 実VS Codeのモデル委譲はオフライン接続テストとは区別します。

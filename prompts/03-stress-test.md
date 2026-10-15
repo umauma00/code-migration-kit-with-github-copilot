@@ -28,6 +28,15 @@ used in production, using a disposable target repo with its own explicit pilot
 approval. Check rule adherence, read-only tools, JSON output, models and repair
 behavior. Do not mix disposable receipts with production receipts.
 
+Use the formal [pilot grant](../docs/PILOT.md): after current 00–02 and judge,
+`pilot prepare --target NEW_EXTERNAL_DIR --sources CSV --through STAGE --note TEXT`,
+then `pilot run --root NEW_EXTERNAL_DIR`. Obtain explicit authorization for that
+scope; default boundary is translation. Production still requires reviewed 03.
+Run independent A/B/pilot work concurrently when the host permits it, record
+isolation limitations, archive findings and verify workspace disposal. Repeated
+failure of the same rule stops for design review; a rule change needs a fresh
+grant and new risk-weighted samples.
+
 Collect proposed rule amendments; only apply them with the user's authorization
 at the gate. Rerun against fresh risk-weighted files, not only the original ones.
 Repeated changes to the same rule need a design decision, not another wording.

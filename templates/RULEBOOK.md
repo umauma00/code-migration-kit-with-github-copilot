@@ -122,6 +122,13 @@ Every translated file ends with a status trailer:
 Reviewers check the trailer against the file's actual `TODO(port)` count —
 a trailer that undercounts is a finding.
 
+For config.markerPolicy `todo-lines-v1`, count literal lines containing the marker
+(two occurrences on one line count once). Keep exactly one PORT STATUS trailer
+on the final nonempty line, with the numeric count matching this measurement.
+Both reviewers receive measured evidence; the coordinator additionally rejects
+a mismatch before done. Existing projects without this policy retain their
+explicitly agreed convention. See the kit's docs/EXECUTION-SCOPES.md.
+
 ## 7. Deviation log
 
 Every departure from the documented process gets one line here — skipped

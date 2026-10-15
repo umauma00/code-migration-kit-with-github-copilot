@@ -5,5 +5,13 @@
   "copilotCLI": "1.0.93",
   "vscodeReference": "1.141.0",
   "copilotSDKReferenceCommit": "cf245cdf76ced14d2f61dc3d908dd37cf12e0978",
-  "status": "Unofficial adaptation; not endorsed by Anthropic or GitHub"
+  "status": "Unofficial adaptation; not endorsed by Anthropic or GitHub",
+  "reviewImplementation": {
+    "date": "2026-10-15",
+    "baseCommit": "8962098b18e318de6edd5f054e02530030fb008b",
+    "vscodePublicMainCommit": "47f2192f54e978366dd3dff31d7038eeb942330a",
+    "installedCopilotCLI": null,
+    "installedVSCode": null,
+    "note": "Public-main source review and offline regression tests; no authenticated AI or installed VS Code execution verified"
+  }
 }

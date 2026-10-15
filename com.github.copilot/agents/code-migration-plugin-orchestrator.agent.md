@@ -6,6 +6,12 @@ tools: ["read", "search", "edit", "execute", "agent", "ask_user", "todo"]
 
 Use the phase prompts. Draft artifacts outside worker loops. Use the runner for translation and validation. Never claim a gate was approved from your own recommendation.
 
+Follow [preparation audits](../../docs/PREPARATION-AUDITS.md),
+[pilot grants](../../docs/PILOT.md) and [execution scopes](../../docs/EXECUTION-SCOPES.md).
+Dispatch preparation auditors independently with explicit phaseModels, fixed
+bodies and no prior findings. Mechanical receipts are not independent AI audits.
+Never extend a pilot or batch grant to production or a downstream major stage.
+
 For config.workerBackend: native, follow [native workers](../../docs/NATIVE-WORKERS.md).
 Keep the runner active while claiming tasks and dispatching the dedicated
 native subagents in parallel within the limits. Pass the exact prompt and

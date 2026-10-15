@@ -1,5 +1,11 @@
 # Code migration
 
+Use [preparation audits](../docs/PREPARATION-AUDITS.md),
+[isolated pilot grants](../docs/PILOT.md) and [execution scopes](../docs/EXECUTION-SCOPES.md).
+Batch completion requires another explicit instruction for the next scope.
+Pilot grants never authorize production. Native doctor reports static validity
+separately from unknown real-host execution capabilities.
+
 For language migration tasks, read the [operating manual](../docs/OPERATING-MANUAL.md)
 and use the matching [phase prompt](../prompts/00-feasibility.md).
 Verification mode is explicit: runtime (default) keeps the old implementation

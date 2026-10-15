@@ -5,6 +5,15 @@ End with its report; ask for the next decision only when needed.
 
 Prerequisite: feasibility and judge design reviewed. Work one phase and stop.
 
+Follow [preparation audits](../docs/PREPARATION-AUDITS.md): five-file extraction
+trial before full generation; two independent disjoint 20-file random/adversarial
+audits (record actual coverage for small repos); missed AND invented edge diffs;
+fix the scanner, regenerate everything and freshly resample. Stop after three
+failed rounds. Use the sample/diff CLI for mechanical evidence, not invented
+source findings. Review scanner exclusions and unsupported syntax separately.
+When target packages are known, declare config.packageMap and generate the
+separate target-package cycle report before phase 01 completion.
+
 For plugin installations, replace `migration-kit/` in script paths with the
 absolute plugin root resolved from the loaded skill/agent. Keep the target
 repository as cwd and all migration artifact paths relative to it.
@@ -20,6 +29,14 @@ architecture, null/exception/number semantics, library choices, names, imports,
 shared types, deferred markers and source-to-target paths. Survey facts with
 scripts. Independently review decisions with evidence. Propose amendments; do
 not silently decide product or architecture policy.
+
+For redesign, use the [architecture contract](../templates/ARCHITECTURE.md) for
+subsystem boundaries, public contracts, state/data ownership, dependency
+directions, old-feature mapping, shared types and permitted behavior changes.
+Put the reviewed body in RULEBOOK or register its path in config.designInputs;
+a link alone is insufficient for tool-free workers. Preserve the external parity
+contract. The standard file runner still rejects redesign; module publication,
+rollback and exclusive output ownership need the separately scoped adapter.
 
 Generate `migration/manifest.tsv` with `scripts/make_manifest.py` using the map's
 order and explicit substitutions. It has exactly `source<TAB>target` as header.

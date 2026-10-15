@@ -1,5 +1,10 @@
 # Source-only verification
 
+The [isolated pilot](PILOT.md) can run translation/build/smoke using this mode,
+but cannot authorize parity or issue production handoff. The early
+`judge-prepare` path validates the source-derived plan without executing original
+or mutation commands. Inference remains distinct from measured equivalence.
+
 Runtime verification remains the default. For a new project initialize with
 `--verification-mode source-only`; existing config is retained even when this
 option is supplied. For an existing project, explicitly set

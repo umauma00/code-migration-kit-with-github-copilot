@@ -5,6 +5,12 @@ description: Run a staged, behavior-preserving language migration with GitHub Co
 
 # Code migration
 
+For config.executionPurpose `pilot`, follow [pilot execution](../../docs/PILOT.md)
+using pilot run and the sealed grant; do not initialize production phase records
+or manufacture a phase-03 result. Otherwise follow the production sequence below.
+Read [preparation audits](../../docs/PREPARATION-AUDITS.md) for 00b/01/02 and
+[execution scopes](../../docs/EXECUTION-SCOPES.md) for approved batches/repair queues.
+
 Read the [operating manual](../../docs/OPERATING-MANUAL.md) and [usage](../../README.md).
 Resolve the plugin root from this SKILL.md location: it is two directories above
 this file. Follow the [runner](../../scripts/run_migration.mjs) and

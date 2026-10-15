@@ -141,6 +141,31 @@ select the affected manifest targets for `repair`; then approve a fresh build.
 
 ## Validation commands
 
+See [execution scopes](EXECUTION-SCOPES.md) for exact translation target grants,
+single-lock repair queues and the explicit todo-lines-v1 count contract. New
+marker receipts bind candidate hash, measured/claimed line count and counting
+policy; both reviewers receive identical evidence. Existing configs remain
+unmodified. designInputs adds complete fixed/protected design bodies for all
+roles; it does not change the single-source/single-output manifest contract.
+
+Repair admission publishes an immutable schemaVersion 1 repair-intent archive
+and an atomic repair-intent-reference (id/checksum). It binds current context,
+build execution, original queue hash, target/source ownership, candidate hashes
+and full diagnostic bodies/hashes for every job. Before all jobs are reviewed,
+old done receipts are invalid even if a job was never dispatched. Unit state and
+both independent review attempts bind repairIntentId, repairIntentHash and
+diagnosticHash. Resume never drops queued work or resets an admitted job's fix
+round counter. Retain historical intent archives with the review evidence.
+The internal done transition is reported/stored as validating until marker,
+cheap typecheck and input/output checks finish. Only then is done published.
+
+See [preparation audits](PREPARATION-AUDITS.md) for task/input-bound preparation
+requests and merge/diff receipts. They are mechanical evidence, not proof of
+model execution or human signoff. Early judge-preparation receipts omit future
+maps/rules; formal judge later binds the complete migration context and records
+reusedFrom when no command was rerun. See [pilot](PILOT.md) for disjoint purpose,
+scope and grants; production completion/phase-03 controls remain in force.
+
 `original`: exit 0 only when the full inherited suite passes on the original.
 `mutation`: exit 0 only when the judge correctly rejects intentionally broken
 implementations (it is a test of the judge, not a broken build expected to pass).

@@ -18,6 +18,28 @@ LocalとCopilotでは委譲ツール・モデル指定方法が異なります�
 
 ## 初期化・設定
 
+`doctor` は静的な設定・profileの正常性を `staticValid` で表示し、nativeの
+実行能力は `executionReady: "unknown"` とします。実モデル情報の取得・起動handle・
+完成通知・子のcancelを結ぶ正式adapterはまだありません。nativeのdoctorは終了コード1を返し、
+実行確認済みとは表示しません。Nodeの文字列一致はhost metadataの真正性を証明しません。
+要求モデルを転記したり、workerの自己申告を実績にしたりしないでください。
+費用・利用記録の `observedModel` は、正式な取得経路がなければnull/unknownです。
+
+| 能力 | CLI adapter | VS Code Copilot native | VS Code Local native |
+|---|---|---|---|
+| 起動 | 独立CLI subprocess | 親が公開host schemaを確認して委譲 | 親が公開host schemaを確認して委譲 |
+| 並列 | 共通cap内のNode scheduler | Nodeの発行は並列。host dispatchは未検証 | Nodeの発行は並列。同一ターンcall/群待ちはhost次第 |
+| 完成順回収 | 完了したPromiseから回収 | handle/event bridge未実装 | 完了待ちtool callと親の群待ち制約を要確認 |
+| 実model | 通常のJSON応答からは不明 | taskと実metadataを結ぶbridge未実装 | 公開mainのtoolMetadataは親向け本文と別。実機の取得経路未検証 |
+| 停止 | runnerがCLI process groupを停止 | 親がrunnerと子の両方を停止。子API要確認 | 親がrunnerと子の両方を停止。子API要確認 |
+
+公式mainの観測とインストール済み版を区別します。開始前に要求model/profile/tools、
+実metadataの取得方法、task/childの対応、独立context、並列回収、Stop責任を確認し、
+確認不能なら未対応を報告してください。公開schemaにない引数を推測して実施済みにしません。
+実機では短いA・長いB・A依存Cを使い、対応hostでB終了前にAをsubmitしCを開始できるか、
+代替modelの検出、timeout/Stop後の子停止、再開後の古い結果拒否を検証します。
+
+
 Localのコピー導入例です。プレビュー後、案件初期化の指示に従って `--apply` を追加します。
 
 ```bash

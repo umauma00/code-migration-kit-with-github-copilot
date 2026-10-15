@@ -20,6 +20,12 @@ for review; they do not route directly to a later phase. Respect redesign mode.
 
 ## Ordered workflow entry
 
+For config.executionPurpose `pilot`, follow [pilot execution](../docs/PILOT.md)
+using pilot run and the sealed grant; do not initialize production phase records
+or manufacture a phase-03 result. Otherwise follow the production sequence below.
+Read [preparation audits](../docs/PREPARATION-AUDITS.md) for 00b/01/02 and
+[execution scopes](../docs/EXECUTION-SCOPES.md) for approved batches/repair queues.
+
 Before routing a configured project, run `run_migration.mjs phase init`, then
 `phase next`. Follow [ordered workflow](../docs/ORDERED-WORKFLOW.md).
 Run only the first incomplete phase; use `phase start ID` before work. An explicit

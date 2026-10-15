@@ -18,6 +18,19 @@ under `migration/`, then use:
 
 `run_migration.mjs repair --target ported/PATH --evidence migration/ERROR-SLICE`
 
+For multiple independent targets, use the [single-coordinator queue](../docs/EXECUTION-SCOPES.md):
+write file/module/code/message TSV from this build, run diagnostic_queue.mjs,
+then repair --queue migration/repair-queue.json. Ensure those targets are within
+the current explicit translation/repair approval. The coordinator keeps one lock,
+caps all AI calls and waits for dependent slice reviews; do not run competing
+repair processes or disable the global lock. Join repairs before one whole build.
+The coordinator admits every queued job durably before dispatch. On Stop, inspect
+status pendingRepairs and resume translate within the existing approval; unfinished
+jobs cannot reuse their old done receipts. Keep the immutable intent archives.
+Do not replay a stale queue, drop its unstarted jobs, or replace frozen diagnostics.
+Count TODO(port) lines mechanically against the final PORT STATUS todos value;
+with todo-lines-v1 the measured check is also bound to Node's completion receipt.
+
 Reviewers verify the evidence against the code; the arbiter confirms findings;
 fixers apply confirmed changes and receive no compiler tool. Review again.
 Approve and run a fresh build after repaired outputs invalidate the previous gate.

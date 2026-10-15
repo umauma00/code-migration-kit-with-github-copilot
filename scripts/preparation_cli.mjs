@@ -1,0 +1,24 @@
+#!/usr/bin/env node
+// SPDX-License-Identifier: Apache-2.0
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { loadConfig, parseArgs, writeJSON, lockRun, assertReportPath } from '../lib/core.mjs';
+import { mergeInventory, packageCycles, dependencySamples, compareDependencyAudit } from '../lib/preparation.mjs';
+export function preparationCommand(root, config, action, options = {}) {
+  if (action === 'inventory-merge') return mergeInventory(root, config, { shards: options.shards?.split(','), sites: options.sites });
+  const release = lockRun(root, `preparation-${action}`);
+  try {
+    let result, out;
+    if (action === 'package-cycles') { result = packageCycles(root, config, options.map ?? config.packageMap); out = 'migration/depmap/package-cycles.json'; }
+    else if (action === 'dependency-samples') { result = dependencySamples(root, config, { seed: options.seed, size: options.size === undefined ? 20 : Number(options.size) }); out = options.out ?? 'migration/depmap/audit-samples.json'; }
+    else if (action === 'dependency-diff') { result = compareDependencyAudit(root, config, { files: options.files?.split(','), audit: options.audit }); out = options.out ?? 'migration/depmap/audit-diff.json'; }
+    else throw new Error('Use inventory-merge --shards LIST --sites PATH | package-cycles --map PATH | dependency-samples --seed TEXT | dependency-diff --files LIST --audit PATH');
+    if (!out.startsWith('migration/depmap/')) throw new Error('Audit reports must be under migration/depmap/');
+    writeJSON(assertReportPath(root, config, out), result); return result;
+  } finally { release(); }
+}
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  try { const args = parseArgs(process.argv.slice(2)), root = fs.realpathSync(path.resolve(args.root ?? '.')); console.log(JSON.stringify(preparationCommand(root, loadConfig(root), args._[0], args), null, 2)); }
+  catch (e) { console.error(`ERROR: ${e.message}`); process.exitCode = 1; }
+}
