@@ -12,6 +12,11 @@ The automated runner starts a fresh `copilot -p` call for each role with:
   would make native-installer launchers run their older bundled build
 - `MIGRATION_KIT_ROLE` for the installed preToolUse backstop
 
+Workers run the CLI version the user normally runs. Each call records that
+version; a change during a run is a warning in the run summary, not a stop.
+`doctor --check-cli` uses the same arguments and environment and proves that
+every worker agent resolves by asking the CLI for an unknown agent.
+
 All workers, including implementers and fixers, return content as JSON. They
 cannot run builds or edit through the exposed tool set. The coordinator checks
 paths and writes only the assigned target. Output roots cannot overlap source,

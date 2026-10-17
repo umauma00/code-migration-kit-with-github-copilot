@@ -59,6 +59,7 @@ export function cliDouble(f, { empty = false } = {}) {
   const responses = Object.fromEntries(f.units.flatMap(unit => roles.map(role => [`${role}:${unit.target}`, result(role, unit)])));
   const file = safePath(f.root, 'cli-double.mjs');
   atomicWrite(file, `import fs from 'node:fs';
+if (process.argv.includes('--version')) { console.log('GitHub Copilot CLI 0.0.0-test.'); process.exit(0); }
 let prompt = ''; for await (const c of process.stdin) prompt += c;
 const argv = process.argv.slice(2), role = process.env.MIGRATION_KIT_ROLE;
 const target = prompt.match(/Set target to "([^"]+)"/)?.[1];

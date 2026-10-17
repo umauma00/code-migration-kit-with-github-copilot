@@ -8,7 +8,7 @@ import { validateWorkerProfile, validateNativeProfile } from '../lib/review.mjs'
 import { runProcess } from '../lib/process.mjs';
 import { approve, runStage, translate, runPilot, runJudgePreparation } from '../lib/pipeline.mjs';
 import { preparePilot } from '../lib/pilot.mjs';
-import { createCopilotAdapter, requiredCopilotFlags } from './copilot_adapter.mjs';
+import { createCopilotAdapter, requiredCopilotFlags, copilotEnv, probeWorkerAgents } from './copilot_adapter.mjs';
 import { runtimeLayout } from '../lib/runtime.mjs';
 import { migrationStatus, statusMarkdown } from '../lib/status.mjs';
 import { createNativeAdapter } from '../lib/native-workers.mjs';
@@ -57,13 +57,17 @@ export async function doctor(root, config, { checkCLI = false, command = 'copilo
     note: 'Static profiles do not verify this host. Before native execution, verify per-call model selection, execution-bound model metadata, tools, dispatch and cancellation on the installed host. Do not echo requested models or silently fall back to CLI.' });
   if (checkCLI && !native) {
     try {
-      const version = await runProcess(command, ['--version'], { cwd: root, timeoutMs: 20000 });
-      const help = await runProcess(command, ['--help'], { cwd: root, timeoutMs: 20000 });
+      // Same environment as workers: a launcher may pick a different build otherwise.
+      const env = copilotEnv('reviewer-rules');
+      const version = await runProcess(command, ['--version'], { cwd: root, timeoutMs: 20000, env });
+      const help = await runProcess(command, ['--help'], { cwd: root, timeoutMs: 20000, env });
       const text = help.stdout + help.stderr;
       checks.push({ check: 'Copilot executable', ok: version.code === 0, detail: version.stdout.trim() });
       const advertised = new Set(text.match(/(?<![\w-])--?[A-Za-z][A-Za-z0-9-]*/g) ?? []);
       const missing = requiredCopilotFlags(layout).filter(flag => !advertised.has(flag));
       checks.push({ check: 'required flags', ok: help.code === 0 && missing.length === 0, missing });
+      const agents = await probeWorkerAgents(command, [], { cwd: root, layout });
+      checks.push({ check: 'worker agents resolve', ...agents });
     } catch (e) { checks.push({ check: 'Copilot executable', ok: false, detail: e.message }); }
   }
   const staticValid = checks.every(x => x.ok !== false);

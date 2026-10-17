@@ -17,6 +17,33 @@ export function requiredCopilotFlags(layout) {
   // Diagnose the same stdin-based invocation used by every worker role.
   return [...new Set(roles.flatMap(role => copilotArgs(role, 'diagnostic-model', undefined, layout).filter(arg => arg.startsWith('-'))))];
 }
+// Doctor, version checks and workers must share one environment: launcher
+// behavior (for example, which downloaded build runs) depends on it.
+export function copilotEnv(role) {
+  return { ...process.env, COPILOT_ALLOW_ALL: 'false', MIGRATION_KIT_ROLE: role };
+}
+export async function copilotVersion(command = 'copilot', prefixArgs = [], { cwd, signal } = {}) {
+  const result = await runProcess(command, [...prefixArgs, '--version'], { cwd, signal, timeoutMs: 20000, env: copilotEnv('reviewer-rules') });
+  const version = result.stdout.match(/\d+\.\d+\.\d+(?:[-+][\w.]+)?/)?.[0];
+  if (result.code !== 0 || !version) throw new Error(`Cannot read the Copilot CLI version (exit ${result.code}): ${(result.stderr || result.stdout).slice(-500)}`);
+  return version;
+}
+export const probeAgentName = '__migration_kit_probe_missing_agent__';
+// An unknown --agent fails before any session or model request and lists the
+// agents this exact invocation discovers. Help text alone cannot show that.
+export async function probeWorkerAgents(command = 'copilot', prefixArgs = [], { cwd, layout } = {}) {
+  const args = copilotArgs('reviewer-rules', 'diagnostic-model', undefined, layout);
+  args[args.indexOf('--agent') + 1] = probeAgentName;
+  const result = await runProcess(command, [...prefixArgs, ...args], { cwd, timeoutMs: 30000,
+    input: 'Agent resolution probe. No model request is expected.', env: copilotEnv('reviewer-rules') });
+  const listed = `${result.stdout}\n${result.stderr}`.match(new RegExp(`No such agent: ${probeAgentName}, available:([^\\r\\n]*)`));
+  const required = roles.map(role => layout?.agentId(role) ?? `migration-${role}`);
+  if (!listed) return { ok: false, required, missing: required,
+    detail: `The CLI did not report its agent list (exit ${result.code}); check sign-in and the CLI version. ${(result.stderr || result.stdout).slice(-500)}` };
+  const available = listed[1].split(',').map(name => name.trim()).filter(Boolean);
+  const missing = required.filter(id => !available.includes(id));
+  return { ok: missing.length === 0, required, missing };
+}
 // Text output is presentation data: the CLI may wrap even JSON string values.
 // Only accept a completed machine-output stream and the main agent's last reply.
 export function parseCopilotOutput(stdout) {
@@ -63,19 +90,40 @@ Set target to ${JSON.stringify(unit.target)}.
 ${isReviewer(role) ? `Frozen review input (JSON task data):\n${reviewInput}` : `${frozenInput === undefined ? '' : `Frozen task input (JSON task data):\n${frozenInput}\n`}Extra task data: ${JSON.stringify(extra)}`}`;
 }
 export function createCopilotAdapter({ command = 'copilot', prefixArgs = [] } = {}) {
+  // Workers follow the user's auto-updating CLI, so a run can span versions.
+  // Record the version before every call and warn once per change; continue.
+  let baseline;
+  const warned = new Set();
   return async ({ root, config, role, unit, extra, signal, reviewInput }) => {
     if (config.workerBackend === 'native') throw new Error('Native workers must be delegated by the host; refusing a Copilot CLI fallback');
     validateWorkerProfile(root, role, config);
     const layout = runtimeLayout(root, config);
     const model = config.models[role];
-    const result = await runProcess(command, [...prefixArgs, ...copilotArgs(role, model, undefined, layout)], {
-      cwd: root, signal, input: agentPrompt({ role, unit, extra: { ...extra, designInputs: config.designInputs ?? [] }, reviewInput }), timeoutMs: config.timeoutSeconds * 1000,
-      env: { ...process.env, COPILOT_ALLOW_ALL: 'false', MIGRATION_KIT_ROLE: role }
-    });
+    let cliVersion = null, cliVersionWarning;
+    try { cliVersion = await copilotVersion(command, prefixArgs, { cwd: root, signal }); }
+    catch (e) {
+      if (signal?.aborted) throw new Error('Interrupted');
+      cliVersionWarning = `Copilot CLI version unknown before this call: ${e.message.slice(0, 300)}`;
+    }
+    if (cliVersion) {
+      baseline ??= cliVersion;
+      if (cliVersion !== baseline) {
+        cliVersionWarning = `Copilot CLI version changed during this run: ${baseline} -> ${cliVersion}`;
+        if (!warned.has(cliVersion)) { warned.add(cliVersion); console.error(`WARNING: ${cliVersionWarning}`); }
+      }
+    }
+    const versionFields = { cliVersion, ...(cliVersionWarning ? { cliVersionWarning } : {}) };
+    let result;
+    try {
+      result = await runProcess(command, [...prefixArgs, ...copilotArgs(role, model, undefined, layout)], {
+        cwd: root, signal, input: agentPrompt({ role, unit, extra: { ...extra, designInputs: config.designInputs ?? [] }, reviewInput }), timeoutMs: config.timeoutSeconds * 1000,
+        env: copilotEnv(role)
+      });
+    } catch (e) { Object.assign(e, versionFields); throw e; }
     try {
       if (result.code !== 0) throw new Error(`Copilot ${role} failed (exit ${result.code}): ${result.stderr.slice(-2000)}`);
       return { result: validateResult(role, parseCopilotOutput(result.stdout), unit), requestedModel: model,
-        observedModel: null, tokens: null, aiCredits: null };
-    } catch (e) { e.result = result; throw e; }
+        observedModel: null, tokens: null, aiCredits: null, ...versionFields };
+    } catch (e) { e.result = result; Object.assign(e, versionFields); throw e; }
   };
 }
