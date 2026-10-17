@@ -29,9 +29,15 @@ Anthropicの[Code Migration Kit](https://github.com/anthropics/code-migration-ki
 | VS Code | Copilotは共通スキル、Localは10工程のprompt filesとLocal用hooksを利用 |
 | Dynamic Workflows | 共通実行エンジンを使う任意の実験的アダプター |
 
-## VS Code内でサブエージェントを使う（実験的）
+## VS Codeだけで動かす（native方式・実行モデル未検証）
 
-> **実験的機能・最後まで完了できません。** native方式の手順は、提出前に「ホストが実際に使ったモデル」を確認することを求めます。しかしVS Codeはサブエージェントの実行モデルを親エージェントに返さないため、手順どおりに進めると全ジョブが失敗になります。VS Codeでも、既定のCLIワーカー方式（`copilot-cli`）を使ってください。親エージェントがターミナルでrunnerを動かし、runnerがCopilot CLIのワーカーを起動します。
+Copilot CLIを導入せずにVS Codeだけで進めたい場合は、native方式を選びます。新規のnative導入は `nativeModelVerification: "requested-unverified"` になり、親エージェントが要求モデルをサブエージェント呼び出しのモデル引数に渡して結果を提出します。VS Codeはサブエージェントが**実際に使ったモデル**を返さないため、各実行記録・runの要約・status・doctorに「実行モデル未検証」と残ります。
+
+```bash
+node /path/to/code-migration-kit/scripts/install.mjs --target . --layout plugin --worker-backend native --native-harness copilot --model MODEL_ID --apply
+```
+
+Copilot CLIを使える場合は既定のCLIワーカー方式（`copilot-cli`）を推奨します。ワーカーごとに `--model` で固定したプロセスを起動し、暗黙の指示の隔離も実機で確認済みです。実行メタデータでの確認を必須にする従来の契約は `--native-model-verification host-metadata` で選べますが、VS Codeでは完了できない実験的な設定です。
 
 `workerBackend: "native"` を選ぶと、現在のVS Codeセッションの親エージェントが
 実装・レビュー・裁定・修正をサブエージェントへ委譲します。Copilot CLIは起動しません。

@@ -2,7 +2,14 @@
 
 [日本語](NATIVE-WORKERS.md) | English
 
-> **Experimental; cannot currently complete.** This procedure requires confirming the executed model from host metadata before each submission. VS Code does not return the model used by `runSubagent` to the parent agent, so the check cannot be made and every job has to be reported with `fail`. Use the CLI worker backend (`copilot-cli`, the default) for real projects; it works in VS Code too.
+> **Runs inside VS Code only, with the executed model unverified.** `nativeModelVerification` has two values:
+>
+> | Setting | Condition for submitting | On VS Code |
+> |---|---|---|
+> | `requested-unverified` (default for new native installs) | The requested model was passed to the per-call model parameter | Completes; records say "executed model unverified" |
+> | `host-metadata` (when omitted in existing configs) | The executed model was confirmed from host execution metadata | Cannot complete, because VS Code returns no such metadata (experimental) |
+>
+> When the Copilot CLI is available, the CLI worker backend (`copilot-cli`, the default) is recommended.
 
 `workerBackend: "native"` makes the parent agent of the current VS Code session start subagents; the Copilot CLI is not started. The Node runner issues jobs, validates results, writes files and handles independent review, arbitration and fixing, approvals, completion records and resumption.
 
@@ -16,7 +23,7 @@ This is not automatic dispatch by a VS Code extension: the parent agent services
 
 ## Initialization and settings
 
-`doctor` reports static configuration and profile validity as `staticValid`, and native execution capability as `executionReady: "unknown"`. There is not yet a formal adapter that ties together executed-model information, launch handles, completion notifications and child cancellation. Native doctor exits with code 1 and never reports execution as verified. A string match in Node does not prove host metadata is genuine. Do not copy the requested model, or a worker's own claim, into the record as if it were observed. `observedModel` in cost and usage records stays null/unknown without a formal source.
+`doctor` reports static configuration and profile validity as `staticValid`, and native execution capability as `executionReady: "unknown"`. There is not yet a formal adapter that ties together executed-model information, launch handles, completion notifications and child cancellation. With `host-metadata`, native doctor exits with code 1 and never reports execution as verified; with `requested-unverified` it succeeds when the static checks pass and reports `executionReady: "models-unverified"`. A string match in Node does not prove host metadata is genuine. Do not copy the requested model, or a worker's own claim, into the record as if it were observed. `observedModel` in cost and usage records stays null/unknown without a formal source.
 
 | Capability | CLI adapter | VS Code Copilot native | VS Code Local native |
 |---|---|---|---|
@@ -58,6 +65,8 @@ Native `doctor` does not start the CLI and checks the dedicated profiles, even w
 ### Selecting and confirming the model
 
 On Local, use `runSubagent`'s model argument; on Copilot, use the per-call model argument of the delegation tool the host exposes. Writing a model name into the prompt is no substitute. On a host without per-call selection, report the job as failed. Per-call selection is documented in [VS Code Local's selection order](https://code.visualstudio.com/docs/agents/run/subagents#select-the-model-for-a-subagent) and [the Copilot runtime's selection order](https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-command-reference#custom-agent-frontmatter-fields). Project-specific models do not need to be baked into the shared plugin profiles.
+
+With `requested-unverified`, pass the requested model to the per-call model parameter and give the same requested model to `submit --model`. If the host does not accept or rejects that model, use `fail`. A host fallback to another model cannot be detected, so `modelVerification` in attempt records, `modelVerification` and `warnings` in the run summary, status and doctor all say unverified, and reports state "executed model unverified". The rest of this section is the `host-metadata` procedure.
 
 The Copilot runtime may fall back to another model when the requested one cannot be used, so successfully requesting it is not enough. Before submitting, confirm the model actually used from the execution metadata the host returns. If it differs from the request, cannot be confirmed, or the naming correspondence is unclear, use `fail`. Pass the confirmed model to `submit --model`; never copy the request's `model` or treat the model's own answer as proof. Because Node cannot independently verify the host's claim, `observedModel` in receipts stays null.
 
