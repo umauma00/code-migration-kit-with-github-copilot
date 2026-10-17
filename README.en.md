@@ -72,6 +72,8 @@ node scripts/install.mjs --target /path/to/your-project --model MODEL_ID --langu
 node scripts/install.mjs --target /path/to/your-project --model MODEL_ID --language en --apply
 ```
 
+`--models implementer=ID,reviewers=ID,arbiter=ID,fixer=ID` sets per-role models (unlisted roles use `--model`). As in the upstream model plan, choose by blast radius: reviewers on the largest or a mid model, high-volume implementers on a mid or small model, fixers and the arbiter on a mid model.
+
 `--language ja|en` sets the language of phase reports, questions and `status --format markdown`. It is stored in `migration/preferences.json` and never affects approvals or completion. If omitted, the skill asks Japanese or English at the start. Change it later with `run_migration.mjs preferences --language ja`.
 
 Scripts and documents go to `migration-kit/` in the target, and the Copilot entry points to `.github/`. A managed block is appended to existing Copilot instructions. Existing files with different content are never overwritten (the installer stops), and an existing `migration/config.json` is kept. Re-running with the same content changes nothing.
@@ -115,6 +117,8 @@ The minimum settings in `migration/config.json`:
 | `concurrency` | Concurrent AI calls, default 2, reviews included |
 | `maxFixRounds`, `maxAgentCalls` | Fix rounds per unit and AI calls per run |
 | `maxRunInputBytes` | Optional cap on the prompt bytes a run sends to workers. AI Credits are metered on tokens and usage stops when they run out, so this budgets runs between usage checks. The run summary's `usageEstimate` records measured bytes and estimated tokens (bytes ÷ 4, not billing data). The check uses completed calls, so calls already in flight (up to `concurrency`) can overshoot it |
+| `transientRetries`, `transientRetryDelayMs` | Optional. Automatic retries for rate limits (429), 5xx and network errors (default 2) and the first wait (default 5000 ms, doubling). Retries count as AI calls |
+| `maxConsecutiveFailures` | Optional. Stop dispatching after this many unit failures in a row (default 3). One unit's failure does not stop the others; failures shared by every call (sign-in, credits) stop the run at once |
 | `timeoutSeconds` | Time limit for one CLI worker call |
 | `commandTimeoutSeconds` | Time limit for build and comparison commands |
 
@@ -201,7 +205,7 @@ The table and the CLI examples that follow are for **runtime mode**. In [source-
 | Comparator design | [00b-judge-setup](prompts/00b-judge-setup.md) | Original tests, comparator, mutation self-check |
 | Dependencies | [01-dependency-map](prompts/01-dependency-map.md) | depmap, `migration/manifest.tsv`, `review-dependencies.json` |
 | Semantic gaps and policy | [02-gap-inventory](prompts/02-gap-inventory.md) | `migration/RULEBOOK.md`, `inventory.tsv` |
-| Stress test | [03-stress-test](prompts/03-stress-test.md) | `migration/stress-test/report.md` |
+| Stress test | [03-stress-test](prompts/03-stress-test.md) ([checklist](docs/STRESS-TEST-CHECKLIST.en.md)) | `migration/stress-test/report.md` |
 | Translation and review | [04-translation-kickoff](prompts/04-translation-kickoff.md) | Translated sources, review records |
 | Whole build | [05-survey-build](prompts/05-survey-build.md) | Diagnostics, repair records |
 | Basic operation | [05b-smoke](prompts/05b-smoke.md) | Smoke results from real operations |

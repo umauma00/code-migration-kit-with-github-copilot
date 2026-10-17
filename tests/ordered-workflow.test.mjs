@@ -131,7 +131,7 @@ test('main-compatible cost rows preserve unknowns, measured usage, existing rows
 test('failed worker logs actual calls and unknown usage, not unused reservations',async t=>{
   const f=fixture(t);f.config.concurrency=1;writeJSON(safePath(f.root,'migration/config.json'),f.config);
   await preparation(f);
-  await assert.rejects(translate(f.root,f.config,c=>{if(c.role==='reviewer-semantics')throw new Error('Review transport failed');return fake(c);}),/transport failed/);
+  await assert.rejects(translate(f.root,f.config,c=>{if(c.role==='reviewer-semantics')throw new Error('Review transport failed: Bad credentials');return fake(c);}),/transport failed/);
   assert.deepEqual(rows(f.root).findLast(r=>r[0]==='04').slice(3),['unknown','2','unknown']);
 });
 

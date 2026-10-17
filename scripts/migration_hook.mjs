@@ -2,10 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { guardrailDecision } from '../lib/guardrails.mjs';
+import { interactiveDecision } from '../lib/guardrails.mjs';
 export function decide(event, role, cwd) {
-  // Interactive sessions are restricted only by the human-installed guardrails.
-  if (!role) return guardrailDecision(event, cwd);
+  // Interactive sessions: the human-installed guardrails, plus the human's own
+  // acts (guardrails.json edits are denied, approvals ask for confirmation).
+  if (!role) { const d = interactiveDecision(event, cwd); return d?.decision === 'deny' ? d.reason : d; }
   if (role.startsWith('reviewer-') && !role.endsWith('-read')) return 'Independent reviewers have no tools; use only the supplied frozen input.';
   const name = event.toolName ?? event.tool_name;
   if (!name) return 'Malformed hook event: tool name missing';
@@ -22,9 +23,11 @@ export function decide(event, role, cwd) {
   }
   return null;
 }
-export function decisionOutput(reason) {
-  if (!reason) return {};
-  const decision = { permissionDecision: 'deny', permissionDecisionReason: reason };
+// A string is a denial; { decision: 'ask', reason } asks the person to confirm.
+export function decisionOutput(result) {
+  if (!result) return {};
+  const ask = typeof result === 'object' && result.decision === 'ask';
+  const decision = { permissionDecision: ask ? 'ask' : 'deny', permissionDecisionReason: ask ? result.reason : String(result) };
   // Always emit both shapes. Copilot CLI reads the top level; VS Code also loads
   // CLI-format .github/hooks files but reads hookSpecificOutput, so a CLI-only
   // answer would let VS Code agents through. Each consumer ignores the other key.

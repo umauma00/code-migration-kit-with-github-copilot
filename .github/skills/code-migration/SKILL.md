@@ -53,7 +53,9 @@ for review; they do not route directly to a later phase. Respect redesign mode.
 Before choosing a verification mode (at initialization, and whenever runtime 00b
 blocks), ask two questions with the question tool: can the original
 implementation still run here, and does a specification or portable test suite
-exist? If both answers are no, recommend [source as the only specification](../../../docs/SOURCE-AS-SPEC.md)
+exist? Record the first answer with `run_migration.mjs preferences --original-runtime
+available|unavailable` (presentation only; failure guidance uses it to pick its
+recommendation). If both answers are no, recommend [source as the only specification](../../../docs/SOURCE-AS-SPEC.md)
 (`--preparation-profile source-as-spec` for a new project, `source-spec init`
 then `--apply` after consent for an existing one) and explain that equivalence
 stays unverified; if the original runs, recommend runtime. The user chooses.
@@ -74,8 +76,11 @@ Never choose on the user's behalf or offer routing around a guardrail.
 
 Before routing a configured project, run `run_migration.mjs phase init`, then
 `phase next`. Follow [ordered workflow](../../../docs/ORDERED-WORKFLOW.md).
-Run only the first incomplete phase; use `phase start ID` before work. Phases
-03/04 need human-installed `migration/guardrails.json`; ask the human, never create it. An explicit
+Run only the first incomplete phase; use `phase start ID` before work. For 03,
+work through and show the [one-page checklist](../../../docs/STRESS-TEST-CHECKLIST.md). Phases
+03/04 need human-installed `migration/guardrails.json`; ask the human, never create it
+(the hook denies agent edits of it). The host asks the person to confirm every
+`approve` / `phase complete` command; if it cannot ask, hand them the command to run. An explicit
 request for a later phase does not waive missing earlier reviews. Do not route
 from file existence. After user review, record early phases with `phase complete
 ID --note TEXT`; runner receipts determine implementation and validation phases.

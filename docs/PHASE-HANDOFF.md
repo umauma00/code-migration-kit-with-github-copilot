@@ -132,6 +132,14 @@ For translation/build/smoke and runtime parity/post-parity or source-only handof
 say **approve and run the named stage**, identifying the current artifacts in the
 question. Only after a real answer authorizes it, record the appropriate runner
 approval and execute that stage. Never issue every future approval in advance.
+
+The kit's hook makes the host ask the person to confirm every `approve`,
+`phase complete`, `pilot prepare` and `source-spec init --apply` command, and it
+refuses any agent edit of `migration/guardrails.json`. That host confirmation is
+the person's act; never ask them to switch it off. When the session cannot ask
+(a non-interactive run reports "unable to ask user for confirmation"), give the
+person the exact command and let them run it in their own terminal. These hooks
+work only where the host loads them (see `doctor`).
 If artifacts or predecessor results changed, refresh the report and authorization
 as required by the runner. A user's change request is not approval to proceed.
 
@@ -146,7 +154,9 @@ instruction. Do not create a question merely to end the conversation.
 
 Every failed command, failed phase check, blocked unit or refused gate ends with
 a **failure report**, never with a bare error or a silent retry. Runner commands
-print it after the `ERROR:` line; for failures from any other tool (host TODO,
+print it after the `ERROR:` line (one section per distinct cause when several
+units failed), `doctor` prints it for every failed check, and
+`status --format markdown` appends it for blocked units; for failures from any other tool (host TODO,
 question tool, a script, a worker), run
 `run_migration.mjs guidance --message "<the error text>"` to get the same
 structure. Adapt it with what you actually observed, then report:

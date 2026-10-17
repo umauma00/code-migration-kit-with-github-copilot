@@ -12,6 +12,7 @@ import { phaseCommand } from '../scripts/phase_cli.mjs';
 import { migrationStatus, statusTodo, statusChecklist } from '../lib/status.mjs';
 import { initSourceSpec, sourceSpecReadiness, contractsFile } from '../lib/source-spec.mjs';
 import { failureGuidance, guidanceMarkdown } from '../lib/guidance.mjs';
+import { setPreferences } from '../lib/preferences.mjs';
 import { runProcess } from '../lib/process.mjs';
 import { doctor } from '../scripts/run_migration.mjs';
 const writeJSONFile = (root, rel, value) => atomicWrite(safePath(root, rel), `${JSON.stringify(value, null, 2)}\n`);
@@ -72,7 +73,10 @@ test('source-spec init previews, then switches an existing runtime project and d
   const readiness = sourceSpecReadiness(root, saved);
   assert.equal(readiness.ready, false);
   assert.equal(readiness.items.find(i => i.path === 'migration/RULEBOOK.md').status, 'template');
-  assert.match(readiness.commands.dependencyMap, /depmap_python\.py --root \. /);
+  // src has no __init__.py: parse from src (sibling imports resolve) and re-prefix paths.
+  assert.match(readiness.commands.dependencyMap, /depmap_python\.py --root src /);
+  assert.match(readiness.commands.manifest, /--prefix 'src\/'/);
+  assert.match(readiness.commands.reviewDependencies, /--depmap-root src /);
 });
 
 test('one user OK records 00b-02 together; unfilled contracts and gaps stop with guidance', async t => {
@@ -131,9 +135,17 @@ test('failure guidance names the cause and recommends one of several choices wit
     assert.equal(g.recommended, g.options[0].id);
     assert.ok(g.options.every(o => o.label && o.reason));
   }
-  const runtime = failureGuidance('Prepare runtime judge inputs and original/mutation/parity commands', { root, language: 'en' });
-  assert.equal(runtime.recommended, 'switch-source-as-spec');
-  assert.match(runtime.options[0].command, /^node \S*scripts\/run_migration\.mjs source-spec init$/);
+  // The recommendation follows whether the original can still run; unknown asks first.
+  const runtimeMessage = 'Prepare runtime judge inputs and original/mutation/parity commands';
+  const runtime = failureGuidance(runtimeMessage, { root, language: 'en' });
+  assert.equal(runtime.recommended, 'answer-runtime');
+  assert.match(runtime.options[0].command, /preferences --original-runtime available\|unavailable$/);
+  setPreferences(root, { originalRuntime: 'unavailable' });
+  const unavailable = failureGuidance(runtimeMessage, { root, language: 'en' });
+  assert.equal(unavailable.recommended, 'switch-source-as-spec');
+  assert.match(unavailable.options[0].command, /^node \S*scripts\/run_migration\.mjs source-spec init$/);
+  setPreferences(root, { originalRuntime: 'available' });
+  assert.equal(failureGuidance(runtimeMessage, { root, language: 'en' }).recommended, 'configure-runtime');
   assert.match(guidanceMarkdown(runtime, 'ja'), /（推奨）/);
   // The installed runner prints the guidance after every error.
   const script = safePath(root, 'migration-kit/scripts/run_migration.mjs');
