@@ -90,8 +90,8 @@ node migration-kit/scripts/run_migration.mjs phase complete 00b,01,02 --note "Us
 node migration-kit/scripts/run_migration.mjs judge
 ```
 
-Each phase's artifacts are checked in order; a gap stops at that phase and
-prints its cause and choices. Phase 00 (feasibility) is reviewed separately.
+All three phases are checked before anything is written; if anything is
+missing, **no phase is recorded**, and the cause and choices are printed. Phase 00 (feasibility) is reviewed separately.
 
 ## Afterwards
 

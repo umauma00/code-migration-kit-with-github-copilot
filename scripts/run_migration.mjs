@@ -66,17 +66,34 @@ export async function doctor(root, config, { checkCLI = false, command = 'copilo
   checks.push({ check: 'build artifact roots', ok: true, roots: config.buildArtifactRoots ?? [], note: 'Declare generated binaries, objects and reports here. Their file contents are excluded from command-input fingerprints; actual inputs must stay outside these roots.' });
   if (!native) checks.push({ check: 'worker hook installed', ok: fs.existsSync(safePath(layout.root, layout.hookPath)) });
   // Copilot hooks fail open on timeout: a slow start silently disables the
-  // guardrails. Time one denial through the same script the hook config runs.
+  // guardrails. Run the exact command from the hook configuration twice: as a
+  // worker (must deny a shell call) and as an interactive session (the slower
+  // guardrail path, which reads migration/guardrails.json).
   {
-    const hookFile = safePath(layout.root, layout.hookPath);
-    let limit = null;
-    try { const spec = JSON.parse(fs.readFileSync(hookFile, 'utf8')).hooks; limit = (spec.preToolUse ?? spec.PreToolUse)?.[0]?.timeoutSec ?? (spec.PreToolUse ?? spec.preToolUse)?.[0]?.timeout ?? null; } catch {}
-    const started = Date.now();
-    const probe = await runProcess(process.execPath, [path.join(layout.plugin ? layout.root : safePath(root, 'migration-kit'), 'scripts/migration_hook.mjs')], {
-      cwd: root, timeoutMs: 60000, input: JSON.stringify({ toolName: 'bash', toolArgs: { command: 'true' } }), env: { ...process.env, MIGRATION_KIT_ROLE: 'implementer' } }).catch(e => ({ code: null, stderr: e.message }));
-    const ms = Date.now() - started, decision = (() => { try { return JSON.parse(probe.stdout); } catch { return null; } })();
-    checks.push({ check: 'hook responds before its timeout', ok: probe.code === 0 && decision?.permissionDecision === 'deny' && decision?.hookSpecificOutput?.permissionDecision === 'deny' && (limit === null || ms < limit * 500),
-      durationMs: ms, timeoutSec: limit, note: 'Copilot CLI and VS Code let a tool call through when a hook times out. Keep the measured time well under half the configured timeout.' });
+    let entry = null, limit = null;
+    try {
+      const spec = JSON.parse(fs.readFileSync(safePath(layout.root, layout.hookPath), 'utf8')).hooks;
+      entry = (spec.preToolUse ?? spec.PreToolUse)?.[0] ?? null;
+      limit = entry?.timeoutSec ?? entry?.timeout ?? null;
+    } catch {}
+    const line = entry && (entry.bash ?? entry.command);
+    const argv = typeof line === 'string' ? [...line.replaceAll('${PLUGIN_ROOT}', layout.root).matchAll(/"([^"]*)"|(\S+)/g)].map(m => m[1] ?? m[2]) : [];
+    const probe = async (role, command) => {
+      const started = Date.now();
+      const r = await runProcess(argv[0] === 'node' ? process.execPath : argv[0], argv.slice(1), { cwd: root, timeoutMs: 60000,
+        input: JSON.stringify({ toolName: 'bash', toolArgs: { command }, cwd: root }),
+        env: { ...process.env, ...(role ? { MIGRATION_KIT_ROLE: role } : {}) } }).catch(e => ({ code: null, stdout: '', stderr: e.message }));
+      let decision = null; try { decision = JSON.parse(r.stdout); } catch {}
+      return { ms: Date.now() - started, code: r.code, decision };
+    };
+    const worker = argv.length ? await probe('implementer', 'true') : null;
+    const parent = argv.length ? await probe(null, 'git status') : null;
+    const slowest = Math.max(worker?.ms ?? 0, parent?.ms ?? 0);
+    checks.push({ check: 'hook responds before its timeout', ok: Boolean(worker && parent) && worker.code === 0 && parent.code === 0 &&
+        worker.decision?.permissionDecision === 'deny' && worker.decision?.hookSpecificOutput?.permissionDecision === 'deny' &&
+        parent.decision !== null && (limit === null || slowest < limit * 500),
+      command: line ?? null, durationMs: slowest, timeoutSec: limit,
+      note: 'Runs the configured hook command. Copilot CLI and VS Code let a tool call through when a hook times out; keep the measured time well under half the configured timeout.' });
   }
   let guardrails = null, guardrailError;
   try { guardrails = readGuardrails(root); } catch (e) { guardrailError = e.message; }

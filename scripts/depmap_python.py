@@ -29,16 +29,20 @@ from pathlib import Path
 # Directories never walked. Any path component in this set — or starting with
 # "." — is excluded. Kept visible at the top per CONTRIBUTING's requirement
 # that the exclusion list be inspectable without reading the walker.
-# migration-kit/ (a repository-copy install) and migration/ are kit and run
-# metadata, never sources to port.
-SKIP_DIRS = {"venv", "node_modules", "__pycache__", "generated", "migration-kit", "migration"}
+SKIP_DIRS = {"venv", "node_modules", "__pycache__", "generated"}
+# A repository-copy install (migration-kit/) and run metadata (migration/) are
+# never sources to port. Skip them only at the top of --root and only when the
+# marker proves it is the kit, so a real package named "migration" is kept.
+KIT_DIRS = {"migration-kit": "scripts/run_migration.mjs", "migration": "config.json"}
 
 
 def find_py_files(root: Path):
+    kit = {name for name, marker in KIT_DIRS.items() if (root / name / marker).is_file()}
     return sorted(
         p for p in root.rglob("*.py")
         if not any(part.startswith(".") or part in SKIP_DIRS
                    for part in p.relative_to(root).parts)
+        and p.relative_to(root).parts[0] not in kit
     )
 
 

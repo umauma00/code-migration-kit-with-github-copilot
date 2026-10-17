@@ -123,7 +123,7 @@ node migration-kit/scripts/run_migration.mjs doctor --check-cli
 | `nativeHarness` | native時に必須。`vscode-local` または `copilot`。現在のセッションと合わせる |
 | `concurrency` | 同時AI呼び出し数。初期値2。レビューを含めてこの数以下 |
 | `maxFixRounds`, `maxAgentCalls` | 1単位の修正回数、1回の実行のAI呼び出し数の上限 |
-| `maxRunInputBytes` | 任意。1回の実行でワーカーへ送る入力の合計バイト数の上限。AI Creditsはトークン量で消費され、使い切ると利用が止まるため、区切って使用量を確認するための予算。runの要約の `usageEstimate` に実測バイト数と推定トークン数（バイト÷4、課金データではない）を残す |
+| `maxRunInputBytes` | 任意。1回の実行でワーカーへ送る入力の合計バイト数の上限。AI Creditsはトークン量で消費され、使い切ると利用が止まるため、区切って使用量を確認するための予算。runの要約の `usageEstimate` に実測バイト数と推定トークン数（バイト÷4、課金データではない）を残す。判定は完了した呼び出しの合計で行うため、実行中の呼び出し（最大 `concurrency` 件）の分だけ上限を超えることがある |
 | `timeoutSeconds` | 通常CLIの1ワーカー呼び出しの時間上限 |
 | `commandTimeoutSeconds` | ビルド・比較コマンドの時間上限 |
 

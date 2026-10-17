@@ -13,6 +13,8 @@ import { migrationStatus, statusTodo, statusChecklist } from '../lib/status.mjs'
 import { initSourceSpec, sourceSpecReadiness, contractsFile } from '../lib/source-spec.mjs';
 import { failureGuidance, guidanceMarkdown } from '../lib/guidance.mjs';
 import { runProcess } from '../lib/process.mjs';
+import { doctor } from '../scripts/run_migration.mjs';
+const writeJSONFile = (root, rel, value) => atomicWrite(safePath(root, rel), `${JSON.stringify(value, null, 2)}\n`);
 
 function project(t, options = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'source-as-spec-'));
@@ -58,7 +60,7 @@ test('source-spec init previews, then switches an existing runtime project and d
   assert.deepEqual(preview.changes.map(c => c.path), ['migration/config.json', 'migration/judge-plan.json', contractsFile]);
   assert.equal(fs.readFileSync(safePath(root, 'migration/config.json'), 'utf8'), before, 'preview never writes');
   const applied = initSourceSpec(root, config, { apply: true });
-  assert.match(applied.warning, /invalidates earlier approvals/);
+  assert.match(applied.warning, /verification mode invalidates every phase record from 00/);
   const saved = loadConfig(root);
   assert.equal(saved.preparationProfile, 'source-as-spec');
   const plan = readJSON(safePath(root, 'migration/judge-plan.json'));
@@ -145,4 +147,97 @@ test('failure guidance names the cause and recommends one of several choices wit
   assert.equal(typecheck.id, 'typecheck');
   assert.match(typecheck.options[0].command, /^node migration-kit\/scripts\/run_migration\.mjs repair /, 'installed copies cite their project-relative runner');
   assert.ok(fs.existsSync(path.join(kitRoot, 'docs/SOURCE-AS-SPEC.en.md')));
+});
+
+test('review fixes: guidance does not misroute file/diagnostic errors and never pre-fills review notes', t => {
+  const root = project(t);
+  for (const [message, id] of [
+    ['Build failed but no diagnostic maps to a manifest target (parsed 1, unmapped 1). src/login.ts:12', 'build-failed'],
+    ['Invalid review result for src/login.py', 'worker-output'],
+    ['Native worker failed: tsc error at line 401', 'native-worker'],
+    ['ENOENT: no such file or directory, open migration/RULEBOOK.md', 'unknown'],
+    ['spawn copilot ENOENT', 'copilot-missing'],
+    ['Copilot implementer failed (exit 1): To authenticate, you can use any of the following methods', 'copilot-auth']]) {
+    assert.equal(failureGuidance(message, { root, language: 'en' }).id, id, message);
+  }
+  const runtime = failureGuidance('Phase 01 is not reviewed for current inputs.', { root, language: 'en' });
+  assert.deepEqual(runtime.options.map(o => o.id), ['review-previous', 'redo-phase', 'pause'], 'no source-as-spec bundle in runtime projects');
+  assert.match(runtime.options[0].command, /--note "<確認した内容 \/ what you reviewed>"$/);
+  const runner = failureGuidance('Phase 04 is not reviewed for current inputs.', { root, language: 'en' });
+  assert.ok(!runner.options.some(o => o.command?.includes('phase complete')), 'runner phases are never recorded by hand');
+  initSourceSpec(root, loadConfig(root), { apply: true });
+  assert.ok(failureGuidance('Phase 01 is not reviewed for current inputs.', { root }).options.some(o => o.id === 'bundle-spec'));
+});
+
+test('review fixes: an invalid config never reads as "all phases complete"', t => {
+  const root = project(t);
+  fs.writeFileSync(safePath(root, 'migration/config.json'), '{bad');
+  const report = migrationStatus(root);
+  assert.match(statusChecklist(report, 'en'), /^Migration flow: progress cannot be determined\. Cause: migration\/config\.json/);
+  const todo = statusTodo(report, 'ja');
+  assert.ok(todo.blocked && todo.todoList.every(i => i.status !== 'completed' && i.description.startsWith('判定不能')));
+});
+
+test('review fixes: the bundle records nothing when a later phase is incomplete', t => {
+  const root = project(t, { preparationProfile: 'source-as-spec' });
+  let config = loadConfig(root);
+  initSourceSpec(root, config, { apply: true }); config = loadConfig(root);
+  phaseCommand(root, config, 'init');
+  atomicWrite(safePath(root, 'migration/feasibility.md'), 'Three files; no original runtime or spec.\n');
+  phaseCommand(root, config, 'complete', '00', { note: 'User reviewed feasibility' });
+  draftPackage(root);
+  fs.rmSync(safePath(root, 'migration/gap-report.md'));
+  assert.throws(() => phaseCommand(root, config, 'complete', '00b,01,02', { note: 'User OK' }), /gap-report\.md/);
+  assert.equal(migrationStatus(root).workflow.next, '00b');
+  for (const id of ['00b', '01', '02']) assert.equal(fs.existsSync(safePath(root, `migration/phases/${id}.json`)), false, id);
+  assert.throws(() => phaseCommand(root, config, 'complete', '02,03', { note: 'x' }), /00 through 02/);
+});
+
+test('review fixes: TODO(spec) only blocks source-as-spec; a profile-only switch keeps 00-01 valid', t => {
+  const root = project(t, { verificationMode: 'source-only' });
+  const config = loadConfig(root);
+  phaseCommand(root, config, 'init');
+  atomicWrite(safePath(root, 'migration/feasibility.md'), 'Feasible.\n');
+  phaseCommand(root, config, 'complete', '00', { note: 'Reviewed' });
+  atomicWrite(safePath(root, 'tests/scenarios.md'), 'Scenario notes; the literal TODO(spec) is allowed here.\n');
+  writeJSONFile(root, 'migration/judge-plan.json', { schemaVersion: 1, verificationMode: 'source-only', method: 'Source review', sources: ['src/main.py'],
+    scenarios: [{ path: 'tests/scenarios.md', contract: 'main prints results', expectationBasis: 'source-inferred' }], unverified: ['Original not executed'] });
+  atomicWrite(safePath(root, 'migration/judge-report.md'), 'Judge plan reviewed.\n');
+  phaseCommand(root, config, 'complete', '00b', { note: 'Reviewed plan' });
+  const preview = initSourceSpec(root, config);
+  assert.match(preview.warning, /phase 02 onward/);
+  initSourceSpec(root, config, { apply: true });
+  const after = migrationStatus(root).workflow;
+  assert.equal(after.phases.find(p => p.id === '00b').complete, true, 'profile switch keeps 00b');
+});
+
+test('review fixes: python depmap keeps a real migration package; manifest --include keeps only source roots', async t => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'depmap-migration-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  for (const [p, text] of [['src/app/__init__.py', ''], ['src/app/migration/__init__.py', ''], ['src/app/migration/step.py', 'X = 1\n'],
+    ['tests/test_app.py', 'import app\n'], ['migration/config.json', '{}'], ['migration/x.py', '']]) {
+    fs.mkdirSync(path.dirname(path.join(dir, p)), { recursive: true }); fs.writeFileSync(path.join(dir, p), text);
+  }
+  const map = await runProcess('python3', ['-I', path.join(kitRoot, 'scripts/depmap_python.py'), '--root', '.', '--out', 'migration/depmap'], { cwd: dir });
+  assert.equal(map.code, 0, map.stderr);
+  const order = fs.readFileSync(path.join(dir, 'migration/depmap/order.txt'), 'utf8');
+  assert.match(order, /src\/app\/migration\/step\.py/);
+  assert.doesNotMatch(order, /migration\/x\.py$/m);
+  const manifest = await runProcess('python3', ['-I', path.join(kitRoot, 'scripts/make_manifest.py'), '--order', 'migration/depmap/order.txt', '--out', 'migration/manifest.tsv',
+    '--include', 'src/', '--sub', 'src/=ported/', '--sub', '.py=.mjs'], { cwd: dir });
+  assert.equal(manifest.code, 0, manifest.stderr);
+  const rows = fs.readFileSync(path.join(dir, 'migration/manifest.tsv'), 'utf8');
+  assert.match(rows, /src\/app\/migration\/step\.py\tported\/app\/migration\/step\.mjs/);
+  assert.doesNotMatch(rows, /tests\//);
+});
+
+test('review fixes: doctor runs the configured hook command and fails when it points at a missing script', async t => {
+  const root = project(t);
+  const ok = (await doctor(root, loadConfig(root))).checks.find(c => c.check === 'hook responds before its timeout');
+  assert.equal(ok.ok, true);
+  assert.match(ok.command, /migration_hook\.mjs/);
+  const file = safePath(root, '.github/hooks/code-migration.json'), hook = JSON.parse(fs.readFileSync(file, 'utf8'));
+  hook.hooks.preToolUse[0].bash = 'node migration-kit/scripts/missing_hook.mjs';
+  fs.writeFileSync(file, JSON.stringify(hook));
+  assert.equal((await doctor(root, loadConfig(root))).checks.find(c => c.check === 'hook responds before its timeout').ok, false);
 });
