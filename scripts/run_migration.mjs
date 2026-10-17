@@ -3,14 +3,16 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { loadConfig, readManifest, contextHash, unitState, done, safePath, readJSON, parseArgs, verificationFiles, loadReviewDependencies, reviewSources } from '../lib/core.mjs';
+import { lockRun, loadConfig, readManifest, contextHash, unitState, done, safePath, readJSON, parseArgs, verificationFiles, loadReviewDependencies, reviewSources } from '../lib/core.mjs';
 import { validateWorkerProfile, validateNativeProfile, assistedReviewerRoles } from '../lib/review.mjs';
 import { runProcess } from '../lib/process.mjs';
 import { approve, runStage, translate, runPilot, runJudgePreparation } from '../lib/pipeline.mjs';
 import { preparePilot } from '../lib/pilot.mjs';
 import { createCopilotAdapter, requiredCopilotFlags, copilotEnv, probeWorkerAgents } from './copilot_adapter.mjs';
 import { runtimeLayout } from '../lib/runtime.mjs';
-import { migrationStatus, statusMarkdown } from '../lib/status.mjs';
+import { migrationStatus, statusMarkdown, statusTodo, statusChecklist } from '../lib/status.mjs';
+import { failureGuidance, guidanceMarkdown } from '../lib/guidance.mjs';
+import { initSourceSpec, sourceSpecReadiness } from '../lib/source-spec.mjs';
 import { createNativeAdapter } from '../lib/native-workers.mjs';
 import { phaseCommand } from './phase_cli.mjs';
 import { diagnoseBuild } from './diagnostic_queue.mjs';
@@ -19,10 +21,15 @@ import { readGuardrails, cliFolderTrust } from '../lib/guardrails.mjs';
 
 export const usage = `Usage: node migration-kit/scripts/run_migration.mjs COMMAND [options]
   doctor [--check-cli] [--copilot /path/to/copilot]
-  status [--format json|markdown]  Read-only preparation and execution evidence
+  status [--format json|markdown|todo|checklist]
+                              Read-only evidence; todo = host task-list items, checklist = chat progress
+  guidance --message TEXT [--format json|markdown]
+                              Explain a failure: cause, impact and choices with a recommendation
   preferences [--language ja|en]   Show or set the language of user-facing reports
-  phase init | next | check ID | start ID | complete ID --note TEXT
+  phase init | next | check ID | start ID | complete ID[,ID...] --note TEXT
                               Ordered workflow; optional --tokens N --subagents N --model ID
+  source-spec init [--apply] | check
+                              Source as the only specification: scaffold source-only preparation
   judge                       Runtime: original/mutation; source-only: validate preparation
   judge-prepare               Validate/reuse the judge at 00b before map/rules exist
   approve STAGE --note TEXT   Review/approve translation, build, smoke, parity, post-parity, handoff
@@ -107,13 +114,21 @@ export async function main(argv = process.argv.slice(2)) {
     console.log(JSON.stringify(args.language ? setPreferences(root, { language: args.language }) : preferencesReport(root), null, 2));
     return;
   }
+  let language = 'en';
+  try { language = readPreferences(root).userLanguage ?? 'en'; } catch {}
   if (cmd === 'status') {
-    if (args.format && !['json', 'markdown'].includes(args.format)) throw new Error('status format must be json or markdown');
+    if (args.format && !['json', 'markdown', 'todo', 'checklist'].includes(args.format)) throw new Error('status format must be json, markdown, todo or checklist');
     const report = migrationStatus(root);
     if (!report.ok) process.exitCode = 1;
-    let language = 'en';
-    try { language = readPreferences(root).userLanguage ?? 'en'; } catch {}
-    console.log(args.format === 'markdown' ? statusMarkdown(report, language) : JSON.stringify(report, null, 2));
+    console.log(args.format === 'markdown' ? `${statusChecklist(report, language)}\n\n${statusMarkdown(report, language)}`
+      : args.format === 'checklist' ? statusChecklist(report, language)
+      : args.format === 'todo' ? JSON.stringify(statusTodo(report, language), null, 2) : JSON.stringify(report, null, 2));
+    return;
+  }
+  if (cmd === 'guidance') {
+    if (typeof args.message !== 'string' || !args.message.trim()) throw new Error('guidance requires --message TEXT (the error to explain)');
+    const g = failureGuidance(args.message, { root, language });
+    console.log(args.format === 'json' ? JSON.stringify(g, null, 2) : guidanceMarkdown(g, language));
     return;
   }
   const config = loadConfig(root), controller = new AbortController();
@@ -139,6 +154,12 @@ export async function main(argv = process.argv.slice(2)) {
         result = { diagnosis, repair, next: 'Review the repaired outputs and the round counts in migration/build-rounds.tsv, then approve build and run build for the next round.' };
       }
     }
+    else if (cmd === 'source-spec' && args._[1] === 'init') {
+      const release = args.apply ? lockRun(root, 'source-spec-init') : () => {};
+      try { result = initSourceSpec(root, config, { apply: args.apply }); } finally { release(); }
+    }
+    else if (cmd === 'source-spec' && args._[1] === 'check') result = sourceSpecReadiness(root, config);
+    else if (cmd === 'source-spec') throw new Error('Use source-spec init [--apply] | check');
     else if (cmd === 'judge-prepare') result = await runJudgePreparation(root, config, { signal: controller.signal });
     else if (cmd === 'phase') result = phaseCommand(root,config,args._[1],args._[2],args);
     else if (cmd === 'doctor') { result = await doctor(root, config, { checkCLI: args['check-cli'], command: args.copilot }); if (!result.ok) process.exitCode = 1; }
@@ -157,5 +178,15 @@ export async function main(argv = process.argv.slice(2)) {
   } finally { process.removeListener('SIGINT', abort); process.removeListener('SIGTERM', abort); }
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
-  main().catch(e => { console.error(`ERROR: ${e.message}`); process.exitCode = 1; });
+  main().catch(e => {
+    console.error(`ERROR: ${e.message}`);
+    // Every failure ends with its cause and the user's choices (docs/PHASE-HANDOFF.md).
+    try {
+      const root = fs.realpathSync(path.resolve(parseArgs(process.argv.slice(2)).root ?? '.'));
+      let language = 'en';
+      try { language = readPreferences(root).userLanguage ?? 'en'; } catch {}
+      console.error(`\n${guidanceMarkdown(failureGuidance(e, { root, language }), language)}`);
+    } catch {}
+    process.exitCode = 1;
+  });
 }

@@ -158,6 +158,24 @@ The commands below are for the default **runtime mode**. Projects without a usab
 
 This is the bundled fixture's example; replace it with your project's commands. `mutation` exits 0 when the comparator detects a deliberately broken implementation. Keep `typecheck` to a cheap check that is valid before the whole tree is translated, or set it to `null`.
 
+## No runnable original or no specification
+
+When the original cannot run and no specification exists, choose [source as the only specification](docs/SOURCE-AS-SPEC.en.md). The AI drafts the 00b, 01 and 02 artifacts (source-derived contracts, dependency map, RULEBOOK, inventory) together; after one user review and OK the migration continues from 03. Behavioral equivalence is handed off as unverified.
+
+```bash
+# New project
+node scripts/install.mjs --target /path/to/your-project --model MODEL_ID --preparation-profile source-as-spec --apply
+# Existing project (for example, runtime 00b got stuck): preview, then --apply after consent
+node migration-kit/scripts/run_migration.mjs source-spec init
+node migration-kit/scripts/run_migration.mjs source-spec check
+```
+
+## Progress display and failure guidance
+
+`status --format checklist` shows the ten phases and "you are here"; `status --format todo` returns the items for the host TODO tool. Every phase report starts with this checklist.
+
+When a runner command fails it prints, after the `ERROR:` line, **the cause, the impact and the choices (one recommended, each with its reason and command)**. Copilot shows this, asks with the question tool and waits for the answer. For failures outside the runner, `run_migration.mjs guidance --message "error text"` produces the same guidance.
+
 ## Working through the phases
 
 Before phase 03, copy `templates/guardrails.json` (`migration-kit/templates/guardrails.json` for a repository copy) to `migration/guardrails.json` and edit it for your target's build and test commands. It replaces the upstream `.claude/settings.json` deny rules: a hook denies matching shell commands in every agent session. Builds run by the runner are not affected. `phase start 03` / `04` stops without this file (or a recorded waiver); agents never create it. With a repository copy, the Copilot CLI loads the hook only in a trusted folder; check with `doctor`.

@@ -29,7 +29,9 @@ from pathlib import Path
 # Directories never walked. Any path component in this set — or starting with
 # "." — is excluded. Kept visible at the top per CONTRIBUTING's requirement
 # that the exclusion list be inspectable without reading the walker.
-SKIP_DIRS = {"venv", "node_modules", "__pycache__", "generated"}
+# migration-kit/ (a repository-copy install) and migration/ are kit and run
+# metadata, never sources to port.
+SKIP_DIRS = {"venv", "node_modules", "__pycache__", "generated", "migration-kit", "migration"}
 
 
 def find_py_files(root: Path):

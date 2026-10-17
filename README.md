@@ -167,6 +167,24 @@ JSON形式は `{"schemaVersion":1,"dependencies":{"src/a.py":["src/b.py"],"src/b
 
 これは付属題材の例です。実案件のコマンドに置き換えてください。`mutation` は「意図的に壊した実装を比較器が検出できたとき」に終了0を返します。`typecheck` は全体の変換前でも有効な軽量検査だけにし、それが難しければ `null` にします。
 
+## 現行の実行環境・仕様書がない場合
+
+現行実装を動かせず、仕様書もない案件では、**ソースコードを唯一の仕様**とする [source-as-spec方式](docs/SOURCE-AS-SPEC.md) を選べます。00b・01・02の成果物（ソース由来の契約、依存マップ、RULEBOOK、inventory）をAIがまとめて作成し、ユーザーが一度確認してOKすれば03以降へ進みます。動作同等性は「未検証」として引き継ぎます。
+
+```bash
+# 新規
+node scripts/install.mjs --target /path/to/your-project --model MODEL_ID --preparation-profile source-as-spec --apply
+# 既存案件（runtime方式の00bで止まった場合など）。まず確認し、同意後に --apply
+node migration-kit/scripts/run_migration.mjs source-spec init
+node migration-kit/scripts/run_migration.mjs source-spec check
+```
+
+## 進捗表示と失敗時の案内
+
+`status --format checklist` は10工程と「いまここ」を表示し、`status --format todo` はホストのTODOツールに渡す一覧を返します。工程の報告は毎回このチェックリストから始まります。
+
+runnerのコマンドが失敗すると、`ERROR:` に続けて **原因・影響・選択肢（推奨1つと各理由・実行例）** を表示します。Copilotはこれを示したうえで、質問ツールで選択を求め、ユーザーの回答を待ちます。runner以外の失敗は `run_migration.mjs guidance --message "エラー文"` で同じ形式の案内を作れます。
+
 ## 工程を進める
 
 03の前に、`templates/guardrails.json`（コピー導入では `migration-kit/templates/guardrails.json`）を `migration/guardrails.json` へコピーし、対象言語のビルド・テストコマンドに合わせて編集してください。上流の `.claude/settings.json` の deny ルールに相当し、hookがすべてのエージェントの該当シェルコマンドを拒否します。runnerが実行するbuild等は対象外です。`phase start 03` / `04` は、このファイル（または免除の記録）がないと停止します。エージェントは作成しません。コピー導入方式のhookは、Copilot CLIで信頼済みのフォルダでしか読み込まれません。`doctor` で確認してください。

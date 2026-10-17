@@ -80,3 +80,10 @@ Do not begin production translation. Stop for review.
 <!-- Copilot adaptation: migration control and instructions updated on 2026-10-08; see NOTICE. -->
 
 Save the concrete phase report to `migration/depmap/report.md`. After its actual user review, record `phase complete 01 --note TEXT` as described in [ordered workflow](../docs/ORDERED-WORKFLOW.md).
+
+## Source as the only specification
+
+With `preparationProfile: source-as-spec`, generate the map, manifest and review
+dependencies mechanically (`source-spec check` prints the commands), record parser
+limits in `depmap/report.md`, skip the agent edge-sampling rounds and do not stop
+for a 01-only gate: continue to 02. See [source-as-spec](../docs/SOURCE-AS-SPEC.md).

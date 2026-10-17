@@ -40,9 +40,35 @@ Create or reconcile the host TODO list before starting phase work; update it on
 phase start, completion, approval waits, revisions, failures and resumption.
 Only the parent orchestrator updates it from actual evidence. If the tool is
 unavailable, show the same checklist in chat. TODO items never authorize a gate.
+Build the items from `run_migration.mjs status --format todo` (ten phases, one
+in progress, names in the user's language) and put the output of
+`status --format checklist` at the top of every phase and failure report, so the
+user always sees which phase is current even when the TODO UI does not render.
 
 The runner selects the first incomplete phase. Existing artifacts supply evidence
 for review; they do not route directly to a later phase. Respect redesign mode.
+
+## No runnable original or no specification
+
+Before choosing a verification mode (at initialization, and whenever runtime 00b
+blocks), ask two questions with the question tool: can the original
+implementation still run here, and does a specification or portable test suite
+exist? If both answers are no, recommend [source as the only specification](../../../docs/SOURCE-AS-SPEC.md)
+(`--preparation-profile source-as-spec` for a new project, `source-spec init`
+then `--apply` after consent for an existing one) and explain that equivalence
+stays unverified; if the original runs, recommend runtime. The user chooses.
+In source-as-spec, draft 00b, 01 and 02 together from the source, run one
+independent review of the package, show one report and record
+`phase complete 00b,01,02 --note TEXT` only after the user's OK.
+
+## When a step fails
+
+Follow [When a step fails](../../../docs/PHASE-HANDOFF.md#when-a-step-fails) for every
+failed command, refused gate or blocked unit: cause, impact, at least two
+choices plus pause, exactly one recommended option first, a reason for each,
+then ask with the question tool and wait. Runner errors already print this
+guidance; for other failures run `run_migration.mjs guidance --message TEXT`.
+Never choose on the user's behalf or offer routing around a guardrail.
 
 ## Ordered workflow entry
 
