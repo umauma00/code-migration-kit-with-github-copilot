@@ -191,12 +191,4 @@ replace a live test of the consumer's hook handling.
 
 ## VS Code orchestration and verification modes
 
-The user-facing parent owns phase TODO, questions and native job dispatch.
-Status is read-only and available after initialization: `status --format markdown`
-shows artifact candidates separately from validation, current reviewed units,
-active lock/run roles, blockers and next actions. It never grants approval.
-Use [source-only verification](SOURCE-ONLY.md) when the original runtime
-is unavailable; runtime remains the default. Use [built-in Rubber Duck](RUBBER-DUCK.md)
-only through host capabilities, with advisory decisions and existing repair/review.
-Live VS Code rendering, native model dispatch and Stop behavior remain pending
-until checked on a real host. Models and existing execution limits are unchanged.
+See the canonical section in the [operating manual](OPERATING-MANUAL.md#vs-code-orchestration-and-verification-modes).

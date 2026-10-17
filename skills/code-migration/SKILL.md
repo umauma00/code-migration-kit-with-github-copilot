@@ -20,6 +20,19 @@ plugin lives in that repository or that `${PLUGIN_ROOT}` expands in Markdown.
 In the shared prompts/manual, replace `migration-kit/` in executable paths with
 the resolved absolute plugin root; keep all project-relative inputs and outputs.
 
+## Report language (first step)
+
+Before anything else at start or resumption, run `run_migration.mjs preferences`
+(skip only before initialization, see below). If it returns an `action`, ask the
+user with the available question tool: 日本語 (ja) or English (en). Record the
+answer with `preferences --language ja|en` (it lives outside config.json and
+never revokes approvals). Write every user-facing report, question, TODO label
+and next-instruction example in that language, and link the matching documents:
+`X.md` for Japanese, `X.en.md` for English (for example [README](../../README.md) /
+[README.en](../../README.en.md)). Worker prompts and JSON stay in English. Before
+initialization, ask the language together with the model and migration
+languages and pass `--language ja|en` to the installer.
+
 If migration/config.json is missing, ask for the user's available model ID and
 migration languages, then choose the initialization command for the current host
 (reuse any explicit execution preference):

@@ -1,5 +1,7 @@
 # main形式の利用量記録
 
+日本語 | [English](COST-LOG.en.md)
+
 要求modelと実modelを分けます。native submitのhostReportedModelは親からの入力であり、
 それだけでは実測として集計しません。正式adapterの観測がない間はunknownです。
 pilotのAI呼出しは03、production repairは05、通常翻訳は04として記録します。

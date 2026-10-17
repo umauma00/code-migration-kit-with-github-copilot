@@ -9,7 +9,10 @@ removing preparation or cleanup evidence.
 
 This contract applies to the main interactive migration orchestrator. Automated
 implementers, reviewers, arbiters and fixers keep their JSON contracts and never
-ask the user questions. Use the user's language for reports and questions.
+ask the user questions. Use the language recorded in `migration/preferences.json`
+(`run_migration.mjs preferences`) for reports, questions, TODO labels and next
+instructions; if it is unset, ask 日本語 / English first and record the answer.
+Link `.en.md` documents for English and `.md` documents for Japanese.
 
 ## Track the ten phases in the host TODO list
 

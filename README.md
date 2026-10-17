@@ -1,10 +1,12 @@
 # Code Migration Kit with GitHub Copilot
 
+日本語 | [English](README.en.md)
+
 Anthropicの[Code Migration Kit](https://github.com/anthropics/code-migration-kit-with-claude-code)を、GitHub Copilot CLIを中心に使える形へ変更した非公式版です。言語間移植の「事前調査 → ルール固定 → 変換 → 独立レビュー → ビルド → 新旧比較」を扱います。
 
 **0.2.0** はVS Code / Copilot CLIのAgent Plugins形式に対応しました。キット本体をプラグインとして導入し、案件側では設定と成果物を管理できます。[プラグイン導入手順](docs/PLUGIN.md)、[従来版の修正と再レビュー](docs/reviews/2026-10-10-copilot-rereview-fixes.md)、[既存版からの更新](docs/UPGRADING.md)を参照してください。
 
-参照したCLIは **1.0.93**、VS Codeは **1.141.0** です。固定した元コミットとSDK参照版は [UPSTREAM.json](UPSTREAM.json) に記録しています。Anthropic/GitHubの公式配布物ではありません。
+参照したCLIは **1.0.93**（1.0.95・1.0.98でも疑似プロバイダーとの通信を確認）、VS Codeは **1.141.0** です。固定した元コミットとSDK参照版は [UPSTREAM.json](UPSTREAM.json) に記録しています。Anthropic/GitHubの公式配布物ではありません。
 
 **検証状況：自動テスト、オフライン題材、macOSでの実CLIと疑似プロバイダー間の通信は検証済みです。実際のCopilot認証・AIによる移植品質、VS Code上の操作、Dynamic Workflowsの実セッションは未検証です。** 実案件の前に [LIVE-SMOKE.md](docs/LIVE-SMOKE.md) の小規模確認を実施してください。
 
@@ -20,7 +22,7 @@ Anthropicの[Code Migration Kit](https://github.com/anthropics/code-migration-ki
 | 役割分担 | orchestrator / implementer / 独立reviewer 2種 / arbiter / fixerに、準備監査用のtool-free profileを追加 |
 | モデル | 5種類のワーカーに明示指定。利用できるモデルIDをユーザーが設定 |
 | 変換 | CLI担当は `view,grep,glob` のみ、native担当は固定入力・ツールなし。JSON応答を検証し、Nodeの調整役が対象ファイルだけを書き込む |
-| 独立レビュー | 2担当に同じ固定入力を渡す。レビュー担当はツールなし。CLIは `--no-custom-instructions`、nativeはホスト管理の指示環境 |
+| 独立レビュー | 2担当に同じ固定入力を渡す。レビュー担当はツールなし。入力が上限を超えた単位は、ハッシュ付きのファイル一覧と読み取り専用ツールで自動的にレビュー。CLIは `--no-custom-instructions`、nativeはホスト管理の指示環境 |
 | 完了判定 | 出力、入力、2件のレビュー、必要な裁定結果のハッシュを保存。ファイルが存在するだけでは完了にしない |
 | 再開 | 中断した工程から再開。失われたレビューや変更された出力は再レビュー |
 | 工程の承認 | 入力・出力・前工程の実行IDに結び付ける。上流の再実行で下流結果・承認は失効 |
@@ -67,11 +69,13 @@ copilot plugin install code-migration-kit@code-migration-kit-marketplace
 
 ```bash
 # まず変更対象を確認
-node scripts/install.mjs --target /path/to/your-project --model MODEL_ID
+node scripts/install.mjs --target /path/to/your-project --model MODEL_ID --language ja
 
 # 確認した内容を導入
-node scripts/install.mjs --target /path/to/your-project --model MODEL_ID --apply
+node scripts/install.mjs --target /path/to/your-project --model MODEL_ID --language ja --apply
 ```
+
+`--language ja|en` は、工程報告・質問・`status --format markdown` の言語です。`migration/preferences.json` に保存され、承認・完了判定には影響しません。省略した場合は、スキルが開始時に日本語・英語のどちらにするかを質問します。後から `run_migration.mjs preferences --language en` で変更できます。
 
 スクリプト・文書は対象の `migration-kit/`、Copilotの入口は `.github/` に入ります。既存のCopilot指示には管理ブロックを追記します。内容が異なる既存ファイルは上書きせず停止し、既存の `migration/config.json` は保持します。同じ内容での再実行は変更を作りません。
 
@@ -269,17 +273,9 @@ npm run demo
 
 <!-- Copilot adaptation: migration control and instructions updated on 2026-10-08; see NOTICE. -->
 
-## VS Code orchestration and verification modes
+## VS Codeでの進め方と検証方式
 
-The user-facing parent owns phase TODO, questions and native job dispatch.
-Status is read-only and available after initialization: `status --format markdown`
-shows artifact candidates separately from validation, current reviewed units,
-active lock/run roles, blockers and next actions. It never grants approval.
-Use [source-only verification](docs/SOURCE-ONLY.md) when the original runtime
-is unavailable; runtime remains the default. Use [built-in Rubber Duck](docs/RUBBER-DUCK.md)
-only through host capabilities, with advisory decisions and existing repair/review.
-Live VS Code rendering, native model dispatch and Stop behavior remain pending
-until checked on a real host. Models and existing execution limits are unchanged.
+親エージェントの役割（工程TODO・質問・nativeの仕事の配布）、読み取り専用の `status --format markdown`、source-only方式、Rubber Duckの扱いは [運用マニュアル](docs/OPERATING-MANUAL.md#vs-code-orchestration-and-verification-modes) にまとめています。
 
 ## 工程順序と利用量の記録
 

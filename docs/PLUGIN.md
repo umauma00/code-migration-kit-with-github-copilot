@@ -1,6 +1,8 @@
 # Copilotプラグインとして使う
 
-Node.js 22以上、Agent Plugins 1.0対応のVS Code / GitHub Copilotを使います。CLIワーカー方式にはログイン済みCopilot CLIが必要です。VS Code Copilotセッションでは [native方式](NATIVE-WORKERS.md) も選択でき、この場合ワーカー実行にCLIは不要です。確認したCLIは1.0.93です。移行対象の言語環境とテストも必要です。
+日本語 | [English](PLUGIN.en.md)
+
+Node.js 22以上、Agent Plugins 1.0対応のVS Code / GitHub Copilotを使います。CLIワーカー方式にはログイン済みCopilot CLIが必要です。VS Code Copilotセッションでは実験的な [native方式](NATIVE-WORKERS.md) も選択できますが、現状では最後まで完了できません。確認したCLIは1.0.93・1.0.95・1.0.98です。移行対象の言語環境とテストも必要です。
 
 ## インストール
 
@@ -40,13 +42,13 @@ Git配布が整った後はマーケットプレイスのGit URLを登録でき�
 開始・再開時には、親の調整エージェントがCopilotのTODOに10工程の一覧を作り、現在の工程・承認待ち・修正中・停止を表示します。工程末の報告にも完了した工程数と次の工程を含めます。再開時は保存した成果物・検証記録を確認して更新し、TODOのチェックだけで承認・完了と判断しません。TODOが使えない環境ではチャットの一覧に切り替えます。詳細は [工程のTODO表示](PHASE-HANDOFF.md#track-the-ten-phases-in-the-host-todo-list) を参照してください。
 
 ```bash
-node /path/to/code-migration-kit/scripts/install.mjs --target . --layout plugin --worker-backend copilot-cli --model MODEL_ID
-node /path/to/code-migration-kit/scripts/install.mjs --target . --layout plugin --worker-backend copilot-cli --model MODEL_ID --apply
+node /path/to/code-migration-kit/scripts/install.mjs --target . --layout plugin --worker-backend copilot-cli --model MODEL_ID --language ja
+node /path/to/code-migration-kit/scripts/install.mjs --target . --layout plugin --worker-backend copilot-cli --model MODEL_ID --language ja --apply
 ```
 
 VS Code・Copilot CLIのどちらから開始する場合も、CLIワーカー方式（`copilot-cli`）を使います。VS Codeでも、親エージェントがターミナルでrunnerを動かし、runnerがCopilot CLIのワーカーを起動します。native方式は**実験的**です（[native方式](NATIVE-WORKERS.md)を参照）。既存案件の方式は初期化で切り替えません。
 
-作成するのは `migration/config.json`、`migration/RULEBOOK.md`、`migration/inventory.tsv` の3ファイルです。設定済みの案件ではモデルやルールを上書きしません。初期化は工程を承認しません。言語、元ソース・出力・テストの場所、検証コマンドを設定してください。
+作成するのは `migration/config.json`、`migration/RULEBOOK.md`、`migration/inventory.tsv` の3ファイルと、`--language` を指定した場合の `migration/preferences.json`（報告の言語）です。設定済みの案件ではモデルやルールを上書きしません。初期化は工程を承認しません。言語、元ソース・出力・テストの場所、検証コマンドを設定してください。
 
 プラグイン内のスクリプトには絶対パスを指定し、実行ディレクトリは対象リポジトリにします。
 
@@ -73,8 +75,8 @@ native専用ワーカーはホストでの名前選択にも対応するため�
 
 このプラグインはCopilot実行方式を対象とします。VS Code Local用hooksと実験的Dynamic Workflows拡張は従来のコピー導入で選択してください。
 
-自動テストでは案件側に `.github/` や `migration-kit/` を置かずに、3ファイルの変換・独立レビュー・build/smoke/parityを確認します。モデル応答はテスト用です。実CLIでのプラグイン認識・マーケットプレイス導入・6担当の名前付きID解決も確認しています。これは `node tests/verify_plugin.mjs /absolute/path/to/copilot` で再確認できます。外部AIは呼びません。
+自動テストでは案件側に `.github/` や `migration-kit/` を置かずに、3ファイルの変換・独立レビュー・build/smoke/parityを確認します。モデル応答はテスト用です。実CLIでのプラグイン認識・マーケットプレイス導入・担当の名前付きID解決も確認しています。これは `node tests/verify_plugin.mjs /absolute/path/to/copilot` で再確認できます。外部AIは呼びません。`doctor --check-cli` も、ワーカーと同じ条件で全担当IDが解決できるかを確認します。
 
 担当の衝突とhook変更後の失効は、`node tests/verify_plugin_resolution.mjs /absolute/path/to/runtime.node` でCLI 1.0.93の実際の探索・選択・hook APIと照合できます。この内部APIへの依存は検証用スクリプトだけです。
 
-このクラウド環境では実CLIのセッション開始がファイル監視の資源上限（`Too many open files`）で止まり、疑似プロバイダーとのプラグイン通信は完了していません。VS Code UIと認証済み実モデルでの移植品質も未検証です。実案件の前に [LIVE-SMOKE.md](LIVE-SMOKE.md) の小規模確認を行い、同文書の `migration-kit/` をプラグインの絶対パスへ読み替えてください。
+macOSの実CLI（1.0.95・1.0.98）と疑似プロバイダーの間で、プラグイン方式の変換・独立レビュー（ツール付きレビューを含む）・ガードレールhookによる拒否を確認しました。古いCLI（1.0.40）はプラグインのエージェントを読み込めず、`doctor` が不足する担当IDを報告します。VS Code UIと認証済み実モデルでの移植品質は未検証です。実案件の前に [LIVE-SMOKE.md](LIVE-SMOKE.md) の小規模確認を行い、同文書の `migration-kit/` をプラグインの絶対パスへ読み替えてください。

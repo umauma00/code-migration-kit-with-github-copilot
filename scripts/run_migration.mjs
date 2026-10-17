@@ -14,11 +14,13 @@ import { migrationStatus, statusMarkdown } from '../lib/status.mjs';
 import { createNativeAdapter } from '../lib/native-workers.mjs';
 import { phaseCommand } from './phase_cli.mjs';
 import { diagnoseBuild } from './diagnostic_queue.mjs';
+import { readPreferences, setPreferences, preferencesReport } from '../lib/preferences.mjs';
 import { readGuardrails, cliFolderTrust } from '../lib/guardrails.mjs';
 
 export const usage = `Usage: node migration-kit/scripts/run_migration.mjs COMMAND [options]
   doctor [--check-cli] [--copilot /path/to/copilot]
   status [--format json|markdown]  Read-only preparation and execution evidence
+  preferences [--language ja|en]   Show or set the language of user-facing reports
   phase init | next | check ID | start ID | complete ID --note TEXT
                               Ordered workflow; optional --tokens N --subagents N --model ID
   judge                       Runtime: original/mutation; source-only: validate preparation
@@ -101,11 +103,17 @@ export async function main(argv = process.argv.slice(2)) {
     if (alive) throw new Error('Lock owner is still running; refusing to unlock');
     fs.unlinkSync(file); console.log('Removed stale migration lock'); return;
   }
+  if (cmd === 'preferences') {
+    console.log(JSON.stringify(args.language ? setPreferences(root, { language: args.language }) : preferencesReport(root), null, 2));
+    return;
+  }
   if (cmd === 'status') {
     if (args.format && !['json', 'markdown'].includes(args.format)) throw new Error('status format must be json or markdown');
     const report = migrationStatus(root);
     if (!report.ok) process.exitCode = 1;
-    console.log(args.format === 'markdown' ? statusMarkdown(report) : JSON.stringify(report, null, 2));
+    let language = 'en';
+    try { language = readPreferences(root).userLanguage ?? 'en'; } catch {}
+    console.log(args.format === 'markdown' ? statusMarkdown(report, language) : JSON.stringify(report, null, 2));
     return;
   }
   const config = loadConfig(root), controller = new AbortController();

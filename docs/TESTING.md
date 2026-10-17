@@ -1,5 +1,17 @@
 # 検証記録（2026-10-08 JST）
 
+日本語 | [English](TESTING.en.md)
+
+## 2026-10-17 CLI版の追従・ガードレール・ツール付きレビュー・診断・言語
+
+- macOS（Darwin arm64）/ Node v26.11.1で `npm test`：189件中188成功、失敗0、skip 1（大文字小文字を区別するファイルシステム専用）。
+- 実CLI（1.0.95・1.0.98）と疑似プロバイダーで `verify_cli_transport.mjs` を実行：3単位・9呼び出し、指示の隔離OK。プラグイン方式も変換・独立レビュー成功。
+- `--no-auto-update` 付きでは、ネイティブインストーラ版のCLIが同梱の1.0.40で起動し、プラグインの担当を読み込めないことを再現。フラグを外して解消し、新しい `doctor` が1.0.40の不足する担当IDを報告することを確認。
+- 実CLI 1.0.98で、ガードレールhookが `git reset --hard` を拒否することを、信頼済みフォルダのコピー導入とプラグイン導入で確認。未信頼フォルダではリポジトリのhookが読み込まれず、`doctor` がそれを報告。
+- 実CLI 1.0.98で、上限を超えた単位のレビューだけが `-read` プロファイル・読み取りツール・ファイル一覧の入力で実行されることを、両方式で確認。
+- 診断パーサー：Python・Node・bash・clangは実ツールの出力、javac・Maven・ShellCheck・tsc・ESLint・pyright・mypy・rustcは公開されている形式のサンプルで確認。
+- 認証済みの実モデル、VS CodeのUI、大規模移行は未確認です。
+
 ## 2026-10-15 レビュー1・2の反映
 
 - Node v24.19.0 / Python 3.12.14のLinux環境で `npm test`：170/170成功、失敗・skip・cancel 0。
@@ -106,7 +118,7 @@ Astraの指摘A1・A2は親エージェントも実コンパイラで独立再�
 
 **実アカウントによるCopilotモデル呼び出しは行っていません。** 自動テストのワーカーとSDKはテスト用の応答です。新旧比較・ビルドは実際のPython/Nodeプロセスで実行していますが、モデルの変換能力を評価した結果ではありません。
 
-実CLIでのツール制限・hook起動、アカウントごとのモデル利用可否、VS CodeのUI、Dynamic Workflowsの登録・実行、実際の利用量、大規模な実案件、macOS/Windowsは未検証です。[LIVE-SMOKE.md](LIVE-SMOKE.md) に次の確認手順を記載しています。
+アカウントごとのモデル利用可否、VS CodeのUI、Dynamic Workflowsの登録・実行、実際の利用量、大規模な実案件、Windowsは未検証です（実CLIでのツール制限・hook起動とmacOSは、2026-10-17の記録で確認済み）。[LIVE-SMOKE.md](LIVE-SMOKE.md) に次の確認手順を記載しています。
 
 ## 再現
 
@@ -116,12 +128,4 @@ Astraの指摘A1・A2は親エージェントも実コンパイラで独立再�
 
 ## VS Code orchestration and verification modes
 
-The user-facing parent owns phase TODO, questions and native job dispatch.
-Status is read-only and available after initialization: `status --format markdown`
-shows artifact candidates separately from validation, current reviewed units,
-active lock/run roles, blockers and next actions. It never grants approval.
-Use [source-only verification](SOURCE-ONLY.md) when the original runtime
-is unavailable; runtime remains the default. Use [built-in Rubber Duck](RUBBER-DUCK.md)
-only through host capabilities, with advisory decisions and existing repair/review.
-Live VS Code rendering, native model dispatch and Stop behavior remain pending
-until checked on a real host. Models and existing execution limits are unchanged.
+See the canonical section in the [operating manual](OPERATING-MANUAL.md#vs-code-orchestration-and-verification-modes).

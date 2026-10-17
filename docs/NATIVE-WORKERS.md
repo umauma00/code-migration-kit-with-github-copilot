@@ -1,5 +1,7 @@
 # VS Codeのサブエージェントで実行する（実験的）
 
+日本語 | [English](NATIVE-WORKERS.en.md)
+
 > **実験的機能・現状では最後まで完了できません。** 本書の手順は、提出前にホストの実行メタデータで使用モデルを確認することを求めます。VS Codeは `runSubagent` で使ったモデルを親エージェントに返さないため、この確認ができず、全ジョブを `fail` で報告することになります。実案件ではCLIワーカー方式（`copilot-cli`、既定）を使ってください。VS Codeでも動作します。
 
 `workerBackend: "native"` は、現在のVS Codeセッションの親エージェントが
@@ -177,15 +179,7 @@ node migration-kit/scripts/native_workers.mjs fail --task TASK_ID --claim CLAIM_
 
 ## VS Code orchestration and verification modes
 
-The user-facing parent owns phase TODO, questions and native job dispatch.
-Status is read-only and available after initialization: `status --format markdown`
-shows artifact candidates separately from validation, current reviewed units,
-active lock/run roles, blockers and next actions. It never grants approval.
-Use [source-only verification](SOURCE-ONLY.md) when the original runtime
-is unavailable; runtime remains the default. Use [built-in Rubber Duck](RUBBER-DUCK.md)
-only through host capabilities, with advisory decisions and existing repair/review.
-Live VS Code rendering, native model dispatch and Stop behavior remain pending
-until checked on a real host. Models and existing execution limits are unchanged.
+See the canonical section in the [operating manual](OPERATING-MANUAL.md#vs-code-orchestration-and-verification-modes).
 
 ## Dispatch, cancellation and resumption
 

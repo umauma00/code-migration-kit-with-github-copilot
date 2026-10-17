@@ -15,6 +15,19 @@ Read the [operating manual](../../../docs/OPERATING-MANUAL.md) and [usage](../..
 Locate the installed kit at `migration-kit/`; when maintaining the kit itself,
 its scripts and prompts are at repository root.
 
+## Report language (first step)
+
+Before anything else at start or resumption, run `run_migration.mjs preferences`
+(skip only before initialization, see below). If it returns an `action`, ask the
+user with the available question tool: 日本語 (ja) or English (en). Record the
+answer with `preferences --language ja|en` (it lives outside config.json and
+never revokes approvals). Write every user-facing report, question, TODO label
+and next-instruction example in that language, and link the matching documents:
+`X.md` for Japanese, `X.en.md` for English (for example [README](../../../README.md) /
+[README.en](../../../README.en.md)). Worker prompts and JSON stay in English. Before
+initialization, ask the language together with the model and migration
+languages and pass `--language ja|en` to the installer.
+
 Follow [phase reports and user decisions](../../../docs/PHASE-HANDOFF.md) at every
 phase boundary. Show the actual artifacts, review points and a copyable next
 instruction before asking. Use the available question tool for missing decisions;

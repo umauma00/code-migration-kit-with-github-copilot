@@ -13,7 +13,11 @@ function rewriteLinks(text, relativeFile) {
     return `](${path.posix.relative(path.posix.dirname(relativeFile), `migration-kit/${resolved}`)}${fragment})`;
   });
 }
-export function install(target, { apply = false, model, harness = 'copilot', withWorkflow = false, layout = 'repository', workerBackend = 'copilot-cli', nativeHarness = harness, verificationMode } = {}) {
+export function install(target, { apply = false, model, harness = 'copilot', withWorkflow = false, layout = 'repository', workerBackend = 'copilot-cli', nativeHarness = harness, verificationMode, language } = {}) {
+  if (language !== undefined && !['ja', 'en'].includes(language)) throw new Error('language must be ja or en');
+  // Report language lives outside config.json so changing it never revokes approvals.
+  const preferences = language && !fs.existsSync(safePath(fs.realpathSync(path.resolve(target)), 'migration/preferences.json'))
+    ? `${JSON.stringify({ schemaVersion: 1, userLanguage: language }, null, 2)}\n` : null;
   if (verificationMode !== undefined && !['runtime', 'source-only'].includes(verificationMode)) throw new Error('verificationMode must be runtime or source-only');
   if (!['repository', 'plugin'].includes(layout)) throw new Error('layout must be repository or plugin');
   if (!['copilot', 'vscode-local'].includes(harness)) throw new Error('harness must be copilot or vscode-local');
@@ -48,6 +52,7 @@ export function install(target, { apply = false, model, harness = 'copilot', wit
         if (!fs.statSync(file).isFile()) throw new Error(`Destination is not a regular file: ${name}`);
       } else files.set(name, fs.readFileSync(path.join(kitRoot, `templates/${rel}`), 'utf8'));
     }
+    if (preferences) files.set('migration/preferences.json', preferences);
     if (apply) for (const [name, content] of files) atomicWrite(safePath(root, name), content);
     return { applied: apply, target: root, layout, changes: [...files.keys()], ...(warnings.length ? { warnings } : {}),
       next: 'Edit migration/config.json (languages, paths, models and commands), then invoke the code-migration skill from the installed plugin. Existing configuration is retained.' };
@@ -57,7 +62,7 @@ export function install(target, { apply = false, model, harness = 'copilot', wit
     if (rel === 'scripts/demo.mjs') continue;
     files.set(`migration-kit/${rel}`, fs.readFileSync(safePath(kitRoot, rel), 'utf8'));
   }
-  for (const rel of ['README.md', 'LICENSE', 'NOTICE', 'CHANGELOG.md', 'UPSTREAM.json']) files.set(`migration-kit/${rel}`, fs.readFileSync(path.join(kitRoot, rel), 'utf8'));
+  for (const rel of ['README.md', 'README.en.md', 'LICENSE', 'NOTICE', 'CHANGELOG.md', 'UPSTREAM.json']) files.set(`migration-kit/${rel}`, fs.readFileSync(path.join(kitRoot, rel), 'utf8'));
   const runtimePackage = readJSON(path.join(kitRoot, 'package.json'));
   runtimePackage.scripts = { check: 'node scripts/run_migration.mjs doctor --root ..' };
   files.set('migration-kit/package.json', `${JSON.stringify(runtimePackage, null, 2)}\n`);
@@ -80,6 +85,7 @@ export function install(target, { apply = false, model, harness = 'copilot', wit
   if (model) for (const role of Object.keys(config.models)) config.models[role] = model;
   if (!fs.existsSync(safePath(root, 'migration/config.json'))) files.set('migration/config.json', `${JSON.stringify(config, null, 2)}\n`);
   for (const rel of ['RULEBOOK.md', 'inventory.tsv']) if (!fs.existsSync(safePath(root, `migration/${rel}`))) files.set(`migration/${rel}`, fs.readFileSync(path.join(kitRoot, `templates/${rel}`), 'utf8'));
+  if (preferences) files.set('migration/preferences.json', preferences);
   const changes = [];
   for (const [rel, content] of files) {
     const file = safePath(root, rel);
@@ -97,7 +103,7 @@ export function install(target, { apply = false, model, harness = 'copilot', wit
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
   try {
     const args = parseArgs(process.argv.slice(2));
-    if (!args.target) throw new Error('Usage: node scripts/install.mjs --target PATH [--layout repository|plugin] [--model MODEL_ID] [--harness copilot|vscode-local] [--worker-backend copilot-cli|native] [--native-harness copilot|vscode-local] [--verification-mode runtime|source-only] [--with-workflow] [--apply]');
-    console.log(JSON.stringify(install(args.target, { apply: args.apply, model: args.model, harness: args.harness, withWorkflow: args['with-workflow'], layout: args.layout, workerBackend: args['worker-backend'], nativeHarness: args['native-harness'], verificationMode: args['verification-mode'] }), null, 2));
+    if (!args.target) throw new Error('Usage: node scripts/install.mjs --target PATH [--layout repository|plugin] [--model MODEL_ID] [--harness copilot|vscode-local] [--worker-backend copilot-cli|native] [--native-harness copilot|vscode-local] [--verification-mode runtime|source-only] [--language ja|en] [--with-workflow] [--apply]');
+    console.log(JSON.stringify(install(args.target, { apply: args.apply, model: args.model, harness: args.harness, withWorkflow: args['with-workflow'], layout: args.layout, workerBackend: args['worker-backend'], nativeHarness: args['native-harness'], verificationMode: args['verification-mode'], language: args.language }), null, 2));
   } catch (e) { console.error(`ERROR: ${e.message}`); process.exitCode = 1; }
 }

@@ -1,5 +1,7 @@
 # /code-migrationから10工程を順番に進める
 
+日本語 | [English](ORDERED-WORKFLOW.en.md)
+
 [6大段階と内部工程の対応](EXECUTION-SCOPES.md)に沿って、以下の10工程を維持します。
 00bは十分な既存judgeを再利用し、早期検証の記録を通す軽量な経路を持ちます。
 [準備監査](PREPARATION-AUDITS.md)と[隔離pilot](PILOT.md)を参照してください。
@@ -30,8 +32,8 @@ node migration-kit/scripts/run_migration.mjs phase complete 00 --note "対象範
 | 00b | judge-report.md。runtimeは比較入力とoriginal/mutation/parityの設定、source-onlyは実在するjudge-plan入力。正式judgeは02後 |
 | 01 | depmap/report.md、manifest、監査した依存宣言 |
 | 02 | gap-report.md、RULEBOOK、inventory、manifest、依存宣言 |
-| 03 | 現在のjudge成功とstress-test/report.md、試作結果のレビュー |
-| 04 | 実装承認と全単位の有効な独立2レビュー。runnerの記録で判定 |
+| 03 | 現在のjudge成功とstress-test/report.md、試作結果のレビュー。`phase start 03` には人間が設置した `migration/guardrails.json` も必要 |
+| 04 | 実装承認と全単位の有効な独立2レビュー。runnerの記録で判定。`phase start 04` にもガードレールが必要 |
 | 05 | 現在の承認付きbuild成功 |
 | 05b | 現在の承認付きsmoke成功 |
 | 05c | runtimeは実際のparity成功。source-onlyは現在のsmokeを確認し、対象外・同等性未検証の記録を残す |

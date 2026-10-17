@@ -1,5 +1,7 @@
 # 実アカウントでの小規模確認
 
+日本語 | [English](LIVE-SMOKE.en.md)
+
 自動テストはCopilot認証やAI呼び出しを行いません。この手順は、自分の環境で通常CLI経路を確認するためのものです。モデル呼び出しには利用枠・料金が発生します。
 
 VS Codeのnative方式は [専用手順](NATIVE-WORKERS.md) を使います。下記の題材を準備した後、
@@ -8,7 +10,7 @@ judge・承認の前に `workerBackend: "native"` と `nativeHarness` を設定�
 処理してください。全5役のnativeプロファイル解決・モデル指定・ツールなしの実動作と、
 キャンセル・再開を確認します。CLIの暗黙指示遮断と同じ保証があるとは扱いません。
 
-1. Copilot CLIのログインを自分の環境で済ませ、`copilot --version` と `/model` で利用可能なモデルIDを確認します。
+1. 報告の言語は `run_migration.mjs preferences --language ja|en` で設定するか、スキルの最初の質問で選びます。Copilot CLIのログインを自分の環境で済ませ、`copilot --version` と `/model` で利用可能なモデルIDを確認します。
 2. キットのルートから、**まだ存在しない**検証用ディレクトリを作ります。
 
    ```bash
@@ -21,7 +23,8 @@ judge・承認の前に `workerBackend: "native"` と `nativeHarness` を設定�
 
 3. `phase init`、`phase next`に従い、00の対象範囲とmodel planを実際にレビューします。各工程の作業前にphase start、ユーザーの確認後にphase complete ID --noteを記録してください。`src/`、`tests/judge.py`、`migration/RULEBOOK.md`、manifest、inventory、`migration/review-dependencies.json`を確認し、[準備監査](PREPARATION-AUDITS.md)の適用対象を検証します。mainからmath_ops/text_opsへの依存宣言と独立ファイルの空配列を確認し、draft報告は実際の証拠で更新します。12ケースの範囲外は未検証です。
 4. 00の確認後、00bで`judge-prepare`を実行します。originalは12ケース成功、mutationは意図的な負数・Unicodeの差分を検出し、いずれも終了0になることを確認します。00b/01/02の実レビュー後に正式`judge`を実行します。早期証拠の再利用が記録され、本番03前提は維持されることを確認します。
-5. [pilot手順](PILOT.md)に従い、別の新規ディレクトリへ明示的な使い捨て許可を作り、同じCLI profilesでpilot runを実行します。本番は03未承認でtranslationを拒否すること、pilot結果が本番doneにならないことを確認します。実際の試作・監査結果で03報告を作り、ユーザー確認後にphase complete 03と`approve translation --note "実際に確認した内容"`、続いて`translate`を実行します。Copilot API・権限・モデル・JSON形式で失敗した場合はエラーとして止まることを確認します。安易に権限を広げて回避しないでください。
+5. 03の前に `migration-kit/templates/guardrails.json` を `migration/guardrails.json` へ自分でコピーします。`phase start 03` がこのファイルなしでは停止すること、対話セッションで `git reset --hard` 等が拒否されることを確認します。コピー導入では、`copilot` を一度対話起動してフォルダを信頼済みにし、`doctor` の `repository hooks load in Copilot CLI` が失敗しないことを確認します。
+   続いて[pilot手順](PILOT.md)に従い、別の新規ディレクトリへ明示的な使い捨て許可を作り、同じCLI profilesでpilot runを実行します。本番は03未承認でtranslationを拒否すること、pilot結果が本番doneにならないことを確認します。実際の試作・監査結果で03報告を作り、ユーザー確認後にphase complete 03と`approve translation --note "実際に確認した内容"`、続いて`translate`を実行します。Copilot API・権限・モデル・JSON形式で失敗した場合はエラーとして止まることを確認します。安易に権限を広げて回避しないでください。
 6. 各単位について、独立した2レビュー、必要なら裁定と修正後の再レビュー、要求モデル、出力ハッシュを確認します。2レビューの `reviewInputHash` が同じこと、レビュー担当の `tools: []` が実際に適用されることを確認します。全CLIワーカーに `--no-custom-instructions` が指定され、AGENTSや個人指示が混入せず、指定した役割プロファイルが適用されることも確認します。案件方針はRULEBOOK/inventoryへ取り込みます。`status` が `3/3` に相当する結果を返すことを確認します。
 7. 各前工程を確認してからbuild → smoke → parityを個別承認・実行します。parityは12ケース、差分0、skip 0であることを確認します。
 8. `translate` の再実行でAI呼び出し0になること、レビュー記録を検証用に退避すると再レビューされること、中断した処理が再開できることを確認します。失敗した検証用ロックの解除は所有プロセス停止後だけにします。

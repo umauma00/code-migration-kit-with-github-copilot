@@ -22,6 +22,9 @@ Use the host's per-call model parameter and verify the model in host execution
 metadata before submission. If unavailable or mismatched, fail the job; never
 treat the request's model string or the worker's self-report as verification.
 
+First read the report language with `run_migration.mjs preferences`; if unset, ask
+日本語 / English with the question tool and record it with `preferences --language`.
+Write all user-facing text in that language; worker prompts and JSON stay English.
 Follow [phase reports and user decisions](../../docs/PHASE-HANDOFF.md) after every phase.
 Use the host's available question tool for missing decisions; report concrete
 artifacts before asking and include a next-instruction example. Reuse explicit
