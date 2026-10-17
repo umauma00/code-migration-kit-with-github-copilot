@@ -79,7 +79,7 @@ node migration-kit/scripts/run_migration.mjs phase complete 00b,01,02 --note "�
 node migration-kit/scripts/run_migration.mjs judge
 ```
 
-各工程の成果物は順に検査され、不足があればその工程で止まり、原因と選択肢を表示します。
+記録の前に3工程すべての成果物を検査し、1つでも不足があれば**どの工程も記録せず**、原因と選択肢を表示します。
 00（事前調査）は別に確認します。
 
 ## その後

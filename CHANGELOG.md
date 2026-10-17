@@ -1,5 +1,14 @@
 # Unreleased
 
+- Review fixes: failure guidance no longer routes file or diagnostic errors
+  containing ENOENT/401/login to CLI install or sign-in, never pre-fills review
+  notes, and offers the 00b–02 bundle only in source-as-spec; `phase complete
+  00b,01,02` checks every phase before writing any receipt; status checklist/todo
+  report unknown progress with its blocker instead of "all complete"; the Python
+  parser skips `migration-kit/`/`migration/` only at the top when they are the
+  kit, and `make_manifest.py --include` keeps only source roots; `TODO(spec)`
+  blocks 00b only in source-as-spec; doctor runs the configured hook command for
+  both worker and interactive paths; accurate profile-switch warnings.
 - Align with current Copilot behavior: hook denials carry both the CLI
   top-level and the VS Code `hookSpecificOutput` decision; hook timeouts rise
   to 30 s (hooks fail open on timeout) and doctor times the hook; worker

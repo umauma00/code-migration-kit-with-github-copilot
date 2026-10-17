@@ -35,6 +35,9 @@ def main():
                     help="manifest TSV to write (header: source\\ttarget)")
     ap.add_argument("--sub", action="append", default=[], metavar="OLD=NEW",
                     help="substitution old=new, repeatable, applied in order")
+    ap.add_argument("--include", action="append", default=[], metavar="DIR/",
+                    help="keep only sources under these directories (repeatable); "
+                         "use when the parser walked more than the source roots")
     args = ap.parse_args()
 
     subs = []
@@ -51,6 +54,8 @@ def main():
             continue
         for source in line.split("\t"):
             if not source:
+                continue
+            if args.include and not any(source.startswith(p.rstrip("/") + "/") for p in args.include):
                 continue
             target = source
             for old, new in subs:
