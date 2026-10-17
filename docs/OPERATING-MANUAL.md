@@ -31,12 +31,15 @@ does not apply to automated workers, which keep their JSON-only contracts.
    user asking you to approve the concrete artifacts. Approval is bound to hashes.
 4. Translate through the runner. CLI implementers, fixers and arbiters use read/search
    tools; native host workers all use tools: [] with self-contained inputs.
-   Reviewers have no tools and receive the same frozen input. All return
+   Reviewers have no tools and receive the same frozen input; when it exceeds
+   maxReviewInputBytes (CLI only) both receive the same hash-bound file list and
+   run on read-only `reviewer-*-read` profiles, recorded as tool-assisted. All return
    JSON. The coordinator validates and writes only the manifest target.
    Never route around a tool denial or substitute an unrestricted agent session.
 5. Two independent reviewers examine every output: source behavior and rule
    adherence. The runner supplies source files, candidate, rules, inventory and
-   any diagnostic; reviewer profiles must keep `tools: []`. They never receive
+   any diagnostic; reviewer profiles must keep `tools: []` (the `-read` twins keep
+   read/search tools only). They never receive
    each other's findings. An arbiter confirms or
    rejects disputed findings with evidence. Fix only confirmed findings and
    review the changed output again. Do not weaken tests to clear a queue.

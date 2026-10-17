@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { loadConfig, readManifest, contextHash, unitState, done, safePath, readJSON, parseArgs, verificationFiles, loadReviewDependencies, reviewSources } from '../lib/core.mjs';
-import { validateWorkerProfile, validateNativeProfile } from '../lib/review.mjs';
+import { validateWorkerProfile, validateNativeProfile, assistedReviewerRoles } from '../lib/review.mjs';
 import { runProcess } from '../lib/process.mjs';
 import { approve, runStage, translate, runPilot, runJudgePreparation } from '../lib/pipeline.mjs';
 import { preparePilot } from '../lib/pilot.mjs';
@@ -36,7 +36,7 @@ export async function doctor(root, config, { checkCLI = false, command = 'copilo
   const checks = [{ check: 'configuration', ok: true }];
   const layout = runtimeLayout(root, config);
   const native = config.workerBackend === 'native';
-  for (const role of ['orchestrator', 'implementer', 'reviewer-semantics', 'reviewer-rules', 'arbiter', 'fixer']) {
+  for (const role of ['orchestrator', 'implementer', 'reviewer-semantics', 'reviewer-rules', 'arbiter', 'fixer', ...(native ? [] : assistedReviewerRoles)]) {
     const p = native && role !== 'orchestrator' ? layout.nativeAgentPath(role) : layout.agentPath(role), file = safePath(layout.root, p);
     checks.push({ check: p, ok: fs.existsSync(file) });
     if (role !== 'orchestrator' && fs.existsSync(file)) {

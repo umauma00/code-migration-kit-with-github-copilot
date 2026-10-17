@@ -38,6 +38,10 @@ The runner performs implementation → two independent reviews → arbitration o
 findings → confirmed fixes → re-review → hash-bound completion. Workers use
 explicit models from config and structured results. Reviewers have no tools and
 receive identical frozen inputs; other CLI workers have read/search-only tools.
+If a unit's evidence exceeds maxReviewInputBytes, the CLI runner automatically
+gives both reviewers the same SHA-256-bound file list on read-only `-read`
+profiles. Report every `toolAssistedReviews` target and warning to the human;
+native runs stop instead.
 Native workers all have no tools and receive self-contained frozen inputs.
 Only the coordinator writes the assigned manifest target. Existing output files
 without reviewed receipts are unfinished and must be reviewed.

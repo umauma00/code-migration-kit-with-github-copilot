@@ -57,3 +57,12 @@ waiver. To dissolve Step 4 for a cheap typecheck, the human removes that entry
 at a gate. Copilot CLI loads repository hooks only in trusted folders, so
 `doctor` fails when guardrails are installed in an untrusted folder; plugin
 hooks load regardless. Like upstream, this is a guardrail, not a security boundary.
+
+## Tool-assisted reviews
+
+When a unit's review evidence exceeds `maxReviewInputBytes`, CLI reviewers
+switch automatically to `reviewer-*-read` profiles with `view,grep,glob`
+(`--allow-tool read --deny-tool write,shell`). Both receive the same file list
+bound by SHA-256 instead of contents. The hook requires an explicit path and
+denies the repository root and `migration/runs|state|results|gates|phases`.
+The run records `reviewInputMode`, `toolAssistedReviews` and a warning.

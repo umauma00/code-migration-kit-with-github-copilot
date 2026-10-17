@@ -5,6 +5,7 @@ import { prepare, ready, cliDouble } from './helpers.mjs';
 import { safePath, atomicWrite, readJSON, roles } from '../lib/core.mjs';
 import { translate } from '../lib/pipeline.mjs';
 import { runtimeLayout } from '../lib/runtime.mjs';
+import { assistedReviewerRoles } from '../lib/review.mjs';
 import { copilotArgs, copilotEnv, createCopilotAdapter, probeAgentName, requiredCopilotFlags } from '../scripts/copilot_adapter.mjs';
 import { doctor } from '../scripts/run_migration.mjs';
 
@@ -34,7 +35,7 @@ process.exit(1);
 }
 
 test('doctor proves every worker agent resolves and names the missing ones', async t => {
-  const f = prepare(t), ids = roles.map(role => `migration-${role}`);
+  const f = prepare(t), ids = [...roles, ...assistedReviewerRoles].map(role => `migration-${role}`);
   const ok = await doctor(f.root, f.config, { checkCLI: true, command: agentCli(f, ['other', ...ids]) });
   const passed = ok.checks.find(c => c.check === 'worker agents resolve');
   assert.equal(passed.ok, true); assert.deepEqual(passed.missing, []);

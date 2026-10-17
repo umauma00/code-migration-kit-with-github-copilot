@@ -132,19 +132,29 @@ test('C2: unknown inventory headers and malformed unrelated rows block before mo
   }
 });
 
-test('C2: preflight measures escaped JSON bytes; oversized generated candidates still block reviewers', async t => {
-  const f = prepare(t), calls = [];
+test('C2: escaped-byte overflow switches CLI reviewers to identical hash-bound tool-assisted input', async t => {
+  const f = prepare(t), calls = [], inputs = [];
   f.config.maxReviewInputBytes = 4096;
   write(f, f.units[0].source, '"'.repeat(2500));
   writeJSON(safePath(f.root, 'migration/config.json'), f.config);
   await runStage(f.root, f.config, 'judge'); approve(f.root, f.config, 'translation', 'Escaped byte fixture');
-  await assert.rejects(translate(f.root, f.config, args => { calls.push(args.role); return fake(args); }), /maxReviewInputBytes/);
-  assert.deepEqual(calls, []);
+  const report = await translate(f.root, f.config, args => {
+    calls.push(`${args.role}:${args.reviewMode ?? 'none'}`); if (args.reviewInput) inputs.push(args.reviewInput); return fake(args);
+  });
+  assert.equal(report.done, 1); assert.deepEqual(report.toolAssistedReviews, [f.units[0].target]);
+  assert.match(report.warnings.join('\n'), /exceeded maxReviewInputBytes/);
+  assert.deepEqual(calls.sort(), ['implementer:none', 'reviewer-rules:tool-assisted', 'reviewer-semantics:tool-assisted']);
+  assert.equal(inputs[0], inputs[1]);
+  const listed = JSON.parse(inputs[0]);
+  assert.equal(listed.mode, 'tool-assisted'); assert.ok(listed.files.every(file => /^[a-f0-9]{64}$/.test(file.sha256)));
+  assert.ok(listed.files.some(file => file.path === f.units[0].source));
+  assert.equal(unitState(f.root, f.units[0]).reviewInputMode, 'tool-assisted');
+  assert.equal(done(f.root, f.units[0], contextHash(f.root, f.config)), true);
   const g = prepare(t), candidateCalls = []; g.config.maxReviewInputBytes = 2048; g.config.commands.typecheck = null;
   writeJSON(safePath(g.root, 'migration/config.json'), g.config);
   await runStage(g.root, g.config, 'judge'); approve(g.root, g.config, 'translation', 'Candidate limit fixture');
-  await assert.rejects(translate(g.root, g.config, args => { candidateCalls.push(args.role); return { result: result(args.role, args.unit, { content: 'X'.repeat(5000) }) }; }), /maxReviewInputBytes/);
-  assert.deepEqual(candidateCalls, ['implementer']);
+  const candidate = await translate(g.root, g.config, args => { candidateCalls.push(args.reviewMode ?? args.role); return { result: result(args.role, args.unit, { content: 'X'.repeat(5000) }) }; });
+  assert.equal(candidate.done, 1); assert.deepEqual(candidateCalls.sort(), ['implementer', 'tool-assisted', 'tool-assisted']);
 });
 
 test('C2: dependency-map conversion keeps isolated nodes and refuses malformed input atomically', t => {

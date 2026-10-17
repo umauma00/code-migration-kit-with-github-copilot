@@ -2,7 +2,7 @@
 import { runProcess } from '../lib/process.mjs';
 import { roles } from '../lib/core.mjs';
 import { parseResult, validateResult } from '../lib/results.mjs';
-import { isReviewer, validateWorkerProfile } from '../lib/review.mjs';
+import { isReviewer, isToolFreeReviewer, toolAssistedRole, assistedReviewerRoles, validateWorkerProfile } from '../lib/review.mjs';
 import { runtimeLayout } from '../lib/runtime.mjs';
 
 export function copilotArgs(role, model, prompt, layout) {
@@ -11,7 +11,7 @@ export function copilotArgs(role, model, prompt, layout) {
   // No --no-auto-update: native-installer launchers then run their bundled
   // (possibly much older) build instead of the version the user and doctor see.
   return [...(prompt === undefined ? [] : ['-p', prompt]), ...(layout?.plugin ? ['--plugin-dir', layout.root] : []), '-s', '--output-format', 'json', '--stream', 'off', '--no-color', '--no-ask-user', '--no-custom-instructions', '--disable-builtin-mcps', '--agent', layout?.agentId(role) ?? `migration-${role}`, '--model', model,
-    '--available-tools', 'view,grep,glob', ...(isReviewer(role) ? ['--deny-tool', 'read,write,shell'] : ['--allow-tool', 'read', '--deny-tool', 'write,shell'])];
+    '--available-tools', 'view,grep,glob', ...(isToolFreeReviewer(role) ? ['--deny-tool', 'read,write,shell'] : ['--allow-tool', 'read', '--deny-tool', 'write,shell'])];
 }
 export function requiredCopilotFlags(layout) {
   // Diagnose the same stdin-based invocation used by every worker role.
@@ -37,7 +37,7 @@ export async function probeWorkerAgents(command = 'copilot', prefixArgs = [], { 
   const result = await runProcess(command, [...prefixArgs, ...args], { cwd, timeoutMs: 30000,
     input: 'Agent resolution probe. No model request is expected.', env: copilotEnv('reviewer-rules') });
   const listed = `${result.stdout}\n${result.stderr}`.match(new RegExp(`No such agent: ${probeAgentName}, available:([^\\r\\n]*)`));
-  const required = roles.map(role => layout?.agentId(role) ?? `migration-${role}`);
+  const required = [...roles, ...assistedReviewerRoles].map(role => layout?.agentId(role) ?? `migration-${role}`);
   if (!listed) return { ok: false, required, missing: required,
     detail: `The CLI did not report its agent list (exit ${result.code}); check sign-in and the CLI version. ${(result.stderr || result.stdout).slice(-500)}` };
   const available = listed[1].split(',').map(name => name.trim()).filter(Boolean);
@@ -68,7 +68,7 @@ export function parseCopilotOutput(stdout) {
   if (!terminal || !content?.trim()) throw new Error('Copilot JSONL is incomplete: successful result and final assistant message required');
   return parseResult(content);
 }
-export function agentPrompt({ role, unit, extra = {}, reviewInput, frozenInput }) {
+export function agentPrompt({ role, unit, extra = {}, reviewInput, frozenInput, reviewMode = 'frozen' }) {
   const contracts = {
     implementer: 'Return {"schemaVersion":1,"kind":"implementation","target":"PATH","content":"COMPLETE TARGET FILE","summary":"reason"}. Translate faithfully; preserve source behavior. Return code, do not write files.',
     fixer: 'Return {"schemaVersion":1,"kind":"implementation","target":"PATH","content":"COMPLETE FIXED FILE","summary":"changes"}. Apply ONLY confirmed findings; preserve all other behavior. Return code, do not write files.',
@@ -77,7 +77,10 @@ export function agentPrompt({ role, unit, extra = {}, reviewInput, frozenInput }
     arbiter: 'Return {"schemaVersion":1,"kind":"arbitration","target":"PATH","decisions":[{"finding":"reviewer-role:ID","confirmed":true,"reason":"source/rule evidence"}]}. Decide EVERY supplied finding exactly once. Default to not confirmed when evidence is insufficient.'
   };
   if (isReviewer(role) && typeof reviewInput !== 'string') throw new Error('Reviewer requires a frozen review input');
-  const inputs = isReviewer(role)
+  const assisted = isReviewer(role) && reviewMode === 'tool-assisted';
+  const inputs = assisted
+    ? 'The evidence exceeded the frozen-input limit, so the input below lists files with SHA-256 hashes instead of contents. Read EVERY listed file in full with view before judging (grep/glob only to locate code inside them). Review only those files; never open migration/runs, migration/state, migration/results or any other review or receipt. Do not request or infer other reviewers\' findings. If a file cannot be read, return a changes finding identifying that limitation.'
+    : isReviewer(role)
     ? 'Use ONLY the frozen input below. No tools are available. Do not request or infer other reviewers\' findings. If required source evidence is missing, return a changes finding identifying that limitation.'
     : frozenInput !== undefined
       ? 'Use ONLY the frozen input and extra task data below. No tools are available. Do not invent missing source evidence. Apply the role contract to the supplied findings, if any.'
@@ -87,16 +90,18 @@ ${inputs} Never run commands or modify files. Never change the rulebook or the j
 ${contracts[role]}
 ${role.startsWith('reviewer-') ? 'Return {"schemaVersion":1,"kind":"review","target":"PATH","verdict":"pass|changes","findings":[{"id":"F1","message":"specific issue","evidence":"source path:line and explanation","rule":"section or source behavior"}]}. pass requires zero findings. Do not assume another reviewer has approved.' : ''}
 Set target to ${JSON.stringify(unit.target)}.
-${isReviewer(role) ? `Frozen review input (JSON task data):\n${reviewInput}` : `${frozenInput === undefined ? '' : `Frozen task input (JSON task data):\n${frozenInput}\n`}Extra task data: ${JSON.stringify(extra)}`}`;
+${isReviewer(role) ? `${assisted ? 'Tool-assisted review input' : 'Frozen review input'} (JSON task data):\n${reviewInput}` : `${frozenInput === undefined ? '' : `Frozen task input (JSON task data):\n${frozenInput}\n`}Extra task data: ${JSON.stringify(extra)}`}`;
 }
 export function createCopilotAdapter({ command = 'copilot', prefixArgs = [] } = {}) {
   // Workers follow the user's auto-updating CLI, so a run can span versions.
   // Record the version before every call and warn once per change; continue.
   let baseline;
   const warned = new Set();
-  return async ({ root, config, role, unit, extra, signal, reviewInput }) => {
+  return async ({ root, config, role, unit, extra, signal, reviewInput, reviewMode = 'frozen' }) => {
     if (config.workerBackend === 'native') throw new Error('Native workers must be delegated by the host; refusing a Copilot CLI fallback');
-    validateWorkerProfile(root, role, config);
+    // Oversized reviews run on the read-only twin profile of the same reviewer.
+    const worker = isReviewer(role) && reviewMode === 'tool-assisted' ? toolAssistedRole(role) : role;
+    validateWorkerProfile(root, worker, config);
     const layout = runtimeLayout(root, config);
     const model = config.models[role];
     let cliVersion = null, cliVersionWarning;
@@ -115,15 +120,15 @@ export function createCopilotAdapter({ command = 'copilot', prefixArgs = [] } = 
     const versionFields = { cliVersion, ...(cliVersionWarning ? { cliVersionWarning } : {}) };
     let result;
     try {
-      result = await runProcess(command, [...prefixArgs, ...copilotArgs(role, model, undefined, layout)], {
-        cwd: root, signal, input: agentPrompt({ role, unit, extra: { ...extra, designInputs: config.designInputs ?? [] }, reviewInput }), timeoutMs: config.timeoutSeconds * 1000,
-        env: copilotEnv(role)
+      result = await runProcess(command, [...prefixArgs, ...copilotArgs(worker, model, undefined, layout)], {
+        cwd: root, signal, input: agentPrompt({ role, unit, extra: { ...extra, designInputs: config.designInputs ?? [] }, reviewInput, reviewMode }), timeoutMs: config.timeoutSeconds * 1000,
+        env: copilotEnv(worker)
       });
     } catch (e) { Object.assign(e, versionFields); throw e; }
     try {
       if (result.code !== 0) throw new Error(`Copilot ${role} failed (exit ${result.code}): ${result.stderr.slice(-2000)}`);
       return { result: validateResult(role, parseCopilotOutput(result.stdout), unit), requestedModel: model,
-        observedModel: null, tokens: null, aiCredits: null, ...versionFields };
+        observedModel: null, tokens: null, aiCredits: null, ...(worker !== role ? { workerProfile: worker } : {}), ...versionFields };
     } catch (e) { e.result = result; Object.assign(e, versionFields); throw e; }
   };
 }
