@@ -22,18 +22,20 @@ export function decide(event, role, cwd) {
   }
   return null;
 }
-export function decisionOutput(reason, vscode = false) {
+export function decisionOutput(reason) {
   if (!reason) return {};
   const decision = { permissionDecision: 'deny', permissionDecisionReason: reason };
-  // Explicit harness selection, never infer it from snake_case input keys.
-  // Local templates can also be loaded by CLI, which consumes the top level.
-  return vscode ? { ...decision, hookSpecificOutput: { hookEventName: 'PreToolUse', ...decision } } : decision;
+  // Always emit both shapes. Copilot CLI reads the top level; VS Code also loads
+  // CLI-format .github/hooks files but reads hookSpecificOutput, so a CLI-only
+  // answer would let VS Code agents through. Each consumer ignores the other key.
+  return { ...decision, hookSpecificOutput: { hookEventName: 'PreToolUse', ...decision } };
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
   let input = '';
   for await (const part of process.stdin) input += part;
   try {
     const event = JSON.parse(input), reason = decide(event, process.env.MIGRATION_KIT_ROLE);
-    console.log(JSON.stringify(decisionOutput(reason, process.argv.includes('--vscode'))));
+    // --vscode is accepted for existing Local templates; output is the same.
+    console.log(JSON.stringify(decisionOutput(reason)));
   } catch (e) { console.error(`Migration hook: ${e.message}`); process.exitCode = 2; }
 }

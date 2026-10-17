@@ -65,6 +65,19 @@ export async function doctor(root, config, { checkCLI = false, command = 'copilo
   } catch (e) { checks.push({ check: 'review dependency map', ok: false, detail: e.message }); }
   checks.push({ check: 'build artifact roots', ok: true, roots: config.buildArtifactRoots ?? [], note: 'Declare generated binaries, objects and reports here. Their file contents are excluded from command-input fingerprints; actual inputs must stay outside these roots.' });
   if (!native) checks.push({ check: 'worker hook installed', ok: fs.existsSync(safePath(layout.root, layout.hookPath)) });
+  // Copilot hooks fail open on timeout: a slow start silently disables the
+  // guardrails. Time one denial through the same script the hook config runs.
+  {
+    const hookFile = safePath(layout.root, layout.hookPath);
+    let limit = null;
+    try { const spec = JSON.parse(fs.readFileSync(hookFile, 'utf8')).hooks; limit = (spec.preToolUse ?? spec.PreToolUse)?.[0]?.timeoutSec ?? (spec.PreToolUse ?? spec.preToolUse)?.[0]?.timeout ?? null; } catch {}
+    const started = Date.now();
+    const probe = await runProcess(process.execPath, [path.join(layout.plugin ? layout.root : safePath(root, 'migration-kit'), 'scripts/migration_hook.mjs')], {
+      cwd: root, timeoutMs: 60000, input: JSON.stringify({ toolName: 'bash', toolArgs: { command: 'true' } }), env: { ...process.env, MIGRATION_KIT_ROLE: 'implementer' } }).catch(e => ({ code: null, stderr: e.message }));
+    const ms = Date.now() - started, decision = (() => { try { return JSON.parse(probe.stdout); } catch { return null; } })();
+    checks.push({ check: 'hook responds before its timeout', ok: probe.code === 0 && decision?.permissionDecision === 'deny' && decision?.hookSpecificOutput?.permissionDecision === 'deny' && (limit === null || ms < limit * 500),
+      durationMs: ms, timeoutSec: limit, note: 'Copilot CLI and VS Code let a tool call through when a hook times out. Keep the measured time well under half the configured timeout.' });
+  }
   let guardrails = null, guardrailError;
   try { guardrails = readGuardrails(root); } catch (e) { guardrailError = e.message; }
   checks.push({ check: 'command guardrails', ok: !guardrailError,
@@ -79,6 +92,11 @@ export async function doctor(root, config, { checkCLI = false, command = 'copilo
   const unverifiedModels = native && nativeModelVerification(config) === 'requested-unverified';
   if (unverifiedModels) checks.push({ check: 'native model verification', ok: true, status: 'requested-unverified',
     note: 'VS Code-only mode: the parent passes each requested model to the host\'s per-call model parameter and submits; the executed model is recorded as unverified in every attempt, run summary and report. Use host-metadata (or the copilot-cli backend) when observed models are required.' });
+  // Host settings live in VS Code, not in files Node can read reliably; list
+  // them so the parent confirms each one before dispatching.
+  if (native) checks.push({ check: 'native host requirements', ok: null, status: 'confirm in the host',
+    requirements: ['VS Code 1.117 or later: runSubagent accepts a per-call model', 'chat.customAgentInSubagent.enabled is on, so the dedicated native profiles can run as subagents',
+      'The requested models in config.models are allowed for subagents on this account (some models are not)', 'Restart the chat after installing or updating profiles'] });
   if (native) checks.push({ check: 'native host capabilities', ok: null, status: 'unknown', experimental: !unverifiedModels, harness: config.nativeHarness,
     capabilities: Object.fromEntries(['modelSelection', 'modelExecutionEvidence', 'toolRestrictions', 'instructionIsolation', 'parallelDispatch', 'completionEvents', 'childCancellation'].map(name => [name, unverifiedModels && name === 'modelExecutionEvidence' ? 'not required (requested-unverified)' : 'unknown'])),
     note: 'EXPERIMENTAL: VS Code does not return the executed subagent model to the parent, so jobs cannot be submitted under the native contract; use the copilot-cli backend for real migrations. Static profiles do not verify this host. Before native execution, verify per-call model selection, execution-bound model metadata, tools, dispatch and cancellation on the installed host. Do not echo requested models or silently fall back to CLI.' });

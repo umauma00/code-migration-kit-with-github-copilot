@@ -68,6 +68,8 @@ export function parseCopilotOutput(stdout) {
   if (!terminal || !content?.trim()) throw new Error('Copilot JSONL is incomplete: successful result and final assistant message required');
   return parseResult(content);
 }
+// Fixed role text first, task data next (shared rules lead it), and the
+// unit-specific target last, so repeated calls reuse the cached prompt prefix.
 export function agentPrompt({ role, unit, extra = {}, reviewInput, frozenInput, reviewMode = 'frozen' }) {
   const contracts = {
     implementer: 'Return {"schemaVersion":1,"kind":"implementation","target":"PATH","content":"COMPLETE TARGET FILE","summary":"reason"}. Translate faithfully; preserve source behavior. Return code, do not write files.',
@@ -89,8 +91,8 @@ export function agentPrompt({ role, unit, extra = {}, reviewInput, frozenInput, 
 ${inputs} Never run commands or modify files. Never change the rulebook or the judge. Return ONLY one JSON object without commentary.
 ${contracts[role]}
 ${role.startsWith('reviewer-') ? 'Return {"schemaVersion":1,"kind":"review","target":"PATH","verdict":"pass|changes","findings":[{"id":"F1","message":"specific issue","evidence":"source path:line and explanation","rule":"section or source behavior"}]}. pass requires zero findings. Do not assume another reviewer has approved.' : ''}
-Set target to ${JSON.stringify(unit.target)}.
-${isReviewer(role) ? `${assisted ? 'Tool-assisted review input' : 'Frozen review input'} (JSON task data):\n${reviewInput}` : `${frozenInput === undefined ? '' : `Frozen task input (JSON task data):\n${frozenInput}\n`}Extra task data: ${JSON.stringify(extra)}`}`;
+${isReviewer(role) ? `${assisted ? 'Tool-assisted review input' : 'Frozen review input'} (JSON task data):\n${reviewInput}` : `${frozenInput === undefined ? '' : `Frozen task input (JSON task data):\n${frozenInput}\n`}Extra task data: ${JSON.stringify(extra)}`}
+Set target to ${JSON.stringify(unit.target)}.`;
 }
 export function createCopilotAdapter({ command = 'copilot', prefixArgs = [] } = {}) {
   // Workers follow the user's auto-updating CLI, so a run can span versions.
@@ -119,15 +121,18 @@ export function createCopilotAdapter({ command = 'copilot', prefixArgs = [] } = 
     }
     const versionFields = { cliVersion, ...(cliVersionWarning ? { cliVersionWarning } : {}) };
     let result;
+    const prompt = agentPrompt({ role, unit, extra: { ...extra, designInputs: config.designInputs ?? [] }, reviewInput, reviewMode });
+    const promptBytes = Buffer.byteLength(prompt);
     try {
       result = await runProcess(command, [...prefixArgs, ...copilotArgs(worker, model, undefined, layout)], {
-        cwd: root, signal, input: agentPrompt({ role, unit, extra: { ...extra, designInputs: config.designInputs ?? [] }, reviewInput, reviewMode }), timeoutMs: config.timeoutSeconds * 1000,
+        cwd: root, signal, input: prompt, timeoutMs: config.timeoutSeconds * 1000,
         env: copilotEnv(worker)
       });
     } catch (e) { Object.assign(e, versionFields); throw e; }
     try {
       if (result.code !== 0) throw new Error(`Copilot ${role} failed (exit ${result.code}): ${result.stderr.slice(-2000)}`);
-      return { result: validateResult(role, parseCopilotOutput(result.stdout), unit), requestedModel: model,
+      const value = validateResult(role, parseCopilotOutput(result.stdout), unit);
+      return { result: value, requestedModel: model, promptBytes, responseBytes: Buffer.byteLength(JSON.stringify(value)),
         observedModel: null, tokens: null, aiCredits: null, ...(worker !== role ? { workerProfile: worker } : {}), ...versionFields };
     } catch (e) { e.result = result; Object.assign(e, versionFields); throw e; }
   };

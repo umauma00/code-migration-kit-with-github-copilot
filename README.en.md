@@ -114,6 +114,7 @@ The minimum settings in `migration/config.json`:
 | `nativeHarness` | Required for native: `vscode-local` or `copilot`, matching the current session |
 | `concurrency` | Concurrent AI calls, default 2, reviews included |
 | `maxFixRounds`, `maxAgentCalls` | Fix rounds per unit and AI calls per run |
+| `maxRunInputBytes` | Optional cap on the prompt bytes a run sends to workers. AI Credits are metered on tokens and usage stops when they run out, so this budgets runs between usage checks. The run summary's `usageEstimate` records measured bytes and estimated tokens (bytes ÷ 4, not billing data) |
 | `timeoutSeconds` | Time limit for one CLI worker call |
 | `commandTimeoutSeconds` | Time limit for build and comparison commands |
 

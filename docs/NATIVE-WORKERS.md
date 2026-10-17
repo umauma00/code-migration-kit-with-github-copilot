@@ -89,6 +89,15 @@ native設定の `doctor` はCLIを起動せず専用プロファイルを検査�
 `--check-cli` が付いていても同じです。ホストでのプロファイル解決・モデル利用可否・
 実際のツール制限は、Nodeからの検査では保証しません。
 
+### VS Codeの前提条件
+
+最初のnative実行の前に、VS Codeで次を確認します（`doctor` の `native host requirements` に一覧を表示します。NodeからVS Codeの設定は読めません）。
+
+- VS Code 1.117以降。この版から `runSubagent` が呼び出し単位のモデル指定を受け付けます。モデルは「呼び出し時の指定 → プロファイルの `model` → 親の会話のモデル」の順で決まります。キットは常に呼び出し時の指定を使うため、プロファイルに `model` を書きません。
+- `chat.customAgentInSubagent.enabled` を有効にする。無効だと専用のnativeプロファイルをサブエージェントとして使えません。
+- 指定モデルが、このアカウントでサブエージェントに使えること（使えないモデルがあります）。
+- 担当プロファイルは `user-invocable: false` でエージェント一覧に表示しません。CLI用の担当は `disable-model-invocation: true` で、親がサブエージェントとして呼ぶこともできません。native用は親が委譲するため呼び出し可能のままです。
+
 ### モデルの指定と確認
 
 Localでは `runSubagent` のモデル引数、Copilotではホストに公開された委譲ツールの

@@ -1,5 +1,14 @@
 # Unreleased
 
+- Align with current Copilot behavior: hook denials carry both the CLI
+  top-level and the VS Code `hookSpecificOutput` decision; hook timeouts rise
+  to 30 s (hooks fail open on timeout) and doctor times the hook; worker
+  profiles set `user-invocable: false` and CLI workers
+  `disable-model-invocation: true`; doctor lists VS Code native prerequisites
+  (1.117+, `chat.customAgentInSubagent.enabled`).
+- AI Credits: prompts lead with shared rules and end with the unit target so
+  repeated calls share a cached prefix; optional `maxRunInputBytes` stops a run
+  at a measured prompt-size budget; run summaries add `usageEstimate`.
 - Run the native backend inside VS Code only: `nativeModelVerification:
   requested-unverified` (the default for new native installs) accepts results
   submitted with the requested model and records the executed model as

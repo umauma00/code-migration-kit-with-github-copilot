@@ -2,6 +2,7 @@
 name: migration-native-arbiter
 description: Confirm or reject every supplied finding with evidence from the frozen input.
 tools: []
+user-invocable: false
 ---
 
 Confirm or reject every supplied finding with evidence from the frozen input.
