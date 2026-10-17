@@ -13,6 +13,7 @@ import { runtimeLayout } from '../lib/runtime.mjs';
 import { migrationStatus, statusMarkdown } from '../lib/status.mjs';
 import { createNativeAdapter } from '../lib/native-workers.mjs';
 import { phaseCommand } from './phase_cli.mjs';
+import { diagnoseBuild } from './diagnostic_queue.mjs';
 import { readGuardrails, cliFolderTrust } from '../lib/guardrails.mjs';
 
 export const usage = `Usage: node migration-kit/scripts/run_migration.mjs COMMAND [options]
@@ -28,6 +29,8 @@ export const usage = `Usage: node migration-kit/scripts/run_migration.mjs COMMAN
   pilot prepare --target NEW_DIR --sources src/a,src/b --note TEXT [--through translation|build|smoke|parity]
   pilot run --root PILOT_DIR  Run only the explicitly authorized, isolated pilot
   repair --target PATH --evidence migration/PATH | repair --queue migration/QUEUE.json
+  diagnose                   Parse the current failed build into a TSV and repair queue
+  repair-round               diagnose, then repair the queue; a fresh build still needs approval
   build | smoke | parity | handoff     Run one approved validation stage and stop
   unlock --pid PID           Remove a lock only after its owning process has stopped
 Options: --root PATH (default cwd), --copilot PATH (default copilot)
@@ -114,6 +117,19 @@ export async function main(argv = process.argv.slice(2)) {
     else if (cmd === 'pilot' && args._[1] === 'run') {
       if (config.workerBackend === 'native' && args.copilot) throw new Error('--copilot cannot be used with a native pilot');
       result = await runPilot(root, config, config.workerBackend === 'native' ? createNativeAdapter() : createCopilotAdapter({ command: args.copilot }), { signal: controller.signal, onProgress: event => console.error(`${event.unit}: ${event.stage}`) });
+    }
+    else if (cmd === 'diagnose') result = diagnoseBuild(root, config);
+    else if (cmd === 'repair-round') {
+      const diagnosis = diagnoseBuild(root, config);
+      if (diagnosis.clean) result = { ...diagnosis, next: 'Build is clean; review it and approve smoke.' };
+      else {
+        const native = config.workerBackend === 'native';
+        if (native && args.copilot) throw new Error('--copilot cannot be used with workerBackend: native');
+        const repair = await translate(root, config, native ? createNativeAdapter() : createCopilotAdapter({ command: args.copilot }), {
+          signal: controller.signal, repairQueue: diagnosis.queue,
+          onProgress: event => console.error(`${event.unit}: ${event.stage} (agent calls ${event.calls})`) });
+        result = { diagnosis, repair, next: 'Review the repaired outputs and the round counts in migration/build-rounds.tsv, then approve build and run build for the next round.' };
+      }
     }
     else if (cmd === 'judge-prepare') result = await runJudgePreparation(root, config, { signal: controller.signal });
     else if (cmd === 'phase') result = phaseCommand(root,config,args._[1],args._[2],args);

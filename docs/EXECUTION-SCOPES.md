@@ -40,7 +40,11 @@ receipts. Re-approval does not discard already reviewed units.
 
 A language-specific adapter or reviewed extraction produces a TSV from one
 current build attempt. The common header is file, module, code, message separated
-by tabs. File is an exact manifest target; no universal compiler parser is claimed.
+by tabs. File is an exact manifest target. `run_migration.mjs diagnose` produces it
+from the current failed build with the bundled parsers (Python, Java/Maven,
+JavaScript/Node/ESLint/tsc, shell/ShellCheck, rustc, generic FILE:LINE:COL), and
+`repair-round` also runs the repair queue. Lines that map to no manifest target
+are reported, not guessed. Each round is logged in `migration/build-rounds.tsv`.
 
 ```bash
 node migration-kit/scripts/diagnostic_queue.mjs --diagnostics migration/build-diagnostics.tsv

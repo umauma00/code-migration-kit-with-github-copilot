@@ -11,10 +11,16 @@ fingerprints are the evidence. A failed command never counts as a clean build.
 The retained Bash daemon writes an exit-code sidecar and --once propagates failure;
 the Node runner is the portable reference path.
 
-Parse diagnostics with the target toolchain into a machine queue by file, module,
-error code and message. The kit does not supply one parser for every language.
-Resolve each affected file to its manifest unit. Put a concise diagnostic slice
-under `migration/`, then use:
+After a failed build, run `run_migration.mjs repair-round` (or `diagnose` to
+only build the queue). The bundled parsers read the recorded build output
+(Python, Java/Maven, JavaScript/Node/ESLint/tsc, shell/ShellCheck, rustc and the
+generic FILE:LINE:COL: error form), map each error to its manifest target and
+write `migration/build-diagnostics/<build>.tsv`, `migration/repair-queue.json` and
+a row in `migration/build-rounds.tsv`. Never re-derive the list by judgment. If
+the command reports no mapped diagnostic, show the human the unmapped lines and
+build record; for an unsupported format, produce the same TSV with a reviewed
+adapter. Report the round-over-round counts from `migration/build-rounds.tsv`.
+For a single manual slice you can still use:
 
 `run_migration.mjs repair --target ported/PATH --evidence migration/ERROR-SLICE`
 

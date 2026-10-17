@@ -214,7 +214,15 @@ node migration-kit/scripts/run_migration.mjs approve parity --note "基本動作
 node migration-kit/scripts/run_migration.mjs parity
 ```
 
-ビルドエラーは言語横断で自動解析しません。問題の単位と診断の抜粋を指定します。
+ビルドが失敗したら `repair-round` を実行します。同梱のパーサー（Python・Java/Maven・JavaScript/Node/ESLint/tsc・シェル/ShellCheck・Rust・汎用の `file:line:col: error` 形式）が記録済みのビルド出力からエラーを読み取り、manifestの変換先ごとの修正キューを作って修正まで実行します。manifestに対応しない行は推測せず一覧で報告します。ラウンドごとのエラー件数は `migration/build-rounds.tsv` に残ります。修正後のbuildには、従来どおり承認が必要です。
+
+```bash
+node migration-kit/scripts/run_migration.mjs repair-round
+node migration-kit/scripts/run_migration.mjs approve build --note "修正結果を確認"
+node migration-kit/scripts/run_migration.mjs build
+```
+
+未対応の形式などで個別に指定する場合は、問題の単位と診断の抜粋を指定します。
 
 ```bash
 node migration-kit/scripts/run_migration.mjs repair \
