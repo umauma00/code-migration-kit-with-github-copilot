@@ -8,7 +8,9 @@ import { runtimeLayout } from '../lib/runtime.mjs';
 export function copilotArgs(role, model, prompt, layout) {
   // A CLI worker is a fresh session agent: tools: [] alone does not prevent
   // automatic repository/personal instructions from entering its system prompt.
-  return [...(prompt === undefined ? [] : ['-p', prompt]), ...(layout?.plugin ? ['--plugin-dir', layout.root] : []), '-s', '--output-format', 'json', '--stream', 'off', '--no-color', '--no-auto-update', '--no-ask-user', '--no-custom-instructions', '--disable-builtin-mcps', '--agent', layout?.agentId(role) ?? `migration-${role}`, '--model', model,
+  // No --no-auto-update: native-installer launchers then run their bundled
+  // (possibly much older) build instead of the version the user and doctor see.
+  return [...(prompt === undefined ? [] : ['-p', prompt]), ...(layout?.plugin ? ['--plugin-dir', layout.root] : []), '-s', '--output-format', 'json', '--stream', 'off', '--no-color', '--no-ask-user', '--no-custom-instructions', '--disable-builtin-mcps', '--agent', layout?.agentId(role) ?? `migration-${role}`, '--model', model,
     '--available-tools', 'view,grep,glob', ...(isReviewer(role) ? ['--deny-tool', 'read,write,shell'] : ['--allow-tool', 'read', '--deny-tool', 'write,shell'])];
 }
 export function requiredCopilotFlags(layout) {
@@ -68,7 +70,7 @@ export function createCopilotAdapter({ command = 'copilot', prefixArgs = [] } = 
     const model = config.models[role];
     const result = await runProcess(command, [...prefixArgs, ...copilotArgs(role, model, undefined, layout)], {
       cwd: root, signal, input: agentPrompt({ role, unit, extra: { ...extra, designInputs: config.designInputs ?? [] }, reviewInput }), timeoutMs: config.timeoutSeconds * 1000,
-      env: { ...process.env, COPILOT_ALLOW_ALL: 'false', COPILOT_AUTO_UPDATE: 'false', MIGRATION_KIT_ROLE: role }
+      env: { ...process.env, COPILOT_ALLOW_ALL: 'false', MIGRATION_KIT_ROLE: role }
     });
     try {
       if (result.code !== 0) throw new Error(`Copilot ${role} failed (exit ${result.code}): ${result.stderr.slice(-2000)}`);

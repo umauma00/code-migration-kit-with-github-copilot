@@ -8,7 +8,8 @@ The automated runner starts a fresh `copilot -p` call for each role with:
 
 - `--available-tools view,grep,glob`
 - `--allow-tool read --deny-tool write,shell`
-- explicit `--agent` and `--model`, `--no-auto-update`, no fleet/autopilot
+- explicit `--agent` and `--model`, no fleet/autopilot; no `--no-auto-update`, which
+  would make native-installer launchers run their older bundled build
 - `MIGRATION_KIT_ROLE` for the installed preToolUse backstop
 
 All workers, including implementers and fixers, return content as JSON. They

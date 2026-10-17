@@ -15,7 +15,7 @@ const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'migration-plugin-cli-'));
 try {
   const root = path.join(sandbox, 'project'); fs.mkdirSync(root);
   const env = { ...process.env, COPILOT_HOME: path.join(sandbox, 'copilot-home'),
-    COPILOT_GITHUB_TOKEN: '', GH_TOKEN: '', GITHUB_TOKEN: '', COPILOT_AUTO_UPDATE: 'false',
+    COPILOT_GITHUB_TOKEN: '', GH_TOKEN: '', GITHUB_TOKEN: '',
     // A loopback-only dummy provider bypasses account checks. The invalid
     // agent aborts before sending a request; no provider is listening here.
     COPILOT_PROVIDER_TYPE: 'openai', COPILOT_PROVIDER_BASE_URL: 'http://127.0.0.1:1/v1',

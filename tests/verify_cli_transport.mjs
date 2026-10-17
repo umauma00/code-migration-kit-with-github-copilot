@@ -26,7 +26,11 @@ const canaries = {
   root: 'ROOT_INSTRUCTION_CANARY_20261010', ancestor: 'ANCESTOR_INSTRUCTION_CANARY_20261010',
   personal: 'PERSONAL_INSTRUCTION_CANARY_20261010', repository: 'REPO_INSTRUCTION_CANARY_20261010'
 };
+// Instruction sources vary by CLI version and launcher (for example, an
+// ancestor AGENTS.md outside the repository). Isolation must hide every source
+// the unisolated control actually discovered.
 let providerError, control = false;
+const discovered = new Set();
 const server = http.createServer(async (req, res) => {
   try {
     let body = ''; for await (const c of req) body += c;
@@ -40,8 +44,8 @@ const server = http.createServer(async (req, res) => {
     const ambient = Object.fromEntries(Object.entries(canaries).map(([name, marker]) => [name, messages.includes(marker)]));
     const profileIncluded = messages.includes(`PROFILE_CANARY_${role}`);
     assert.ok(profileIncluded, 'Explicit --agent profile must still be loaded');
-    if (control) assert.ok(Object.values(ambient).every(v => v), 'Positive control must discover all instruction canaries');
-    else assert.ok(Object.values(ambient).every(v => !v), 'Ambient instructions must not enter a worker request');
+    if (control) for (const [name, seen] of Object.entries(ambient)) { if (seen) discovered.add(name); }
+    else assert.ok([...discovered].every(name => !ambient[name]), 'Ambient instructions must not enter a worker request');
     records.push({ control, role, target, tools, requestedModel: request.model, profileIncluded, ambient });
     const content = JSON.stringify(result(role, unit));
     if (request.stream) {
@@ -77,10 +81,11 @@ try {
   const unit = f.units[0], frozen = reviewInput(f.root, f.config, unit, null, { candidate: false }).text;
   const positive = await runProcess(command, copilotArgs('reviewer-rules', f.config.models['reviewer-rules']).filter(a => a !== '--no-custom-instructions'), {
     cwd: f.root, timeoutMs: 30000, input: agentPrompt({ role: 'reviewer-rules', unit, reviewInput: frozen }),
-    env: { ...process.env, COPILOT_ALLOW_ALL: 'false', COPILOT_AUTO_UPDATE: 'false', MIGRATION_KIT_ROLE: 'reviewer-rules' }
+    env: { ...process.env, COPILOT_ALLOW_ALL: 'false', MIGRATION_KIT_ROLE: 'reviewer-rules' }
   });
   assert.equal(positive.code, 0, positive.stderr); parseCopilotOutput(positive.stdout); control = false;
   if (providerError) throw providerError;
+  assert.ok(discovered.size > 0, 'Positive control must discover at least one instruction canary');
   const definition = createWorkflowDefinition(f.root);
   const runTranslation = () => workflow ? definition.run({ args: { stage: 'translate', copilot: command }, phase() {}, log() {},
     agent: async () => { throw new Error('Host SDK agent must not run'); } }) : translate(f.root, f.config, adapter);
@@ -106,7 +111,8 @@ try {
   console.log(JSON.stringify({ schemaVersion: 1, date: new Date().toISOString(), cli: version.stdout.trim(),
     platform: `${process.platform}/${process.arch}`, node: process.version, localProviderIsTestDouble: true,
     externalAIUsed: false, entrypoint: workflow ? 'workflow (simulated SDK host, real CLI workers)' : 'CLI', doctorOK: checks.ok,
-    instructionIsolationOK: records.filter(r => !r.control).every(r => Object.values(r.ambient).every(v => !v) && r.profileIncluded),
+    controlDiscovered: [...discovered].sort(),
+    instructionIsolationOK: records.filter(r => !r.control).every(r => [...discovered].every(name => !r.ambient[name]) && r.profileIncluded),
     translation: { done: translation.done, total: translation.total, agentCalls: translation.agentCalls },
     stages, resumedAgentCalls: resumed.agentCalls, records, outputHashes: f.units.map(u => ({ target: u.target, hash: fileHash(safePath(f.root, u.target)) })) }, null, 2));
 } finally {
