@@ -46,12 +46,15 @@ acknowledgment before handoff. Record known host usage with completion;
 
 ## Worker execution backend
 
-For a new VS Code migration, initialize with `--worker-backend native` and
-`--native-harness copilot` for Copilot sessions, or `--harness vscode-local`
-for Local (repository-copy installation). For Copilot CLI, keep the default
-`copilot-cli` backend. Reuse the user's specified execution preference.
-Preserve existing config; changing backend requires fresh judge validation and
-translation approval, not a silent switch during a run.
+Initialize every new migration with the default `copilot-cli` backend, in VS Code
+as well: the parent runs the Node runner in a terminal and the runner starts
+isolated Copilot CLI workers (signed-in Copilot CLI required). `native` is
+EXPERIMENTAL and cannot complete under its own contract today: VS Code does not
+return the subagent's executed model to the parent, so every job must be failed
+rather than submitted. Choose native only when the user explicitly asks for it
+after you state this; never pick it on your own. Preserve existing config;
+changing backend requires fresh judge validation and translation approval, not
+a silent switch during a run.
 
 When config.workerBackend is native, follow [native workers](../../../docs/NATIVE-WORKERS.md).
 Keep the runner active in a continuing terminal, claim pending jobs, delegate

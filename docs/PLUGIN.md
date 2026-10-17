@@ -40,13 +40,11 @@ Git配布が整った後はマーケットプレイスのGit URLを登録でき�
 開始・再開時には、親の調整エージェントがCopilotのTODOに10工程の一覧を作り、現在の工程・承認待ち・修正中・停止を表示します。工程末の報告にも完了した工程数と次の工程を含めます。再開時は保存した成果物・検証記録を確認して更新し、TODOのチェックだけで承認・完了と判断しません。TODOが使えない環境ではチャットの一覧に切り替えます。詳細は [工程のTODO表示](PHASE-HANDOFF.md#track-the-ten-phases-in-the-host-todo-list) を参照してください。
 
 ```bash
-node /path/to/code-migration-kit/scripts/install.mjs --target . --layout plugin --worker-backend native --native-harness copilot --model MODEL_ID
-node /path/to/code-migration-kit/scripts/install.mjs --target . --layout plugin --worker-backend native --native-harness copilot --model MODEL_ID --apply
+node /path/to/code-migration-kit/scripts/install.mjs --target . --layout plugin --worker-backend copilot-cli --model MODEL_ID
+node /path/to/code-migration-kit/scripts/install.mjs --target . --layout plugin --worker-backend copilot-cli --model MODEL_ID --apply
 ```
 
-上記はVS Code Copilot用です。Copilot CLIから開始する場合は
-`--worker-backend native --native-harness copilot` を `--worker-backend copilot-cli`
-へ置き換えます。既存案件の方式は初期化で切り替えません。
+VS Code・Copilot CLIのどちらから開始する場合も、CLIワーカー方式（`copilot-cli`）を使います。VS Codeでも、親エージェントがターミナルでrunnerを動かし、runnerがCopilot CLIのワーカーを起動します。native方式は**実験的**です（[native方式](NATIVE-WORKERS.md)を参照）。既存案件の方式は初期化で切り替えません。
 
 作成するのは `migration/config.json`、`migration/RULEBOOK.md`、`migration/inventory.tsv` の3ファイルです。設定済みの案件ではモデルやルールを上書きしません。初期化は工程を承認しません。言語、元ソース・出力・テストの場所、検証コマンドを設定してください。
 
@@ -63,7 +61,7 @@ node /path/to/code-migration-kit/scripts/run_migration.mjs status
 
 `plugin.json` と `skills/` はAgent Plugins 1.0形式です。従来の6役、native専用の5ワーカー、CLI用hooksは `com.github.copilot/` に配置しています。既定のCLI方式ではプラグインを `--plugin-dir` で明示し、`--agent code-migration-kit:code-migration-plugin-担当名` で選択します。レビュー担当は固定入力のみ・ツールなし、他担当も読み取りだけです。出力はNodeの調整役が書き込みます。
 
-VS Code Copilotでは初期化に `--worker-backend native --native-harness copilot` を追加すると、ホストの親エージェントがnative専用サブエージェントを起動します。全ワーカーはツールなしで、入力・結果をNode runnerと受け渡します。導入後はチャットを再起動して新しいプロファイルを読み込み、[native手順](NATIVE-WORKERS.md)に従ってください。既存設定はinstallerで上書きしません。
+**実験的機能**：VS Code Copilotで初期化に `--worker-backend native --native-harness copilot` を指定すると、ホストの親エージェントがnative専用サブエージェントを起動します。ただし、VS Codeは実行したモデルを親に返さないため、現状のnative手順では最後まで完了できません。全ワーカーはツールなしで、入力・結果をNode runnerと受け渡します。導入後はチャットを再起動して新しいプロファイルを読み込み、[native手順](NATIVE-WORKERS.md)に従ってください。既存設定はinstallerで上書きしません。
 
 案件・親ディレクトリ・個人設定のカスタムエージェントに、上記の完全修飾名を `name` またはファイル由来IDとして使う定義がある場合、doctorとワーカー起動前の検査で停止します。YAMLの引用符・折り畳み・別名参照も解釈し、サブディレクトリのMarkdownも確認します。非修飾の `code-migration-plugin-担当名` は別の名前として共存できます。検査対象は通常のUTF-8ファイルです。YAMLを解析できない定義やシンボリックリンクは、検査不能として停止します。
 

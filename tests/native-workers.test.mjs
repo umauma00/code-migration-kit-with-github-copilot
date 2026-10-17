@@ -5,7 +5,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { setTimeout as delay } from 'node:timers/promises';
 import { prepare, result, finding } from './helpers.mjs';
-import { install } from '../scripts/install.mjs';
+import { install, kitRoot } from '../scripts/install.mjs';
 import { approve, runStage, translate, requireGate } from '../lib/pipeline.mjs';
 import { loadConfig, contextHash, safePath, writeJSON, readJSON, done, unitState, atomicWrite, fileHash, lockRun } from '../lib/core.mjs';
 import { createNativeAdapter, listNativeTasks, claimNativeTask, submitNativeTask } from '../lib/native-workers.mjs';
@@ -345,4 +345,15 @@ test('native command interface transports exact JSON, rejects bad JSON and start
   assert.equal(outcome.error, undefined);
   assert.equal(outcome.value.code, 0, outcome.value.stderr);
   assert.equal(JSON.parse(outcome.value.stdout).done, 1);
+});
+
+test('native initialization is reported as experimental and copilot-cli stays the default', t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'native-experimental-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  assert.match(install(root, { layout: 'plugin', workerBackend: 'native', nativeHarness: 'copilot' }).warnings[0], /EXPERIMENTAL/);
+  assert.equal(install(root, { layout: 'plugin' }).warnings, undefined);
+  for (const skill of ['skills/code-migration/SKILL.md', '.github/skills/code-migration/SKILL.md']) {
+    const text = fs.readFileSync(path.join(kitRoot, skill), 'utf8');
+    assert.match(text, /default `copilot-cli` backend, in VS Code/); assert.match(text, /EXPERIMENTAL/);
+  }
 });

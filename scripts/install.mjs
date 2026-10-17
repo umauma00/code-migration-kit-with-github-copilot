@@ -20,6 +20,7 @@ export function install(target, { apply = false, model, harness = 'copilot', wit
   if (!['copilot-cli', 'native'].includes(workerBackend)) throw new Error('workerBackend must be copilot-cli or native');
   if (workerBackend === 'native' && (!['copilot', 'vscode-local'].includes(nativeHarness) || (layout === 'plugin' && nativeHarness !== 'copilot'))) throw new Error('Native harness must be copilot or vscode-local; vscode-local requires repository layout');
   if (workerBackend === 'native' && withWorkflow) throw new Error('Native workers use the host session, not the experimental workflow');
+  const warnings = workerBackend === 'native' ? ['workerBackend native is EXPERIMENTAL: VS Code does not report the executed subagent model, so native jobs cannot be submitted under the documented contract. Use the default copilot-cli backend for real migrations, including in VS Code.'] : [];
   const configureBackend = config => {
     config.workerBackend = workerBackend;
     if (verificationMode !== undefined) config.verificationMode = verificationMode;
@@ -48,7 +49,7 @@ export function install(target, { apply = false, model, harness = 'copilot', wit
       } else files.set(name, fs.readFileSync(path.join(kitRoot, `templates/${rel}`), 'utf8'));
     }
     if (apply) for (const [name, content] of files) atomicWrite(safePath(root, name), content);
-    return { applied: apply, target: root, layout, changes: [...files.keys()],
+    return { applied: apply, target: root, layout, changes: [...files.keys()], ...(warnings.length ? { warnings } : {}),
       next: 'Edit migration/config.json (languages, paths, models and commands), then invoke the code-migration skill from the installed plugin. Existing configuration is retained.' };
   }
   const files = new Map();
@@ -90,7 +91,7 @@ export function install(target, { apply = false, model, harness = 'copilot', wit
     changes.push(rel);
   }
   if (apply) for (const rel of changes) atomicWrite(safePath(root, rel), files.get(rel));
-  return { applied: apply, target: root, harness, changes,
+  return { applied: apply, target: root, harness, changes, ...(warnings.length ? { warnings } : {}),
     next: 'Edit migration/config.json, draft the rulebook and inventory, then follow migration-kit/README.md. Existing configuration is retained.' };
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {

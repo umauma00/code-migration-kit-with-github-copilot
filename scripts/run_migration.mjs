@@ -64,9 +64,9 @@ export async function doctor(root, config, { checkCLI = false, command = 'copilo
     checks.push({ check: 'repository hooks load in Copilot CLI', ok: !(trust === 'untrusted' && guardrails?.denyCommands.length), status: trust,
       note: 'Copilot CLI ignores .github/hooks in untrusted folders, silently disabling the guardrails. Start copilot interactively in this repository once and trust the folder.' });
   }
-  if (native) checks.push({ check: 'native host capabilities', ok: null, status: 'unknown', harness: config.nativeHarness,
+  if (native) checks.push({ check: 'native host capabilities', ok: null, status: 'unknown', experimental: true, harness: config.nativeHarness,
     capabilities: Object.fromEntries(['modelSelection', 'modelExecutionEvidence', 'toolRestrictions', 'instructionIsolation', 'parallelDispatch', 'completionEvents', 'childCancellation'].map(name => [name, 'unknown'])),
-    note: 'Static profiles do not verify this host. Before native execution, verify per-call model selection, execution-bound model metadata, tools, dispatch and cancellation on the installed host. Do not echo requested models or silently fall back to CLI.' });
+    note: 'EXPERIMENTAL: VS Code does not return the executed subagent model to the parent, so jobs cannot be submitted under the native contract; use the copilot-cli backend for real migrations. Static profiles do not verify this host. Before native execution, verify per-call model selection, execution-bound model metadata, tools, dispatch and cancellation on the installed host. Do not echo requested models or silently fall back to CLI.' });
   if (checkCLI && !native) {
     try {
       // Same environment as workers: a launcher may pick a different build otherwise.

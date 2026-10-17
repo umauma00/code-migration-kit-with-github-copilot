@@ -27,7 +27,9 @@ Anthropicの[Code Migration Kit](https://github.com/anthropics/code-migration-ki
 | VS Code | Copilotは共通スキル、Localは10工程のprompt filesとLocal用hooksを利用 |
 | Dynamic Workflows | 共通実行エンジンを使う任意の実験的アダプター |
 
-## VS Code内でサブエージェントを使う
+## VS Code内でサブエージェントを使う（実験的）
+
+> **実験的機能・最後まで完了できません。** native方式の手順は、提出前に「ホストが実際に使ったモデル」を確認することを求めます。しかしVS Codeはサブエージェントの実行モデルを親エージェントに返さないため、手順どおりに進めると全ジョブが失敗になります。VS Codeでも、既定のCLIワーカー方式（`copilot-cli`）を使ってください。親エージェントがターミナルでrunnerを動かし、runnerがCopilot CLIのワーカーを起動します。
 
 `workerBackend: "native"` を選ぶと、現在のVS Codeセッションの親エージェントが
 実装・レビュー・裁定・修正をサブエージェントへ委譲します。Copilot CLIは起動しません。
