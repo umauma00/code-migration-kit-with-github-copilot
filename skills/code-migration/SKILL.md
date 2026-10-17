@@ -60,7 +60,8 @@ for review; they do not route directly to a later phase. Respect redesign mode.
 
 Before routing a configured project, run `run_migration.mjs phase init`, then
 `phase next`. Follow [ordered workflow](../../docs/ORDERED-WORKFLOW.md).
-Run only the first incomplete phase; use `phase start ID` before work. An explicit
+Run only the first incomplete phase; use `phase start ID` before work. Phases
+03/04 need human-installed `migration/guardrails.json`; ask the human, never create it. An explicit
 request for a later phase does not waive missing earlier reviews. Do not route
 from file existence. After user review, record early phases with `phase complete
 ID --note TEXT`; runner receipts determine implementation and validation phases.

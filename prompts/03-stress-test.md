@@ -3,6 +3,13 @@
 Read [phase reports and user decisions](../docs/PHASE-HANDOFF.md).
 End with its report; ask for the next decision only when needed.
 
+Command guardrails: `phase start 03` refuses to start until the human has copied
+`templates/guardrails.json` to `migration/guardrails.json` (adapted to this target) or
+recorded a waiver there. Never create, edit or relax that file yourself: installing it is
+the human's act, because that is when they decide the referee price. If a guardrail
+denies a command, that is the design working; report it instead of routing around it.
+Run `doctor` and confirm `repository hooks load in Copilot CLI` is not failing.
+
 Prerequisite: reviewed rulebook, map, inventory and judge. Produce
 `migration/stress-test/report.md`; the user reviews it before translation.
 

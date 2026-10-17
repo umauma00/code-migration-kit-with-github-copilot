@@ -163,6 +163,8 @@ JSON形式は `{"schemaVersion":1,"dependencies":{"src/a.py":["src/b.py"],"src/b
 
 ## 工程を進める
 
+03の前に、`templates/guardrails.json`（コピー導入では `migration-kit/templates/guardrails.json`）を `migration/guardrails.json` へコピーし、対象言語のビルド・テストコマンドに合わせて編集してください。上流の `.claude/settings.json` の deny ルールに相当し、hookがすべてのエージェントの該当シェルコマンドを拒否します。runnerが実行するbuild等は対象外です。`phase start 03` / `04` は、このファイル（または免除の記録）がないと停止します。エージェントは作成しません。コピー導入方式のhookは、Copilot CLIで信頼済みのフォルダでしか読み込まれません。`doctor` で確認してください。
+
 Copilotに該当プロンプトを読ませ、各工程の成果物を確認します。VS Codeの **Local** では、対応する `/migrate-…` のprompt fileを使えます。
 
 VS Codeの **Copilot（Agent Host）** はprompt filesを読み込みません。既存の共通スキル `/code-migration` を呼び出し、「比較器の設計を進める」など、下表の工程を指定してください。スキルは全工程のプロンプトへリンクしており、工程別スキルの追加は不要です。Local用の10個の `/migrate-…` コマンドは、この実行方式では登録されません。

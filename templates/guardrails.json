@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "notes": "Copy to migration/guardrails.json before phase 03 (the human's act, never an agent's). Replace the build/test entries with this target's commands. Each entry denies a command that starts with these words in any agent session. To dissolve Step 4 for a cheap typecheck, remove its entry at a gate. The runner's own build/test commands are not affected.",
+  "denyCommands": [
+    "git rebase", "git reset", "git checkout", "git stash", "git push", "git commit",
+    "git merge", "git switch", "git restore", "git clean",
+    "cargo build", "cargo check", "cargo test", "cargo run",
+    "npm test", "npx tsc", "make", "cmake",
+    "javac", "mvn", "gradle", "gradlew", "pytest", "python -m pytest", "python3 -m pytest"
+  ]
+}

@@ -2,8 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-export function decide(event, role) {
-  if (!role) return null;
+import { guardrailDecision } from '../lib/guardrails.mjs';
+export function decide(event, role, cwd) {
+  // Interactive sessions are restricted only by the human-installed guardrails.
+  if (!role) return guardrailDecision(event, cwd);
   if (role.startsWith('reviewer-')) return 'Independent reviewers have no tools; use only the supplied frozen input.';
   const name = event.toolName ?? event.tool_name;
   if (!name) return 'Malformed hook event: tool name missing';

@@ -10,13 +10,15 @@ import { approve, runStage, translate } from '../lib/pipeline.mjs';
 import { phaseCommand } from '../scripts/phase_cli.mjs';
 import { migrationStatus } from '../lib/status.mjs';
 import { costHeader } from '../lib/cost.mjs';
-import { install } from '../scripts/install.mjs';
+import { install, kitRoot } from '../scripts/install.mjs';
 import { runProcess } from '../lib/process.mjs';
 
 function fixture(t, mode = 'runtime') {
   const f = prepare(t);
   Object.assign(f.config,{phasePolicy:'strict',verificationMode:mode});
   writeJSON(safePath(f.root,'migration/config.json'),f.config);
+  // The human-installed command guardrails that phases 03/04 require.
+  fs.copyFileSync(path.join(kitRoot,'templates/guardrails.json'),safePath(f.root,'migration/guardrails.json'));
   atomicWrite(safePath(f.root,'migration/judge-report.md'),'Reviewed public arithmetic scenarios, commands, normalization and limitations.');
   atomicWrite(safePath(f.root,'migration/depmap/report.md'),'Audited parser coverage, isolated files and source dependency map.');
   atomicWrite(safePath(f.root,'migration/gap-report.md'),'Audited floor division, Unicode semantics and inventory coverage.');
@@ -131,4 +133,21 @@ test('failed worker logs actual calls and unknown usage, not unused reservations
   await preparation(f);
   await assert.rejects(translate(f.root,f.config,c=>{if(c.role==='reviewer-semantics')throw new Error('Review transport failed');return fake(c);}),/transport failed/);
   assert.deepEqual(rows(f.root).findLast(r=>r[0]==='04').slice(3),['unknown','2','unknown']);
+});
+
+test('phases 03 and 04 refuse to start without human-installed guardrails or a recorded waiver',async t=>{
+  const f=fixture(t),file=safePath(f.root,'migration/guardrails.json');
+  for(const id of ['00','00b','01','02']) complete(f,id);
+  await runStage(f.root,f.config,'judge');
+  fs.rmSync(file);
+  assert.throws(()=>phaseCommand(f.root,f.config,'start','03'),/requires human-installed command guardrails/);
+  writeJSON(file,{schemaVersion:1,denyCommands:[]});
+  assert.throws(()=>phaseCommand(f.root,f.config,'start','03'),/deny nothing and record no waiver/);
+  fs.writeFileSync(file,'{not json');
+  assert.throws(()=>phaseCommand(f.root,f.config,'start','03'),/guardrails are invalid/);
+  writeJSON(file,{schemaVersion:1,waiver:{note:'Human accepted: disposable sandbox run'}});
+  assert.equal(phaseCommand(f.root,f.config,'start','03').phase,'03');
+  phaseCommand(f.root,f.config,'complete','03',{note:'Reviewed fixture stress evidence'});
+  fs.rmSync(file);
+  assert.throws(()=>phaseCommand(f.root,f.config,'start','04'),/Phase 04 requires human-installed/);
 });

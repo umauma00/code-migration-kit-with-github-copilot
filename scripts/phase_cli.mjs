@@ -3,6 +3,7 @@ import { lockRun, contextHash, readManifest, done } from '../lib/core.mjs';
 import { currentRecord, requireGate } from '../lib/pipeline.mjs';
 import { initializePhases, checkPreparation, startPhase, completePhase, requirePhase } from '../lib/phases.mjs';
 import { migrationStatus } from '../lib/status.mjs';
+import { requireGuardrails } from '../lib/guardrails.mjs';
 
 function validate(root, config, phase, completing = false) {
   checkPreparation(root, config, phase);
@@ -13,6 +14,8 @@ function validate(root, config, phase, completing = false) {
     if (stage !== 'judge') requireGate(root, config, stage, context);
   };
   if (phase === '03' || phase === '04') record('judge');
+  // Upstream: no stress test or fan-out until the human installed the denies.
+  if ((phase === '03' || phase === '04') && !completing) requireGuardrails(root, phase);
   if (['05','05b','05c','06'].includes(phase)) {
     const units = readManifest(root, config);
     if (!units.length || !units.every(u => done(root, u, context))) throw new Error('Current reviewed translation units are required');

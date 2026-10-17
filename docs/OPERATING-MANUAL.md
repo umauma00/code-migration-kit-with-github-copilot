@@ -48,6 +48,9 @@ does not apply to automated workers, which keep their JSON-only contracts.
 7. Only the coordinator runs configured commands. Expensive builds and suites
    run once per round. A configured cheap unit typecheck may run inside the loop.
    A unit is one source file to one target file in this version.
+   From phase 03, human-installed `migration/guardrails.json` denies destructive
+   git and expensive build/test commands to every agent session through the
+   preToolUse hook. Agents never install, edit or route around it.
 8. Report requested model, timing and observed usage when available. Unknown
    usage/model fields stay null; never invent measurements. Set each worker model
    explicitly in config. The runner rejects profile-level model overrides.

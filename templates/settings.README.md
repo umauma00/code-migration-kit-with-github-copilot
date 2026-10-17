@@ -43,3 +43,17 @@ outside outputRoots (which describe translated source). Keep old source and
 judge files under version control. No worker may change its own grader.
 
 <!-- Copilot adaptation: migration control and instructions updated on 2026-10-08; see NOTICE. -->
+
+## Command guardrails (upstream settings.json denies)
+
+Copilot has no repository setting that denies shell commands. The upstream
+`.claude/settings.json` deny list is therefore `templates/guardrails.json`,
+copied by the human to `migration/guardrails.json` before phase 03 and adapted
+to the target's build/test commands. The preToolUse hook denies matching shell
+commands (Copilot CLI `bash`, VS Code `run_in_terminal`) in every agent session;
+the runner's own build/test/typecheck processes are not tool calls and are not
+affected. `phase start 03|04` refuses to start without the file or a recorded
+waiver. To dissolve Step 4 for a cheap typecheck, the human removes that entry
+at a gate. Copilot CLI loads repository hooks only in trusted folders, so
+`doctor` fails when guardrails are installed in an untrusted folder; plugin
+hooks load regardless. Like upstream, this is a guardrail, not a security boundary.

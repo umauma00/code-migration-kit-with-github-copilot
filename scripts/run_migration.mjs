@@ -13,6 +13,7 @@ import { runtimeLayout } from '../lib/runtime.mjs';
 import { migrationStatus, statusMarkdown } from '../lib/status.mjs';
 import { createNativeAdapter } from '../lib/native-workers.mjs';
 import { phaseCommand } from './phase_cli.mjs';
+import { readGuardrails, cliFolderTrust } from '../lib/guardrails.mjs';
 
 export const usage = `Usage: node migration-kit/scripts/run_migration.mjs COMMAND [options]
   doctor [--check-cli] [--copilot /path/to/copilot]
@@ -52,6 +53,17 @@ export async function doctor(root, config, { checkCLI = false, command = 'copilo
   } catch (e) { checks.push({ check: 'review dependency map', ok: false, detail: e.message }); }
   checks.push({ check: 'build artifact roots', ok: true, roots: config.buildArtifactRoots ?? [], note: 'Declare generated binaries, objects and reports here. Their file contents are excluded from command-input fingerprints; actual inputs must stay outside these roots.' });
   if (!native) checks.push({ check: 'worker hook installed', ok: fs.existsSync(safePath(layout.root, layout.hookPath)) });
+  let guardrails = null, guardrailError;
+  try { guardrails = readGuardrails(root); } catch (e) { guardrailError = e.message; }
+  checks.push({ check: 'command guardrails', ok: !guardrailError,
+    status: guardrailError ? 'invalid' : !guardrails ? 'not installed' : guardrails.denyCommands.length ? 'installed' : guardrails.waiver ? 'waived' : 'empty',
+    ...(guardrailError ? { detail: guardrailError } : {}), note: 'Phases 03/04 require migration/guardrails.json, copied by the human from templates/guardrails.json (or a recorded waiver).' });
+  if (!native && !layout.plugin) {
+    // Repository hooks (worker backstop and guardrails) load only in a trusted folder.
+    const trust = cliFolderTrust(root);
+    checks.push({ check: 'repository hooks load in Copilot CLI', ok: !(trust === 'untrusted' && guardrails?.denyCommands.length), status: trust,
+      note: 'Copilot CLI ignores .github/hooks in untrusted folders, silently disabling the guardrails. Start copilot interactively in this repository once and trust the folder.' });
+  }
   if (native) checks.push({ check: 'native host capabilities', ok: null, status: 'unknown', harness: config.nativeHarness,
     capabilities: Object.fromEntries(['modelSelection', 'modelExecutionEvidence', 'toolRestrictions', 'instructionIsolation', 'parallelDispatch', 'completionEvents', 'childCancellation'].map(name => [name, 'unknown'])),
     note: 'Static profiles do not verify this host. Before native execution, verify per-call model selection, execution-bound model metadata, tools, dispatch and cancellation on the installed host. Do not echo requested models or silently fall back to CLI.' });
