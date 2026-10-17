@@ -11,7 +11,7 @@ import { preparePilot } from '../lib/pilot.mjs';
 import { createCopilotAdapter, requiredCopilotFlags, copilotEnv, probeWorkerAgents } from './copilot_adapter.mjs';
 import { runtimeLayout } from '../lib/runtime.mjs';
 import { migrationStatus, statusMarkdown, statusTodo, statusChecklist } from '../lib/status.mjs';
-import { failureGuidance, guidanceMarkdown } from '../lib/guidance.mjs';
+import { failureGuidance, guidanceMarkdown, failureGuidanceList, guidanceListMarkdown, doctorGuidance } from '../lib/guidance.mjs';
 import { initSourceSpec, sourceSpecReadiness } from '../lib/source-spec.mjs';
 import { createNativeAdapter } from '../lib/native-workers.mjs';
 import { phaseCommand } from './phase_cli.mjs';
@@ -25,7 +25,8 @@ export const usage = `Usage: node migration-kit/scripts/run_migration.mjs COMMAN
                               Read-only evidence; todo = host task-list items, checklist = chat progress
   guidance --message TEXT [--format json|markdown]
                               Explain a failure: cause, impact and choices with a recommendation
-  preferences [--language ja|en]   Show or set the language of user-facing reports
+  preferences [--language ja|en] [--original-runtime available|unavailable]
+                              Report language; whether the original can still run (guides recommendations)
   phase init | next | check ID | start ID | complete ID[,ID...] --note TEXT
                               Ordered workflow; optional --tokens N --subagents N --model ID
   source-spec init [--apply] | check
@@ -103,8 +104,10 @@ export async function doctor(root, config, { checkCLI = false, command = 'copilo
   if (!native && !layout.plugin) {
     // Repository hooks (worker backstop and guardrails) load only in a trusted folder.
     const trust = cliFolderTrust(root);
-    checks.push({ check: 'repository hooks load in Copilot CLI', ok: !(trust === 'untrusted' && guardrails?.denyCommands.length), status: trust,
-      note: 'Copilot CLI ignores .github/hooks in untrusted folders, silently disabling the guardrails. Start copilot interactively in this repository once and trust the folder.' });
+    // The hook also asks before approvals and denies guardrails edits, so an
+    // untrusted folder disables protections even before guardrails exist.
+    checks.push({ check: 'repository hooks load in Copilot CLI', ok: trust !== 'untrusted', status: trust,
+      note: 'Copilot CLI ignores .github/hooks in untrusted folders, silently disabling the guardrails, the approval confirmations and the guardrails-file protection. Start copilot interactively in this repository once and trust the folder.' });
   }
   const unverifiedModels = native && nativeModelVerification(config) === 'requested-unverified';
   if (unverifiedModels) checks.push({ check: 'native model verification', ok: true, status: 'requested-unverified',
@@ -150,7 +153,7 @@ export async function main(argv = process.argv.slice(2)) {
     fs.unlinkSync(file); console.log('Removed stale migration lock'); return;
   }
   if (cmd === 'preferences') {
-    console.log(JSON.stringify(args.language ? setPreferences(root, { language: args.language }) : preferencesReport(root), null, 2));
+    console.log(JSON.stringify(args.language || args['original-runtime'] ? setPreferences(root, { language: args.language, originalRuntime: args['original-runtime'] }) : preferencesReport(root), null, 2));
     return;
   }
   let language = 'en';
@@ -159,7 +162,11 @@ export async function main(argv = process.argv.slice(2)) {
     if (args.format && !['json', 'markdown', 'todo', 'checklist'].includes(args.format)) throw new Error('status format must be json, markdown, todo or checklist');
     const report = migrationStatus(root);
     if (!report.ok) process.exitCode = 1;
-    console.log(args.format === 'markdown' ? `${statusChecklist(report, language)}\n\n${statusMarkdown(report, language)}`
+    // Problems that need the person's decision: blocked units and unreadable state.
+    const problems = !report.ok ? [{ targets: [report.blockers[0]?.path].filter(Boolean), guidance: failureGuidance(report.blockers[0]?.reason ?? 'status failed', { root, language }) }]
+      : report.units.some(u => u.status === 'blocked' && u.reason) ? failureGuidanceList(`Translation stopped: ${report.units.filter(u => u.status === 'blocked' && u.reason).map(u => `${u.target}: ${u.reason}`).join('; ')}`, { root, language }) : [];
+    const actions = problems.length ? `\n\n${guidanceListMarkdown(problems, language)}` : '';
+    console.log(args.format === 'markdown' ? `${statusChecklist(report, language)}\n\n${statusMarkdown(report, language)}${actions}`
       : args.format === 'checklist' ? statusChecklist(report, language)
       : args.format === 'todo' ? JSON.stringify(statusTodo(report, language), null, 2) : JSON.stringify(report, null, 2));
     return;
@@ -201,7 +208,15 @@ export async function main(argv = process.argv.slice(2)) {
     else if (cmd === 'source-spec') throw new Error('Use source-spec init [--apply] | check');
     else if (cmd === 'judge-prepare') result = await runJudgePreparation(root, config, { signal: controller.signal });
     else if (cmd === 'phase') result = phaseCommand(root,config,args._[1],args._[2],args);
-    else if (cmd === 'doctor') { result = await doctor(root, config, { checkCLI: args['check-cli'], command: args.copilot }); if (!result.ok) process.exitCode = 1; }
+    else if (cmd === 'doctor') {
+      result = await doctor(root, config, { checkCLI: args['check-cli'], command: args.copilot });
+      if (!result.ok) {
+        process.exitCode = 1;
+        // Failed checks are results, not exceptions: explain them the same way.
+        const list = doctorGuidance(result, { root, language });
+        if (list.length) console.error(guidanceListMarkdown(list, language));
+      }
+    }
     else if (cmd === 'approve') result = approve(root, config, args._[1], args.note, { batch: args.batch, targets: args.targets?.split(',') });
     else if (['judge', 'build', 'smoke', 'parity', 'handoff'].includes(cmd)) result = await runStage(root, config, cmd, { signal: controller.signal });
     else if (['translate', 'repair'].includes(cmd)) {
@@ -224,7 +239,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.ar
       const root = fs.realpathSync(path.resolve(parseArgs(process.argv.slice(2)).root ?? '.'));
       let language = 'en';
       try { language = readPreferences(root).userLanguage ?? 'en'; } catch {}
-      console.error(`\n${guidanceMarkdown(failureGuidance(e, { root, language }), language)}`);
+      console.error(`\n${guidanceListMarkdown(failureGuidanceList(e, { root, language }), language)}`);
     } catch {}
     process.exitCode = 1;
   });

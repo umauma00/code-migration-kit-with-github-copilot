@@ -33,9 +33,13 @@ and next-instruction example in that language, and link the matching documents:
 initialization, ask the language together with the model and migration
 languages and pass `--language ja|en` to the installer.
 
-If migration/config.json is missing, ask for the user's available model ID and
+If migration/config.json is missing, ask for the user's available model IDs and
 migration languages, then choose the initialization command for the current host
-(reuse any explicit execution preference):
+(reuse any explicit execution preference). Offer the upstream model plan: tier by
+blast radius — reviewers on the largest or a mid model, high-volume implementers
+on a mid or small model, fixers and the arbiter on a mid model — and pass it as
+`--models implementer=ID,reviewers=ID,arbiter=ID,fixer=ID` (with `--model` as the
+default for unlisted roles). The user decides the plan:
 
 - VS Code and Copilot CLI: `node "<absolute-plugin-root>/scripts/install.mjs" --target . --layout plugin --worker-backend copilot-cli --model MODEL_ID`.
 - VS Code only, without the Copilot CLI (the user's choice after you state that executed models stay unverified, see below): replace the backend with `--worker-backend native --native-harness copilot`; the installer records `nativeModelVerification: requested-unverified`. VS Code Local native requires the repository-copy layout described in [native workers](../../docs/NATIVE-WORKERS.md).
@@ -75,7 +79,9 @@ for review; they do not route directly to a later phase. Respect redesign mode.
 Before choosing a verification mode (at initialization, and whenever runtime 00b
 blocks), ask two questions with the question tool: can the original
 implementation still run here, and does a specification or portable test suite
-exist? If both answers are no, recommend [source as the only specification](../../docs/SOURCE-AS-SPEC.md)
+exist? Record the first answer with `run_migration.mjs preferences --original-runtime
+available|unavailable` (presentation only; failure guidance uses it to pick its
+recommendation). If both answers are no, recommend [source as the only specification](../../docs/SOURCE-AS-SPEC.md)
 (`--preparation-profile source-as-spec` for a new project, `source-spec init`
 then `--apply` after consent for an existing one) and explain that equivalence
 stays unverified; if the original runs, recommend runtime. The user chooses.
@@ -96,8 +102,11 @@ Never choose on the user's behalf or offer routing around a guardrail.
 
 Before routing a configured project, run `run_migration.mjs phase init`, then
 `phase next`. Follow [ordered workflow](../../docs/ORDERED-WORKFLOW.md).
-Run only the first incomplete phase; use `phase start ID` before work. Phases
-03/04 need human-installed `migration/guardrails.json`; ask the human, never create it. An explicit
+Run only the first incomplete phase; use `phase start ID` before work. For 03,
+work through and show the [one-page checklist](../../docs/STRESS-TEST-CHECKLIST.md). Phases
+03/04 need human-installed `migration/guardrails.json`; ask the human, never create it
+(the hook denies agent edits of it). The host asks the person to confirm every
+`approve` / `phase complete` command; if it cannot ask, hand them the command to run. An explicit
 request for a later phase does not waive missing earlier reviews. Do not route
 from file existence. After user review, record early phases with `phase complete
 ID --note TEXT`; runner receipts determine implementation and validation phases.

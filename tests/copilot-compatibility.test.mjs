@@ -175,7 +175,8 @@ test('C2: changed invalid evidence is rejected before another model call', async
   const f = await ready(t), calls = [];
   await assert.rejects(translate(f.root, f.config, args => {
     calls.push(args.role);
-    if (args.role.startsWith('reviewer-')) return { result: result(args.role, args.unit, { findings: [finding] }) };
+    // Different source locations: a disputed pair, so the arbiter is consulted.
+    if (args.role.startsWith('reviewer-')) return { result: result(args.role, args.unit, { findings: [args.role === 'reviewer-rules' ? { ...finding, evidence: 'src/math_ops.py:2 import naming' } : finding] }) };
     if (args.role === 'arbiter') write(f, args.unit.source, Buffer.from([255]));
     return fake(args);
   }), /valid UTF-8|Migration inputs changed during worker invocation/);

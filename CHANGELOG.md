@@ -1,5 +1,25 @@
 # Unreleased
 
+- Upstream fidelity: phase 02 refuses untouched RULEBOOK/inventory templates;
+  findings both reviewers raise at the same source line are agreed and skip the
+  arbiter (upstream: a third rules only on disagreements); a failing in-loop
+  typecheck becomes a confirmed finding for the fixer; `install.mjs --models`
+  maps the upstream model plan per role.
+- Human gates: the hook denies agent edits of `migration/guardrails.json` and
+  asks the person to confirm `approve`, `phase complete`, `pilot prepare` and
+  `source-spec init --apply` (verified on Copilot CLI 1.0.98: non-interactive
+  sessions refuse them with "unable to ask user for confirmation").
+- Parallel resilience: rate-limit/5xx/network failures retry with backoff; a
+  unit failure blocks only that unit and its dependents; systemic failures and
+  `maxConsecutiveFailures` stop the run.
+- Progress: run summaries record startedAt/unitsCompleted; status estimates the
+  remaining time, calls and input, and names the current phase's waiting state.
+- Failure guidance for doctor checks and blocked units in status, one section
+  per distinct cause, and a 00b recommendation that follows
+  `preferences --original-runtime`.
+- Phase 01: parse Python from the import base (`make_manifest.py --prefix`);
+  an all-empty dependency map needs `--confirm-no-dependencies`. One-page phase
+  03 checklist. The test runner uses a hermetic COPILOT_HOME.
 - Review fixes: failure guidance no longer routes file or diagnostic errors
   containing ENOENT/401/login to CLI install or sign-in, never pre-fills review
   notes, and offers the 00b–02 bundle only in source-as-spec; `phase complete

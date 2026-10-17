@@ -31,6 +31,8 @@ does not apply to automated workers, which keep their JSON-only contracts.
 3. Complete one phase, report the evidence, then stop. The user's explicit next
    phase invocation authorizes that phase. Never self-issue `approve` without the
    user asking you to approve the concrete artifacts. Approval is bound to hashes.
+   The hook asks the person to confirm approval and phase-completion commands
+   and denies agent edits of `migration/guardrails.json`.
 4. Translate through the runner. CLI implementers, fixers and arbiters use read/search
    tools; native host workers all use tools: [] with self-contained inputs.
    Reviewers have no tools and receive the same frozen input; when it exceeds
@@ -42,8 +44,10 @@ does not apply to automated workers, which keep their JSON-only contracts.
    adherence. The runner supplies source files, candidate, rules, inventory and
    any diagnostic; reviewer profiles must keep `tools: []` (the `-read` twins keep
    read/search tools only). They never receive
-   each other's findings. An arbiter confirms or
-   rejects disputed findings with evidence. Fix only confirmed findings and
+   each other's findings. Findings both reviewers raise at the same source
+   path:line are agreed; an arbiter confirms or rejects the disputed rest with
+   evidence, defaulting to not confirmed. A failing in-loop typecheck is a
+   confirmed finding for the fixer. Fix only confirmed findings and
    review the changed output again. Do not weaken tests to clear a queue.
 6. Disk receipts, not conversation memory or file existence, determine completion.
    The receipt binds the input context, output hash and review evidence. Existing

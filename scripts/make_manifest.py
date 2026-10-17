@@ -19,6 +19,10 @@ Usage:
   python3 make_manifest.py --order migration/depmap/order.txt \
       --out migration/manifest.tsv --sub 'src_prefix=dst_prefix' --sub '.py=.ts'
 
+  When the parser ran with --root src, its paths are relative to src; add
+  --prefix src/ so manifest sources stay repository-relative. When it ran
+  from the repository root, --include src/ keeps only the source roots.
+
 Test: python3 scripts/make_manifest.py --order fixtures/python/expected_order.txt --out /tmp/manifest.tsv --sub 'pkg/=ts/' --sub '.py=.ts' && diff /tmp/manifest.tsv fixtures/python/expected_manifest.tsv
 """
 
@@ -35,6 +39,9 @@ def main():
                     help="manifest TSV to write (header: source\\ttarget)")
     ap.add_argument("--sub", action="append", default=[], metavar="OLD=NEW",
                     help="substitution old=new, repeatable, applied in order")
+    ap.add_argument("--prefix", default="", metavar="DIR/",
+                    help="prepend to every order.txt path; use when the parser ran with "
+                         "--root DIR so its paths are relative to DIR")
     ap.add_argument("--include", action="append", default=[], metavar="DIR/",
                     help="keep only sources under these directories (repeatable); "
                          "use when the parser walked more than the source roots")
@@ -55,6 +62,8 @@ def main():
         for source in line.split("\t"):
             if not source:
                 continue
+            if args.prefix:
+                source = args.prefix.rstrip("/") + "/" + source
             if args.include and not any(source.startswith(p.rstrip("/") + "/") for p in args.include):
                 continue
             target = source
