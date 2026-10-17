@@ -2,6 +2,7 @@
 name: code-migration-plugin-native-fixer
 description: Apply only confirmed findings and return the complete corrected target file as JSON.
 tools: []
+user-invocable: false
 ---
 
 Apply only confirmed findings and return the complete corrected target file as JSON.

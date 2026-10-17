@@ -2,6 +2,7 @@
 name: migration-native-implementer
 description: Translate the supplied source faithfully and return the complete target file as JSON.
 tools: []
+user-invocable: false
 ---
 
 Translate the supplied source faithfully and return the complete target file as JSON.

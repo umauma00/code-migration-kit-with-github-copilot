@@ -99,6 +99,8 @@ today. Preserve existing config; changing backend requires fresh judge
 validation and translation approval, not a silent switch during a run.
 
 When config.workerBackend is native, follow [native workers](../../../docs/NATIVE-WORKERS.md).
+First confirm doctor's `native host requirements` with the user (VS Code 1.117+,
+`chat.customAgentInSubagent.enabled`, models allowed for subagents).
 Keep the runner active in a continuing terminal, claim pending jobs, delegate
 the exact prompt to the named tool-free host subagent with the requested model,
 and submit unchanged results. Dispatch independent jobs in parallel within the

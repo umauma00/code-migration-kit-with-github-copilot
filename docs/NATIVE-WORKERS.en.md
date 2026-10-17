@@ -62,6 +62,15 @@ After updating the kit, restart the chat to load the new profiles. Repository co
 
 Native `doctor` does not start the CLI and checks the dedicated profiles, even with `--check-cli`. Profile resolution on the host, model availability and actual tool restrictions are not guaranteed by checks run from Node.
 
+### VS Code prerequisites
+
+Confirm these in VS Code before the first native run (`doctor` lists them under `native host requirements`; Node cannot read VS Code settings):
+
+- VS Code 1.117 or later. From that release `runSubagent` accepts a per-call model; the model is chosen in this order: the per-call model, the profile's `model` frontmatter, then the parent conversation's model. The kit always uses the per-call model, so its profiles carry no `model`.
+- `chat.customAgentInSubagent.enabled` is on. Without it the dedicated native profiles cannot run as subagents.
+- The requested models are allowed for subagents on this account; some models are not.
+- The worker profiles have `user-invocable: false`, so they stay out of the agent picker. The CLI worker profiles also have `disable-model-invocation: true`, so a parent never calls them as subagents; the native profiles stay callable because the parent dispatches them.
+
 ### Selecting and confirming the model
 
 On Local, use `runSubagent`'s model argument; on Copilot, use the per-call model argument of the delegation tool the host exposes. Writing a model name into the prompt is no substitute. On a host without per-call selection, report the job as failed. Per-call selection is documented in [VS Code Local's selection order](https://code.visualstudio.com/docs/agents/run/subagents#select-the-model-for-a-subagent) and [the Copilot runtime's selection order](https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-command-reference#custom-agent-frontmatter-fields). Project-specific models do not need to be baked into the shared plugin profiles.

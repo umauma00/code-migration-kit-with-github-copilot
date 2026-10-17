@@ -246,14 +246,14 @@ test('R7: installed runtime advertises only executable checks; missing tests can
   assert.notEqual(zero.code, 0); assert.match(zero.stderr, /No test files/);
 });
 
-test('C1: snake_case CLI events still return top-level denial; Local template exposes both consumers decisions', async t => {
+test('C1: every hook denial carries both the CLI top-level and the VS Code hookSpecificOutput decision', async t => {
   const f = prepare(t);
   const event = JSON.stringify({ hook_event_name: 'PreToolUse', tool_name: 'bash', tool_input: {} });
   for (const local of [false, true]) {
     const r = await node([path.join(kitRoot, 'scripts/migration_hook.mjs'), ...(local ? ['--vscode'] : [])], { cwd: f.root, input: event, env: { ...process.env, MIGRATION_KIT_ROLE: 'implementer' } });
     assert.equal(r.code, 0); const d = JSON.parse(r.stdout);
     assert.equal(d.permissionDecision, 'deny');
-    if (local) assert.equal(d.hookSpecificOutput.permissionDecision, 'deny');
-    else assert.equal(d.hookSpecificOutput, undefined);
+    assert.equal(d.hookSpecificOutput.permissionDecision, 'deny');
+    assert.equal(d.hookSpecificOutput.hookEventName, 'PreToolUse');
   }
 });

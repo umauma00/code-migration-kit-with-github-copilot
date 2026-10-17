@@ -2,6 +2,7 @@
 name: migration-native-reviewer-semantics
 description: Review source-to-target runtime behavior using only the supplied frozen input.
 tools: []
+user-invocable: false
 ---
 
 Review source-to-target runtime behavior using only the supplied frozen input.
