@@ -71,9 +71,10 @@ Read [usage](../README.md), [contracts](CONTRACTS.md) and
 [permissions](../templates/settings.README.md) before a production run.
 The CLI worker backend (`copilot-cli`) is the default automated path in VS Code
 as well: the parent runs the runner in a terminal and the runner starts Copilot
-CLI workers. `workerBackend: native` is EXPERIMENTAL and cannot complete today
-(VS Code does not return the executed subagent model); choose it only on the
-user's explicit request and follow [native workers](NATIVE-WORKERS.md). The same
+CLI workers. For VS Code without the Copilot CLI, the user may choose
+`workerBackend: native` with `nativeModelVerification: requested-unverified`,
+which records every executed model as unverified; follow [native workers](NATIVE-WORKERS.md).
+`host-metadata` remains experimental and cannot complete on VS Code. The same
 runner owns validation, writes, receipts and gates. Host-managed instruction
 isolation is recorded and is not equivalent to the CLI's isolation.
 Use the shared skill with Copilot, or the skill/phase prompt files with Local.

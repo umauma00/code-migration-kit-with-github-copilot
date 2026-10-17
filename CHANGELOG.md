@@ -1,5 +1,10 @@
 # Unreleased
 
+- Run the native backend inside VS Code only: `nativeModelVerification:
+  requested-unverified` (the default for new native installs) accepts results
+  submitted with the requested model and records the executed model as
+  unverified in attempts, run summaries, status and doctor. `host-metadata`
+  keeps the previous experimental contract; copilot-cli stays the default.
 - Add the source-as-spec preparation profile for projects without a runnable
   original or a specification: `source-spec init|check` scaffolds source-only
   preparation from every source file, 00b refuses unfilled `TODO(spec)` contracts,

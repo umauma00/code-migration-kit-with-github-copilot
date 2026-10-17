@@ -27,9 +27,15 @@ Following reviews 1 and 2, this version adds [isolated pilots](docs/PILOT.md) be
 | VS Code | Copilot uses the shared skill; Local uses the ten phase prompt files and Local hooks |
 | Dynamic Workflows | Optional experimental adapter on the same execution engine |
 
-## Using subagents inside VS Code (experimental)
+## Running inside VS Code only (native backend, executed model unverified)
 
-> **Experimental and cannot complete today.** The native procedure requires the parent to confirm, before submitting each job, which model the host actually ran. VS Code does not return the subagent's executed model to the parent, so following the procedure fails every job. In VS Code too, use the default CLI worker backend (`copilot-cli`): the parent runs the runner in a terminal and the runner starts Copilot CLI workers.
+To work in VS Code without installing the Copilot CLI, choose the native backend. New native installations get `nativeModelVerification: "requested-unverified"`: the parent passes the requested model to the subagent call's model parameter and submits the result. VS Code does not return the model a subagent **actually ran**, so every attempt record, run summary, status and doctor report says the executed model is unverified.
+
+```bash
+node /path/to/code-migration-kit/scripts/install.mjs --target . --layout plugin --worker-backend native --native-harness copilot --model MODEL_ID --apply
+```
+
+When the Copilot CLI is available, the default CLI worker backend (`copilot-cli`) is still recommended: each worker is a process fixed by `--model`, and implicit-instruction isolation is verified on a real CLI. The previous contract that requires host execution metadata is available as `--native-model-verification host-metadata`; it is experimental and cannot complete on VS Code.
 
 With `workerBackend: "native"`, the parent agent of the current VS Code session delegates implementation, review, arbitration and fixing to subagents, and the Copilot CLI is not started. The Node runner issues jobs and the parent submits results; validation, writes, approvals and resumption are shared with the CLI backend. Initialize with `--worker-backend native`. Local supports the repository copy; Copilot (Agent Host) supports the plugin or the copy. See [VS Code native workers](docs/NATIVE-WORKERS.en.md).
 

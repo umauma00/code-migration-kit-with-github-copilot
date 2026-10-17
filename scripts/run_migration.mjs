@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { lockRun, loadConfig, readManifest, contextHash, unitState, done, safePath, readJSON, parseArgs, verificationFiles, loadReviewDependencies, reviewSources } from '../lib/core.mjs';
+import { lockRun, loadConfig, nativeModelVerification, readManifest, contextHash, unitState, done, safePath, readJSON, parseArgs, verificationFiles, loadReviewDependencies, reviewSources } from '../lib/core.mjs';
 import { validateWorkerProfile, validateNativeProfile, assistedReviewerRoles } from '../lib/review.mjs';
 import { runProcess } from '../lib/process.mjs';
 import { approve, runStage, translate, runPilot, runJudgePreparation } from '../lib/pipeline.mjs';
@@ -76,8 +76,11 @@ export async function doctor(root, config, { checkCLI = false, command = 'copilo
     checks.push({ check: 'repository hooks load in Copilot CLI', ok: !(trust === 'untrusted' && guardrails?.denyCommands.length), status: trust,
       note: 'Copilot CLI ignores .github/hooks in untrusted folders, silently disabling the guardrails. Start copilot interactively in this repository once and trust the folder.' });
   }
-  if (native) checks.push({ check: 'native host capabilities', ok: null, status: 'unknown', experimental: true, harness: config.nativeHarness,
-    capabilities: Object.fromEntries(['modelSelection', 'modelExecutionEvidence', 'toolRestrictions', 'instructionIsolation', 'parallelDispatch', 'completionEvents', 'childCancellation'].map(name => [name, 'unknown'])),
+  const unverifiedModels = native && nativeModelVerification(config) === 'requested-unverified';
+  if (unverifiedModels) checks.push({ check: 'native model verification', ok: true, status: 'requested-unverified',
+    note: 'VS Code-only mode: the parent passes each requested model to the host\'s per-call model parameter and submits; the executed model is recorded as unverified in every attempt, run summary and report. Use host-metadata (or the copilot-cli backend) when observed models are required.' });
+  if (native) checks.push({ check: 'native host capabilities', ok: null, status: 'unknown', experimental: !unverifiedModels, harness: config.nativeHarness,
+    capabilities: Object.fromEntries(['modelSelection', 'modelExecutionEvidence', 'toolRestrictions', 'instructionIsolation', 'parallelDispatch', 'completionEvents', 'childCancellation'].map(name => [name, unverifiedModels && name === 'modelExecutionEvidence' ? 'not required (requested-unverified)' : 'unknown'])),
     note: 'EXPERIMENTAL: VS Code does not return the executed subagent model to the parent, so jobs cannot be submitted under the native contract; use the copilot-cli backend for real migrations. Static profiles do not verify this host. Before native execution, verify per-call model selection, execution-bound model metadata, tools, dispatch and cancellation on the installed host. Do not echo requested models or silently fall back to CLI.' });
   if (checkCLI && !native) {
     try {
@@ -95,7 +98,8 @@ export async function doctor(root, config, { checkCLI = false, command = 'copilo
     } catch (e) { checks.push({ check: 'Copilot executable', ok: false, detail: e.message }); }
   }
   const staticValid = checks.every(x => x.ok !== false);
-  return { ok: staticValid && !native, staticValid, executionReady: native ? 'unknown' : 'not-verified', checks, workerBackend: config.workerBackend ?? 'copilot-cli', requestedModels: config.models, requestedPhaseModels: config.phaseModels ?? {},
+  return { ok: staticValid && (!native || unverifiedModels), staticValid, executionReady: unverifiedModels ? 'models-unverified' : native ? 'unknown' : 'not-verified',
+    ...(native ? { modelVerification: nativeModelVerification(config) } : {}), checks, workerBackend: config.workerBackend ?? 'copilot-cli', requestedModels: config.models, requestedPhaseModels: config.phaseModels ?? {},
     note: 'Help checks do not authenticate, verify model availability, exercise hooks, or make AI calls. Run the live smoke procedure before production use.' };
 }
 export async function main(argv = process.argv.slice(2)) {
