@@ -3,7 +3,7 @@
 この記録の後の再レビューで見つかった4件は、
 [2026-10-14の修正・再確認記録](2026-10-14-vscode-rereview-fixes.md)を参照。
 
-対象は `feat/github-copilot-migration-kit`、開始コミットは `e700c60`。
+対象は `feat/github-copilot-migration-kit`、開始コミットは `164aa47`。
 [詳細な実装方針](../plans/2026-10-13-vscode-orchestration.md)を渡して
 GPT-6.1 Solのサブエージェントが実装し、親エージェントが差分と動作をレビューした。
 重要な指摘を実装担当へ戻し、修正版を再確認した。今回確認した範囲では、未解消の重大な指摘はない。

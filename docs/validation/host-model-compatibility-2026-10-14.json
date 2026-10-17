@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "date": "2026-10-14",
   "branch": "feat/github-copilot-migration-kit",
-  "head": "e700c604bea0d867a729efa0b7102b1df00e99f6",
+  "head": "164aa47fa6555bef139b7c8545ec8b881d839684",
   "includesUncommittedChanges": true,
   "tests": {
     "command": "node --test tests/native-workers.test.mjs tests/copilot-compatibility.test.mjs",

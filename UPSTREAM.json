@@ -8,7 +8,7 @@
   "status": "Unofficial adaptation; not endorsed by Anthropic or GitHub",
   "reviewImplementation": {
     "date": "2026-10-15",
-    "baseCommit": "8962098b18e318de6edd5f054e02530030fb008b",
+    "baseCommit": "81b4aad2d93547afc6e6ee25b752e3f70f5ffb3c",
     "vscodePublicMainCommit": "47f2192f54e978366dd3dff31d7038eeb942330a",
     "installedCopilotCLI": null,
     "installedVSCode": null,

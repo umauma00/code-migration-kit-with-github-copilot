@@ -1,6 +1,6 @@
 # VS Codeでの移行体験を改善する実装方針
 
-対象ブランチ: `feat/github-copilot-migration-kit`。開始時のコミット: `e700c60`。
+対象ブランチ: `feat/github-copilot-migration-kit`。開始時のコミット: `164aa47`。
 利用者との合意に基づく実装仕様。実装後は親エージェントが差分と検証結果をレビューする。
 
 ## 1. 今回の範囲

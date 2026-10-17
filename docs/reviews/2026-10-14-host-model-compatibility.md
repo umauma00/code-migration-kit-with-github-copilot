@@ -1,7 +1,7 @@
 # VS Code / Copilot CLIのモデル・専用ワーカー互換性調査
 
 2026-10-14。対象は `feat/github-copilot-migration-kit`、HEAD
-`e700c604bea0d867a729efa0b7102b1df00e99f6` と現在の未コミット変更。
+`164aa47fa6555bef139b7c8545ec8b881d839684` と現在の未コミット変更。
 今回は調査であり、実行コード・プロンプトは変更していない。
 
 ## 判定

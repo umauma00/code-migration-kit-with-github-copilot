@@ -1,7 +1,7 @@
 # Review 1/2 implementation, 2026-10-15
 
 Base: feat/github-copilot-migration-kit at
-8962098b18e318de6edd5f054e02530030fb008b. GPT-6 Astra independently checked the
+81b4aad2d93547afc6e6ee25b752e3f70f5ffb3c. GPT-6 Astra independently checked the
 integrated review before implementation. Upstream stays pinned to
 cf91c9d5068d9aaf95a36164169f08c3e636c909. Git history identifies the published
 revision of this implementation and its follow-up fixes.
