@@ -1,5 +1,16 @@
 # Unreleased
 
+- Add the source-as-spec preparation profile for projects without a runnable
+  original or a specification: `source-spec init|check` scaffolds source-only
+  preparation from every source file, 00b refuses unfilled `TODO(spec)` contracts,
+  and `phase complete 00b,01,02` records one user review of the whole package.
+- Every runner failure now prints its cause, impact and choices with one
+  recommended option and reasons; `guidance --message` explains other failures.
+- Add `status --format todo|checklist` so hosts show the ten phases with exactly
+  one current phase; reports start with the checklist.
+- The bundled Python dependency parser skips `migration-kit/` and `migration/`.
+- Correct the operating manual: VS Code also defaults to the CLI worker backend.
+
 - Preserve every admitted diagnostic repair job across Stop/resume, including
   undispatched dependencies; bind fresh reviews to immutable intent evidence and
   refuse downstream approval until all repair obligations are reviewed.

@@ -51,3 +51,9 @@ reported invisibility. Read [source-only mode](../../docs/SOURCE-ONLY.md) and
 [built-in Rubber Duck](../../docs/RUBBER-DUCK.md). Workers never own phase TODO.
 
 The user-facing parent initializes ordered phase records with `phase init`, then reads `phase next` before routing. Use `phase start ID` to enforce prerequisites; review early reports before `phase complete ID --note TEXT`. Follow [ordered workflow](../../docs/ORDERED-WORKFLOW.md) and [cost logs](../../docs/COST-LOG.md). A planning child returns this required next action to its parent.
+
+On any failure, report cause, impact and at least two choices plus pause, with
+one recommended option first and a reason for each, then ask and wait
+([When a step fails](../../docs/PHASE-HANDOFF.md#when-a-step-fails)). Start every report with
+`status --format checklist`. Without a runnable original or a specification,
+offer [source as the only specification](../../docs/SOURCE-AS-SPEC.md).

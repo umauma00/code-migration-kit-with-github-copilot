@@ -19,7 +19,9 @@ at every phase boundary. Show artifacts, review points and a next-action example
 use the available question tool when an answer is needed. This reporting format
 does not apply to automated workers, which keep their JSON-only contracts.
 
-1. In runtime mode (the default), keep the original implementation runnable as
+1. Without a runnable original or a specification, the user may choose
+   [source as the only specification](SOURCE-AS-SPEC.md): 00b–02 are drafted
+   from the source and reviewed once. Otherwise, in runtime mode (the default), keep the original implementation runnable as
    the executable specification and require original/mutation/parity validation.
    Explicit source-only mode instead validates source-derived preparation, then
    reviewed translation and actual target build/smoke. Handoff states behavioral
@@ -57,18 +59,23 @@ does not apply to automated workers, which keep their JSON-only contracts.
 8. Report requested model, timing and observed usage when available. Unknown
    usage/model fields stay null; never invent measurements. Set each worker model
    explicitly in config. The runner rejects profile-level model overrides.
-9. Repeated failures signal an upstream rule/design problem. Stop at the repair
+9. Every failure ends with a report of its cause, impact and choices, one of
+   them recommended with reasons, and waits for the user's choice
+   ([When a step fails](PHASE-HANDOFF.md#when-a-step-fails)).
+   Repeated failures signal an upstream rule/design problem. Stop at the repair
    limit and propose a rule amendment rather than endlessly patching instances.
 10. Separate redesign from structural translation. In redesign mode, replace the
     rulebook bakeoff with adversarial design review and disposable module trials.
 
 Read [usage](../README.md), [contracts](CONTRACTS.md) and
 [permissions](../templates/settings.README.md) before a production run.
-The CLI remains the default automated path. In VS Code, select workerBackend:
-native and follow [native workers](NATIVE-WORKERS.md): keep the runner active,
-claim tasks, delegate to tool-free host subagents, and submit unchanged results.
-The same runner owns validation, writes, receipts and gates. Host-managed
-instruction isolation is recorded and is not equivalent to the CLI's isolation.
+The CLI worker backend (`copilot-cli`) is the default automated path in VS Code
+as well: the parent runs the runner in a terminal and the runner starts Copilot
+CLI workers. `workerBackend: native` is EXPERIMENTAL and cannot complete today
+(VS Code does not return the executed subagent model); choose it only on the
+user's explicit request and follow [native workers](NATIVE-WORKERS.md). The same
+runner owns validation, writes, receipts and gates. Host-managed instruction
+isolation is recorded and is not equivalent to the CLI's isolation.
 Use the shared skill with Copilot, or the skill/phase prompt files with Local.
 
 ## VS Code orchestration and verification modes

@@ -50,3 +50,12 @@ fix, owner (AI/user/environment), completion criterion, and whether it blocks
 implementation. Identify checks that can be deferred. Perform authorized AI fixes
 and group only necessary user decisions. 00 assesses suitability/scope; 00b
 prepares comparison evidence; 03 prototypes; 04 begins production implementation.
+
+## Source as the only specification
+
+When `preparationProfile` is `source-as-spec` (no runnable original, no
+specification), follow [source-as-spec](../docs/SOURCE-AS-SPEC.md) instead of the
+runtime harness above: run `source-spec init`, fill `migration/source-spec/contracts.md`
+from cited source lines (write "unknown" where the source cannot decide), write
+`judge-report.md`, and continue straight into 01 and 02 without stopping for a
+00b-only review. The user reviews 00b–02 once as a package.
