@@ -33,12 +33,16 @@ and next-instruction example in that language, and link the matching documents:
 initialization, ask the language together with the model and migration
 languages and pass `--language ja|en` to the installer.
 
-If migration/config.json is missing, ask for the user's available model ID and
+If migration/config.json is missing, ask for the user's available model IDs and
 migration languages, then choose the initialization command for the current host
-(reuse any explicit execution preference):
+(reuse any explicit execution preference). Offer the upstream model plan: tier by
+blast radius — reviewers on the largest or a mid model, high-volume implementers
+on a mid or small model, fixers and the arbiter on a mid model — and pass it as
+`--models implementer=ID,reviewers=ID,arbiter=ID,fixer=ID` (with `--model` as the
+default for unlisted roles). The user decides the plan:
 
 - VS Code and Copilot CLI: `node "<absolute-plugin-root>/scripts/install.mjs" --target . --layout plugin --worker-backend copilot-cli --model MODEL_ID`.
-- Experimental native (only on the user's explicit request, see below): replace the backend with `--worker-backend native --native-harness copilot`. VS Code Local native requires the repository-copy layout described in [native workers](../../docs/NATIVE-WORKERS.md).
+- VS Code only, without the Copilot CLI (the user's choice after you state that executed models stay unverified, see below): replace the backend with `--worker-backend native --native-harness copilot`; the installer records `nativeModelVerification: requested-unverified`. VS Code Local native requires the repository-copy layout described in [native workers](../../docs/NATIVE-WORKERS.md).
 Apply with `--apply` once project initialization is authorized, and configure
 languages, source/output/test roots and validation commands. Initialization
 creates only migration/config.json, RULEBOOK.md and inventory.tsv; it does not
@@ -62,16 +66,56 @@ Create or reconcile the host TODO list before starting phase work; update it on
 phase start, completion, approval waits, revisions, failures and resumption.
 Only the parent orchestrator updates it from actual evidence. If the tool is
 unavailable, show the same checklist in chat. TODO items never authorize a gate.
+Build the items from `run_migration.mjs status --format todo` (ten phases, one
+in progress, names in the user's language) and put the output of
+`status --format checklist` at the top of every phase and failure report, so the
+user always sees which phase is current even when the TODO UI does not render.
 
 The runner selects the first incomplete phase. Existing artifacts supply evidence
 for review; they do not route directly to a later phase. Respect redesign mode.
+
+## No runnable original or no specification
+
+Before choosing a verification mode (at initialization, and whenever runtime 00b
+blocks), ask two questions with the question tool: can the original
+implementation still run here, and does a specification or portable test suite
+exist? Record the first answer with `run_migration.mjs preferences --original-runtime
+available|unavailable` (presentation only; failure guidance uses it to pick its
+recommendation). If both answers are no, recommend [source as the only specification](../../docs/SOURCE-AS-SPEC.md)
+(`--preparation-profile source-as-spec` for a new project, `source-spec init`
+then `--apply` after consent for an existing one) and explain that equivalence
+stays unverified; if the original runs, recommend runtime. The user chooses.
+In source-as-spec, draft 00b, 01 and 02 together from the source, run one
+independent review of the package, show one report and record
+`phase complete 00b,01,02 --note TEXT` only after the user's OK.
+
+## Keep the parent's context small
+
+In 00, 00b (source-as-spec) and 02, do not read the whole codebase yourself on
+anything but a small repository. Use [surveys](../../docs/SURVEYS.md): `survey run --kind
+facts|contracts|inventory` sends each scope to a fresh tool-free surveyor (a new
+Copilot CLI process, or a host subagent in native mode) and saves its answer as a
+file; `survey merge` builds the draft you review. Check cited lines before relying
+on them; merged drafts still go through the phase's audits and the human gate.
+
+## When a step fails
+
+Follow [When a step fails](../../docs/PHASE-HANDOFF.md#when-a-step-fails) for every
+failed command, refused gate or blocked unit: cause, impact, at least two
+choices plus pause, exactly one recommended option first, a reason for each,
+then ask with the question tool and wait. Runner errors already print this
+guidance; for other failures run `run_migration.mjs guidance --message TEXT`.
+Never choose on the user's behalf or offer routing around a guardrail.
 
 ## Ordered workflow entry
 
 Before routing a configured project, run `run_migration.mjs phase init`, then
 `phase next`. Follow [ordered workflow](../../docs/ORDERED-WORKFLOW.md).
-Run only the first incomplete phase; use `phase start ID` before work. Phases
-03/04 need human-installed `migration/guardrails.json`; ask the human, never create it. An explicit
+Run only the first incomplete phase; use `phase start ID` before work. For 03,
+work through and show the [one-page checklist](../../docs/STRESS-TEST-CHECKLIST.md). Phases
+03/04 need human-installed `migration/guardrails.json`; ask the human, never create it
+(the hook denies agent edits of it). The host asks the person to confirm every
+`approve` / `phase complete` command; if it cannot ask, hand them the command to run. An explicit
 request for a later phase does not waive missing earlier reviews. Do not route
 from file existence. After user review, record early phases with `phase complete
 ID --note TEXT`; runner receipts determine implementation and validation phases.
@@ -81,17 +125,22 @@ acknowledgment before handoff. Record known host usage with completion;
 
 ## Worker execution backend
 
-Initialize every new migration with the default `copilot-cli` backend, in VS Code
-as well: the parent runs the Node runner in a terminal and the runner starts
-isolated Copilot CLI workers (signed-in Copilot CLI required). `native` is
-EXPERIMENTAL and cannot complete under its own contract today: VS Code does not
-return the subagent's executed model to the parent, so every job must be failed
-rather than submitted. Choose native only when the user explicitly asks for it
-after you state this; never pick it on your own. Preserve existing config;
-changing backend requires fresh judge validation and translation approval, not
-a silent switch during a run.
+Choose the worker backend with the user at initialization. The default
+`copilot-cli` backend applies in VS Code as well: the parent runs the Node
+runner in a terminal and the runner starts isolated Copilot CLI workers
+(signed-in Copilot CLI required; each worker's model is fixed by `--model` and
+instruction isolation is verified). When the Copilot CLI is not
+available or the user wants to run inside VS Code only, offer `native` with
+`nativeModelVerification: requested-unverified` (the installer default for
+native): host subagents do the work and every record states that the executed
+model is unverified. State that trade-off before the user chooses; never switch
+on your own. `host-metadata` stays EXPERIMENTAL and cannot complete on VS Code
+today. Preserve existing config; changing backend requires fresh judge
+validation and translation approval, not a silent switch during a run.
 
 When config.workerBackend is native, follow [native workers](../../docs/NATIVE-WORKERS.md).
+First confirm doctor's `native host requirements` with the user (VS Code 1.117+,
+`chat.customAgentInSubagent.enabled`, models allowed for subagents).
 Keep the runner active in a continuing terminal, claim pending jobs, delegate
 the exact prompt to the named tool-free host subagent with the requested model,
 and submit unchanged results. Dispatch independent jobs in parallel within the
@@ -100,9 +149,13 @@ Do not inherit the parent conversation or add other reviewers' results.
 If the required model/profile/tools cannot be selected, report a failed job;
 never substitute the parent agent, edit the target, or fall back to CLI.
 Select the model through the host's actual per-call model parameter, not prompt
-text. Before submitting, check host execution metadata for the model used;
-if absent, different, or ambiguous, fail the job. Do not echo the requested
-model or ask the worker to identify itself as proof of execution.
+text. With `host-metadata`, check host execution metadata before submitting and
+fail the job if it is absent, different or ambiguous. With
+`requested-unverified`, submit with `--model` equal to the model you passed to
+the host's per-call model parameter; if the host offers no per-call model
+selection or rejects that model, fail the job instead. Never echo a model you
+did not request, ask the worker to identify itself, or describe the result as a
+verified model; reports say 「実行モデル未検証」/ "executed model unverified".
 On cancellation stop host workers too; only the runner's receipts establish done.
 
 Use `run_migration.mjs status` for progress. Never silently install policies,

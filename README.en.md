@@ -27,9 +27,15 @@ Following reviews 1 and 2, this version adds [isolated pilots](docs/PILOT.md) be
 | VS Code | Copilot uses the shared skill; Local uses the ten phase prompt files and Local hooks |
 | Dynamic Workflows | Optional experimental adapter on the same execution engine |
 
-## Using subagents inside VS Code (experimental)
+## Running inside VS Code only (native backend, executed model unverified)
 
-> **Experimental and cannot complete today.** The native procedure requires the parent to confirm, before submitting each job, which model the host actually ran. VS Code does not return the subagent's executed model to the parent, so following the procedure fails every job. In VS Code too, use the default CLI worker backend (`copilot-cli`): the parent runs the runner in a terminal and the runner starts Copilot CLI workers.
+To work in VS Code without installing the Copilot CLI, choose the native backend. New native installations get `nativeModelVerification: "requested-unverified"`: the parent passes the requested model to the subagent call's model parameter and submits the result. VS Code does not return the model a subagent **actually ran**, so every attempt record, run summary, status and doctor report says the executed model is unverified.
+
+```bash
+node /path/to/code-migration-kit/scripts/install.mjs --target . --layout plugin --worker-backend native --native-harness copilot --model MODEL_ID --apply
+```
+
+When the Copilot CLI is available, the default CLI worker backend (`copilot-cli`) is still recommended: each worker is a process fixed by `--model`, and implicit-instruction isolation is verified on a real CLI. The previous contract that requires host execution metadata is available as `--native-model-verification host-metadata`; it is experimental and cannot complete on VS Code.
 
 With `workerBackend: "native"`, the parent agent of the current VS Code session delegates implementation, review, arbitration and fixing to subagents, and the Copilot CLI is not started. The Node runner issues jobs and the parent submits results; validation, writes, approvals and resumption are shared with the CLI backend. Initialize with `--worker-backend native`. Local supports the repository copy; Copilot (Agent Host) supports the plugin or the copy. See [VS Code native workers](docs/NATIVE-WORKERS.en.md).
 
@@ -65,6 +71,8 @@ node scripts/install.mjs --target /path/to/your-project --model MODEL_ID --langu
 # Apply what you reviewed
 node scripts/install.mjs --target /path/to/your-project --model MODEL_ID --language en --apply
 ```
+
+`--models implementer=ID,reviewers=ID,arbiter=ID,fixer=ID` sets per-role models (unlisted roles use `--model`). As in the upstream model plan, choose by blast radius: reviewers on the largest or a mid model, high-volume implementers on a mid or small model, fixers and the arbiter on a mid model.
 
 `--language ja|en` sets the language of phase reports, questions and `status --format markdown`. It is stored in `migration/preferences.json` and never affects approvals or completion. If omitted, the skill asks Japanese or English at the start. Change it later with `run_migration.mjs preferences --language ja`.
 
@@ -108,6 +116,9 @@ The minimum settings in `migration/config.json`:
 | `nativeHarness` | Required for native: `vscode-local` or `copilot`, matching the current session |
 | `concurrency` | Concurrent AI calls, default 2, reviews included |
 | `maxFixRounds`, `maxAgentCalls` | Fix rounds per unit and AI calls per run |
+| `maxRunInputBytes` | Optional cap on the prompt bytes a run sends to workers. AI Credits are metered on tokens and usage stops when they run out, so this budgets runs between usage checks. The run summary's `usageEstimate` records measured bytes and estimated tokens (bytes ÷ 4, not billing data). The check uses completed calls, so calls already in flight (up to `concurrency`) can overshoot it |
+| `transientRetries`, `transientRetryDelayMs` | Optional. Automatic retries for rate limits (429), 5xx and network errors (default 2) and the first wait (default 5000 ms, doubling). Retries count as AI calls |
+| `maxConsecutiveFailures` | Optional. Stop dispatching after this many unit failures in a row (default 3). One unit's failure does not stop the others; failures shared by every call (sign-in, credits) stop the run at once |
 | `timeoutSeconds` | Time limit for one CLI worker call |
 | `commandTimeoutSeconds` | Time limit for build and comparison commands |
 
@@ -158,6 +169,28 @@ The commands below are for the default **runtime mode**. Projects without a usab
 
 This is the bundled fixture's example; replace it with your project's commands. `mutation` exits 0 when the comparator detects a deliberately broken implementation. Keep `typecheck` to a cheap check that is valid before the whole tree is translated, or set it to `null`.
 
+## No runnable original or no specification
+
+When the original cannot run and no specification exists, choose [source as the only specification](docs/SOURCE-AS-SPEC.en.md). The AI drafts the 00b, 01 and 02 artifacts (source-derived contracts, dependency map, RULEBOOK, inventory) together; after one user review and OK the migration continues from 03. Behavioral equivalence is handed off as unverified.
+
+```bash
+# New project
+node scripts/install.mjs --target /path/to/your-project --model MODEL_ID --preparation-profile source-as-spec --apply
+# Existing project (for example, runtime 00b got stuck): preview, then --apply after consent
+node migration-kit/scripts/run_migration.mjs source-spec init
+node migration-kit/scripts/run_migration.mjs source-spec check
+```
+
+## Progress display and failure guidance
+
+`status --format checklist` shows the ten phases and "you are here"; `status --format todo` returns the items for the host TODO tool. Every phase report starts with this checklist.
+
+When a runner command fails it prints, after the `ERROR:` line, **the cause, the impact and the choices (one recommended, each with its reason and command)**. Copilot shows this, asks with the question tool and waits for the answer. For failures outside the runner, `run_migration.mjs guidance --message "error text"` produces the same guidance.
+
+## Delegating preparation reading by scope
+
+In 00, 00b and 02, instead of the parent reading every file itself, `survey run --kind facts|contracts|inventory` splits the source into scopes and hands each to a fresh surveyor (a new `copilot` process with the CLI backend, a VS Code subagent with native). Results are saved as files under `migration/surveys/`; `survey merge` builds the draft. Interrupted runs resume with the remaining scopes. See [preparation surveys](docs/SURVEYS.en.md).
+
 ## Working through the phases
 
 Before phase 03, copy `templates/guardrails.json` (`migration-kit/templates/guardrails.json` for a repository copy) to `migration/guardrails.json` and edit it for your target's build and test commands. It replaces the upstream `.claude/settings.json` deny rules: a hook denies matching shell commands in every agent session. Builds run by the runner are not affected. `phase start 03` / `04` stops without this file (or a recorded waiver); agents never create it. With a repository copy, the Copilot CLI loads the hook only in a trusted folder; check with `doctor`.
@@ -176,7 +209,7 @@ The table and the CLI examples that follow are for **runtime mode**. In [source-
 | Comparator design | [00b-judge-setup](prompts/00b-judge-setup.md) | Original tests, comparator, mutation self-check |
 | Dependencies | [01-dependency-map](prompts/01-dependency-map.md) | depmap, `migration/manifest.tsv`, `review-dependencies.json` |
 | Semantic gaps and policy | [02-gap-inventory](prompts/02-gap-inventory.md) | `migration/RULEBOOK.md`, `inventory.tsv` |
-| Stress test | [03-stress-test](prompts/03-stress-test.md) | `migration/stress-test/report.md` |
+| Stress test | [03-stress-test](prompts/03-stress-test.md) ([checklist](docs/STRESS-TEST-CHECKLIST.en.md)) | `migration/stress-test/report.md` |
 | Translation and review | [04-translation-kickoff](prompts/04-translation-kickoff.md) | Translated sources, review records |
 | Whole build | [05-survey-build](prompts/05-survey-build.md) | Diagnostics, repair records |
 | Basic operation | [05b-smoke](prompts/05b-smoke.md) | Smoke results from real operations |

@@ -40,6 +40,13 @@ rollback and exclusive output ownership need the separately scoped adapter.
 
 Generate `migration/manifest.tsv` with `scripts/make_manifest.py` using the map's
 order and explicit substitutions. It has exactly `source<TAB>target` as header.
+Run the parser from the import base: for Python, the source root itself unless it
+is a package (has `__init__.py`), in which case its parent. Parser paths are then
+relative to that root: pass `--prefix ROOT/` to make_manifest and `--depmap-root
+ROOT` to make_review_dependencies; when the parser walked a wider directory, add
+`--include SOURCE_ROOT/`. `source-spec check` prints these commands for the
+project. An all-empty dependency map for several files is refused at phase
+completion unless the person confirms independence (`--confirm-no-dependencies`).
 Reject duplicate targets, source overlap and unsafe paths. The current runner
 supports one file per unit and must not be used for many writers to one output.
 Cycles/shared helpers may need manual preparation or an atomic module adapter.
@@ -80,3 +87,10 @@ Do not begin production translation. Stop for review.
 <!-- Copilot adaptation: migration control and instructions updated on 2026-10-08; see NOTICE. -->
 
 Save the concrete phase report to `migration/depmap/report.md`. After its actual user review, record `phase complete 01 --note TEXT` as described in [ordered workflow](../docs/ORDERED-WORKFLOW.md).
+
+## Source as the only specification
+
+With `preparationProfile: source-as-spec`, generate the map, manifest and review
+dependencies mechanically (`source-spec check` prints the commands), record parser
+limits in `depmap/report.md`, skip the agent edge-sampling rounds and do not stop
+for a 01-only gate: continue to 02. See [source-as-spec](../docs/SOURCE-AS-SPEC.md).

@@ -242,18 +242,32 @@ test('active coordinator attempt collection ignores unrelated native answers and
   hold.resolve(); await running;
 });
 
-test('a failed reviewer stops the queued review and new unit while preserving the original cause', async t => {
+test('a systemic reviewer failure stops the queued review and new unit while preserving the original cause', async t => {
   const f = prepare(t, {count:2}); f.config.concurrency = 1;
   writeJSON(safePath(f.root, 'migration/config.json'), f.config);
   await runStage(f.root, f.config, 'judge'); approve(f.root, f.config, 'translation', 'Serial failure fixture');
   const calls = [];
+  // Sign-in failures hit every call alike, so the whole run stops at once.
   await assert.rejects(translate(f.root, f.config, async c => {
     calls.push(`${c.role}:${c.unit.target}`);
-    if(c.role === 'reviewer-semantics') throw new Error('Concrete reviewer transport failure');
+    if(c.role === 'reviewer-semantics') throw new Error('Copilot reviewer-semantics failed (exit 1): Bad credentials');
     return fake(c);
-  }), /Concrete reviewer transport failure/);
+  }), /Bad credentials/);
   assert.deepEqual(calls, ['implementer:ported/math_ops.mjs', 'reviewer-semantics:ported/math_ops.mjs']);
   assert.equal(fs.existsSync(safePath(f.root, 'ported/text_ops.mjs')), false);
+  assert.equal(fs.existsSync(safePath(f.root, 'migration/run.lock')), false);
+});
+
+test('a unit-specific reviewer failure blocks only its unit; independent units still finish', async t => {
+  const f = prepare(t, {count:2}); f.config.concurrency = 1;
+  writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  await runStage(f.root, f.config, 'judge'); approve(f.root, f.config, 'translation', 'Isolated failure fixture');
+  const error = await translate(f.root, f.config, async c => {
+    if (c.role === 'reviewer-semantics' && c.unit.target === 'ported/math_ops.mjs') throw new Error('Concrete reviewer transport failure');
+    return fake(c);
+  }).catch(e => e);
+  assert.match(error.message, /ported\/math_ops\.mjs: Concrete reviewer transport failure/);
+  assert.equal(done(f.root, f.units[1], contextHash(f.root, f.config)), true, 'the independent unit completed');
   assert.equal(fs.existsSync(safePath(f.root, 'migration/run.lock')), false);
 });
 
@@ -274,7 +288,7 @@ test('actual calls exclude a reserved review stopped by reviewer failure', async
   await runStage(f.root, f.config, 'judge'); approve(f.root, f.config, 'translation', 'Serial failure fixture');
   let calls = 0;
   await assert.rejects(translate(f.root, f.config, async call => {
-    calls++; if (call.role === 'reviewer-semantics') throw new Error('review failed'); return fake(call);
+    calls++; if (call.role === 'reviewer-semantics') throw new Error('review failed: Bad credentials'); return fake(call);
   }), /review failed/);
   const runs = fs.readdirSync(safePath(f.root, 'migration/runs'));
   const summary = readJSON(safePath(f.root, `migration/runs/${runs[0]}/summary.json`));
@@ -361,7 +375,7 @@ test('cycle repair retains incomplete external prerequisite and unrelated cycles
   atomicWrite(safePath(f.root, f.units[0].target), result('implementer', f.units[0]).content);
   atomicWrite(safePath(f.root, 'migration/repair-evidence.md'), 'Review candidate');
   let calls = 0;
-  await assert.rejects(translate(f.root, f.config, async call => {calls++; return fake(call);}, {onlyTarget:f.units[0].target,evidence:'migration/repair-evidence.md'}), /Dependency jobs are incomplete/);
+  await assert.rejects(translate(f.root, f.config, async call => {calls++; return fake(call);}, {onlyTarget:f.units[0].target,evidence:'migration/repair-evidence.md'}), /Waiting on unfinished dependencies/);
   assert.equal(calls, 0);
   // Complete a separate cycle while typecheck is deferred, then repair an independent unit with typecheck enabled.
   writeJSON(safePath(f.root, 'migration/review-dependencies.json'), {schemaVersion:1, dependencies: {

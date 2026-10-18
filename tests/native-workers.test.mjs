@@ -347,13 +347,42 @@ test('native command interface transports exact JSON, rejects bad JSON and start
   assert.equal(JSON.parse(outcome.value.stdout).done, 1);
 });
 
-test('native initialization is reported as experimental and copilot-cli stays the default', t => {
+test('native initialization defaults to the VS Code-only unverified-model mode; copilot-cli stays the default backend', t => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'native-experimental-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
-  assert.match(install(root, { layout: 'plugin', workerBackend: 'native', nativeHarness: 'copilot' }).warnings[0], /EXPERIMENTAL/);
+  assert.match(install(root, { layout: 'plugin', workerBackend: 'native', nativeHarness: 'copilot' }).warnings[0], /requested-unverified/);
+  assert.match(install(root, { layout: 'plugin', workerBackend: 'native', nativeHarness: 'copilot', nativeModelVerification: 'host-metadata' }).warnings[0], /EXPERIMENTAL/);
+  assert.throws(() => install(root, { layout: 'plugin', nativeModelVerification: 'requested-unverified' }), /requires --worker-backend native/);
   assert.equal(install(root, { layout: 'plugin' }).warnings, undefined);
   for (const skill of ['skills/code-migration/SKILL.md', '.github/skills/code-migration/SKILL.md']) {
     const text = fs.readFileSync(path.join(kitRoot, skill), 'utf8');
-    assert.match(text, /default `copilot-cli` backend, in VS Code/); assert.match(text, /EXPERIMENTAL/);
+    assert.match(text, /default\n`copilot-cli` backend applies in VS Code/); assert.match(text, /requested-unverified/); assert.match(text, /EXPERIMENTAL/);
   }
+});
+
+test('VS Code-only native runs complete with the executed model recorded as unverified', async t => {
+  const f = await nativeReady(t, { count: 2 });
+  assert.equal((await doctor(f.root, f.config)).ok, false, 'host-metadata keeps the experimental contract');
+  Object.assign(f.config, { nativeModelVerification: 'requested-unverified' });
+  writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  const check = await doctor(f.root, loadConfig(f.root));
+  assert.equal(check.ok, true);
+  assert.equal(check.executionReady, 'models-unverified');
+  assert.equal(check.checks.find(c => c.check === 'native host capabilities').capabilities.modelExecutionEvidence, 'not required (requested-unverified)');
+  await runStage(f.root, f.config, 'judge');
+  approve(f.root, f.config, 'translation', 'Reviewed VS Code-only native fixture with unverified models');
+  const run = start(t, f);
+  const first = await nextTask(f);
+  assert.equal(first.modelVerification, 'requested-unverified');
+  const claimed = claimNativeTask(f.root, first.task);
+  assert.throws(() => submitNativeTask(f.root, first.task, claimed.claimToken, { result: result(claimed.role, claimed.unit), model: 'some-other-model' }), /differs from the requested model/);
+  submitNativeTask(f.root, first.task, claimed.claimToken, { result: result(claimed.role, claimed.unit), model: claimed.model });
+  const report = await drain(f, run);
+  assert.equal(report.done, 2);
+  assert.equal(report.modelVerification, 'requested-unverified');
+  assert.match(report.warnings.join('\n'), /executed model was not verified/);
+  for (const unit of f.units) assert.ok(done(f.root, unit, contextHash(f.root, f.config)));
+  const attempts = fs.readdirSync(safePath(f.root, `migration/runs/${report.runId}`)).filter(n => n.endsWith('.json') && n !== 'summary.json');
+  const recorded = attempts.map(n => readJSON(safePath(f.root, `migration/runs/${report.runId}/${n}`))).filter(a => a.status === 'success');
+  assert.ok(recorded.length && recorded.every(a => a.modelVerification === 'requested-unverified' && a.observedModel === null));
 });

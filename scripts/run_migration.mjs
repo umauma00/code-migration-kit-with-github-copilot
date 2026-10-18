@@ -3,14 +3,17 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { loadConfig, readManifest, contextHash, unitState, done, safePath, readJSON, parseArgs, verificationFiles, loadReviewDependencies, reviewSources } from '../lib/core.mjs';
+import { lockRun, loadConfig, nativeModelVerification, readManifest, contextHash, unitState, done, safePath, readJSON, parseArgs, verificationFiles, loadReviewDependencies, reviewSources } from '../lib/core.mjs';
 import { validateWorkerProfile, validateNativeProfile, assistedReviewerRoles } from '../lib/review.mjs';
 import { runProcess } from '../lib/process.mjs';
 import { approve, runStage, translate, runPilot, runJudgePreparation } from '../lib/pipeline.mjs';
 import { preparePilot } from '../lib/pilot.mjs';
 import { createCopilotAdapter, requiredCopilotFlags, copilotEnv, probeWorkerAgents } from './copilot_adapter.mjs';
 import { runtimeLayout } from '../lib/runtime.mjs';
-import { migrationStatus, statusMarkdown } from '../lib/status.mjs';
+import { migrationStatus, statusMarkdown, statusTodo, statusChecklist } from '../lib/status.mjs';
+import { failureGuidance, guidanceMarkdown, failureGuidanceList, guidanceListMarkdown, doctorGuidance } from '../lib/guidance.mjs';
+import { initSourceSpec, sourceSpecReadiness } from '../lib/source-spec.mjs';
+import { runSurvey, mergeSurvey, surveyStatus, planSurvey } from '../lib/survey.mjs';
 import { createNativeAdapter } from '../lib/native-workers.mjs';
 import { phaseCommand } from './phase_cli.mjs';
 import { diagnoseBuild } from './diagnostic_queue.mjs';
@@ -19,10 +22,18 @@ import { readGuardrails, cliFolderTrust } from '../lib/guardrails.mjs';
 
 export const usage = `Usage: node migration-kit/scripts/run_migration.mjs COMMAND [options]
   doctor [--check-cli] [--copilot /path/to/copilot]
-  status [--format json|markdown]  Read-only preparation and execution evidence
-  preferences [--language ja|en]   Show or set the language of user-facing reports
-  phase init | next | check ID | start ID | complete ID --note TEXT
+  status [--format json|markdown|todo|checklist]
+                              Read-only evidence; todo = host task-list items, checklist = chat progress
+  guidance --message TEXT [--format json|markdown]
+                              Explain a failure: cause, impact and choices with a recommendation
+  preferences [--language ja|en] [--original-runtime available|unavailable]
+                              Report language; whether the original can still run (guides recommendations)
+  phase init | next | check ID | start ID | complete ID[,ID...] --note TEXT
                               Ordered workflow; optional --tokens N --subagents N --model ID
+  survey plan|run|status|merge --kind facts|contracts|inventory [--max-files N] [--sites migration/SITES.tsv]
+                              Split preparation reading into scopes for fresh tool-free workers; results are files
+  source-spec init [--apply] | check
+                              Source as the only specification: scaffold source-only preparation
   judge                       Runtime: original/mutation; source-only: validate preparation
   judge-prepare               Validate/reuse the judge at 00b before map/rules exist
   approve STAGE --note TEXT   Review/approve translation, build, smoke, parity, post-parity, handoff
@@ -41,7 +52,7 @@ export async function doctor(root, config, { checkCLI = false, command = 'copilo
   const checks = [{ check: 'configuration', ok: true }];
   const layout = runtimeLayout(root, config);
   const native = config.workerBackend === 'native';
-  for (const role of ['orchestrator', 'implementer', 'reviewer-semantics', 'reviewer-rules', 'arbiter', 'fixer', ...(native ? [] : assistedReviewerRoles)]) {
+  for (const role of ['orchestrator', 'implementer', 'reviewer-semantics', 'reviewer-rules', 'arbiter', 'fixer', 'surveyor', ...(native ? [] : assistedReviewerRoles)]) {
     const p = native && role !== 'orchestrator' ? layout.nativeAgentPath(role) : layout.agentPath(role), file = safePath(layout.root, p);
     checks.push({ check: p, ok: fs.existsSync(file) });
     if (role !== 'orchestrator' && fs.existsSync(file)) {
@@ -58,6 +69,36 @@ export async function doctor(root, config, { checkCLI = false, command = 'copilo
   } catch (e) { checks.push({ check: 'review dependency map', ok: false, detail: e.message }); }
   checks.push({ check: 'build artifact roots', ok: true, roots: config.buildArtifactRoots ?? [], note: 'Declare generated binaries, objects and reports here. Their file contents are excluded from command-input fingerprints; actual inputs must stay outside these roots.' });
   if (!native) checks.push({ check: 'worker hook installed', ok: fs.existsSync(safePath(layout.root, layout.hookPath)) });
+  // Copilot hooks fail open on timeout: a slow start silently disables the
+  // guardrails. Run the exact command from the hook configuration twice: as a
+  // worker (must deny a shell call) and as an interactive session (the slower
+  // guardrail path, which reads migration/guardrails.json).
+  {
+    let entry = null, limit = null;
+    try {
+      const spec = JSON.parse(fs.readFileSync(safePath(layout.root, layout.hookPath), 'utf8')).hooks;
+      entry = (spec.preToolUse ?? spec.PreToolUse)?.[0] ?? null;
+      limit = entry?.timeoutSec ?? entry?.timeout ?? null;
+    } catch {}
+    const line = entry && (entry.bash ?? entry.command);
+    const argv = typeof line === 'string' ? [...line.replaceAll('${PLUGIN_ROOT}', layout.root).matchAll(/"([^"]*)"|(\S+)/g)].map(m => m[1] ?? m[2]) : [];
+    const probe = async (role, command) => {
+      const started = Date.now();
+      const r = await runProcess(argv[0] === 'node' ? process.execPath : argv[0], argv.slice(1), { cwd: root, timeoutMs: 60000,
+        input: JSON.stringify({ toolName: 'bash', toolArgs: { command }, cwd: root }),
+        env: { ...process.env, ...(role ? { MIGRATION_KIT_ROLE: role } : {}) } }).catch(e => ({ code: null, stdout: '', stderr: e.message }));
+      let decision = null; try { decision = JSON.parse(r.stdout); } catch {}
+      return { ms: Date.now() - started, code: r.code, decision };
+    };
+    const worker = argv.length ? await probe('implementer', 'true') : null;
+    const parent = argv.length ? await probe(null, 'git status') : null;
+    const slowest = Math.max(worker?.ms ?? 0, parent?.ms ?? 0);
+    checks.push({ check: 'hook responds before its timeout', ok: Boolean(worker && parent) && worker.code === 0 && parent.code === 0 &&
+        worker.decision?.permissionDecision === 'deny' && worker.decision?.hookSpecificOutput?.permissionDecision === 'deny' &&
+        parent.decision !== null && (limit === null || slowest < limit * 500),
+      command: line ?? null, durationMs: slowest, timeoutSec: limit,
+      note: 'Runs the configured hook command. Copilot CLI and VS Code let a tool call through when a hook times out; keep the measured time well under half the configured timeout.' });
+  }
   let guardrails = null, guardrailError;
   try { guardrails = readGuardrails(root); } catch (e) { guardrailError = e.message; }
   checks.push({ check: 'command guardrails', ok: !guardrailError,
@@ -66,11 +107,21 @@ export async function doctor(root, config, { checkCLI = false, command = 'copilo
   if (!native && !layout.plugin) {
     // Repository hooks (worker backstop and guardrails) load only in a trusted folder.
     const trust = cliFolderTrust(root);
-    checks.push({ check: 'repository hooks load in Copilot CLI', ok: !(trust === 'untrusted' && guardrails?.denyCommands.length), status: trust,
-      note: 'Copilot CLI ignores .github/hooks in untrusted folders, silently disabling the guardrails. Start copilot interactively in this repository once and trust the folder.' });
+    // The hook also asks before approvals and denies guardrails edits, so an
+    // untrusted folder disables protections even before guardrails exist.
+    checks.push({ check: 'repository hooks load in Copilot CLI', ok: trust !== 'untrusted', status: trust,
+      note: 'Copilot CLI ignores .github/hooks in untrusted folders, silently disabling the guardrails, the approval confirmations and the guardrails-file protection. Start copilot interactively in this repository once and trust the folder.' });
   }
-  if (native) checks.push({ check: 'native host capabilities', ok: null, status: 'unknown', experimental: true, harness: config.nativeHarness,
-    capabilities: Object.fromEntries(['modelSelection', 'modelExecutionEvidence', 'toolRestrictions', 'instructionIsolation', 'parallelDispatch', 'completionEvents', 'childCancellation'].map(name => [name, 'unknown'])),
+  const unverifiedModels = native && nativeModelVerification(config) === 'requested-unverified';
+  if (unverifiedModels) checks.push({ check: 'native model verification', ok: true, status: 'requested-unverified',
+    note: 'VS Code-only mode: the parent passes each requested model to the host\'s per-call model parameter and submits; the executed model is recorded as unverified in every attempt, run summary and report. Use host-metadata (or the copilot-cli backend) when observed models are required.' });
+  // Host settings live in VS Code, not in files Node can read reliably; list
+  // them so the parent confirms each one before dispatching.
+  if (native) checks.push({ check: 'native host requirements', ok: null, status: 'confirm in the host',
+    requirements: ['VS Code 1.117 or later: runSubagent accepts a per-call model', 'chat.customAgentInSubagent.enabled is on, so the dedicated native profiles can run as subagents',
+      'The requested models in config.models are allowed for subagents on this account (some models are not)', 'Restart the chat after installing or updating profiles'] });
+  if (native) checks.push({ check: 'native host capabilities', ok: null, status: 'unknown', experimental: !unverifiedModels, harness: config.nativeHarness,
+    capabilities: Object.fromEntries(['modelSelection', 'modelExecutionEvidence', 'toolRestrictions', 'instructionIsolation', 'parallelDispatch', 'completionEvents', 'childCancellation'].map(name => [name, unverifiedModels && name === 'modelExecutionEvidence' ? 'not required (requested-unverified)' : 'unknown'])),
     note: 'EXPERIMENTAL: VS Code does not return the executed subagent model to the parent, so jobs cannot be submitted under the native contract; use the copilot-cli backend for real migrations. Static profiles do not verify this host. Before native execution, verify per-call model selection, execution-bound model metadata, tools, dispatch and cancellation on the installed host. Do not echo requested models or silently fall back to CLI.' });
   if (checkCLI && !native) {
     try {
@@ -88,7 +139,8 @@ export async function doctor(root, config, { checkCLI = false, command = 'copilo
     } catch (e) { checks.push({ check: 'Copilot executable', ok: false, detail: e.message }); }
   }
   const staticValid = checks.every(x => x.ok !== false);
-  return { ok: staticValid && !native, staticValid, executionReady: native ? 'unknown' : 'not-verified', checks, workerBackend: config.workerBackend ?? 'copilot-cli', requestedModels: config.models, requestedPhaseModels: config.phaseModels ?? {},
+  return { ok: staticValid && (!native || unverifiedModels), staticValid, executionReady: unverifiedModels ? 'models-unverified' : native ? 'unknown' : 'not-verified',
+    ...(native ? { modelVerification: nativeModelVerification(config) } : {}), checks, workerBackend: config.workerBackend ?? 'copilot-cli', requestedModels: config.models, requestedPhaseModels: config.phaseModels ?? {},
     note: 'Help checks do not authenticate, verify model availability, exercise hooks, or make AI calls. Run the live smoke procedure before production use.' };
 }
 export async function main(argv = process.argv.slice(2)) {
@@ -104,16 +156,28 @@ export async function main(argv = process.argv.slice(2)) {
     fs.unlinkSync(file); console.log('Removed stale migration lock'); return;
   }
   if (cmd === 'preferences') {
-    console.log(JSON.stringify(args.language ? setPreferences(root, { language: args.language }) : preferencesReport(root), null, 2));
+    console.log(JSON.stringify(args.language || args['original-runtime'] ? setPreferences(root, { language: args.language, originalRuntime: args['original-runtime'] }) : preferencesReport(root), null, 2));
     return;
   }
+  let language = 'en';
+  try { language = readPreferences(root).userLanguage ?? 'en'; } catch {}
   if (cmd === 'status') {
-    if (args.format && !['json', 'markdown'].includes(args.format)) throw new Error('status format must be json or markdown');
+    if (args.format && !['json', 'markdown', 'todo', 'checklist'].includes(args.format)) throw new Error('status format must be json, markdown, todo or checklist');
     const report = migrationStatus(root);
     if (!report.ok) process.exitCode = 1;
-    let language = 'en';
-    try { language = readPreferences(root).userLanguage ?? 'en'; } catch {}
-    console.log(args.format === 'markdown' ? statusMarkdown(report, language) : JSON.stringify(report, null, 2));
+    // Problems that need the person's decision: blocked units and unreadable state.
+    const problems = !report.ok ? [{ targets: [report.blockers[0]?.path].filter(Boolean), guidance: failureGuidance(report.blockers[0]?.reason ?? 'status failed', { root, language }) }]
+      : report.units.some(u => u.status === 'blocked' && u.reason) ? failureGuidanceList(`Translation stopped: ${report.units.filter(u => u.status === 'blocked' && u.reason).map(u => `${u.target}: ${u.reason}`).join('; ')}`, { root, language }) : [];
+    const actions = problems.length ? `\n\n${guidanceListMarkdown(problems, language)}` : '';
+    console.log(args.format === 'markdown' ? `${statusChecklist(report, language)}\n\n${statusMarkdown(report, language)}${actions}`
+      : args.format === 'checklist' ? statusChecklist(report, language)
+      : args.format === 'todo' ? JSON.stringify(statusTodo(report, language), null, 2) : JSON.stringify(report, null, 2));
+    return;
+  }
+  if (cmd === 'guidance') {
+    if (typeof args.message !== 'string' || !args.message.trim()) throw new Error('guidance requires --message TEXT (the error to explain)');
+    const g = failureGuidance(args.message, { root, language });
+    console.log(args.format === 'json' ? JSON.stringify(g, null, 2) : guidanceMarkdown(g, language));
     return;
   }
   const config = loadConfig(root), controller = new AbortController();
@@ -139,9 +203,38 @@ export async function main(argv = process.argv.slice(2)) {
         result = { diagnosis, repair, next: 'Review the repaired outputs and the round counts in migration/build-rounds.tsv, then approve build and run build for the next round.' };
       }
     }
+    else if (cmd === 'source-spec' && args._[1] === 'init') {
+      const release = args.apply ? lockRun(root, 'source-spec-init') : () => {};
+      try { result = initSourceSpec(root, config, { apply: args.apply }); } finally { release(); }
+    }
+    else if (cmd === 'source-spec' && args._[1] === 'check') result = sourceSpecReadiness(root, config);
+    else if (cmd === 'source-spec') throw new Error('Use source-spec init [--apply] | check');
+    else if (cmd === 'survey') {
+      // Delegated preparation surveys: scopes go to fresh tool-free surveyor workers.
+      const kind = args.kind, options = { maxFiles: args['max-files'] === undefined ? undefined : Number(args['max-files']), sitesFile: args.sites };
+      const action = args._[1];
+      if (action === 'plan') result = planSurvey(root, config, kind, options);
+      else if (action === 'status') result = surveyStatus(root, config, kind, options);
+      else if (action === 'merge') { const release = lockRun(root, 'survey-merge'); try { result = mergeSurvey(root, config, kind, options); } finally { release(); } }
+      else if (action === 'run') {
+        const native = config.workerBackend === 'native';
+        if (native && args.copilot) throw new Error('--copilot cannot be used with workerBackend: native');
+        if (native) console.error('Native workers: keep this runner active; use native_workers.mjs list/claim/submit from the host session. No Copilot CLI is launched.');
+        result = await runSurvey(root, config, kind, native ? createNativeAdapter() : createCopilotAdapter({ command: args.copilot }), { signal: controller.signal, ...options,
+          onProgress: event => console.error(`${event.unit}: ${event.stage} (agent calls ${event.calls})`) });
+      } else throw new Error('Use survey plan|run|status|merge --kind facts|contracts|inventory [--max-files N] [--sites migration/PATH.tsv]');
+    }
     else if (cmd === 'judge-prepare') result = await runJudgePreparation(root, config, { signal: controller.signal });
     else if (cmd === 'phase') result = phaseCommand(root,config,args._[1],args._[2],args);
-    else if (cmd === 'doctor') { result = await doctor(root, config, { checkCLI: args['check-cli'], command: args.copilot }); if (!result.ok) process.exitCode = 1; }
+    else if (cmd === 'doctor') {
+      result = await doctor(root, config, { checkCLI: args['check-cli'], command: args.copilot });
+      if (!result.ok) {
+        process.exitCode = 1;
+        // Failed checks are results, not exceptions: explain them the same way.
+        const list = doctorGuidance(result, { root, language });
+        if (list.length) console.error(guidanceListMarkdown(list, language));
+      }
+    }
     else if (cmd === 'approve') result = approve(root, config, args._[1], args.note, { batch: args.batch, targets: args.targets?.split(',') });
     else if (['judge', 'build', 'smoke', 'parity', 'handoff'].includes(cmd)) result = await runStage(root, config, cmd, { signal: controller.signal });
     else if (['translate', 'repair'].includes(cmd)) {
@@ -157,5 +250,15 @@ export async function main(argv = process.argv.slice(2)) {
   } finally { process.removeListener('SIGINT', abort); process.removeListener('SIGTERM', abort); }
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
-  main().catch(e => { console.error(`ERROR: ${e.message}`); process.exitCode = 1; });
+  main().catch(e => {
+    console.error(`ERROR: ${e.message}`);
+    // Every failure ends with its cause and the user's choices (docs/PHASE-HANDOFF.md).
+    try {
+      const root = fs.realpathSync(path.resolve(parseArgs(process.argv.slice(2)).root ?? '.'));
+      let language = 'en';
+      try { language = readPreferences(root).userLanguage ?? 'en'; } catch {}
+      console.error(`\n${guidanceListMarkdown(failureGuidanceList(e, { root, language }), language)}`);
+    } catch {}
+    process.exitCode = 1;
+  });
 }

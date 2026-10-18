@@ -1,5 +1,73 @@
 # Unreleased
 
+- Review fixes: the hook asks for confirmation when an approval or phase
+  completion is chained after another command (`status && approve …`);
+  `survey merge --kind contracts` replaces contracts.md only while it is the
+  exact `source-spec init` skeleton; a transient retry re-checks
+  `maxAgentCalls` after its backoff; a multi-phase `phase complete` computes
+  the judge/context hashes in its dry run, so a missing dependency declaration
+  records nothing.
+- Delegated preparation surveys: `survey plan|run|status|merge --kind
+  facts|contracts|inventory` splits the source into directory/size scopes, sends
+  each to a fresh tool-free surveyor (new Copilot CLI process, or a host subagent
+  in native mode) and saves each answer as a hash-bound file under
+  `migration/surveys/`; merges build facts.md, fill the source-as-spec contracts
+  skeleton, or publish inventory shards through the existing census merge.
+  New surveyor profiles; `phaseModels.survey` (default: implementer model).
+- Upstream fidelity: phase 02 refuses untouched RULEBOOK/inventory templates;
+  findings both reviewers raise at the same source line are agreed and skip the
+  arbiter (upstream: a third rules only on disagreements); a failing in-loop
+  typecheck becomes a confirmed finding for the fixer; `install.mjs --models`
+  maps the upstream model plan per role.
+- Human gates: the hook denies agent edits of `migration/guardrails.json` and
+  asks the person to confirm `approve`, `phase complete`, `pilot prepare` and
+  `source-spec init --apply` (verified on Copilot CLI 1.0.98: non-interactive
+  sessions refuse them with "unable to ask user for confirmation").
+- Parallel resilience: rate-limit/5xx/network failures retry with backoff; a
+  unit failure blocks only that unit and its dependents; systemic failures and
+  `maxConsecutiveFailures` stop the run.
+- Progress: run summaries record startedAt/unitsCompleted; status estimates the
+  remaining time, calls and input, and names the current phase's waiting state.
+- Failure guidance for doctor checks and blocked units in status, one section
+  per distinct cause, and a 00b recommendation that follows
+  `preferences --original-runtime`.
+- Phase 01: parse Python from the import base (`make_manifest.py --prefix`);
+  an all-empty dependency map needs `--confirm-no-dependencies`. One-page phase
+  03 checklist. The test runner uses a hermetic COPILOT_HOME.
+- Review fixes: failure guidance no longer routes file or diagnostic errors
+  containing ENOENT/401/login to CLI install or sign-in, never pre-fills review
+  notes, and offers the 00b–02 bundle only in source-as-spec; `phase complete
+  00b,01,02` checks every phase before writing any receipt; status checklist/todo
+  report unknown progress with its blocker instead of "all complete"; the Python
+  parser skips `migration-kit/`/`migration/` only at the top when they are the
+  kit, and `make_manifest.py --include` keeps only source roots; `TODO(spec)`
+  blocks 00b only in source-as-spec; doctor runs the configured hook command for
+  both worker and interactive paths; accurate profile-switch warnings.
+- Align with current Copilot behavior: hook denials carry both the CLI
+  top-level and the VS Code `hookSpecificOutput` decision; hook timeouts rise
+  to 30 s (hooks fail open on timeout) and doctor times the hook; worker
+  profiles set `user-invocable: false` and CLI workers
+  `disable-model-invocation: true`; doctor lists VS Code native prerequisites
+  (1.117+, `chat.customAgentInSubagent.enabled`).
+- AI Credits: prompts lead with shared rules and end with the unit target so
+  repeated calls share a cached prefix; optional `maxRunInputBytes` stops a run
+  at a measured prompt-size budget; run summaries add `usageEstimate`.
+- Run the native backend inside VS Code only: `nativeModelVerification:
+  requested-unverified` (the default for new native installs) accepts results
+  submitted with the requested model and records the executed model as
+  unverified in attempts, run summaries, status and doctor. `host-metadata`
+  keeps the previous experimental contract; copilot-cli stays the default.
+- Add the source-as-spec preparation profile for projects without a runnable
+  original or a specification: `source-spec init|check` scaffolds source-only
+  preparation from every source file, 00b refuses unfilled `TODO(spec)` contracts,
+  and `phase complete 00b,01,02` records one user review of the whole package.
+- Every runner failure now prints its cause, impact and choices with one
+  recommended option and reasons; `guidance --message` explains other failures.
+- Add `status --format todo|checklist` so hosts show the ten phases with exactly
+  one current phase; reports start with the checklist.
+- The bundled Python dependency parser skips `migration-kit/` and `migration/`.
+- Correct the operating manual: VS Code also defaults to the CLI worker backend.
+
 - Preserve every admitted diagnostic repair job across Stop/resume, including
   undispatched dependencies; bind fresh reviews to immutable intent evidence and
   refuse downstream approval until all repair obligations are reviewed.

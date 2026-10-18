@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { lockRun, contextHash, readManifest, done } from '../lib/core.mjs';
 import { currentRecord, requireGate } from '../lib/pipeline.mjs';
-import { initializePhases, checkPreparation, startPhase, completePhase, requirePhase } from '../lib/phases.mjs';
+import { initializePhases, checkPreparation, startPhase, completePhase, requirePhase, orderedPhases } from '../lib/phases.mjs';
 import { migrationStatus } from '../lib/status.mjs';
 import { requireGuardrails } from '../lib/guardrails.mjs';
 
@@ -45,10 +45,26 @@ export function phaseCommand(root, config, action, phase, options = {}) {
   const release = lockRun(root,`phase-${action}-${phase ?? 'policy'}`);
   try {
     if (action === 'init') return initializePhases(root);
-    validate(root,config,phase,action === 'complete');
-    if (action === 'start') return startPhase(root,config,phase);
-    return completePhase(root,config,phase,options.note,{
-      tokens:usageNumber(options.tokens),subagents:usageNumber(options.subagents),model:options.model === 'unknown' ? undefined : options.model
-    });
+    // One reviewed note may cover consecutive phases (source-as-spec reviews
+    // 00b–02 as one package). Each phase is still validated and recorded in
+    // order, so a missing artifact stops the list at that phase.
+    const ids = action === 'complete' && typeof phase === 'string' && phase.includes(',') ? phase.split(',').map(p => p.trim()) : [phase];
+    if (ids.length > 1 && ids.some((id, i) => i && orderedPhases.indexOf(id) !== orderedPhases.indexOf(ids[i - 1]) + 1)) throw new Error('List consecutive phases in order, for example 00b,01,02');
+    if (ids.length > 1 && ids.some(id => !['00','00b','01','02'].includes(id))) throw new Error('Only preparation phases 00 through 02 can be completed together');
+    const confirmNoDependencies = Boolean(options['confirm-no-dependencies']);
+    const usage = {tokens:usageNumber(options.tokens),subagents:usageNumber(options.subagents),model:options.model === 'unknown' ? undefined : options.model};
+    if (action === 'start') { validate(root,config,phase); return startPhase(root,config,phase); }
+    // All or nothing: check every listed phase before writing any receipt, so
+    // one review note never records only part of a package.
+    if (ids.length > 1) {
+      validate(root,config,ids[0],true);
+      ids.forEach((id, i) => completePhase(root,config,id,options.note,{},{dryRun:true,assumePredecessor:i > 0,confirmNoDependencies}));
+    }
+    const results = [];
+    for (const id of ids) {
+      validate(root,config,id,true);
+      results.push(completePhase(root,config,id,options.note,ids.length > 1 && results.length ? {} : usage,{confirmNoDependencies}));
+    }
+    return ids.length > 1 ? results : results[0];
   } finally {release();}
 }

@@ -1,5 +1,8 @@
 # 03 — Stress-test the rules
 
+Work in the order of the [one-page checklist](../docs/STRESS-TEST-CHECKLIST.md)
+([English](../docs/STRESS-TEST-CHECKLIST.en.md)) and show it to the user.
+
 Read [phase reports and user decisions](../docs/PHASE-HANDOFF.md).
 End with its report; ask for the next decision only when needed.
 

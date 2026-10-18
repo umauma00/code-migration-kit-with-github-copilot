@@ -23,3 +23,5 @@ The runner records each judge, translate/repair, build, smoke, parity and handof
 Automatic time and usage cover activity inside the runner; they are not the total bill, which also includes the parent conversation and Rubber Duck. Verification commands that call no AI record tokens=0, subagents=0, model=none. The formal judge is recorded additionally as 00b validation activity. Several rows are separate runs or retries, not counts of completed phases.
 
 Existing upstream rows in the TSV are kept. Event IDs are tracked in migration/phases/cost-index.json so re-exporting the same completion record does not duplicate rows. A deleted TSV or one interrupted mid-write can be re-exported from the index. If a managed row is edited by hand, the mismatch is reported and the run stops. New rows appended by hand are kept.
+
+`usageEstimate` in the run summary `migration/runs/RUN_ID/summary.json` holds the measured bytes sent to and received from workers and tokens estimated as bytes ÷ 4. It is not AI Credits billing data, so cost-log.tsv keeps `tokens` as unknown.

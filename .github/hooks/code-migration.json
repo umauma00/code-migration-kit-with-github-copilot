@@ -5,7 +5,7 @@
       "type": "command",
       "bash": "node scripts/migration_hook.mjs",
       "powershell": "node scripts/migration_hook.mjs",
-      "timeoutSec": 5
+      "timeoutSec": 30
     }]
   }
 }

@@ -19,7 +19,9 @@ at every phase boundary. Show artifacts, review points and a next-action example
 use the available question tool when an answer is needed. This reporting format
 does not apply to automated workers, which keep their JSON-only contracts.
 
-1. In runtime mode (the default), keep the original implementation runnable as
+1. Without a runnable original or a specification, the user may choose
+   [source as the only specification](SOURCE-AS-SPEC.md): 00b–02 are drafted
+   from the source and reviewed once. Otherwise, in runtime mode (the default), keep the original implementation runnable as
    the executable specification and require original/mutation/parity validation.
    Explicit source-only mode instead validates source-derived preparation, then
    reviewed translation and actual target build/smoke. Handoff states behavioral
@@ -29,7 +31,11 @@ does not apply to automated workers, which keep their JSON-only contracts.
 3. Complete one phase, report the evidence, then stop. The user's explicit next
    phase invocation authorizes that phase. Never self-issue `approve` without the
    user asking you to approve the concrete artifacts. Approval is bound to hashes.
-4. Translate through the runner. CLI implementers, fixers and arbiters use read/search
+   The hook asks the person to confirm approval and phase-completion commands
+   and denies agent edits of `migration/guardrails.json`.
+4. Delegate preparation reading by scope with `survey` (fresh tool-free
+   surveyors, results as files under `migration/surveys/`); see [surveys](SURVEYS.md).
+   Translate through the runner. CLI implementers, fixers and arbiters use read/search
    tools; native host workers all use tools: [] with self-contained inputs.
    Reviewers have no tools and receive the same frozen input; when it exceeds
    maxReviewInputBytes (CLI only) both receive the same hash-bound file list and
@@ -40,8 +46,10 @@ does not apply to automated workers, which keep their JSON-only contracts.
    adherence. The runner supplies source files, candidate, rules, inventory and
    any diagnostic; reviewer profiles must keep `tools: []` (the `-read` twins keep
    read/search tools only). They never receive
-   each other's findings. An arbiter confirms or
-   rejects disputed findings with evidence. Fix only confirmed findings and
+   each other's findings. Findings both reviewers raise at the same source
+   path:line are agreed; an arbiter confirms or rejects the disputed rest with
+   evidence, defaulting to not confirmed. A failing in-loop typecheck is a
+   confirmed finding for the fixer. Fix only confirmed findings and
    review the changed output again. Do not weaken tests to clear a queue.
 6. Disk receipts, not conversation memory or file existence, determine completion.
    The receipt binds the input context, output hash and review evidence. Existing
@@ -57,18 +65,24 @@ does not apply to automated workers, which keep their JSON-only contracts.
 8. Report requested model, timing and observed usage when available. Unknown
    usage/model fields stay null; never invent measurements. Set each worker model
    explicitly in config. The runner rejects profile-level model overrides.
-9. Repeated failures signal an upstream rule/design problem. Stop at the repair
+9. Every failure ends with a report of its cause, impact and choices, one of
+   them recommended with reasons, and waits for the user's choice
+   ([When a step fails](PHASE-HANDOFF.md#when-a-step-fails)).
+   Repeated failures signal an upstream rule/design problem. Stop at the repair
    limit and propose a rule amendment rather than endlessly patching instances.
 10. Separate redesign from structural translation. In redesign mode, replace the
     rulebook bakeoff with adversarial design review and disposable module trials.
 
 Read [usage](../README.md), [contracts](CONTRACTS.md) and
 [permissions](../templates/settings.README.md) before a production run.
-The CLI remains the default automated path. In VS Code, select workerBackend:
-native and follow [native workers](NATIVE-WORKERS.md): keep the runner active,
-claim tasks, delegate to tool-free host subagents, and submit unchanged results.
-The same runner owns validation, writes, receipts and gates. Host-managed
-instruction isolation is recorded and is not equivalent to the CLI's isolation.
+The CLI worker backend (`copilot-cli`) is the default automated path in VS Code
+as well: the parent runs the runner in a terminal and the runner starts Copilot
+CLI workers. For VS Code without the Copilot CLI, the user may choose
+`workerBackend: native` with `nativeModelVerification: requested-unverified`,
+which records every executed model as unverified; follow [native workers](NATIVE-WORKERS.md).
+`host-metadata` remains experimental and cannot complete on VS Code. The same
+runner owns validation, writes, receipts and gates. Host-managed instruction
+isolation is recorded and is not equivalent to the CLI's isolation.
 Use the shared skill with Copilot, or the skill/phase prompt files with Local.
 
 ## VS Code orchestration and verification modes

@@ -58,7 +58,8 @@ test('doctor fails when installed guardrails would be silently ignored in an unt
   const check = async () => (await doctor(f.root, f.config)).checks.find(c => c.check === 'repository hooks load in Copilot CLI');
   assert.equal(cliFolderTrust(f.root), 'unknown');
   trust(['/elsewhere']);
-  assert.deepEqual([(await check()).status, (await check()).ok], ['untrusted', true]);
+  // Approval confirmations depend on the hook too, so untrusted fails even before guardrails exist.
+  assert.deepEqual([(await check()).status, (await check()).ok], ['untrusted', false]);
   writeJSON(safePath(f.root, 'migration/guardrails.json'), template);
   assert.equal((await check()).ok, false);
   trust([path.dirname(f.root)]);

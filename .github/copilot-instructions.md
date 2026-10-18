@@ -30,3 +30,8 @@ delegate the full orchestration to a child. Follow [phase handoff](../docs/PHASE
 [source-only verification](../docs/SOURCE-ONLY.md) and [built-in Rubber Duck](../docs/RUBBER-DUCK.md).
 
 Before phase work, follow [ordered workflow](../docs/ORDERED-WORKFLOW.md): initialize phase records and ask the runner for the first incomplete phase. File existence and TODO checks do not waive prerequisite reviews. [Cost logs](../docs/COST-LOG.md) use measured values or unknown.
+
+Every failure ends with its cause, impact and choices with one recommended option
+and reasons, then a question; see [When a step fails](../docs/PHASE-HANDOFF.md#when-a-step-fails).
+Show `status --format checklist` in every report. Without a runnable original or a
+specification, offer [source as the only specification](../docs/SOURCE-AS-SPEC.md).

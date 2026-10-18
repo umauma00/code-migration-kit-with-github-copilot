@@ -2,7 +2,14 @@
 
 日本語 | [English](NATIVE-WORKERS.en.md)
 
-> **実験的機能・現状では最後まで完了できません。** 本書の手順は、提出前にホストの実行メタデータで使用モデルを確認することを求めます。VS Codeは `runSubagent` で使ったモデルを親エージェントに返さないため、この確認ができず、全ジョブを `fail` で報告することになります。実案件ではCLIワーカー方式（`copilot-cli`、既定）を使ってください。VS Codeでも動作します。
+> **VS Codeだけで動かせます（実行モデル未検証）。** `nativeModelVerification` は2種類です。
+>
+> | 設定 | 提出の条件 | VS Codeでの状況 |
+> |---|---|---|
+> | `requested-unverified`（新規native導入の既定） | 呼び出し単位のモデル引数に要求モデルを渡したこと | 完了できる。記録は「実行モデル未検証」 |
+> | `host-metadata`（既存設定の省略時） | ホストの実行メタデータで使用モデルを確認したこと | VS Codeがメタデータを返さないため完了できない（実験的） |
+>
+> Copilot CLIを使える場合は、CLIワーカー方式（`copilot-cli`、既定）を推奨します。
 
 `workerBackend: "native"` は、現在のVS Codeセッションの親エージェントが
 サブエージェントを起動する方式です。Copilot CLIは起動しません。
@@ -24,8 +31,9 @@ LocalとCopilotでは委譲ツール・モデル指定方法が異なります�
 
 `doctor` は静的な設定・profileの正常性を `staticValid` で表示し、nativeの
 実行能力は `executionReady: "unknown"` とします。実モデル情報の取得・起動handle・
-完成通知・子のcancelを結ぶ正式adapterはまだありません。nativeのdoctorは終了コード1を返し、
-実行確認済みとは表示しません。Nodeの文字列一致はhost metadataの真正性を証明しません。
+完成通知・子のcancelを結ぶ正式adapterはまだありません。`host-metadata` のdoctorは終了コード1を返し、
+実行確認済みとは表示しません。`requested-unverified` のdoctorは静的検査が通れば成功し、
+`executionReady: "models-unverified"` と表示します。Nodeの文字列一致はhost metadataの真正性を証明しません。
 要求モデルを転記したり、workerの自己申告を実績にしたりしないでください。
 費用・利用記録の `observedModel` は、正式な取得経路がなければnull/unknownです。
 
@@ -81,6 +89,15 @@ native設定の `doctor` はCLIを起動せず専用プロファイルを検査�
 `--check-cli` が付いていても同じです。ホストでのプロファイル解決・モデル利用可否・
 実際のツール制限は、Nodeからの検査では保証しません。
 
+### VS Codeの前提条件
+
+最初のnative実行の前に、VS Codeで次を確認します（`doctor` の `native host requirements` に一覧を表示します。NodeからVS Codeの設定は読めません）。
+
+- VS Code 1.117以降。この版から `runSubagent` が呼び出し単位のモデル指定を受け付けます。モデルは「呼び出し時の指定 → プロファイルの `model` → 親の会話のモデル」の順で決まります。キットは常に呼び出し時の指定を使うため、プロファイルに `model` を書きません。
+- `chat.customAgentInSubagent.enabled` を有効にする。無効だと専用のnativeプロファイルをサブエージェントとして使えません。
+- 指定モデルが、このアカウントでサブエージェントに使えること（使えないモデルがあります）。
+- 担当プロファイルは `user-invocable: false` でエージェント一覧に表示しません。CLI用の担当は `disable-model-invocation: true` で、親がサブエージェントとして呼ぶこともできません。native用は親が委譲するため呼び出し可能のままです。
+
 ### モデルの指定と確認
 
 Localでは `runSubagent` のモデル引数、Copilotではホストに公開された委譲ツールの
@@ -90,6 +107,12 @@ Localでは `runSubagent` のモデル引数、Copilotではホストに公開�
 [Copilotランタイムの選択順](https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-command-reference#custom-agent-frontmatter-fields)
 には呼び出し単位の指定が記載されています。共有プラグインのプロファイルへ案件固有の
 モデルを焼き込む必要はありません。
+
+`requested-unverified` では、呼び出し単位のモデル引数に要求モデルを渡したうえで
+`submit --model` に同じ要求モデルを指定します。ホストがモデル指定を受け付けない・拒否した場合は
+`fail` にします。ホストが別モデルへフォールバックしても検出できないため、実行記録の
+`modelVerification`、runの要約の `modelVerification` と `warnings`、status・doctorに未検証と残り、
+報告でも「実行モデル未検証」と明記します。以下は `host-metadata` の手順です。
 
 Copilotランタイムは指定を実現できない場合に別モデルへフォールバックすることがあるため、
 指定できたことだけでは十分ではありません。提出前にホストが返す実行メタデータで
