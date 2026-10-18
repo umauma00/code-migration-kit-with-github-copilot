@@ -56,6 +56,8 @@
     actions, and `migration/` resolves from the shell's working directory
     against the project root (`src/db/migration` is not protected; a `cd` in the
     same command line falls back to the name match).
+  - HTTP 500 from the model (`session.error … 500`, `500 Internal Server
+    Error`) is retried like 502-504; a bare 500 elsewhere in a message is not.
 - 2026-10-18 review against Copilot CLI 1.0.98 and current VS Code docs:
   - JSON-mode failures: the CLI reports rate limits, 5xx and authentication only
     as stdout `session.error` events (stderr empty). The adapter now includes
