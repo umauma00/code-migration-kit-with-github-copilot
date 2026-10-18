@@ -27,10 +27,14 @@ export function requiredCopilotFlags(layout) {
 // Doctor, version checks and workers must share one environment: launcher
 // behavior (for example, which downloaded build runs) depends on it.
 // Prompt-mode workers load repository hooks only in a trusted folder unless
-// asked to. Without the hook, tool-assisted reviewers could read other workers'
-// records, so the runner always admits the installed repository hooks.
+// asked to. Only tool-assisted reviewers depend on the hook (it keeps them out
+// of other workers' records); every other role is limited by its CLI flags. So
+// only they admit the repository hooks, which bypasses folder trust for every
+// .github/hooks file in the project; the others follow folder trust.
 export function copilotEnv(role) {
-  return { ...process.env, COPILOT_ALLOW_ALL: 'false', GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS: 'true', MIGRATION_KIT_ROLE: role };
+  const env = { ...process.env, COPILOT_ALLOW_ALL: 'false', MIGRATION_KIT_ROLE: role };
+  if (assistedReviewerRoles.includes(role)) env.GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS = 'true';
+  return env;
 }
 export async function copilotVersion(command = 'copilot', prefixArgs = [], { cwd, signal } = {}) {
   const result = await runProcess(command, [...prefixArgs, '--version'], { cwd, signal, timeoutMs: 20000, env: copilotEnv('reviewer-rules') });

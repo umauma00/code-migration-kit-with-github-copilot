@@ -8,6 +8,9 @@ import { prepare } from './helpers.mjs';
 import { safePath } from '../lib/core.mjs';
 import { interactiveDecision, deniedRule, humanGate, parseGuardrails } from '../lib/guardrails.mjs';
 import { isTransientFailure, isSystemicFailure } from '../lib/failures.mjs';
+import { copilotEnv } from '../scripts/copilot_adapter.mjs';
+import { roles } from '../lib/core.mjs';
+import { assistedReviewerRoles } from '../lib/review.mjs';
 
 test('reading migration/ is allowed while writes to the guardrails file and the directory stay denied', t => {
   const f = prepare(t);
@@ -77,4 +80,15 @@ test('the build-loop question says builds run model-written code under the input
   const f = prepare(t);
   const reason = interactiveDecision({ toolName: 'bash', toolArgs: { command: 'node migration-kit/scripts/run_migration.mjs build-loop --note x' }, cwd: f.root }, f.root).reason;
   assert.match(reason, /model-written code/); assert.match(reason, /maxRunInputBytes/);
+});
+
+test('only tool-assisted reviewers admit repository hooks regardless of folder trust', t => {
+  const before = process.env.GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS;
+  t.after(() => { if (before === undefined) delete process.env.GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS; else process.env.GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS = before; });
+  delete process.env.GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS;
+  for (const role of assistedReviewerRoles) assert.equal(copilotEnv(role).GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS, 'true', role);
+  for (const role of [...roles, 'surveyor']) assert.equal('GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS' in copilotEnv(role), false, role);
+  // A value the person set for their own shell is passed through unchanged.
+  process.env.GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS = 'true';
+  assert.equal(copilotEnv('implementer').GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS, 'true');
 });

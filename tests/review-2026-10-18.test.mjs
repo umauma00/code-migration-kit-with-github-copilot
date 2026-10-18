@@ -76,7 +76,7 @@ test('CLI-reported model facts ignore subagent events and stay unknown when ambi
   assert.deepEqual(copilotStreamFacts(mixed).observedModels, ['a', 'b']);
 });
 
-test('runner-started workers always admit repository hooks in prompt mode', () => {
+test('runner-started tool-assisted reviewers always admit repository hooks in prompt mode', () => {
   // Copilot CLI loads repository hooks in -p only in trusted folders unless this
   // is set; without them tool-assisted reviewers could read migration/runs.
   assert.equal(copilotEnv('reviewer-rules-read').GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS, 'true');

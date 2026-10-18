@@ -10,9 +10,13 @@ The automated runner starts a fresh `copilot -p` call for each role with:
 - `--allow-tool read --deny-tool write,shell`
 - explicit `--agent` and `--model`, no fleet/autopilot; no `--no-auto-update`, which
   would make native-installer launchers run their older bundled build
-- `MIGRATION_KIT_ROLE` for the installed preToolUse backstop, and
-  `GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS=true` so prompt-mode workers load the
-  repository hook even in an untrusted folder (otherwise CLI 1.0.98 skips it)
+- `MIGRATION_KIT_ROLE` for the installed preToolUse backstop. Only the
+  tool-assisted reviewers (`reviewer-semantics-read`, `reviewer-rules-read`) also
+  get `GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS=true`, so they load the repository
+  hook even in an untrusted folder (otherwise CLI 1.0.98 skips it) and stay out
+  of other workers' records. That variable admits every `.github/hooks` file in
+  the project, so the other roles, already limited by the flags above, follow
+  folder trust
 - `--no-remote-export`, `--session-id <uuid>` and `--name "migration-kit ROLE TARGET ID8"` (the first 8 characters of the new ID):
   worker transcripts hold source code and prompts, so they stay on this machine
   instead of syncing to the GitHub account (the CLI default; the flag is accepted by 1.0.98, its effect on an authenticated account is not verified yet). The runner journals
