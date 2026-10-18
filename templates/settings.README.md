@@ -10,7 +10,9 @@ The automated runner starts a fresh `copilot -p` call for each role with:
 - `--allow-tool read --deny-tool write,shell`
 - explicit `--agent` and `--model`, no fleet/autopilot; no `--no-auto-update`, which
   would make native-installer launchers run their older bundled build
-- `MIGRATION_KIT_ROLE` for the installed preToolUse backstop
+- `MIGRATION_KIT_ROLE` for the installed preToolUse backstop, and
+  `GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS=true` so prompt-mode workers load the
+  repository hook even in an untrusted folder (otherwise CLI 1.0.98 skips it)
 
 Workers run the CLI version the user normally runs. Each call records that
 version; a change during a run is a warning in the run summary, not a stop.
@@ -54,9 +56,9 @@ commands (Copilot CLI `bash`, VS Code `run_in_terminal`) in every agent session;
 the runner's own build/test/typecheck processes are not tool calls and are not
 affected. `phase start 03|04` refuses to start without the file or a recorded
 waiver. To dissolve Step 4 for a cheap typecheck, the human removes that entry
-at a gate. Copilot CLI loads repository hooks only in trusted folders, so
-`doctor` fails when guardrails are installed in an untrusted folder; plugin
-hooks load regardless. Like upstream, this is a guardrail, not a security boundary.
+at a gate. Interactive Copilot CLI sessions load repository hooks only in trusted folders,
+so `doctor` fails when guardrails are installed in an untrusted folder; plugin
+hooks load regardless, and runner-started workers always load them. Like upstream, this is a guardrail, not a security boundary.
 
 ## Tool-assisted reviews
 

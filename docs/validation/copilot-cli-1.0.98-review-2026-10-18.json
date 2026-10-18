@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-10-18",
+  "cli": "GitHub Copilot CLI 1.0.98 (npm @github/copilot, linux-x64)",
+  "provider": "loopback test double (COPILOT_PROVIDER_*); no authenticated GitHub account, no external AI",
+  "liveVSCodeTested": false,
+  "checks": [
+    { "name": "tests/verify_cli_transport.mjs (repository layout)", "result": "pass", "detail": "doctor OK, 9 agent calls for 3 units, tools view/grep/glob or none, ambient instructions isolated, build/smoke/parity pass" },
+    { "name": "transport with layout plugin (probe variant of the same script)", "result": "pass", "detail": "plugin profile body reached the model; isolation and tool restrictions as above" },
+    { "name": "tests/verify_plugin.mjs", "result": "pass", "detail": "marketplace add/install and qualified agent IDs" },
+    { "name": "user-invocable: false profiles selected with --agent", "result": "pass", "detail": "CLI workers resolve and run (profiles added after the 2026-10-14 evidence)" },
+    { "name": "stdout-only session.error", "result": "fixed", "detail": "429/503/401 arrive only as stdout session.error with empty stderr and exit 1; before the fix the adapter reported 'failed (exit 1): ' and classified none of them; after it, 429 is transient and 401 systemic, with the cause in the message" },
+    { "name": "prompt-mode repository hooks", "result": "fixed", "detail": "untrusted repository-copy folder: hook not loaded and a tool-assisted reviewer read migration/runs; trusted folder, plugin layout, or GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS=true: denied. Workers now set the variable; re-run denied in the untrusted folder" },
+    { "name": "bakeoff B skill exposure", "result": "documented", "detail": "with --no-custom-instructions and default tools a user skill description reached the request; with --available-tools view,create,edit,glob,grep it did not" },
+    { "name": "native file input reader hook (agent-scoped PreToolUse)", "result": "pass", "detail": "trusted folder: RULEBOOK read denied, prompt.txt allowed, reader.json written; untrusted folder: hook not run, no reader.json, so the runner rejects the result" },
+    { "name": "JSONL model and usage facts", "result": "implemented", "detail": "model.call_final_result.model and result.usage (premiumRequests, totalApiDurationMs, sessionDurationMs) are present on success" }
+  ]
+}

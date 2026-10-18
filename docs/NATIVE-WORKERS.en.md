@@ -10,6 +10,8 @@
 > | `host-metadata` (when omitted in existing configs) | The executed model was confirmed from host execution metadata | Cannot complete, because VS Code returns no such metadata (experimental) |
 >
 > When the Copilot CLI is available, the CLI worker backend (`copilot-cli`, the default) is recommended.
+>
+> **Cost:** with the default inline input, the parent copies every frozen input (up to `maxReviewInputBytes`) into the subagent call and writes every returned target file again into `answer.json`. That adds parent output tokens to each of up to five calls per unit and fills the parent's context quickly, several times the CLI backend's tokens. With a repository-copy install, [file input](#file-input-nativeinput-file) removes the input copy.
 
 `workerBackend: "native"` makes the parent agent of the current VS Code session start subagents; the Copilot CLI is not started. The Node runner issues jobs, validates results, writes files and handles independent review, arbitration and fixing, approvals, completion records and resumption.
 
@@ -67,7 +69,9 @@ Native `doctor` does not start the CLI and checks the dedicated profiles, even w
 Confirm these in VS Code before the first native run (`doctor` lists them under `native host requirements`; Node cannot read VS Code settings):
 
 - VS Code 1.117 or later. From that release `runSubagent` accepts a per-call model; the model is chosen in this order: the per-call model, the profile's `model` frontmatter, then the parent conversation's model. The kit always uses the per-call model, so its profiles carry no `model`.
-- `chat.customAgentInSubagent.enabled` is on. Without it the dedicated native profiles cannot run as subagents.
+- Custom agents can run as subagents. Current VS Code allows it by default; releases that still list `chat.customAgentInSubagent.enabled` need it turned on.
+- The parent session is not on Auto. In the Copilot harness, subagents of an Auto session inherit the resolved session model instead of the requested one.
+- In the Local harness, each requested model is within the parent model's cost tier; otherwise the subagent does not run. To use the largest model for reviewers, run the parent in the same tier.
 - The requested models are allowed for subagents on this account; some models are not.
 - The worker profiles have `user-invocable: false`, so they stay out of the agent picker. The CLI worker profiles also have `disable-model-invocation: true`, so a parent never calls them as subagents; the native profiles stay callable because the parent dispatches them.
 
@@ -78,6 +82,16 @@ On Local, use `runSubagent`'s model argument; on Copilot, use the per-call model
 With `requested-unverified`, pass the requested model to the per-call model parameter and give the same requested model to `submit --model`. If the host does not accept or rejects that model, use `fail`. A host fallback to another model cannot be detected, so `modelVerification` in attempt records, `modelVerification` and `warnings` in the run summary, status and doctor all say unverified, and reports state "executed model unverified". The rest of this section is the `host-metadata` procedure.
 
 The Copilot runtime may fall back to another model when the requested one cannot be used, so successfully requesting it is not enough. Before submitting, confirm the model actually used from the execution metadata the host returns. If it differs from the request, cannot be confirmed, or the naming correspondence is unclear, use `fail`. Pass the confirmed model to `submit --model`; never copy the request's `model` or treat the model's own answer as proof. Because Node cannot independently verify the host's claim, `observedModel` in receipts stays null.
+
+## File input (nativeInput: file)
+
+Repository-copy native installs can set `"nativeInput": "file"` (`--native-input file` at install).
+
+- The runner writes each task's prompt to `migration/runs/RUN_ID/native/JOB_ID/prompt.txt`, and claim returns a short `dispatch` (path and SHA-256) instead of the full prompt. The parent passes only that `dispatch` to the subagent.
+- The worker is the `migration-native-ROLE-file` profile with `tools: ["read"]`. Its frontmatter PreToolUse hook (`migration_hook.mjs --native-file ROLE`) denies every tool other than reading, and every read other than a claimed, in-flight request file of the same role.
+- The hook leaves `reader.json` when it admits the read. The runner requires it at submission and otherwise fails the job as "the host did not run the agent-scoped hook", so a host without the hook never lets unrestricted reads through silently.
+- Agent-scoped hooks are supported by Copilot CLI 1.0.97+ and VS Code Local (preview, `chat.useHooks`, trusted workspace). The VS Code Copilot harness is unverified; the first `reader.json` check decides.
+- The output (returned JSON) is still submitted by the parent, as with inline. Whether the worker read the whole file (rather than a range) is not verifiable. Not available with plugin installs.
 
 ## Parent agent procedure
 

@@ -27,6 +27,13 @@ repository for repository-copy installations. For plugin installations, use
 `node "<absolute-plugin-root>/scripts/run_migration.mjs" translate` with the same
 target repository as cwd. Resolve the plugin root from the loaded skill/agent.
 Do not replace the runner with fleet or an unrestricted chat loop.
+Run `translate` in a background or continuing terminal and poll
+`status --format markdown`; never block on it or kill it for being slow.
+Failures name the CLI's own cause (for example `session.error rate_limit 429`).
+The configured `fixPolicy` decides whether a fixed output is reviewed again
+(`rereview`) or judged by build/smoke/parity after one fix (`single-pass`,
+upstream); `dependencyOrder` decides whether dependents wait for reviewed
+dependencies. Report both settings with the burndown.
 
 Select the execution path from config.workerBackend. For native, follow
 [native workers](../docs/NATIVE-WORKERS.md): keep the Node runner active, claim
@@ -37,7 +44,8 @@ without servicing its tasks. Never silently fall back to Copilot CLI.
 The runner performs implementation → two independent reviews → arbitration of
 disputed findings (a finding both reviewers raise at the same source path:line is
 agreed and confirmed without the arbiter; the arbiter defaults to not confirmed)
-→ confirmed fixes → re-review → hash-bound completion. Workers use
+→ confirmed fixes → re-review (skipped with `fixPolicy: single-pass`) →
+hash-bound completion. Workers use
 explicit models from config and structured results. Reviewers have no tools and
 receive identical frozen inputs; other CLI workers have read/search-only tools.
 If a unit's evidence exceeds maxReviewInputBytes, the CLI runner automatically

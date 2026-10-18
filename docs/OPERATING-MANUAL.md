@@ -50,7 +50,9 @@ does not apply to automated workers, which keep their JSON-only contracts.
    path:line are agreed; an arbiter confirms or rejects the disputed rest with
    evidence, defaulting to not confirmed. A failing in-loop typecheck is a
    confirmed finding for the fixer. Fix only confirmed findings and
-   review the changed output again. Do not weaken tests to clear a queue.
+   review the changed output again, unless the user chose `fixPolicy:
+   single-pass` (upstream Step 3: one fix, then build/smoke/parity judge it).
+   Do not weaken tests to clear a queue.
 6. Disk receipts, not conversation memory or file existence, determine completion.
    The receipt binds the input context, output hash and review evidence. Existing
    outputs without a receipt are reviewed again. Partial work is not done.

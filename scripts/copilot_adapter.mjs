@@ -19,8 +19,11 @@ export function requiredCopilotFlags(layout) {
 }
 // Doctor, version checks and workers must share one environment: launcher
 // behavior (for example, which downloaded build runs) depends on it.
+// Prompt-mode workers load repository hooks only in a trusted folder unless
+// asked to. Without the hook, tool-assisted reviewers could read other workers'
+// records, so the runner always admits the installed repository hooks.
 export function copilotEnv(role) {
-  return { ...process.env, COPILOT_ALLOW_ALL: 'false', MIGRATION_KIT_ROLE: role };
+  return { ...process.env, COPILOT_ALLOW_ALL: 'false', GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS: 'true', MIGRATION_KIT_ROLE: role };
 }
 export async function copilotVersion(command = 'copilot', prefixArgs = [], { cwd, signal } = {}) {
   const result = await runProcess(command, [...prefixArgs, '--version'], { cwd, signal, timeoutMs: 20000, env: copilotEnv('reviewer-rules') });
@@ -44,6 +47,38 @@ export async function probeWorkerAgents(command = 'copilot', prefixArgs = [], { 
   const missing = required.filter(id => !available.includes(id));
   return { ok: missing.length === 0, required, missing };
 }
+// In JSON mode the CLI reports model and session failures (rate limits, 5xx,
+// authentication, quota) only as session.error events on stdout; stderr stays
+// empty. The error text must carry them so retries and run stops can classify.
+const describeStreamError = data => {
+  const head = [data?.errorType, data?.statusCode].filter(v => v !== undefined && v !== null && v !== '').join(' ');
+  return `session.error${head ? ` ${head}` : ''}: ${String(data?.message ?? 'no message').slice(0, 1500)}`;
+};
+export function copilotStreamError(stdout) {
+  let last;
+  for (const line of String(stdout ?? '').split(/\r?\n/)) {
+    if (!line.includes('session.error')) continue;
+    try { const event = JSON.parse(line); if (event?.type === 'session.error') last = event.data ?? {}; } catch {}
+  }
+  return last ? describeStreamError(last) : '';
+}
+// Main-agent model and usage facts the CLI itself reports in the JSONL stream.
+// The model is the CLI's own record of the call, not a self-report of the model.
+export function copilotStreamFacts(stdout) {
+  const models = new Set();
+  let usage = null;
+  for (const line of String(stdout ?? '').split(/\r?\n/)) {
+    let event;
+    try { event = JSON.parse(line); } catch { continue; }
+    if (event?.agentId || event?.data?.parentToolCallId) continue;
+    if (event?.type === 'model.call_final_result' && event.data?.result === 'success' && typeof event.data.model === 'string' && event.data.model.trim()) models.add(event.data.model);
+    if (event?.type === 'result' && event.usage && typeof event.usage === 'object') {
+      const pick = ['premiumRequests', 'totalApiDurationMs', 'sessionDurationMs'].filter(k => Number.isFinite(event.usage[k]));
+      usage = Object.fromEntries(pick.map(k => [k, event.usage[k]]));
+    }
+  }
+  return { observedModel: models.size === 1 ? [...models][0] : null, observedModels: [...models], cliUsage: usage };
+}
 // Text output is presentation data: the CLI may wrap even JSON string values.
 // Only accept a completed machine-output stream and the main agent's last reply.
 export function parseCopilotOutput(stdout) {
@@ -55,8 +90,10 @@ export function parseCopilotOutput(stdout) {
     if (event.type === 'result') {
       if (event.exitCode !== 0) throw new Error(`Copilot result failed (exit ${event.exitCode})`);
       terminal = true;
-    } else if (event.type === 'session.error' || event.type === 'abort') {
-      throw new Error(`Copilot stream failed: ${event.type}`);
+    } else if (event.type === 'session.error') {
+      throw new Error(`Copilot stream failed: ${describeStreamError(event.data)}`);
+    } else if (event.type === 'abort') {
+      throw new Error('Copilot stream failed: abort');
     } else if (event.type === 'assistant.turn_start' && !event.agentId && !event.data?.parentToolCallId) {
       content = undefined;
     } else if (event.type === 'assistant.message' && !event.agentId && !event.data?.parentToolCallId) {
@@ -132,10 +169,15 @@ export function createCopilotAdapter({ command = 'copilot', prefixArgs = [] } = 
       });
     } catch (e) { Object.assign(e, versionFields); throw e; }
     try {
-      if (result.code !== 0) throw new Error(`Copilot ${role} failed (exit ${result.code}): ${result.stderr.slice(-2000)}`);
+      if (result.code !== 0) throw new Error(`Copilot ${role} failed (exit ${result.code}): ${[copilotStreamError(result.stdout), result.stderr.slice(-2000)].filter(Boolean).join('\n')}`);
       const value = validateResult(role, parseCopilotOutput(result.stdout), unit);
+      const { observedModel, observedModels, cliUsage } = copilotStreamFacts(result.stdout);
+      // A different reported model is a fallback or alias, never a silent pass.
+      const modelWarning = observedModels.length && !observedModels.includes(model)
+        ? `Copilot CLI reported model ${observedModels.join(', ')} for requested ${model}` : undefined;
       return { result: value, requestedModel: model, promptBytes, responseBytes: Buffer.byteLength(JSON.stringify(value)),
-        observedModel: null, tokens: null, aiCredits: null, ...(worker !== role ? { workerProfile: worker } : {}), ...versionFields };
+        observedModel, tokens: null, aiCredits: null, ...(cliUsage ? { cliUsage } : {}), ...(modelWarning ? { modelWarning } : {}),
+        ...(worker !== role ? { workerProfile: worker } : {}), ...versionFields };
     } catch (e) { e.result = result; Object.assign(e, versionFields); throw e; }
   };
 }

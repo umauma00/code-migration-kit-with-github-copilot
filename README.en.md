@@ -6,7 +6,7 @@ An unofficial adaptation of Anthropic's [Code Migration Kit](https://github.com/
 
 **0.2.0** supports the Agent Plugins format for VS Code and the Copilot CLI. Install the kit itself as a plugin and keep only configuration and artifacts in the project. See [plugin installation](docs/PLUGIN.en.md), [fixes and re-review of the previous version](docs/reviews/2026-10-10-copilot-rereview-fixes.md) and [upgrading an existing install](docs/UPGRADING.en.md).
 
-Reference versions: Copilot CLI **1.0.93** (provider transport also checked on 1.0.95 and 1.0.98) and VS Code **1.141.0**. The pinned upstream commit and SDK reference are recorded in [UPSTREAM.json](UPSTREAM.json). This is not an official Anthropic or GitHub distribution.
+Reference versions: Copilot CLI **1.0.98** (provider transport also checked on 1.0.93 and 1.0.95; on 1.0.98 every role's round trip in both layouts, hook loading and the error output format were checked too) and VS Code **1.142**. In VS Code 1.142 the Copilot harness is becoming the default for new sessions, and prompt files are Local-harness only (`chat.promptFilesLocations` is deprecated); use the shared `/code-migration` skill as the entry point in VS Code. The pinned upstream commit and SDK reference are recorded in [UPSTREAM.json](UPSTREAM.json). This is not an official Anthropic or GitHub distribution.
 
 **Verification status: automated tests, the offline fixture and real-CLI transport against a loopback test provider on macOS are verified. Real Copilot authentication, AI translation quality, interactive use in VS Code and live Dynamic Workflows sessions are not.** Run the small check in [LIVE-SMOKE.en.md](docs/LIVE-SMOKE.en.md) before a real project.
 
@@ -24,7 +24,7 @@ Following reviews 1 and 2, this version adds [isolated pilots](docs/PILOT.md) be
 | Completion | Hashes of output, inputs, both reviews and any arbitration are recorded. A file merely existing is never "done" |
 | Resumption | Resumes from the interrupted stage. Missing reviews or changed outputs are reviewed again |
 | Approvals | Bound to inputs, outputs and the previous stage's run ID. Re-running an upstream stage revokes downstream results and approvals |
-| VS Code | Copilot uses the shared skill; Local uses the ten phase prompt files and Local hooks |
+| VS Code | The Copilot harness (becoming the default in 1.142) uses the shared skill; Local uses the ten phase prompt files (Local only; skills are their successor) and Local hooks |
 | Dynamic Workflows | Optional experimental adapter on the same execution engine |
 
 ## Running inside VS Code only (native backend, executed model unverified)
@@ -114,8 +114,11 @@ The minimum settings in `migration/config.json`:
 | `markerPolicy` | `todo-lines-v1` for new installs: the number of lines with TODO(port) must match the trailer's todos. Existing projects without it keep the old contract |
 | `workerBackend` | `copilot-cli` (default) or `native`. Changing it revokes approvals |
 | `nativeHarness` | Required for native: `vscode-local` or `copilot`, matching the current session |
-| `concurrency` | Concurrent AI calls, default 2, reviews included |
-| `maxFixRounds`, `maxAgentCalls` | Fix rounds per unit and AI calls per run |
+| `concurrency` | Concurrent AI calls, 4 for new installs, at most 64, both reviews included. CLI workers are separate processes, so the account's rate limits, not Copilot's subagent concurrency, are the practical limit |
+| `dependencyOrder` | `auto` (new installs): hold a dependent until its dependencies have reviewed receipts only when a per-unit typecheck needs them; without one the approved scope fans out as upstream does. `reviewed` (unset, existing configs): always wait. `none`: never wait (not combinable with a typecheck) |
+| `fixPolicy` | `rereview` (unset): review a fixed output again until no confirmed finding remains. `single-pass`: as in upstream Step 3, one fix of the confirmed findings completes the unit and build/smoke/parity judge it; fewer calls and fewer blocked units |
+| `maxFixRounds`, `maxAgentCalls` | Fix rounds per unit and AI calls per run. A unit takes 3 calls when the reviews pass and 4–5 with one upstream-style fix |
+| `nativeInput` | Native only. `inline` (unset) or `file` (repository-copy installs). With `file` the parent no longer copies frozen inputs: the worker reads its request file, and a dedicated hook restricts and records the read |
 | `maxRunInputBytes` | Optional cap on the prompt bytes a run sends to workers. AI Credits are metered on tokens and usage stops when they run out, so this budgets runs between usage checks. The run summary's `usageEstimate` records measured bytes and estimated tokens (bytes ÷ 4, not billing data). The check uses completed calls, so calls already in flight (up to `concurrency`) can overshoot it |
 | `transientRetries`, `transientRetryDelayMs` | Optional. Automatic retries for rate limits (429), 5xx and network errors (default 2) and the first wait (default 5000 ms, doubling). Retries count as AI calls |
 | `maxConsecutiveFailures` | Optional. Stop dispatching after this many unit failures in a row (default 3). One unit's failure does not stop the others; failures shared by every call (sign-in, credits) stop the run at once |
@@ -289,7 +292,9 @@ The demo replaces worker responses with prepared code and really runs the Python
 - The operating rules are language-neutral, but this is not a universal translator that prepares dependency mapping, builds and equivalence checks for every language automatically.
 - Large real projects, very large single files, units that rewrite several files as one and automatic redesign are untested or unsupported.
 - A CLI response is one JSON object. Worker responses are capped at 16 MiB and are also limited by the model's own output limit.
-- Logs record the requested model and timing. Models, tokens and AI credits that cannot be measured are `null`. Call limits are not spending limits.
+- Logs record the requested model and timing. With the CLI backend they also record the model the CLI reports in its JSONL (`model.call_final_result`) and usage such as `premiumRequests`; a model different from the request is a run warning. Tokens and AI credits that cannot be measured are `null`. Call limits are not spending limits.
+- With `--output-format json` the CLI reports rate limits, 5xx and authentication errors only as `session.error` on stdout (stderr is empty). The runner reads it: 429/5xx are retried, authentication and exhausted credits stop the run, and the error message keeps the cause.
+- Each CLI worker call leaves a session under `~/.copilot/session-state`. After the migration, tidy them with the CLI's `/session` cleanup subcommands.
 - Permission restrictions and hooks are workflow controls, not an OS isolation boundary. SDK extensions and configured commands run as local code.
 - The old Bash `build_daemon.sh` is kept for compatibility. Do not run it alongside the shared runner; normally use the Node `build` stage.
 

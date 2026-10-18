@@ -6,7 +6,7 @@ Anthropicの[Code Migration Kit](https://github.com/anthropics/code-migration-ki
 
 **0.2.0** はVS Code / Copilot CLIのAgent Plugins形式に対応しました。キット本体をプラグインとして導入し、案件側では設定と成果物を管理できます。[プラグイン導入手順](docs/PLUGIN.md)、[従来版の修正と再レビュー](docs/reviews/2026-10-10-copilot-rereview-fixes.md)、[既存版からの更新](docs/UPGRADING.md)を参照してください。
 
-参照したCLIは **1.0.93**（1.0.95・1.0.98でも疑似プロバイダーとの通信を確認）、VS Codeは **1.141.0** です。固定した元コミットとSDK参照版は [UPSTREAM.json](UPSTREAM.json) に記録しています。Anthropic/GitHubの公式配布物ではありません。
+参照したCLIは **1.0.98**（1.0.93・1.0.95でも疑似プロバイダーとの通信を確認。1.0.98ではrepository/plugin両構成の全ロールの往復、hookの読み込み、エラー出力の形式も確認）、VS Codeは **1.142** です。VS Code 1.142ではCopilot harnessが新規セッションの既定になりつつあり、prompt filesはLocal harness専用（`chat.promptFilesLocations` は非推奨）です。VS Codeでは共通スキル `/code-migration` を入口にしてください。固定した元コミットとSDK参照版は [UPSTREAM.json](UPSTREAM.json) に記録しています。Anthropic/GitHubの公式配布物ではありません。
 
 **検証状況：自動テスト、オフライン題材、macOSでの実CLIと疑似プロバイダー間の通信は検証済みです。実際のCopilot認証・AIによる移植品質、VS Code上の操作、Dynamic Workflowsの実セッションは未検証です。** 実案件の前に [LIVE-SMOKE.md](docs/LIVE-SMOKE.md) の小規模確認を実施してください。
 
@@ -26,7 +26,7 @@ Anthropicの[Code Migration Kit](https://github.com/anthropics/code-migration-ki
 | 完了判定 | 出力、入力、2件のレビュー、必要な裁定結果のハッシュを保存。ファイルが存在するだけでは完了にしない |
 | 再開 | 中断した工程から再開。失われたレビューや変更された出力は再レビュー |
 | 工程の承認 | 入力・出力・前工程の実行IDに結び付ける。上流の再実行で下流結果・承認は失効 |
-| VS Code | Copilotは共通スキル、Localは10工程のprompt filesとLocal用hooksを利用 |
+| VS Code | Copilot harness（1.142で既定化が進行中）は共通スキル、Localは10工程のprompt files（Local専用・移行先はskill）とLocal用hooksを利用 |
 | Dynamic Workflows | 共通実行エンジンを使う任意の実験的アダプター |
 
 ## VS Codeだけで動かす（native方式・実行モデル未検証）
@@ -123,8 +123,11 @@ node migration-kit/scripts/run_migration.mjs doctor --check-cli
 | `markerPolicy` | 新規は`todo-lines-v1`：TODO(port)のある行数と末尾todosを照合。未指定の既存案件は従来契約を維持 |
 | `workerBackend` | `copilot-cli`（省略時）または `native`。変更は承認を失効させる |
 | `nativeHarness` | native時に必須。`vscode-local` または `copilot`。現在のセッションと合わせる |
-| `concurrency` | 同時AI呼び出し数。初期値2。レビューを含めてこの数以下 |
-| `maxFixRounds`, `maxAgentCalls` | 1単位の修正回数、1回の実行のAI呼び出し数の上限 |
+| `concurrency` | 同時AI呼び出し数。新規導入の初期値4、上限64。2つのレビューも含めてこの数以下。CLI方式では各呼び出しが別プロセスなので、Copilotのsubagent同時実行数ではなく、アカウントのレート制限が実質の上限 |
+| `dependencyOrder` | `auto`（新規導入）: 単位型チェックがあるときだけ、依存先のレビュー完了まで依存元を待たせる。型チェックがなければ上流と同じく承認範囲を一斉に展開する。`reviewed`（省略時・既存設定）: 常に待つ。`none`: 待たない（型チェックとは併用不可） |
+| `fixPolicy` | `rereview`（省略時）: 修正後に再レビューし、確定した指摘がなくなるまで繰り返す。`single-pass`: 上流Step 3と同じく、確定指摘の修正は1回で完了とし、build/smoke/parityが判定する。呼び出し数と停止する単位が減る |
+| `maxFixRounds`, `maxAgentCalls` | 1単位の修正回数、1回の実行のAI呼び出し数の上限。1単位はレビューに問題がなければ3回、上流と同じ修正1回なら4〜5回の呼び出し |
+| `nativeInput` | native専用。`inline`（省略時）または `file`（リポジトリコピー導入のみ）。`file` では親がfrozen inputを書き写さず、担当がrequestファイルを読み、専用hookが読み取りを制限・記録する |
 | `maxRunInputBytes` | 任意。1回の実行でワーカーへ送る入力の合計バイト数の上限。AI Creditsはトークン量で消費され、使い切ると利用が止まるため、区切って使用量を確認するための予算。runの要約の `usageEstimate` に実測バイト数と推定トークン数（バイト÷4、課金データではない）を残す。判定は完了した呼び出しの合計で行うため、実行中の呼び出し（最大 `concurrency` 件）の分だけ上限を超えることがある |
 | `timeoutSeconds` | 通常CLIの1ワーカー呼び出しの時間上限 |
 | `transientRetries`, `transientRetryDelayMs` | 任意。レート制限（429）・5xx・通信エラーの自動再試行の回数（既定2）と最初の待ち時間（既定5000ms、毎回倍）。再試行もAI呼び出し数に数える |
@@ -298,7 +301,9 @@ npm run demo
 - 運用ルールは言語共通ですが、各言語の依存解析・ビルド・同等性判定を自動で用意する万能変換器ではありません。
 - 大規模実案件、巨大な1ファイル、複数ファイルを一体で書き換える単位、再設計の自動実行は未検証・未対応です。
 - CLI応答は1つのJSONです。ワーカー応答の取り込み上限は16 MiB。モデル自体の出力上限にも制約されます。
-- ログには要求モデルと時間を保存します。実測できないモデル・トークン・AI creditsは `null` です。呼び出し上限は料金上限ではありません。
+- ログには要求モデルと時間を保存します。CLI方式では、CLIがJSONLで報告する実行モデル（`model.call_final_result`）と `premiumRequests` などの使用量も記録し、要求と違うモデルはrunの警告にします。実測できないトークン・AI creditsは `null` です。呼び出し上限は料金上限ではありません。
+- CLIは `--output-format json` のとき、レート制限・5xx・認証エラーをstdoutの `session.error` だけに出します（stderrは空）。runnerはこれを読み、429/5xxは再試行、認証・クレジット切れは全体停止として扱い、エラーメッセージに原因を残します。
+- CLIワーカーの呼び出しごとに `~/.copilot/session-state` にセッションが残ります。移行後はCLIの `/session` のcleanup系サブコマンドで整理してください。
 - 権限制限とhooksは作業上の制御であり、OSの隔離境界ではありません。SDK拡張と設定コマンドはローカルコードとして動作します。
 - Bashの旧 `build_daemon.sh` は互換用です。共通ランナーと同時実行せず、通常はNodeの `build` 工程を使ってください。
 

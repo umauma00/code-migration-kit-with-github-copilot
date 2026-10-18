@@ -22,9 +22,14 @@ For preserve mode, run a dual translation experiment:
 - A follows the rulebook exactly in a disposable workspace.
 - B receives ONLY copied source files in a separate directory outside the repo
   and an instruction to port them idiomatically. No parent conversation, rulebook,
-  inventory or migration skill is passed to B. Use a fresh isolated session: CLI projects use `--no-custom-instructions`;
-  native projects use host-native isolated tool-free dispatch with the requested
-  model verified in host metadata. Verify personal customization does not leak.
+  inventory or migration skill is passed to B. Run B as a fresh `copilot -p` process
+  in that directory with `--no-custom-instructions --disable-builtin-mcps
+  --available-tools view,create,edit,glob,grep --allow-tool write` and
+  `--model` set to phaseModels.stressB (the exact command is in the checklist).
+  `--no-custom-instructions` alone still exposes user and plugin skill
+  descriptions; leaving `skill` out of `--available-tools` keeps them out. Use the
+  same terminal command in VS Code: a subagent of this chat inherits its context
+  (Local subagents also inherit workspace instructions with the kit's block).
   The kit does not pretend that a second worktree alone provides this isolation.
 - A separate inspector formats both outputs and classifies differences:
   rulebook right, native right, both defensible or both wrong. Cite evidence.

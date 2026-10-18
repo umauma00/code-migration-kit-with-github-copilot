@@ -40,7 +40,7 @@ test('doctor times the hook and lists native host prerequisites', async t => {
   Object.assign(f.config, { workerBackend: 'native', nativeHarness: 'vscode-local', nativeModelVerification: 'requested-unverified' });
   writeJSON(safePath(f.root, 'migration/config.json'), f.config);
   const native = await doctor(f.root, loadConfig(f.root));
-  assert.match(native.checks.find(c => c.check === 'native host requirements').requirements.join('\n'), /1\.117[\s\S]*chat\.customAgentInSubagent\.enabled/);
+  assert.match(native.checks.find(c => c.check === 'native host requirements').requirements.join('\n'), /1\.117[\s\S]*chat\.customAgentInSubagent\.enabled need it[\s\S]*not on Auto[\s\S]*cost tier/);
 });
 
 test('prompts put shared rules first and the unit-specific target last for prompt caching', t => {

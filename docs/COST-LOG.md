@@ -26,7 +26,7 @@ node migration-kit/scripts/run_migration.mjs phase complete 01 --note "依存解
 runnerはjudge、translate/repair、build、smoke、parity、handoffの各実行を自動記録する。
 失敗・中断も、回収と実行要約の保存まで到達した場合は記録する。04のsubagentsは実際に
 呼んだアダプター数で、呼ぶ前に中止した予約は含めない。1件でも使用量不明なら合計tokensも
-unknownとする。CLIで実績モデル・使用量が取得できない場合もunknown。
+unknownとする。CLI方式の model 列には、CLIがJSONLの `model.call_final_result` で報告した実行モデルを記録する（全呼び出しで取れた場合のみ。要求と違えばrunの警告）。取得できない場合と、CLIが出さないトークン数はunknown。
 
 自動記録の時間・使用量はrunner内の活動を対象とし、親の会話やRubber Duckの使用量を
 含めた総課金額ではない。AIを呼ばない検証コマンドはtokens=0、subagents=0、model=none。

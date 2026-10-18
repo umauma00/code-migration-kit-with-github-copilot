@@ -80,9 +80,28 @@ The fixed output goes through both independent reviews again.
 
 `migration/state/units/<unit-id>.json` contains stage, status, input context,
 output hash and references/hashes for model evidence in `migration/runs/`.
-Statuses can be pending, implement, review, arbitrate, fix, done or blocked.
+Statuses can be pending, implement, review, arbitrate, fix, verify-fix, done or blocked.
 The `stage` is retained on failure for resumption. A changed output or context
 invalidates the receipt; an existing nonempty file is reviewed again.
+
+With `fixPolicy: "single-pass"` a unit whose reviews confirmed findings completes
+after one fix. Its receipt keeps both reviews of the earlier candidate and adds
+`singlePass`: `reviewedOutputHash`, the fixer attempt `fix: {path, hash}`, the
+sorted `confirmed` finding references and whether an arbitration applied. The
+receipt is valid only while the fixer record's content is exactly the current
+target, every unrejected finding is in `confirmed`, and the records keep their
+hashes. A fixer that returns the reviewed candidate unchanged fails the unit. A fix
+of a typecheck-only finding has no reviews of its own, so it is reviewed as usual;
+with a unit typecheck configured, `verify-fix` runs it once and a failure returns
+the unit to the full review loop.
+
+CLI worker attempts also record `observedModel` (the CLI's `model.call_final_result`
+for the main agent, null when absent or ambiguous), `cliUsage` (`premiumRequests`,
+`totalApiDurationMs`, `sessionDurationMs` from the JSONL result) and, when the
+reported model differs from the request, `modelWarning`; run summaries list
+`observedModels` and the warning. Native file-input attempts record
+`nativeInput: "file"`; their tasks keep `prompt.txt` and the hook's `reader.json`
+next to `request.json`.
 
 Validation records have an `executionId` and reference their predecessor's
 execution ID. Gates reference the predecessor too. Starting a retry publishes
