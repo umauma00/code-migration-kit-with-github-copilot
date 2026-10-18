@@ -1,6 +1,19 @@
-# Upgrading from 0.1.0–0.1.4 to 0.1.5
+# Upgrading (0.3.0 and earlier releases)
 
 [日本語](UPGRADING.md) | English
+
+## 0.3.0 (native backend removed; chat-only operation)
+
+0.3.0 removes the VS Code subagent (native) backend; workers always run on the Copilot CLI. The AI proposes each step below in chat and runs it after you agree.
+
+1. A configuration with `workerBackend: "native"`, `nativeHarness`, `nativeModelVerification` or `nativeInput` stops with migration instructions. Set `"workerBackend": "copilot-cli"`, remove those keys, then redo judge and the translation approval.
+2. A repository copy's leftover `.github/agents/migration-native-*.agent.md` files are no longer used. The installer does not delete them, so the AI removes them after you agree.
+3. If the Copilot CLI is missing or not signed in, the AI runs `npm install -g @github/copilot` and `copilot login`; you only approve the sign-in in the browser.
+4. The AI proposes `migration/guardrails.json` from `guardrails show` and installs the agreed list with `guardrails install`. The host asks you to confirm, and that confirmation is your act.
+5. Existing configurations do not get `fixPolicy`, `dependencyOrder` or `reviewFocus` added automatically; adopting them restarts approvals.
+6. The managed block in `.github/copilot-instructions.md` is much shorter (the skill holds the detail). Reinstalling a repository copy stops with "Existing managed instructions differ"; the AI replaces the text between `<!-- code-migration-kit:start -->` and `end` after you agree, leaving your own text outside the block unchanged.
+7. Workers run as named, local-only (`--no-remote-export`) sessions whose IDs the run records keep. Worker sessions from before 0.3.0 have no recorded ID, so `sessions prune` does not touch them; tidy any that were synced to your GitHub account from the Copilot CLI's `/session` commands.
+8. Repeated build repairs can be one agreed `build-loop` grant.
 
 ## 2026-10-17 update (CLI version tracking, guardrails, tool-assisted review, diagnostics, language)
 
@@ -8,7 +21,7 @@ Existing approvals and completion records are revoked because the kit's files ch
 
 1. Workers start without `--no-auto-update` and run the CLI version you normally use. A version change during a run produces a warning and is kept in the run's `cliVersions` and `warnings`. Confirm with `doctor --check-cli` that every worker ID resolves.
 2. For a repository copy, take the new profiles `.github/agents/migration-reviewer-semantics-read.agent.md` and `migration-reviewer-rules-read.agent.md` from a temporary install (used by tool-assisted review). Plugins get them by updating.
-3. Starting 03 and 04 requires `migration/guardrails.json`. Copy `templates/guardrails.json` and edit it for the target's build and test commands (agents never create it). For a repository copy, trust the folder in the Copilot CLI.
+3. Starting 03 and 04 requires `migration/guardrails.json`. Copy `templates/guardrails.json` and edit it for the target's build and test commands (agents never create it). From 0.3.0 the AI proposes it with `guardrails show` and, after you agree, installs it with `guardrails install` (the host asks you to confirm). For a repository copy, trust the folder in the Copilot CLI.
 4. When a build fails, `repair-round` runs diagnosis, the repair queue and the repairs in one step.
 5. Set the report language with `run_migration.mjs preferences --language ja|en`. It is stored in `migration/preferences.json` and does not affect approvals.
 6. In VS Code too, use the default CLI worker backend instead of native. The native backend is experimental.

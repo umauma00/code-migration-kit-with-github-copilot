@@ -22,6 +22,7 @@ async function repairFixture(t, { count = 3, concurrency = 2 } = {}) {
   for (const id of ['00', '00b', '01', '02']) phaseCommand(f.root, f.config, 'complete', id, { note: 'Test fixture reviewed preparation only' });
   await runStage(f.root, f.config, 'judge');
   phaseCommand(f.root, f.config, 'complete', '03', { note: 'Synthetic stress fixture only' });
+  fs.copyFileSync(path.join(kitRoot, 'templates/guardrails.json'), safePath(f.root, 'migration/guardrails.json'));
   approve(f.root, f.config, 'translation', 'Fixture authorizes these exact outputs');
   await translate(f.root, f.config, fake);
   approve(f.root, f.config, 'build', 'Fixture build snapshot'); await runStage(f.root, f.config, 'build');

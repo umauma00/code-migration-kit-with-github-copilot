@@ -22,7 +22,7 @@
 
 See [the change table and remaining implementation](plans/2026-10-15-review-implementation.md). The records below are older.
 
-For the specification and verification scope of the native host connection, see [VS Code native workers](NATIVE-WORKERS.en.md#verification-scope); added tests are in [native-workers.test.mjs](../tests/native-workers.test.mjs). Model delegation in a real VS Code is distinct from the offline connection tests.
+The VS Code native backend was removed in 0.3.0; the native records below are history.
 
 In the 2026-10-12 pre-commit re-verification, a race where a native client read an empty run lock during startup was found. A deterministic reproduction test was added and the lock is now published atomically; afterwards 112 of 113 passed, 0 failed, 1 skipped.
 

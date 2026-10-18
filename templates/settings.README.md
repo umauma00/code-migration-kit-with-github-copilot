@@ -10,7 +10,23 @@ The automated runner starts a fresh `copilot -p` call for each role with:
 - `--allow-tool read --deny-tool write,shell`
 - explicit `--agent` and `--model`, no fleet/autopilot; no `--no-auto-update`, which
   would make native-installer launchers run their older bundled build
-- `MIGRATION_KIT_ROLE` for the installed preToolUse backstop
+- `MIGRATION_KIT_ROLE` for the installed preToolUse backstop. Only the
+  tool-assisted reviewers (`reviewer-semantics-read`, `reviewer-rules-read`) also
+  get `GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS=true`, so they load the repository
+  hook even in an untrusted folder (otherwise CLI 1.0.98 skips it) and stay out
+  of other workers' records. That variable admits every `.github/hooks` file in
+  the project, so the other roles, already limited by the flags above, follow
+  folder trust
+- `--no-remote-export`, `--session-id <uuid>` and `--name "migration-kit ROLE TARGET ID8"` (the first 8 characters of the new ID):
+  worker transcripts hold source code and prompts, so they stay on this machine
+  instead of syncing to the GitHub account (the CLI default; the flag is accepted by 1.0.98, its effect on an authenticated account is not verified yet). The runner journals
+  each ID before the call (`migration/runs/<run>/cli-sessions.jsonl`) and the
+  attempt or survey record keeps it as `cliSessionId`; `sessions status | prune`
+  reports or deletes exactly those sessions, never the user's own
+- no launcher wrapper: the CLI (Node) raises its own soft open-file limit to the
+  hard limit (macOS defaults the soft limit to 256). `doctor --check-cli` reports
+  the hard limit and warns below 4096 (the need is per process); raising it needs
+  the person or an administrator
 
 Workers run the CLI version the user normally runs. Each call records that
 version; a change during a run is a warning in the run summary, not a stop.
@@ -47,16 +63,19 @@ judge files under version control. No worker may change its own grader.
 ## Command guardrails (upstream settings.json denies)
 
 Copilot has no repository setting that denies shell commands. The upstream
-`.claude/settings.json` deny list is therefore `templates/guardrails.json`,
-copied by the human to `migration/guardrails.json` before phase 03 and adapted
-to the target's build/test commands. The preToolUse hook denies matching shell
+`.claude/settings.json` deny list is therefore `migration/guardrails.json`,
+installed before phase 03 from `templates/guardrails.json` and adapted to the
+target's build/test commands. Installing it stays the human's act in chat-only
+use: the agent proposes the list (`run_migration.mjs guardrails show`) and runs
+`guardrails install` only after agreement, and the host asks the person to
+confirm that exact command. Any other agent write of the file is denied. The preToolUse hook denies matching shell
 commands (Copilot CLI `bash`, VS Code `run_in_terminal`) in every agent session;
 the runner's own build/test/typecheck processes are not tool calls and are not
 affected. `phase start 03|04` refuses to start without the file or a recorded
 waiver. To dissolve Step 4 for a cheap typecheck, the human removes that entry
-at a gate. Copilot CLI loads repository hooks only in trusted folders, so
-`doctor` fails when guardrails are installed in an untrusted folder; plugin
-hooks load regardless. Like upstream, this is a guardrail, not a security boundary.
+at a gate. Interactive Copilot CLI sessions load repository hooks only in trusted folders,
+so `doctor` fails when guardrails are installed in an untrusted folder; plugin
+hooks load regardless, and runner-started workers always load them. Like upstream, this is a guardrail, not a security boundary.
 
 ## Tool-assisted reviews
 

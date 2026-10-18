@@ -8,12 +8,38 @@ description: Run a staged, behavior-preserving language migration with GitHub Co
 For config.executionPurpose `pilot`, follow [pilot execution](../../../docs/PILOT.md)
 using pilot run and the sealed grant; do not initialize production phase records
 or manufacture a phase-03 result. Otherwise follow the production sequence below.
-Read [preparation audits](../../../docs/PREPARATION-AUDITS.md) for 00b/01/02 and
-[execution scopes](../../../docs/EXECUTION-SCOPES.md) for approved batches/repair queues.
 
-Read the [operating manual](../../../docs/OPERATING-MANUAL.md) and [usage](../../../README.md).
+## Read only what the current step needs
+
+Read the [operating manual](../../../docs/OPERATING-MANUAL.md) first: it is the short
+canonical rule set. Do not read the README or the other kit documents up front;
+the parent's context is the migration's most expensive shared resource. Open a
+document when the current phase prompt links it or a step needs it:
+[preparation audits](../../../docs/PREPARATION-AUDITS.md) for 00b/01/02,
+[execution scopes](../../../docs/EXECUTION-SCOPES.md) for approved batches/repair queues, and
+[usage](../../../README.md) for installation or configuration questions. On resumption,
+re-read the current phase prompt, not the whole kit.
 Locate the installed kit at `migration-kit/`; when maintaining the kit itself,
 its scripts and prompts are at repository root.
+
+## Chat only: the person never types commands
+
+The person drives the whole migration from this chat. Run every command yourself
+in the terminal (a background or continuing terminal for long runs) and report the
+results in chat. The person's own acts are chat answers, the host's confirmation of
+human-gate commands (`approve`, `phase complete`, `pilot prepare`,
+`source-spec init --apply`, `guardrails install`) and, once, approving the Copilot
+CLI sign-in in the browser. Do not hand them commands to type.
+
+Workers always run as Copilot CLI processes, also from VS Code. Before
+initialization check `copilot --version`; afterwards `run_migration.mjs doctor
+--check-cli`. If the CLI is missing, explain why it is required, ask with the
+question tool and, after a yes, run `npm install -g @github/copilot` (Node 22+; on a
+permission error, show the cause and choices from `run_migration.mjs guidance`).
+If it is not signed in (doctor or a worker reports "To authenticate" or
+`session.error authentication`), ask, then run `copilot login` in a background
+terminal, show the URL and any one-time code it prints in chat, wait for it to
+finish and run doctor again. Signing in to VS Code does not sign in the CLI.
 
 ## Report language (first step)
 
@@ -68,8 +94,7 @@ independent review of the package, show one report and record
 In 00, 00b (source-as-spec) and 02, do not read the whole codebase yourself on
 anything but a small repository. Use [surveys](../../../docs/SURVEYS.md): `survey run --kind
 facts|contracts|inventory` sends each scope to a fresh tool-free surveyor (a new
-Copilot CLI process, or a host subagent in native mode) and saves its answer as a
-file; `survey merge` builds the draft you review. Check cited lines before relying
+Copilot CLI process) and saves its answer as a file; `survey merge` builds the draft you review. Check cited lines before relying
 on them; merged drafts still go through the phase's audits and the human gate.
 
 ## When a step fails
@@ -87,9 +112,16 @@ Before routing a configured project, run `run_migration.mjs phase init`, then
 `phase next`. Follow [ordered workflow](../../../docs/ORDERED-WORKFLOW.md).
 Run only the first incomplete phase; use `phase start ID` before work. For 03,
 work through and show the [one-page checklist](../../../docs/STRESS-TEST-CHECKLIST.md). Phases
-03/04 need human-installed `migration/guardrails.json`; ask the human, never create it
-(the hook denies agent edits of it). The host asks the person to confirm every
-`approve` / `phase complete` command; if it cannot ask, hand them the command to run. An explicit
+03/04 need `migration/guardrails.json`, the human's decision: propose the list from
+`guardrails show` adapted to this target's build/test commands (or a waiver with its
+reason), and after their agreement in chat run `guardrails install` with exactly
+those options. Never write the file any other way (the hook denies it). The host
+asks the person to confirm every `approve` / `phase complete` / `guardrails install`
+command; if it cannot ask (autopilot denies the request), tell the person to leave
+autopilot and retry instead of working around it. Run gate commands only in an
+interactive session without autopilot, which denies them. The Copilot CLI may show
+its own permission prompt after the hook's question, so the person can be asked
+twice. An explicit
 request for a later phase does not waive missing earlier reviews. Do not route
 from file existence. After user review, record early phases with `phase complete
 ID --note TEXT`; runner receipts determine implementation and validation phases.
@@ -97,40 +129,45 @@ Keep all ten phases visible. Source-only 05c needs an explicit unverified-mode
 acknowledgment before handoff. Record known host usage with completion;
 [main-format cost logs](../../../docs/COST-LOG.md) use unknown where unavailable.
 
-## Worker execution backend
+## Worker execution
 
-Choose the worker backend with the user at initialization. The default
-`copilot-cli` backend applies in VS Code as well: the parent runs the Node
-runner in a terminal and the runner starts isolated Copilot CLI workers
-(signed-in Copilot CLI required; each worker's model is fixed by `--model` and
-instruction isolation is verified). When the Copilot CLI is not
-available or the user wants to run inside VS Code only, offer `native` with
-`nativeModelVerification: requested-unverified` (the installer default for
-native): host subagents do the work and every record states that the executed
-model is unverified. State that trade-off before the user chooses; never switch
-on your own. `host-metadata` stays EXPERIMENTAL and cannot complete on VS Code
-today. Preserve existing config; changing backend requires fresh judge
-validation and translation approval, not a silent switch during a run.
+Workers are isolated Copilot CLI processes started by the Node runner: `--model`
+fixes each worker's model, tools are restricted and implicit instructions are
+excluded (verified on a real CLI). In VS Code the parent runs the runner in the
+integrated terminal. A configuration from the removed VS Code subagent backend
+stops with migration instructions: show them, and after the person's OK set
+`"workerBackend": "copilot-cli"`, remove the listed keys and redo judge and the
+translation approval.
 
-When config.workerBackend is native, follow [native workers](../../../docs/NATIVE-WORKERS.md).
-First confirm doctor's `native host requirements` with the user (VS Code 1.117+,
-`chat.customAgentInSubagent.enabled`, models allowed for subagents).
-Keep the runner active in a continuing terminal, claim pending jobs, delegate
-the exact prompt to the named tool-free host subagent with the requested model,
-and submit unchanged results. Dispatch independent jobs in parallel within the
-configured and host limits. The parent must service jobs while the runner waits.
-Do not inherit the parent conversation or add other reviewers' results.
-If the required model/profile/tools cannot be selected, report a failed job;
-never substitute the parent agent, edit the target, or fall back to CLI.
-Select the model through the host's actual per-call model parameter, not prompt
-text. With `host-metadata`, check host execution metadata before submitting and
-fail the job if it is absent, different or ambiguous. With
-`requested-unverified`, submit with `--model` equal to the model you passed to
-the host's per-call model parameter; if the host offers no per-call model
-selection or rejects that model, fail the job instead. Never echo a model you
-did not request, ask the worker to identify itself, or describe the result as a
-verified model; reports say 「実行モデル未検証」/ "executed model unverified".
-On cancellation stop host workers too; only the runner's receipts establish done.
+At initialization also offer these settings as the user's choice. `fixPolicy`:
+`rereview` (default; a fixed output is reviewed again until no confirmed finding
+remains) or `single-pass` (upstream Step 3: one fix of the confirmed findings,
+then build/smoke/parity judge it; fewer calls and fewer blocked units).
+`dependencyOrder: auto` (new installs) lets the approved scope fan out like
+upstream and holds dependents for reviewed dependencies only when a per-unit
+typecheck needs them. `concurrency` (up to 64, both reviewers included) should
+stay within the account's rate limits. `reviewFocus`: `shared` (new installs; both
+reviewers check semantics and rules, each from its own lens first) or
+`specialized` (one check each, upstream's split). Changing any of them revokes approvals.
+
+Run a long `translate` or `build-loop` in a background or continuing
+terminal and poll `status --format markdown`; never block the parent on it or kill
+it for being slow. When status shows a worker retrying after a transient failure
+(rate limit, service error), tell the user at once: the runner waits and retries
+by itself; if it persists, offer a lower `concurrency` after the run.
+
+After a failed build, propose `build-loop --note TEXT [--max-rounds N]
+[--max-calls N]` (defaults 5 rounds and `maxAgentCalls` AI calls for the whole
+loop; say both numbers): one host-confirmed grant that rebuilds, parses errors
+into the repair queue, runs reviewed repairs and stops when clean, at the round
+or call limit, or when the error count stops falling (then propose a rule
+amendment). While it runs, other runner commands are refused; poll `status`.
+Show the round counts and calls used.
+
+Workers are local-only (`--no-remote-export`), named Copilot CLI sessions whose
+IDs the runner journals before each call (retries and interrupted calls included); their transcripts contain source code. After the
+migration, report `sessions status` and, only if the user agrees, run
+`sessions prune` (it deletes only the kit's own worker sessions).
 
 Use `run_migration.mjs status` for progress. Never silently install policies,
 change models, approve a stage, increase limits, weaken tests, or declare partial
@@ -138,8 +175,8 @@ outputs complete. The user's explicit instruction can authorize a concrete gate.
 
 ## Parent-session phase ownership
 
-The top-level user-facing session retains phase planning, TODO display, questions
-and native dispatch. Using an orchestrator agent for planning never transfers
+The top-level user-facing session retains phase planning, TODO display and
+questions. Using an orchestrator agent for planning never transfers
 the whole migration to a child. If invoked as a subagent, it returns the plan,
 status and decisions to the parent; it does not update TODO or ask questions.
 Local subagents cannot use TODO/question tools. Before long work, show all ten

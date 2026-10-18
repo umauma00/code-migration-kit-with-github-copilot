@@ -6,10 +6,11 @@ Work in the order of the [one-page checklist](../docs/STRESS-TEST-CHECKLIST.md)
 Read [phase reports and user decisions](../docs/PHASE-HANDOFF.md).
 End with its report; ask for the next decision only when needed.
 
-Command guardrails: `phase start 03` refuses to start until the human has copied
-`templates/guardrails.json` to `migration/guardrails.json` (adapted to this target) or
-recorded a waiver there. Never create, edit or relax that file yourself: installing it is
-the human's act, because that is when they decide the referee price. If a guardrail
+Command guardrails: `phase start 03` refuses to start without `migration/guardrails.json`
+(adapted to this target) or a recorded waiver. Installing it is the human's act, because
+that is when they decide the referee price: propose the list from `guardrails show` in
+chat, and only after their agreement run `guardrails install` with exactly those options;
+the host asks them to confirm it. Never create, edit or relax the file any other way. If a guardrail
 denies a command, that is the design working; report it instead of routing around it.
 Run `doctor` and confirm `repository hooks load in Copilot CLI` is not failing.
 
@@ -22,9 +23,14 @@ For preserve mode, run a dual translation experiment:
 - A follows the rulebook exactly in a disposable workspace.
 - B receives ONLY copied source files in a separate directory outside the repo
   and an instruction to port them idiomatically. No parent conversation, rulebook,
-  inventory or migration skill is passed to B. Use a fresh isolated session: CLI projects use `--no-custom-instructions`;
-  native projects use host-native isolated tool-free dispatch with the requested
-  model verified in host metadata. Verify personal customization does not leak.
+  inventory or migration skill is passed to B. Run B as a fresh `copilot -p` process
+  in that directory with `--no-custom-instructions --disable-builtin-mcps
+  --available-tools view,create,edit,glob,grep --allow-tool write` and
+  `--model` set to phaseModels.stressB (the exact command is in the checklist).
+  `--no-custom-instructions` alone still exposes user and plugin skill
+  descriptions; leaving `skill` out of `--available-tools` keeps them out. Use the
+  same terminal command in VS Code: a subagent of this chat inherits its context
+  (Local subagents also inherit workspace instructions with the kit's block).
   The kit does not pretend that a second worktree alone provides this isolation.
 - A separate inspector formats both outputs and classifies differences:
   rulebook right, native right, both defensible or both wrong. Cite evidence.
@@ -58,6 +64,6 @@ production fan-out based on your own favorable report.
 In source-only mode, prototype against source-derived contracts and adversarial
 target scenarios; do not require the original runtime. Clearly distinguish target
 execution from inferred parity, report unverified assumptions, and keep disposable
-receipts separate. Use the configured native backend for native pilots.
+receipts separate.
 Before resolving difficult prototype or test-design questions, follow
 [built-in Rubber Duck](../docs/RUBBER-DUCK.md); advice does not replace two reviews.

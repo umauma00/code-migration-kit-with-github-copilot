@@ -1,5 +1,8 @@
 # 互換性・並列化調査を反映する統合案
 
+> アーカイブ：0.3.0で削除したnative（VS Codeサブエージェント）ワーカー方式を扱う記録です。
+> 参照先の `docs/NATIVE-WORKERS.md`、`lib/native-workers.mjs`、`tests/native-workers.test.mjs` は現在存在しません。
+
 2026-10-14。対象は `feat/github-copilot-migration-kit`。
 [互換性レビュー](../reviews/2026-10-14-sol56-max-review.md)と
 [並列化調査](../reviews/2026-10-14-copilot-parallel-orchestration.md)を統合した。

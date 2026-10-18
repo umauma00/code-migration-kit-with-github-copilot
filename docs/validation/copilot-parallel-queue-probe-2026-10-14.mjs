@@ -1,4 +1,5 @@
 // Offline fixed-delay simulation of host dispatch policies, not real AI timing.
+// Archive: not runnable since 0.3.0, which removed lib/native-workers.mjs.
 import fs from 'node:fs';
 import {setTimeout as delay} from 'node:timers/promises';
 import {prepare,result} from '../../tests/helpers.mjs';

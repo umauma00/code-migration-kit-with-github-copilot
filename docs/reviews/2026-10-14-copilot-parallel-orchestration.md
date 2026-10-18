@@ -1,5 +1,8 @@
 # Copilotの同期・非同期委譲と並列オーケストレーション
 
+> アーカイブ：0.3.0で削除したnative（VS Codeサブエージェント）ワーカー方式を扱う記録です。
+> 参照先の `docs/NATIVE-WORKERS.md`、`lib/native-workers.mjs`、`tests/native-workers.test.mjs` は現在存在しません。
+
 2026-10-14。現在の `feat/github-copilot-migration-kit` の実装、各プロンプト、
 公式資料、公開ホストソースを調査した。実行コード・プロンプトは変更していない。
 
@@ -12,7 +15,7 @@ nativeは[共通スキル](../../skills/code-migration/SKILL.md#L74)とorchestra
 結果回収は実装されていない。Copilotのtaskを親が使う場合、その既定のsync呼び出しに
 任せる余地がある。実際に親がどの引数を渡したかは実セッションの記録を確認する必要がある。
 
-[native request](../../lib/native-workers.mjs#L111)も、エージェント・モデル・promptは持つが、
+native request（`lib/native-workers.mjs`）も、エージェント・モデル・promptは持つが、
 ホストの起動modeや子エージェントIDを持たない。
 `config.mode` はpreserve/redesignという移植方式で、同期・非同期の指定ではない。
 
@@ -183,7 +186,7 @@ Aの実装100ms、独立Bの実装1800ms、Aに依存するCの実装1200ms、�
 
 - [観測値とイベント列](../validation/copilot-parallel-orchestration-2026-10-14.json)
 - [再現用の固定応答スクリプト](../validation/copilot-parallel-queue-probe-2026-10-14.mjs)
-  は `node docs/validation/copilot-parallel-queue-probe-2026-10-14.mjs` で実行できる。
+  は `node docs/validation/copilot-parallel-queue-probe-2026-10-14.mjs` で実行できた（0.3.0以降は実行不可）。
   使い捨て案件を/tmpに作り、モデルやCopilot CLIは呼ばない。
 
 ## 残る検証と優先順

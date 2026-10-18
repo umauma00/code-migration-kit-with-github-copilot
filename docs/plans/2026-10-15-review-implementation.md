@@ -1,5 +1,8 @@
 # Review 1/2 implementation, 2026-10-15
 
+> Archive: this record covers the native (VS Code subagent) worker backend removed in 0.3.0.
+> `docs/NATIVE-WORKERS.md`, `lib/native-workers.mjs` and `tests/native-workers.test.mjs` no longer exist.
+
 Base: feat/github-copilot-migration-kit at
 81b4aad2d93547afc6e6ee25b752e3f70f5ffb3c. GPT-6 Astra independently checked the
 integrated review before implementation. Upstream stays pinned to

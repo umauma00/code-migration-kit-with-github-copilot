@@ -5,7 +5,7 @@
       {
         "type": "command",
         "bash": "node \"${PLUGIN_ROOT}/scripts/migration_hook.mjs\"",
-        "powershell": "node \"${PLUGIN_ROOT}/scripts/migration_hook.mjs\"",
+        "powershell": "node \"$env:PLUGIN_ROOT/scripts/migration_hook.mjs\"",
         "timeoutSec": 30
       }
     ]

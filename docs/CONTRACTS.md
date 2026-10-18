@@ -19,16 +19,10 @@ Implementer, fixer and arbiter profiles use the concrete CLI tools view,grep,glo
 The read/search aliases are not accepted for these workers because the reference
 CLI loses search tools with those aliases.
 
-With workerBackend: native, the host session launches tool-free subagents instead.
-The [native protocol](NATIVE-WORKERS.md) binds each request and one-time claim to
-the active runner, immutable inputs and candidate. The host submits unchanged
-JSON; the shared runner validates it and alone writes targets and receipts.
-All five roles receive self-contained input. Native receipts explicitly record
-host-managed instruction isolation and a host-reported (not observed) model.
-The parent must select the model through the host's per-call parameter and check
-host execution metadata before submission. Missing or mismatched execution
-metadata is a failed job, not permission to echo the requested model. The runner
-compares the submitted model string; it does not independently attest execution.
+Workers always run as Copilot CLI processes, also when the migration is driven from
+VS Code chat. The VS Code subagent (native) backend and its claim/submit protocol
+were removed in 0.3.0; a configuration that still names it fails with migration
+instructions.
 
 ## Implementation and fix
 
@@ -44,6 +38,11 @@ coordinator chooses the destination from the manifest, not from model text.
 ```json
 {"schemaVersion":1,"kind":"review","target":"ported/example.mjs","verdict":"changes","findings":[{"id":"F1","message":"Negative values are rounded differently","evidence":"src/example.py:8 uses floor division","rule":"RULEBOOK section 2 / source behavior"}]}
 ```
+
+With `reviewFocus: "shared"` (new installs) each reviewer's contract names both
+checks, its own lens first, and asks it to report every defect either finds;
+`"specialized"` (unset, existing configs) keeps one check per reviewer as
+upstream. Either way the two never see each other's output.
 
 `pass` requires an empty findings array. `changes` requires findings. IDs must
 be unique inside a review. Reviewers cite source/rule evidence and work in
@@ -80,9 +79,29 @@ The fixed output goes through both independent reviews again.
 
 `migration/state/units/<unit-id>.json` contains stage, status, input context,
 output hash and references/hashes for model evidence in `migration/runs/`.
-Statuses can be pending, implement, review, arbitrate, fix, done or blocked.
+Statuses can be pending, implement, review, arbitrate, fix, verify-fix, done or blocked.
 The `stage` is retained on failure for resumption. A changed output or context
 invalidates the receipt; an existing nonempty file is reviewed again.
+
+With `fixPolicy: "single-pass"` a unit whose reviews confirmed findings completes
+after one fix. Its receipt keeps both reviews of the earlier candidate and adds
+`singlePass`: `reviewedOutputHash`, the fixer attempt `fix: {path, hash}`, the
+sorted `confirmed` finding references and whether an arbitration applied. The
+receipt is valid only while the fixer record's content is exactly the current
+target, every unrejected finding is in `confirmed`, and the records keep their
+hashes. A fixer that returns the reviewed candidate unchanged fails the unit. A fix
+of a typecheck-only finding has no reviews of its own, so it is reviewed as usual;
+with a unit typecheck configured, `verify-fix` runs it once and a failure returns
+the unit to the full review loop.
+
+Before every worker call (retries included) the runner appends `{id, role,
+target, at}` to `migration/runs/<run>/cli-sessions.jsonl` and passes that `id` as
+the CLI's `--session-id`; attempt and survey records also keep it as
+`cliSessionId`. Only `sessions status | prune` use them (receipts never do), and `observedModel` (the CLI's `model.call_final_result`
+for the main agent, null when absent or ambiguous), `cliUsage` (`premiumRequests`,
+`totalApiDurationMs`, `sessionDurationMs` from the JSONL result) and, when the
+reported model differs from the request, `modelWarning`; run summaries list
+`observedModels` and the warning.
 
 Validation records have an `executionId` and reference their predecessor's
 execution ID. Gates reference the predecessor too. Starting a retry publishes
@@ -140,6 +159,25 @@ checking dependencies. Build errors are not parsed generically across languages:
 select the affected manifest targets for `repair`; then approve a fresh build.
 
 ## Validation commands
+
+`build-loop --note TEXT [--max-rounds N] [--max-calls N]` is one host-confirmed
+grant (default 5, at most 50 rounds; `--max-calls` defaults to `maxAgentCalls` and
+caps the AI calls of all its repair rounds together, as does `maxRunInputBytes`
+for prompt bytes) stored as `migration/gates/build-loop-<id>.json` with its note,
+owner `pid`, current `stage`, `agentCalls`, `promptBytes` and per-round
+`{round, buildExecutionId, success, errors, targets, unmapped}`.
+Each round records an ordinary build approval whose gate carries
+`loop: {grantId, round}`, runs build, diagnoses the recorded output and, unless
+clean, repairs the queue through `translate` with the normal reviews. It stops
+`clean`, `stalled` (three rounds without a falling error count), `budget` or
+`round-limit`. Once the loop's prompt bytes reach `maxRunInputBytes` it starts no
+further repair round. A build that could not run, a stale approval or an unmapped failure
+is an error, not a round. Only build approvals may carry `loop`. A loop takes
+`migration/build-loop.lock` before it saves its grant and holds it to the end, so a
+second loop stops at start; a lock whose pid is gone is retaken. Until the grant
+has `finishedAt`, and while its pid lives, every other process's runner lock is
+refused and `status` reports `buildLoop`. In strict phase mode, translate and
+build-loop also refuse to run when `migration/guardrails.json` is missing.
 
 See [execution scopes](EXECUTION-SCOPES.md) for exact translation target grants,
 single-lock repair queues and the explicit todo-lines-v1 count contract. New

@@ -1,5 +1,8 @@
 # Native workerレビュー4件の精査と修正
 
+> アーカイブ：0.3.0で削除したnative（VS Codeサブエージェント）ワーカー方式を扱う記録です。
+> 参照先の `docs/NATIVE-WORKERS.md`、`lib/native-workers.mjs`、`tests/native-workers.test.mjs` は現在存在しません。
+
 2026-10-12。未コミットのnative worker対応に対する4件の指摘を、実装、回帰テスト、
 現行の公式仕様で再確認した。1件は根拠を訂正して運用手順を補強し、3件を修正した。
 
@@ -16,7 +19,7 @@
 
 一方、要求したモデルと実際に使用されたモデルは区別する必要がある。
 Copilotの仕様には指定を実現できない場合のフォールバックも記載されている。
-[native手順](../NATIVE-WORKERS.md#モデルの指定と確認)、各スキル、orchestratorに、
+native手順（`docs/NATIVE-WORKERS.md`）、各スキル、orchestratorに、
 実際のモデル引数で指定し、ホストの実行メタデータを確認してから提出する手順を追加した。
 メタデータがない・不一致・対応が曖昧なら `fail` とし、要求値の単純な転記や
 モデル自身の自己申告は確認として扱わない。
@@ -43,14 +46,14 @@ Copilot CLIは `--worker-backend copilot-cli` とし、Localはコピー導入�
 ## 4. 過去タスクの破損：採用・修正
 
 実行ロックに[runnerのrun ID](../../lib/pipeline.mjs)を保存し、
-[タスク一覧](../../lib/native-workers.mjs)はその実行だけを列挙するようにした。
+タスク一覧（`lib/native-workers.mjs`）はその実行だけを列挙するようにした。
 過去runのrequestを解析しないため、壊れた履歴や異常終了で閉じられなかったタスクも
 再開を妨げない。現在の未完了requestが壊れている場合は引き続きエラーにする。
 claim・submitとadapterも実行ロックのrun IDに結び付ける。
 
 ## 検証結果
 
-- [追加回帰テスト](../../tests/native-workers.test.mjs)で、指摘2・4の修正前の失敗を再現。
+- 追加回帰テスト（`tests/native-workers.test.mjs`）で、指摘2・4の修正前の失敗を再現。
 - 修正後の `npm test`：112件中111成功、失敗0、skip 1
   （大文字小文字を区別するファイルシステム専用ケース）。
 - 過去runの破損を無視した再開と、現在のrequest破損の拒否の両方を確認。
@@ -69,7 +72,7 @@ nativeクライアントが読み取って失敗するケースを検出した�
 [ロック取得](../../lib/core.mjs)を、別ファイルへ完全なJSONを書き込んでから
 ハードリンクで排他的に公開する方式へ変更した。既存ロックは上書きしない。
 
-[追加回帰テスト](../../tests/native-workers.test.mjs)で公開直後の読み取りを
+追加回帰テスト（`tests/native-workers.test.mjs`）で公開直後の読み取りを
 決定的に再現し、修正前の失敗と修正後の成功を確認した。同時取得の拒否、
 既存ロックの保持、一時ファイルの後片付けも検証した。
 最終の `npm test` は113件中112成功、失敗0、skip 1。

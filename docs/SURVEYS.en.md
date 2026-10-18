@@ -7,9 +7,8 @@ own conversation runs out of context on large repositories. `survey` splits the
 source into **scopes**, hands each scope to a fresh surveyor worker and **gets
 the results back as files**. The parent reads only the merged draft.
 
-- CLI backend: one new `copilot` process per scope (`--agent migration-surveyor`, no tools, `--no-custom-instructions`).
-- Native backend: the parent passes the runner's jobs to a VS Code subagent (`migration-native-surveyor`, no tools).
-- Either way the scope's source text is the frozen input; a surveyor never reads other files or other scopes' results.
+- One new `copilot` process per scope (`--agent migration-surveyor`, no tools, `--no-custom-instructions`), also when driven from VS Code.
+- The scope's source text is the frozen input; a surveyor never reads other files or other scopes' results.
 - Results go to `migration/surveys/<kind>/<scope-id>.json` with the scope's input hash. A current file means done; rerunning after an interruption runs only the remaining scopes.
 - One scope's failure does not stop the others; transient failures retry and systemic ones (sign-in, credits) stop the run, as in translation.
 - The model is `phaseModels.survey`, else the implementer model; `concurrency` and `maxAgentCalls` apply.

@@ -212,11 +212,14 @@ test('map audit finds both missed and invented edges and package cycles in a cle
   assert.deepEqual(packages.sourceCycle, []); assert.deepEqual(packages.targetPackageCycle, ['X', 'Y', 'X']);
 });
 
-test('native doctor separates valid static profiles from unknown execution capabilities', async t => {
-  const f = prepare(t); f.config.workerBackend = 'native'; f.config.nativeHarness = 'vscode-local';
-  const report = await doctor(f.root, f.config);
-  assert.equal(report.staticValid, true); assert.equal(report.ok, false); assert.equal(report.executionReady, 'unknown');
-  assert.equal(report.checks.find(c => c.check === 'native host capabilities').capabilities.modelExecutionEvidence, 'unknown');
+test('a configuration from the removed native backend stops with migration instructions', t => {
+  const f = prepare(t);
+  for (const patch of [{ workerBackend: 'native', nativeHarness: 'vscode-local' }, { nativeModelVerification: 'requested-unverified' }, { nativeInput: 'file' }]) {
+    writeJSON(safePath(f.root, 'migration/config.json'), { ...f.config, ...patch });
+    assert.throws(() => loadConfig(f.root), /native\) worker backend was removed[\s\S]*"workerBackend": "copilot-cli"/);
+  }
+  writeJSON(safePath(f.root, 'migration/config.json'), { ...f.config, workerBackend: 'copilot-cli' });
+  assert.equal(loadConfig(f.root).workerBackend, 'copilot-cli');
 });
 
 test('pilot cancellation rejects late work and resumes only its isolated grant', async t => {

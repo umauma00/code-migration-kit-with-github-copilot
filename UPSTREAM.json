@@ -2,8 +2,8 @@
   "repository": "https://github.com/anthropics/code-migration-kit-with-claude-code",
   "commit": "cf91c9d5068d9aaf95a36164169f08c3e636c909",
   "adaptationDate": "2026-10-08",
-  "copilotCLI": "1.0.93",
-  "vscodeReference": "1.141.0",
+  "copilotCLI": "1.0.98",
+  "vscodeReference": "1.142",
   "copilotSDKReferenceCommit": "cf245cdf76ced14d2f61dc3d908dd37cf12e0978",
   "status": "Unofficial adaptation; not endorsed by Anthropic or GitHub",
   "reviewImplementation": {
@@ -13,5 +13,10 @@
     "installedCopilotCLI": null,
     "installedVSCode": null,
     "note": "Public-main source review and offline regression tests; no authenticated AI or installed VS Code execution verified"
+  },
+  "review20261018": {
+    "date": "2026-10-18",
+    "installedCopilotCLI": "1.0.98",
+    "note": "Loopback-provider checks on CLI 1.0.98: both layouts, prompt-mode hook loading, session.error reporting, agent-scoped reader hook (native backend, removed in 0.3.0); no authenticated AI or installed VS Code execution"
   }
 }

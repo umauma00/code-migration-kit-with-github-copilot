@@ -1,0 +1,96 @@
+// SPDX-License-Identifier: Apache-2.0
+// PR #2 review follow-ups: read-only commands near migration/guardrails.json,
+// root-anchored migration/ protection, deny-list parsing, worker environment
+// and transient failure classes.
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { prepare } from './helpers.mjs';
+import { safePath } from '../lib/core.mjs';
+import { interactiveDecision, deniedRule, humanGate, parseGuardrails } from '../lib/guardrails.mjs';
+import { isTransientFailure, isSystemicFailure } from '../lib/failures.mjs';
+import { copilotEnv } from '../scripts/copilot_adapter.mjs';
+import { roles } from '../lib/core.mjs';
+import { assistedReviewerRoles } from '../lib/review.mjs';
+
+test('reading migration/ is allowed while writes to the guardrails file and the directory stay denied', t => {
+  const f = prepare(t);
+  const decide = (command, cwd = f.root) => interactiveDecision({ toolName: 'bash', toolArgs: { command }, cwd }, f.root)?.decision ?? null;
+  for (const command of ['cat migration/guardrails.json 2>/dev/null || echo none', 'cat migration/guardrails.json 2>&1 | head -20',
+    'jq . migration/guardrails.json > /tmp/out.json', "find migration -maxdepth 2 -name '*.json'", 'find migration -type f | head -20',
+    'find migration -name guardrails.json', "find src/db/migration -name '*.sql'", 'rm -rf src/db/migration', 'mv src/db/migration src/db/migrations',
+    'grep -rn denyCommands migration/ 2>/dev/null', 'ls -la migration/', 'rm -rf migration/runs', 'cat migration/guardrails.json',
+    'rsync -a migration/ /tmp/backup/']) {
+    assert.equal(decide(command), null, command);
+  }
+  for (const command of [`echo '{}' > migration/guardrails.json`, `echo '{}' | tee migration/guardrails.json`, 'cp /tmp/x migration/guardrails.json',
+    "sed -i 's/a/b/' migration/guardrails.json", `python3 -c "open('migration/guardrails.json','w').write('{}')"`,
+    `cd migration && echo '{}' > guardrails.json`, 'dd of=migration/guardrails.json if=/dev/null', 'truncate -s 0 migration/guardrails.json',
+    'rm migration/guardrails.json', 'rm -rf migration', 'mv migration migration.bak', 'git checkout -- migration/guardrails.json',
+    'git rm -f migration/guardrails.json', 'rm -rf ./migration/../migration', 'find migration -name guardrails.json -delete',
+    'find migration -exec rm {} +', 'cat migration/guardrails.json > migration/guardrails.json', ': > migration/guardrails.json',
+    'cat x >migration/guardrails.json', 'cat x 2> "migration/guardrails.json"', 'rsync -a /tmp/x/ migration', 'rsync --remove-source-files migration/ /tmp/x/']) {
+    assert.equal(decide(command), 'deny', command);
+  }
+  // Paths resolve from the shell's working directory; a cd makes that unknown.
+  const src = safePath(f.root, 'src');
+  assert.equal(decide('rm -rf ../migration', src), 'deny');
+  assert.equal(decide('Remove-Item .\\migration -Recurse'), 'deny');
+  assert.equal(decide('Remove-Item ..\\migration -Recurse', src), 'deny');
+  assert.equal(decide('rm -rf migration', src), null);
+  assert.equal(decide('cd .. && rm -rf migration', src), 'deny');
+  assert.equal(decide('rm -rf *', src), null);
+  assert.equal(decide('rm -rf *'), 'deny');
+  assert.equal(decide('rm guardrails.json'), null);
+  assert.equal(decide('rm guardrails.json', safePath(f.root, 'migration')), 'deny');
+  assert.equal(decide(`echo '{}' > guardrails.json`, safePath(f.root, 'migration')), 'deny');
+  // The denial names the file only for writes.
+  assert.match(interactiveDecision({ toolName: 'bash', toolArgs: { command: 'rm -rf migration' }, cwd: f.root }, f.root).reason, /guardrails install/);
+});
+
+test('HTTP 500 from the model is retried like 502-504; 501, sign-in and quota are not', () => {
+  const error = message => new Error(message);
+  for (const message of ['session.error server_error 500: Internal Server Error', 'session.error 500: boom', 'session.error rate_limit 429: slow down',
+    'session.error unavailable 502: Bad Gateway', 'session.error unavailable 503: Service Unavailable', 'session.error unavailable 504: Gateway Timeout']) {
+    assert.equal(isTransientFailure(error(message)), true, message);
+  }
+  for (const message of ['session.error authentication 401: Unauthorized', 'session.error quota_exceeded 402: no credits']) {
+    assert.equal(isSystemicFailure(error(message)), true, message);
+    assert.equal(isTransientFailure(error(message)), false, message);
+  }
+  for (const message of ['session.error not_implemented 501: Not Implemented', 'Copilot implementer failed (exit 1): output exceeded 500 lines']) {
+    assert.equal(isTransientFailure(error(message)), false, message);
+  }
+});
+
+test('deny rules see through shell -c strings, wrapper and git options, quoted substitutions and Windows paths', () => {
+  const rules = parseGuardrails({ schemaVersion: 1, denyCommands: ['git push', 'git reset', 'npm test', 'cargo build', 'gradlew', 'python3 -m pytest'] }).denyCommands;
+  for (const [command, rule] of [['bash -c "git push origin main"', 'git push'], [`sh -c 'npm test'`, 'npm test'], ['git -C . push', 'git push'],
+    ['env -u X git push', 'git push'], ['sudo -u bob git push', 'git push'], ['cargo --locked build', 'cargo build'], ['bash -lc "cd x && git push"', 'git push'],
+    ['pwsh -Command "git push"', 'git push'], ['echo "$(git push)"', 'git push'], ['git push origin main', 'git push'],
+    ['echo hi && git reset --hard', 'git reset'], ['cd sub && cargo build', 'cargo build'], ['.\\gradlew build', 'gradlew']]) {
+    assert.equal(deniedRule(command, rules), rule, command);
+  }
+  for (const command of ['git log --grep reset', 'git -c alias.x=reset log', 'echo "a; git push"', 'python3 -B -m pytest', 'xargs -I{} git push {}']) {
+    assert.equal(deniedRule(command, rules), null, command);
+  }
+  // Windows runner paths keep their separators, so the gate names the act.
+  assert.equal(humanGate('node migration-kit\\scripts\\run_migration.mjs approve build --note x'), 'approve build');
+  assert.equal(humanGate('node migration-kit\\scripts\\run_migration.mjs guidance --message "approve translation"'), null);
+});
+
+test('the build-loop question says builds run model-written code under the input budget too', t => {
+  const f = prepare(t);
+  const reason = interactiveDecision({ toolName: 'bash', toolArgs: { command: 'node migration-kit/scripts/run_migration.mjs build-loop --note x' }, cwd: f.root }, f.root).reason;
+  assert.match(reason, /model-written code/); assert.match(reason, /maxRunInputBytes/);
+});
+
+test('only tool-assisted reviewers admit repository hooks regardless of folder trust', t => {
+  const before = process.env.GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS;
+  t.after(() => { if (before === undefined) delete process.env.GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS; else process.env.GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS = before; });
+  delete process.env.GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS;
+  for (const role of assistedReviewerRoles) assert.equal(copilotEnv(role).GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS, 'true', role);
+  for (const role of [...roles, 'surveyor']) assert.equal('GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS' in copilotEnv(role), false, role);
+  // A value the person set for their own shell is passed through unchanged.
+  process.env.GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS = 'true';
+  assert.equal(copilotEnv('implementer').GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS, 'true');
+});
