@@ -11,7 +11,8 @@
     "liveCLIAllowAll": null,
     "liveVSCodeAsk": null,
     "liveVSCodeCopilotHarnessRepoHooks": null,
-    "liveRemoteExportOff": null
+    "liveRemoteExportOff": null,
+    "liveRepoHooksAssistedReviewersOnly": "pass on linux-x64 loopback (2026-10-18); not run on macOS/Windows"
   },
   "checks": [
     {
@@ -42,7 +43,7 @@
     {
       "name": "prompt-mode repository hooks",
       "result": "fixed",
-      "detail": "untrusted repository-copy folder: hook not loaded and a tool-assisted reviewer read migration/runs; trusted folder, plugin layout, or GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS=true: denied. Workers now set the variable; re-run denied in the untrusted folder"
+      "detail": "untrusted repository-copy folder: hook not loaded and a tool-assisted reviewer read migration/runs; trusted folder, plugin layout, or GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS=true: denied. Workers now set the variable; re-run denied in the untrusted folder. Follow-up: only tool-assisted reviewers set it; see the PR #2 follow-up check below"
     },
     {
       "name": "bakeoff B skill exposure",
@@ -74,6 +75,11 @@
       "name": "transport with layout plugin, follow-up rerun",
       "result": "pass",
       "detail": "doctor OK, 9 agent calls, no ambient instruction canary in any of 11 worker requests; profile canary intentionally not injected in this variant"
+    },
+    {
+      "name": "PR #2 follow-up: repository hooks admitted for tool-assisted reviewers only (untrusted folder, loopback)",
+      "result": "pass",
+      "detail": "2026-10-18, CLI 1.0.98 linux-x64, Node v22.22.0. tests/verify_cli_transport.mjs passed (doctor OK, 9 agent calls for 3 units, build/smoke/parity pass) with the variable only on -read roles. A probe made reviewer-rules-read view migration/runs/probe/secret.txt: with copilotEnv the hook denied it ('Tool-assisted reviewers may not read ...'); with the variable removed (control) the file content was returned"
     }
   ]
 }

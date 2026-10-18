@@ -45,6 +45,7 @@ Automated tests and the loopback checks cover prompt-mode workers only. Check th
 - **Interactive CLI (trusted folder):** have the AI run `node migration-kit/scripts/run_migration.mjs approve translation --note test`. Record that the question appears, that "No" stops the command, and whether the CLI shows its own permission prompt again after "Yes" ([copilot-cli#3042](https://github.com/github/copilot-cli/issues/3042)) (`liveCLIInteractiveAsk`).
 - **Autopilot:** confirm the same command is denied without a question (CLI 1.0.97 and later, `liveCLIAutopilot`). Also record whether `--allow-all` / `--yolo` shows the question (not documented, `liveCLIAllowAll`).
 - **VS Code:** check the same in the Local and Copilot session types (`liveVSCodeAsk`), and record whether the Copilot session type loads `.github/hooks` (`liveVSCodeCopilotHarnessRepoHooks`).
+- **Hooks in an untrusted folder:** re-run `node tests/verify_cli_transport.mjs` on an untrusted repository copy and record that the hook still applies to tool-assisted reviewers (they cannot read `migration/runs`) and that the other roles run (`liveRepoHooksAssistedReviewersOnly`).
 - **Worker session sync:** run one worker on a signed-in account and confirm its session does **not** appear in the session lists on GitHub.com and GitHub Mobile (the effect of `--no-remote-export`, `liveRemoteExportOff`).
 
 ## VS Code orchestration checklist (pending live verification)

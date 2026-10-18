@@ -117,7 +117,7 @@ export async function doctor(root, config, { checkCLI = false, command = 'copilo
     // The hook also asks before approvals and denies guardrails edits, so an
     // untrusted folder disables protections even before guardrails exist.
     checks.push({ check: 'repository hooks load in Copilot CLI', ok: trust !== 'untrusted', status: trust,
-      note: 'Interactive Copilot CLI sessions ignore .github/hooks in untrusted folders, silently disabling the guardrails, the approval confirmations and the guardrails-file protection. Start copilot interactively in this repository once and trust the folder. Runner-started workers always load the repository hooks (GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS=true), so tool-assisted reviewers stay out of other workers\' records either way.' });
+      note: 'Interactive Copilot CLI sessions ignore .github/hooks in untrusted folders, silently disabling the guardrails, the approval confirmations and the guardrails-file protection. Start copilot interactively in this repository once and trust the folder. Runner-started tool-assisted reviewers always load the repository hooks (GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS=true), so they stay out of other workers\' records either way; other workers follow folder trust and rely on their CLI tool flags.' });
   }
   if (checkCLI) {
     try {

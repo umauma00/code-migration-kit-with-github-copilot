@@ -88,9 +88,12 @@
     as stdout `session.error` events (stderr empty). The adapter now includes
     `errorType`, `statusCode` and the message, so 429/5xx retry and
     authentication/credit failures stop the run (verified on 1.0.98).
-  - Prompt-mode hooks: workers set `GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS=true`.
-    Without it, an untrusted repository-copy folder skipped the hook and a
-    tool-assisted reviewer could read `migration/runs` (reproduced on 1.0.98).
+  - Prompt-mode hooks: tool-assisted reviewers set
+    `GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS=true`. Without it, an untrusted
+    repository-copy folder skipped the hook and such a reviewer could read
+    `migration/runs` (reproduced on 1.0.98). The variable admits every
+    `.github/hooks` file regardless of folder trust, so other roles (limited by
+    their CLI tool flags) do not set it.
   - Observed model and usage: CLI attempts record `model.call_final_result` and
     `result.usage`; a model different from the request is a run warning.
   - Scheduling: `dependencyOrder` (`auto` for new installs) stops holding
