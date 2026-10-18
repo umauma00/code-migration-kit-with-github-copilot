@@ -121,7 +121,8 @@ The minimum settings in `migration/config.json`:
 | `concurrency` | Concurrent AI calls, 4 for new installs, at most 64, both reviews included. CLI workers are separate processes, so the account's rate limits, not Copilot's subagent concurrency, are the practical limit |
 | `dependencyOrder` | `auto` (new installs): hold a dependent until its dependencies have reviewed receipts only when a per-unit typecheck needs them; without one the approved scope fans out as upstream does. `reviewed` (unset, existing configs): always wait. `none`: never wait (not combinable with a typecheck) |
 | `fixPolicy` | `rereview` (unset): review a fixed output again until no confirmed finding remains. `single-pass`: as in upstream Step 3, one fix of the confirmed findings completes the unit and build/smoke/parity judge it; fewer calls and fewer blocked units |
-| `maxFixRounds`, `maxAgentCalls` | Fix rounds per unit and AI calls per run. A unit takes 3 calls when the reviews pass and 4–5 with one upstream-style fix |
+| `reviewFocus` | `shared` (new installs): both reviewers check source behavior and rule adherence, each from its own lens first, and report every defect either check finds; they never see each other's output. `specialized` (unset, existing configs): one check each, as upstream |
+| `maxFixRounds`, `maxAgentCalls` | Fix rounds per unit and AI calls per run (each translate or repair). `maxAgentCalls` is a total, not a concurrency (that is `concurrency`). A unit takes 3 calls when the reviews pass and 4–5 with one upstream-style fix |
 | `maxRunInputBytes` | Optional cap on the prompt bytes a run sends to workers. AI Credits are metered on tokens and usage stops when they run out, so this budgets runs between usage checks. The run summary's `usageEstimate` records measured bytes and estimated tokens (bytes ÷ 4, not billing data). The check uses completed calls, so calls already in flight (up to `concurrency`) can overshoot it |
 | `transientRetries`, `transientRetryDelayMs` | Optional. Automatic retries for rate limits (429), 5xx and network errors (default 2) and the first wait (default 5000 ms, doubling). Retries count as AI calls |
 | `maxConsecutiveFailures` | Optional. Stop dispatching after this many unit failures in a row (default 3). One unit's failure does not stop the others; failures shared by every call (sign-in, credits) stop the run at once |
@@ -248,9 +249,11 @@ node migration-kit/scripts/run_migration.mjs approve parity --note "Confirmed ba
 node migration-kit/scripts/run_migration.mjs parity
 ```
 
-When the build fails, run `repair-round`. The bundled parsers (Python, Java/Maven, JavaScript/Node/ESLint/tsc, shell/ShellCheck, Rust and the generic `file:line:col: error` form) read the recorded build output, build a repair queue per manifest target and run the repairs. Lines that map to no manifest target are listed, never guessed. Error counts per round are kept in `migration/build-rounds.tsv`. A fresh build after repairs still needs approval.
+When the build fails and the person agrees in chat, the AI runs `build-loop` (the host asks them to confirm). Like upstream's build daemon it repeats build → parse errors → reviewed repairs → rebuild until clean, the round limit (default 5) or the error count stops falling (`stalled`: propose a rule amendment). Every round's approval is recorded under one grant in `migration/gates/build-loop-<id>.json`. To go one round at a time, run `repair-round`. The bundled parsers (Python, Java/Maven, JavaScript/Node/ESLint/tsc, shell/ShellCheck, Rust and the generic `file:line:col: error` form) read the recorded build output, build a repair queue per manifest target and run the repairs. Lines that map to no manifest target are listed, never guessed. Error counts per round are kept in `migration/build-rounds.tsv`. A fresh build after repairs still needs approval.
 
 ```bash
+node migration-kit/scripts/run_migration.mjs build-loop --note "Up to five build repair rounds agreed" --max-rounds 5
+# One round at a time
 node migration-kit/scripts/run_migration.mjs repair-round
 node migration-kit/scripts/run_migration.mjs approve build --note "Reviewed the repairs"
 node migration-kit/scripts/run_migration.mjs build
@@ -297,7 +300,9 @@ The demo replaces worker responses with prepared code and really runs the Python
 - A CLI response is one JSON object. Worker responses are capped at 16 MiB and are also limited by the model's own output limit.
 - Logs record the requested model and timing. With the CLI backend they also record the model the CLI reports in its JSONL (`model.call_final_result`) and usage such as `premiumRequests`; a model different from the request is a run warning. Tokens and AI credits that cannot be measured are `null`. Call limits are not spending limits.
 - With `--output-format json` the CLI reports rate limits, 5xx and authentication errors only as `session.error` on stdout (stderr is empty). The runner reads it: 429/5xx are retried, authentication and exhausted credits stop the run, and the error message keeps the cause.
-- Each CLI worker call leaves a session under `~/.copilot/session-state`. After the migration, tidy them with the CLI's `/session` cleanup subcommands.
+- Each CLI worker call is a named (`migration-kit ROLE TARGET`), local-only session (`--no-remote-export`: never synced to the GitHub account) under `~/.copilot/session-state`; its ID is kept as `cliSessionId` in the run records. The transcripts contain source code, so after the migration the AI reports `sessions status` and, if the person agrees, runs `sessions prune`, which deletes only the kit's worker sessions (the host asks to confirm).
+- Parallel workers open many files. The Copilot CLI (Node) raises its own soft open-file limit to the hard limit at startup (256 → hard limit observed on 1.0.98), so the kit needs no wrapper. Only the hard limit cannot be raised that way: `doctor --check-cli` checks it and explains how to raise one below 4096.
+- Rate limits (429) and service errors are retried automatically; `status` shows a retrying worker and the AI tells the person.
 - Permission restrictions and hooks are workflow controls, not an OS isolation boundary. SDK extensions and configured commands run as local code.
 - The old Bash `build_daemon.sh` is kept for compatibility. Do not run it alongside the shared runner; normally use the Node `build` stage.
 

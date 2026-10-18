@@ -39,6 +39,11 @@ coordinator chooses the destination from the manifest, not from model text.
 {"schemaVersion":1,"kind":"review","target":"ported/example.mjs","verdict":"changes","findings":[{"id":"F1","message":"Negative values are rounded differently","evidence":"src/example.py:8 uses floor division","rule":"RULEBOOK section 2 / source behavior"}]}
 ```
 
+With `reviewFocus: "shared"` (new installs) each reviewer's contract names both
+checks, its own lens first, and asks it to report every defect either finds;
+`"specialized"` (unset, existing configs) keeps one check per reviewer as
+upstream. Either way the two never see each other's output.
+
 `pass` requires an empty findings array. `changes` requires findings. IDs must
 be unique inside a review. Reviewers cite source/rule evidence and work in
 fresh contexts. Both receive identical frozen JSON containing the current source
@@ -89,7 +94,9 @@ of a typecheck-only finding has no reviews of its own, so it is reviewed as usua
 with a unit typecheck configured, `verify-fix` runs it once and a failure returns
 the unit to the full review loop.
 
-CLI worker attempts also record `observedModel` (the CLI's `model.call_final_result`
+CLI worker attempts and survey records also record `cliSessionId`, the
+runner-chosen `--session-id` of that worker's local-only CLI session (used only by
+`sessions status | prune`; receipts never depend on it), and `observedModel` (the CLI's `model.call_final_result`
 for the main agent, null when absent or ambiguous), `cliUsage` (`premiumRequests`,
 `totalApiDurationMs`, `sessionDurationMs` from the JSONL result) and, when the
 reported model differs from the request, `modelWarning`; run summaries list
@@ -151,6 +158,16 @@ checking dependencies. Build errors are not parsed generically across languages:
 select the affected manifest targets for `repair`; then approve a fresh build.
 
 ## Validation commands
+
+`build-loop --note TEXT [--max-rounds N]` is one host-confirmed grant (default 5,
+at most 50 rounds) stored as `migration/gates/build-loop-<id>.json` with its note
+and per-round `{round, buildExecutionId, success, errors, targets, unmapped}`.
+Each round records an ordinary build approval whose gate carries
+`loop: {grantId, round}`, runs build, diagnoses the recorded output and, unless
+clean, repairs the queue through `translate` with the normal reviews. It stops
+`clean`, `stalled` (three rounds without a falling error count) or `round-limit`.
+A build that could not run, a stale approval or an unmapped failure is an error,
+not a round. Only build approvals may carry `loop`.
 
 See [execution scopes](EXECUTION-SCOPES.md) for exact translation target grants,
 single-lock repair queues and the explicit todo-lines-v1 count contract. New

@@ -8,7 +8,7 @@ import { validateWorkerProfile, assistedReviewerRoles } from '../lib/review.mjs'
 import { runProcess } from '../lib/process.mjs';
 import { approve, runStage, translate, runPilot, runJudgePreparation } from '../lib/pipeline.mjs';
 import { preparePilot } from '../lib/pilot.mjs';
-import { createCopilotAdapter, requiredCopilotFlags, copilotEnv, probeWorkerAgents } from './copilot_adapter.mjs';
+import { createCopilotAdapter, requiredCopilotFlags, copilotEnv, probeWorkerAgents, fileLimits, fileLimitMinimum } from './copilot_adapter.mjs';
 import { runtimeLayout, pluginRoot } from '../lib/runtime.mjs';
 import { migrationStatus, statusMarkdown, statusTodo, statusChecklist } from '../lib/status.mjs';
 import { failureGuidance, guidanceMarkdown, failureGuidanceList, guidanceListMarkdown, doctorGuidance } from '../lib/guidance.mjs';
@@ -16,6 +16,8 @@ import { initSourceSpec, sourceSpecReadiness } from '../lib/source-spec.mjs';
 import { runSurvey, mergeSurvey, surveyStatus, planSurvey } from '../lib/survey.mjs';
 import { phaseCommand } from './phase_cli.mjs';
 import { diagnoseBuild } from './diagnostic_queue.mjs';
+import { sessionsStatus, pruneSessions } from '../lib/sessions.mjs';
+import { buildLoop } from '../lib/build-loop.mjs';
 import { readPreferences, setPreferences, preferencesReport } from '../lib/preferences.mjs';
 import { readGuardrails, cliFolderTrust, guardrailsProposal, installGuardrails } from '../lib/guardrails.mjs';
 
@@ -27,6 +29,8 @@ export const usage = `Usage: node migration-kit/scripts/run_migration.mjs COMMAN
                               Explain a failure: cause, impact and choices with a recommendation
   preferences [--language ja|en] [--original-runtime available|unavailable]
                               Report language; whether the original can still run (guides recommendations)
+  sessions status | prune [--run RUN_ID]
+                             Report / delete the local Copilot CLI transcripts of the kit's own workers
   guardrails show | install [--add CSV] [--remove CSV] [--deny CSV] [--waiver NOTE] [--replace]
                              Propose / install migration/guardrails.json (install is a host-confirmed human gate)
   phase init | next | check ID | start ID | complete ID[,ID...] --note TEXT
@@ -45,6 +49,9 @@ export const usage = `Usage: node migration-kit/scripts/run_migration.mjs COMMAN
   repair --target PATH --evidence migration/PATH | repair --queue migration/QUEUE.json
   diagnose                   Parse the current failed build into a TSV and repair queue
   repair-round               diagnose, then repair the queue; a fresh build still needs approval
+  build-loop --note TEXT [--max-rounds N]
+                             One host-confirmed grant: build, diagnose, repair with reviews and rebuild until clean,
+                             N rounds (default 5) or the error count stops falling
   build | smoke | parity | handoff     Run one approved validation stage and stop
   unlock --pid PID           Remove a lock only after its owning process has stopped
 Options: --root PATH (default cwd), --copilot PATH (default copilot)
@@ -125,6 +132,8 @@ export async function doctor(root, config, { checkCLI = false, command = 'copilo
       checks.push({ check: 'required flags', ok: help.code === 0 && missing.length === 0, missing });
       const agents = await probeWorkerAgents(command, [], { cwd: root, layout });
       checks.push({ check: 'worker agents resolve', ...agents });
+      checks.push({ check: 'file descriptor limit', ...await fileLimits(), minimum: fileLimitMinimum,
+        note: 'Parallel CLI workers need many open files (EMFILE "Too many open files" otherwise). Each CLI process raises its soft limit to the hard limit by itself; a hard limit below the minimum must be raised by the person or an administrator.' });
     } catch (e) { checks.push({ check: 'Copilot executable', ok: false, detail: e.message }); }
   }
   const staticValid = checks.every(x => x.ok !== false);
@@ -208,6 +217,17 @@ export async function main(argv = process.argv.slice(2)) {
     }
     else if (cmd === 'judge-prepare') result = await runJudgePreparation(root, config, { signal: controller.signal });
     else if (cmd === 'phase') result = phaseCommand(root,config,args._[1],args._[2],args);
+    else if (cmd === 'build-loop') {
+      // One host-confirmed grant for build → diagnose → reviewed repairs → rebuild rounds.
+      const maxRounds = args['max-rounds'] === undefined ? 5 : Number(args['max-rounds']);
+      result = await buildLoop(root, config, createCopilotAdapter({ command: args.copilot }), { maxRounds, note: args.note, signal: controller.signal,
+        onProgress: event => console.error(`${event.unit}: ${event.stage}${event.calls === undefined ? '' : ` (agent calls ${event.calls})`}`) });
+    }
+    else if (cmd === 'sessions') {
+      if (args._[1] === 'status') result = sessionsStatus(root, { run: args.run });
+      else if (args._[1] === 'prune') result = pruneSessions(root, { run: args.run });
+      else throw new Error('Use sessions status | prune [--run RUN_ID]');
+    }
     else if (cmd === 'guardrails') {
       if (args._[1] === 'show') result = guardrailsProposal(root, pluginRoot, config);
       else if (args._[1] === 'install') {

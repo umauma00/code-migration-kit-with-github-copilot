@@ -31,8 +31,8 @@ does not apply to automated workers, which keep their JSON-only contracts.
 3. Complete one phase, report the evidence, then stop. The user's explicit next
    phase invocation authorizes that phase. Never self-issue `approve` without the
    user asking you to approve the concrete artifacts. Approval is bound to hashes.
-   The hook asks the person to confirm approval, phase-completion and
-   `guardrails install` commands and denies any other agent write of
+   The hook asks the person to confirm approval, phase-completion,
+   `guardrails install`, `build-loop` and `sessions prune` commands and denies any other agent write of
    `migration/guardrails.json`.
 4. Delegate preparation reading by scope with `survey` (fresh tool-free
    surveyors, results as files under `migration/surveys/`); see [surveys](SURVEYS.md).
@@ -43,7 +43,8 @@ does not apply to automated workers, which keep their JSON-only contracts.
    JSON. The coordinator validates and writes only the manifest target.
    Never route around a tool denial or substitute an unrestricted agent session.
 5. Two independent reviewers examine every output: source behavior and rule
-   adherence. The runner supplies source files, candidate, rules, inventory and
+   adherence (with `reviewFocus: shared`, the new-install default, each covers
+   both from its own lens first). The runner supplies source files, candidate, rules, inventory and
    any diagnostic; reviewer profiles must keep `tools: []` (the `-read` twins keep
    read/search tools only). They never receive
    each other's findings. Findings both reviewers raise at the same source
@@ -74,6 +75,9 @@ does not apply to automated workers, which keep their JSON-only contracts.
    ([When a step fails](PHASE-HANDOFF.md#when-a-step-fails)).
    Repeated failures signal an upstream rule/design problem. Stop at the repair
    limit and propose a rule amendment rather than endlessly patching instances.
+   After the human agrees, `build-loop` runs upstream's build-until-clean rounds
+   under one host-confirmed grant and stops by itself when the error count stalls.
+   When status reports a worker retrying (rate limit, service error), tell the user.
 10. Separate redesign from structural translation. In redesign mode, replace the
     rulebook bakeoff with adversarial design review and disposable module trials.
 

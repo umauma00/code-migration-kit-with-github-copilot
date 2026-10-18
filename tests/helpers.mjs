@@ -20,7 +20,7 @@ export function prepare(t, { realCommands = false, count = 1, model = 'test-doub
   // policy and preparation gates have dedicated user-operation coverage.
   delete config.markerPolicy;
   // Scheduling and fix-loop defaults for new installs have dedicated tests.
-  delete config.dependencyOrder; delete config.fixPolicy;
+  delete config.dependencyOrder; delete config.fixPolicy; delete config.reviewFocus;
   config.concurrency = 2;
   for (const name of ['original', 'mutation', 'build', 'smoke', 'parity']) {
     config.commands[name] = realCommands ? ['python3', '-B', 'tests/judge.py', name] : [process.execPath, '-e', 'console.log("test command OK")'];

@@ -35,7 +35,7 @@ stop and ask the human for a design decision instead of a third wording.
 ```bash
 mkdir /tmp/bakeoff-b && cp SOURCE_FILES /tmp/bakeoff-b/   # copies only, not a checkout
 cd /tmp/bakeoff-b && copilot -p "Port these files to TARGET_LANGUAGE the way a fluent TARGET_LANGUAGE engineer would write them natively. Write each translation next to its source." \
-  --model STRESS_B_MODEL --no-custom-instructions --disable-builtin-mcps --no-ask-user -s \
+  --model STRESS_B_MODEL --no-custom-instructions --disable-builtin-mcps --no-remote-export --no-ask-user -s \
   --available-tools view,create,edit,glob,grep --allow-tool write
 ```
 

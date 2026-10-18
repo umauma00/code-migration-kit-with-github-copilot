@@ -10,6 +10,26 @@
   `copilot login` after the person agrees. `run_migration.mjs guardrails show`
   proposes the deny list and `guardrails install` writes the agreed list as a
   host-confirmed human gate, so phase 03/04 no longer needs a manual file copy.
+- Review follow-ups:
+  - `build-loop --note TEXT [--max-rounds N]`: one host-confirmed grant runs
+    upstream Step 4's build → diagnose → reviewed repair → rebuild rounds until
+    clean, the round limit (default 5) or a stalled error count; every round's
+    build approval records `loop: {grantId, round}`.
+  - `reviewFocus: shared` (new installs) gives both independent reviewers both
+    checks, each from its own lens first; `specialized` keeps upstream's split.
+  - Worker sessions: `--no-remote-export` keeps transcripts (source code and
+    prompts) off the GitHub account; each call gets `--session-id`/`--name`,
+    recorded as `cliSessionId`. `sessions status | prune` reports or deletes only
+    those; `sessions prune` and `build-loop` are host-confirmed.
+  - Open files: the CLI raises its own soft limit to the hard limit (soft 256 →
+    hard observed on 1.0.98), so `doctor --check-cli` checks the hard limit (at
+    least 4096) and EMFILE stops the run with `file-limit` guidance.
+  - `status` shows workers retrying after a rate limit or service error and adds
+    a next action to tell the person.
+  - Tool-assisted reviewer path check resolves symlinks (also through a missing
+    leaf) and compares record directories case-insensitively.
+  - `.github/copilot-instructions.md` managed block trimmed to the always-needed
+    rules (about 640 bytes); the skill carries the rest.
 - 2026-10-18 review against Copilot CLI 1.0.98 and current VS Code docs:
   - JSON-mode failures: the CLI reports rate limits, 5xx and authentication only
     as stdout `session.error` events (stderr empty). The adapter now includes

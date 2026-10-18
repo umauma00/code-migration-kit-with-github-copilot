@@ -1,21 +1,27 @@
 // SPDX-License-Identifier: Apache-2.0
+import crypto from 'node:crypto';
 import { runProcess } from '../lib/process.mjs';
 import { roles, workerModel } from '../lib/core.mjs';
 import { parseResult, validateResult } from '../lib/results.mjs';
 import { isReviewer, isToolFree, toolAssistedRole, assistedReviewerRoles, validateWorkerProfile } from '../lib/review.mjs';
 import { runtimeLayout } from '../lib/runtime.mjs';
 
-export function copilotArgs(role, model, prompt, layout) {
+// Worker sessions hold source code and prompts. They stay local
+// (--no-remote-export: no sync to the GitHub account, no remote control) and
+// carry a runner-chosen ID and name, so receipts point at their transcript and
+// `run_migration.mjs sessions` can report or prune exactly the kit's sessions.
+export function copilotArgs(role, model, prompt, layout, session) {
   // A CLI worker is a fresh session agent: tools: [] alone does not prevent
   // automatic repository/personal instructions from entering its system prompt.
   // No --no-auto-update: installer-based launchers then run their bundled
   // (possibly much older) build instead of the version the user and doctor see.
-  return [...(prompt === undefined ? [] : ['-p', prompt]), ...(layout?.plugin ? ['--plugin-dir', layout.root] : []), '-s', '--output-format', 'json', '--stream', 'off', '--no-color', '--no-ask-user', '--no-custom-instructions', '--disable-builtin-mcps', '--agent', layout?.agentId(role) ?? `migration-${role}`, '--model', model,
+  return [...(prompt === undefined ? [] : ['-p', prompt]), ...(layout?.plugin ? ['--plugin-dir', layout.root] : []), '-s', '--output-format', 'json', '--stream', 'off', '--no-color', '--no-ask-user', '--no-custom-instructions', '--disable-builtin-mcps', '--no-remote-export', ...(session ? ['--session-id', session.id, '--name', session.name] : []), '--agent', layout?.agentId(role) ?? `migration-${role}`, '--model', model,
     '--available-tools', 'view,grep,glob', ...(isToolFree(role) ? ['--deny-tool', 'read,write,shell'] : ['--allow-tool', 'read', '--deny-tool', 'write,shell'])];
 }
 export function requiredCopilotFlags(layout) {
   // Diagnose the same stdin-based invocation used by every worker role.
-  return [...new Set(roles.flatMap(role => copilotArgs(role, 'diagnostic-model', undefined, layout).filter(arg => arg.startsWith('-'))))];
+  const session = { id: '00000000-0000-4000-8000-000000000000', name: 'diagnostic' };
+  return [...new Set(roles.flatMap(role => copilotArgs(role, 'diagnostic-model', undefined, layout, session).filter(arg => arg.startsWith('-'))))];
 }
 // Doctor, version checks and workers must share one environment: launcher
 // behavior (for example, which downloaded build runs) depends on it.
@@ -30,6 +36,20 @@ export async function copilotVersion(command = 'copilot', prefixArgs = [], { cwd
   const version = result.stdout.match(/\d+\.\d+\.\d+(?:[-+][\w.]+)?/)?.[0];
   if (result.code !== 0 || !version) throw new Error(`Cannot read the Copilot CLI version (exit ${result.code}): ${(result.stderr || result.stdout).slice(-500)}`);
   return version;
+}
+// Parallel CLI workers each open many files. Node, and so the Copilot CLI,
+// raises its own soft descriptor limit to the hard limit at startup (observed on
+// 1.0.98: soft 256 -> hard), so only a low hard limit ends in EMFILE ("Too many
+// open files"). Doctor reports it; raising a hard limit needs the person.
+export const fileLimitMinimum = 4096;
+export async function fileLimits() {
+  if (process.platform === 'win32') return { platform: 'win32', ok: true };
+  try {
+    const r = await runProcess('/bin/sh', ['-c', 'ulimit -Hn'], { timeoutMs: 5000 });
+    const value = r.stdout.trim(), hard = value === 'unlimited' ? 'unlimited' : Number(value);
+    if (hard !== 'unlimited' && !(hard > 0)) return { ok: true, unknown: true };
+    return { hard, ok: hard === 'unlimited' || hard >= fileLimitMinimum };
+  } catch { return { ok: true, unknown: true }; }
 }
 export const probeAgentName = '__migration_kit_probe_missing_agent__';
 // An unknown --agent fails before any session or model request and lists the
@@ -107,12 +127,20 @@ export function parseCopilotOutput(stdout) {
 }
 // Fixed role text first, task data next (shared rules lead it), and the
 // unit-specific target last, so repeated calls reuse the cached prompt prefix.
-export function agentPrompt({ role, unit, extra = {}, reviewInput, frozenInput, reviewMode = 'frozen' }) {
+// reviewFocus shared (new installs, upstream): both reviewers are full
+// independent reviewers with a different first lens, so a finding both raise is
+// real corroboration. specialized (unset): each reviewer checks only its lens.
+const reviewLenses = {
+  'reviewer-semantics': 'runtime semantics against the original source, errors, numbers, nullability and boundaries',
+  'reviewer-rules': 'every relevant RULEBOOK decision, inventory item, naming/import rule and PORT STATUS trailer'
+};
+export function agentPrompt({ role, unit, extra = {}, reviewInput, frozenInput, reviewMode = 'frozen', reviewFocus }) {
   const contracts = {
     implementer: 'Return {"schemaVersion":1,"kind":"implementation","target":"PATH","content":"COMPLETE TARGET FILE","summary":"reason"}. Translate faithfully; preserve source behavior. Return code, do not write files.',
     fixer: 'Return {"schemaVersion":1,"kind":"implementation","target":"PATH","content":"COMPLETE FIXED FILE","summary":"changes"}. Apply ONLY confirmed findings; preserve all other behavior. Return code, do not write files.',
-    'reviewer-semantics': 'Check runtime semantics against the original source, errors, numbers, nullability and boundaries.',
-    'reviewer-rules': 'Check every relevant RULEBOOK decision, inventory item, naming/import rule and PORT STATUS trailer.',
+    ...Object.fromEntries(Object.entries(reviewLenses).map(([reviewer, lens]) => [reviewer, reviewFocus === 'shared'
+      ? `Check ${lens} first, then ${reviewLenses[reviewer === 'reviewer-rules' ? 'reviewer-semantics' : 'reviewer-rules']}. You are one of two independent full reviewers: report every defect either check finds.`
+      : `Check ${lens}.`])),
     arbiter: 'Return {"schemaVersion":1,"kind":"arbitration","target":"PATH","decisions":[{"finding":"reviewer-role:ID","confirmed":true,"reason":"source/rule evidence"}]}. Decide EVERY supplied finding exactly once. Default to not confirmed when evidence is insufficient.',
     surveyor: 'Return {"schemaVersion":1,"kind":"survey","survey":"KIND from the input","target":"PATH","items":[...]} following the task in the frozen input exactly. Every item cites PATH:LINE inside the given files. Return only facts the given files show; never propose code.'
   };
@@ -156,13 +184,14 @@ export function createCopilotAdapter({ command = 'copilot', prefixArgs = [] } = 
         if (!warned.has(cliVersion)) { warned.add(cliVersion); console.error(`WARNING: ${cliVersionWarning}`); }
       }
     }
-    const versionFields = { cliVersion, ...(cliVersionWarning ? { cliVersionWarning } : {}) };
+    const session = { id: crypto.randomUUID(), name: `migration-kit ${worker} ${unit.target}`.slice(0, 200) };
+    const versionFields = { cliVersion, ...(cliVersionWarning ? { cliVersionWarning } : {}), cliSessionId: session.id };
     let result;
     // Surveyors get their scope as a frozen input, like tool-free reviewers.
-    const prompt = agentPrompt({ role, unit, extra: { ...extra, designInputs: config.designInputs ?? [] }, reviewInput: role === 'surveyor' ? undefined : reviewInput, frozenInput: role === 'surveyor' ? reviewInput : undefined, reviewMode });
+    const prompt = agentPrompt({ role, unit, extra: { ...extra, designInputs: config.designInputs ?? [] }, reviewInput: role === 'surveyor' ? undefined : reviewInput, frozenInput: role === 'surveyor' ? reviewInput : undefined, reviewMode, reviewFocus: config.reviewFocus });
     const promptBytes = Buffer.byteLength(prompt);
     try {
-      result = await runProcess(command, [...prefixArgs, ...copilotArgs(worker, model, undefined, layout)], {
+      result = await runProcess(command, [...prefixArgs, ...copilotArgs(worker, model, undefined, layout, session)], {
         cwd: root, signal, input: prompt, timeoutMs: config.timeoutSeconds * 1000,
         env: copilotEnv(worker)
       });
