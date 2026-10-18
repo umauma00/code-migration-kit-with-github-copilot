@@ -108,7 +108,7 @@ process.exit(1);
   assert.match(error.cliSessionId, /^[0-9a-f-]{36}$/);
   const argv = JSON.parse(fs.readFileSync(safePath(f.root, 'argv.jsonl'), 'utf8').trim().split('\n').at(-1));
   assert.equal(argv[argv.indexOf('--session-id') + 1], error.cliSessionId);
-  assert.match(argv[argv.indexOf('--name') + 1], /^migration-kit implementer ported\/math_ops\.mjs$/);
+  assert.equal(argv[argv.indexOf('--name') + 1], `migration-kit implementer ported/math_ops.mjs ${error.cliSessionId.slice(0, 8)}`);
 });
 
 test('sessions status and prune touch only recorded worker session directories', t => {

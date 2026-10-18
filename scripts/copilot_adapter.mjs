@@ -188,7 +188,10 @@ export function createCopilotAdapter({ command = 'copilot', prefixArgs = [] } = 
       }
     }
     // The runner journals sessionId before this call; direct callers get a fresh one.
-    const session = { id: sessionIdPattern.test(sessionId ?? '') ? sessionId : crypto.randomUUID(), name: `migration-kit ${worker} ${unit.target}`.slice(0, 200) };
+    // Retries and re-runs repeat role and target, and --resume matches names, so
+    // the name ends with the start of the (always new) ID.
+    const id = sessionIdPattern.test(sessionId ?? '') ? sessionId : crypto.randomUUID();
+    const session = { id, name: `${`migration-kit ${worker} ${unit.target}`.slice(0, 191)} ${id.slice(0, 8)}` };
     const versionFields = { cliVersion, ...(cliVersionWarning ? { cliVersionWarning } : {}), cliSessionId: session.id };
     let result;
     // Surveyors get their scope as a frozen input, like tool-free reviewers.
