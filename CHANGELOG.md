@@ -1,5 +1,12 @@
 # Unreleased
 
+- Review fixes: the hook asks for confirmation when an approval or phase
+  completion is chained after another command (`status && approve …`);
+  `survey merge --kind contracts` replaces contracts.md only while it is the
+  exact `source-spec init` skeleton; a transient retry re-checks
+  `maxAgentCalls` after its backoff; a multi-phase `phase complete` computes
+  the judge/context hashes in its dry run, so a missing dependency declaration
+  records nothing.
 - Delegated preparation surveys: `survey plan|run|status|merge --kind
   facts|contracts|inventory` splits the source into directory/size scopes, sends
   each to a fresh tool-free surveyor (new Copilot CLI process, or a host subagent
