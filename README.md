@@ -6,7 +6,7 @@ Anthropicの[Code Migration Kit](https://github.com/anthropics/code-migration-ki
 
 **0.3.0** ではVS Codeのサブエージェント方式（native）を削除しました。ワーカーは常にCopilot CLIで動き、VS Codeから進める場合も同じです。利用者はAIチャットだけで移行を完遂でき、CLIの導入・サインインの開始、guardrailsの設置などのコマンドはAIが実行します。**0.2.0** はVS Code / Copilot CLIのAgent Plugins形式に対応しました。キット本体をプラグインとして導入し、案件側では設定と成果物を管理できます。[プラグイン導入手順](docs/PLUGIN.md)、[従来版の修正と再レビュー](docs/reviews/2026-10-10-copilot-rereview-fixes.md)、[既存版からの更新](docs/UPGRADING.md)を参照してください。
 
-参照したCLIは **1.0.98**（1.0.93・1.0.95でも疑似プロバイダーとの通信を確認。1.0.98ではrepository/plugin両構成の全ロールの往復、hookの読み込み、エラー出力の形式も確認）、VS Codeは **1.142** です。VS Code 1.142ではCopilot harnessが新規セッションの既定になりつつあり、prompt filesはLocal harness専用（`chat.promptFilesLocations` は非推奨）です。VS Codeでは共通スキル `/code-migration` を入口にしてください。固定した元コミットとSDK参照版は [UPSTREAM.json](UPSTREAM.json) に記録しています。Anthropic/GitHubの公式配布物ではありません。
+参照したCLIは **1.0.98**（1.0.93・1.0.95でも疑似プロバイダーとの通信を確認。1.0.98ではrepository/plugin両構成の全ロールの往復、hookの読み込み、エラー出力の形式も確認）、VS Codeは **1.142** です。VS Code 1.142ではCopilot harnessが新規セッションの既定になりつつあり、prompt filesはLocal harness専用（`chat.promptFilesLocations` は非推奨）です（出典：[1.142リリースノート](https://code.visualstudio.com/updates/v1_142)、[Prompt files](https://code.visualstudio.com/docs/agent-customization/prompt-files)、[AI settings reference](https://code.visualstudio.com/docs/agents/reference/ai-settings)。2026-10-18確認）。VS Codeでは共通スキル `/code-migration` を入口にしてください。固定した元コミットとSDK参照版は [UPSTREAM.json](UPSTREAM.json) に記録しています。Anthropic/GitHubの公式配布物ではありません。
 
 **検証状況：自動テスト、オフライン題材、macOSでの実CLIと疑似プロバイダー間の通信は検証済みです。実際のCopilot認証・AIによる移植品質、VS Code上の操作、Dynamic Workflowsの実セッションは未検証です。** 実案件の前に [LIVE-SMOKE.md](docs/LIVE-SMOKE.md) の小規模確認を実施してください。
 

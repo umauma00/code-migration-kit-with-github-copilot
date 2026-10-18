@@ -89,6 +89,8 @@
     runs with `--available-tools` excluding `skill` (skill descriptions otherwise
     reach it); VS Code 1.142 Copilot harness, Local-only prompt files, Auto and
     cost-tier subagent limits; skill reads documents only as the phase needs.
+    Sources (checked 2026-10-18): [1.142 release notes](https://code.visualstudio.com/updates/v1_142),
+    [Prompt files](https://code.visualstudio.com/docs/agent-customization/prompt-files), [AI settings reference](https://code.visualstudio.com/docs/agents/reference/ai-settings), [Subagents](https://code.visualstudio.com/docs/agents/run/subagents).
 - Review fixes: the hook asks for confirmation when an approval or phase
   completion is chained after another command (`status && approve …`);
   `survey merge --kind contracts` replaces contracts.md only while it is the
