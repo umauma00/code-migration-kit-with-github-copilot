@@ -38,6 +38,15 @@ Dynamic Workflowsは [専用の確認事項](DYNAMIC-WORKFLOWS.md) を追加し�
 
 結果の記録例：CLI版、OS、Node版、モデルID、工程、単位数、ケース数、差分数、所要時間、実測できた利用量、未確認事項。未実測の費用やモデル名を推定値で埋めないでください。
 
+## 人間ゲートとワーカーセッションの実機確認（未実施）
+
+自動テストとloopbackでの確認は、プロンプトモードのワーカーまでです。次の項目は実機で確認し、結果を `docs/validation/copilot-cli-1.0.98-review-2026-10-18.json` の `liveChecks`（未実施は `null`）に記録してください。
+
+- **対話CLI（信頼済みフォルダ）**：`node migration-kit/scripts/run_migration.mjs approve translation --note test` をAIに実行させます。確認が出ること、「No」で実行されないこと、「Yes」の後にCLI自身の許可確認がもう一度出るか（[copilot-cli#3042](https://github.com/github/copilot-cli/issues/3042)）を記録します（`liveCLIInteractiveAsk`）。
+- **autopilot**：同じコマンドが確認なしに拒否されることを確認します（CLI 1.0.97以降の仕様、`liveCLIAutopilot`）。`--allow-all` / `--yolo` のときに確認が出るかも記録します（公式の記載なし、`liveCLIAllowAll`）。
+- **VS Code**：LocalとCopilotの各実行方式で同じことを確認し（`liveVSCodeAsk`）、Copilot実行方式で `.github/hooks` が読み込まれるかを記録します（`liveVSCodeCopilotHarnessRepoHooks`）。
+- **ワーカーセッションの同期**：サインイン済みのアカウントでワーカーを1回実行し、そのセッションがGitHub.comとGitHub Mobileのセッション一覧に**現れない**ことを確認します（`--no-remote-export` の効果、`liveRemoteExportOff`）。
+
 ## VS Code orchestration checklist (pending live verification)
 
 These checks require actual VS Code; offline fixtures do not establish UI behavior.
