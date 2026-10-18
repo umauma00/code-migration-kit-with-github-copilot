@@ -34,6 +34,8 @@ test('reading migration/ is allowed while writes to the guardrails file and the 
   // Paths resolve from the shell's working directory; a cd makes that unknown.
   const src = safePath(f.root, 'src');
   assert.equal(decide('rm -rf ../migration', src), 'deny');
+  assert.equal(decide('Remove-Item .\\migration -Recurse'), 'deny');
+  assert.equal(decide('Remove-Item ..\\migration -Recurse', src), 'deny');
   assert.equal(decide('rm -rf migration', src), null);
   assert.equal(decide('cd .. && rm -rf migration', src), 'deny');
   assert.equal(decide('rm -rf *', src), null);
