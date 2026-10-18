@@ -21,7 +21,9 @@
     "arbiter": "SELECT_MODEL_ID",
     "fixer": "SELECT_MODEL_ID"
   },
-  "concurrency": 2,
+  "concurrency": 4,
+  "dependencyOrder": "auto",
+  "fixPolicy": "rereview",
   "maxFixRounds": 2,
   "maxAgentCalls": 100,
   "timeoutSeconds": 600,

@@ -8,10 +8,18 @@ description: Run a staged, behavior-preserving language migration with GitHub Co
 For config.executionPurpose `pilot`, follow [pilot execution](../../docs/PILOT.md)
 using pilot run and the sealed grant; do not initialize production phase records
 or manufacture a phase-03 result. Otherwise follow the production sequence below.
-Read [preparation audits](../../docs/PREPARATION-AUDITS.md) for 00b/01/02 and
-[execution scopes](../../docs/EXECUTION-SCOPES.md) for approved batches/repair queues.
 
-Read the [operating manual](../../docs/OPERATING-MANUAL.md) and [usage](../../README.md).
+## Read only what the current step needs
+
+Read the [operating manual](../../docs/OPERATING-MANUAL.md) first: it is the short
+canonical rule set. Do not read the README or the other kit documents up front;
+the parent's context is the migration's most expensive shared resource. Open a
+document when the current phase prompt links it or a step needs it:
+[preparation audits](../../docs/PREPARATION-AUDITS.md) for 00b/01/02,
+[execution scopes](../../docs/EXECUTION-SCOPES.md) for approved batches/repair queues,
+[native workers](../../docs/NATIVE-WORKERS.md) only with workerBackend native, and
+[usage](../../README.md) for installation or configuration questions. On resumption,
+re-read the current phase prompt, not the whole kit.
 Resolve the plugin root from this SKILL.md location: it is two directories above
 this file. Follow the [runner](../../scripts/run_migration.mjs) and
 [installer](../../scripts/install.mjs) links to obtain their absolute paths.
@@ -138,12 +146,31 @@ on your own. `host-metadata` stays EXPERIMENTAL and cannot complete on VS Code
 today. Preserve existing config; changing backend requires fresh judge
 validation and translation approval, not a silent switch during a run.
 
+At initialization also offer these settings as the user's choice. `fixPolicy`:
+`rereview` (default; a fixed output is reviewed again until no confirmed finding
+remains) or `single-pass` (upstream Step 3: one fix of the confirmed findings,
+then build/smoke/parity judge it; fewer calls and fewer blocked units).
+`dependencyOrder: auto` (new installs) lets the approved scope fan out like
+upstream and holds dependents for reviewed dependencies only when a per-unit
+typecheck needs them. `concurrency` (up to 64, both reviewers included) should
+stay within the account's rate limits. Changing any of them revokes approvals.
+
+With the CLI backend, run a long `translate` in a background or continuing
+terminal and poll `status --format markdown`; never block the parent on it or kill
+it for being slow. Each worker call leaves a Copilot CLI session under
+`~/.copilot/session-state`; after the migration, point the user to the CLI's
+`/session` cleanup subcommands.
+
 When config.workerBackend is native, follow [native workers](../../docs/NATIVE-WORKERS.md).
 First confirm doctor's `native host requirements` with the user (VS Code 1.117+,
 `chat.customAgentInSubagent.enabled`, models allowed for subagents).
 Keep the runner active in a continuing terminal, claim pending jobs, delegate
 the exact prompt to the named tool-free host subagent with the requested model,
-and submit unchanged results. Dispatch independent jobs in parallel within the
+and submit unchanged results. With `nativeInput: file` (repository layout), pass
+the claim's short `dispatch` text instead: the reader profile opens its own
+request file and its hook records the read. Before the user chooses native,
+state the cost: with inline input the parent re-emits every frozen input and
+every response, several times the CLI backend's tokens. Dispatch independent jobs in parallel within the
 configured and host limits. The parent must service jobs while the runner waits.
 Do not inherit the parent conversation or add other reviewers' results.
 If the required model/profile/tools cannot be selected, report a failed job;

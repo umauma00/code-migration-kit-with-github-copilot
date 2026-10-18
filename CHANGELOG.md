@@ -1,5 +1,29 @@
 # Unreleased
 
+- 2026-10-18 review against Copilot CLI 1.0.98 and current VS Code docs:
+  - JSON-mode failures: the CLI reports rate limits, 5xx and authentication only
+    as stdout `session.error` events (stderr empty). The adapter now includes
+    `errorType`, `statusCode` and the message, so 429/5xx retry and
+    authentication/credit failures stop the run (verified on 1.0.98).
+  - Prompt-mode hooks: workers set `GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS=true`.
+    Without it, an untrusted repository-copy folder skipped the hook and a
+    tool-assisted reviewer could read `migration/runs` (reproduced on 1.0.98).
+  - Observed model and usage: CLI attempts record `model.call_final_result` and
+    `result.usage`; a model different from the request is a run warning.
+  - Scheduling: `dependencyOrder` (`auto` for new installs) stops holding
+    dependents when no unit typecheck needs translated dependencies; the
+    concurrency cap rises from 16 to 64 and the new-install default to 4.
+  - `fixPolicy: single-pass` restores upstream Step 3 (one fix of the confirmed
+    findings, then the build/test referees) with its own hash-bound receipt.
+  - Native `nativeInput: file` (repository copy): the parent passes a short
+    dispatch, the reader profile opens its request file, and an agent-scoped
+    hook restricts and records the read; the runner rejects results without
+    that record (hook behavior verified on 1.0.98 in a trusted folder).
+  - Windows plugin hook uses `$env:PLUGIN_ROOT` in its PowerShell command.
+  - Docs: upstream feasibility report contract restored in prompt 00; bakeoff B
+    runs with `--available-tools` excluding `skill` (skill descriptions otherwise
+    reach it); VS Code 1.142 Copilot harness, Local-only prompt files, Auto and
+    cost-tier subagent limits; skill reads documents only as the phase needs.
 - Review fixes: the hook asks for confirmation when an approval or phase
   completion is chained after another command (`status && approve …`);
   `survey merge --kind contracts` replaces contracts.md only while it is the

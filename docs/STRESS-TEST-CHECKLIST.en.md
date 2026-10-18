@@ -17,7 +17,7 @@ replace `migration-kit/` with the plugin's absolute path.
 | 3 | `phase start 03` | AI | A start record exists |
 | 4 | Pick 3 files that exercise the most risky rulebook sections and inventory rows; write the scores and file:line proof to `migration/stress-test/report.md` | AI | The report has a selection table |
 | 5 | Bakeoff A: translate by the rulebook to the letter (disposable workspace, never production) | AI (separate context) | Every nontrivial choice cites its rule |
-| 6 | Bakeoff B: copy only the source files to an empty directory outside the repo and have them ported natively, without the rules. CLI: `copilot -p … --no-custom-instructions`; VS Code: a tool-free subagent | AI (separate context) | B saw no rulebook, inventory or conversation |
+| 6 | Bakeoff B: copy only the source files to an empty directory outside the repo and have them ported natively, without the rules. Run the "B isolation command" below in that directory (in VS Code too, from a terminal) | AI (separate context) | B saw no rulebook, inventory, conversation or skill |
 | 7 | Diff inspection: format A and B, then judge each difference (rulebook right / native right / both defensible / both wrong) | AI (separate context) | Each verdict has evidence |
 | 8 | Pilot: `pilot prepare --target /new/outside/dir --sources … --note …`, then `pilot run --root …` | AI runs it, the **human** approves (the host asks) | Same workers/reviews/fixes as production; were the rules obeyed? |
 | 9 | Report: amendment queue (never edit RULEBOOK), adherence findings, timing and usage (`usageEstimate` in the run summary), workspace deletion confirmed, estimated duration for 04 (`status`) | AI | `migration/stress-test/report.md` |
@@ -27,6 +27,19 @@ replace `migration-kit/` with the plugin's absolute path.
 For redesign, replace the bakeoff (5–7) with adversarial review of the design
 document plus small disposable trials. If the same section is re-amended twice,
 stop and ask the human for a design decision instead of a third wording.
+
+## B isolation command
+
+`--no-custom-instructions` stops AGENTS.md and Copilot instructions, but user and plugin skill descriptions (including this kit's `code-migration` skill) still reach the model. With CLI 1.0.98, leaving `skill` out of `--available-tools` kept them out.
+
+```bash
+mkdir /tmp/bakeoff-b && cp SOURCE_FILES /tmp/bakeoff-b/   # copies only, not a checkout
+cd /tmp/bakeoff-b && copilot -p "Port these files to TARGET_LANGUAGE the way a fluent TARGET_LANGUAGE engineer would write them natively. Write each translation next to its source." \
+  --model STRESS_B_MODEL --no-custom-instructions --disable-builtin-mcps --no-ask-user -s \
+  --available-tools view,create,edit,glob,grep --allow-tool write
+```
+
+`STRESS_B_MODEL` is `phaseModels.stressB`. Do not run B as a subagent of the migration chat: VS Code Local subagents inherit the parent's instructions, including `.github/copilot-instructions.md` with the kit's managed block. Delete `/tmp/bakeoff-b` afterwards and record the deletion in the report.
 
 ## Common stops
 

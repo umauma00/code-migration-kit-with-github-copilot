@@ -10,6 +10,8 @@
 > | `host-metadata`（既存設定の省略時） | ホストの実行メタデータで使用モデルを確認したこと | VS Codeがメタデータを返さないため完了できない（実験的） |
 >
 > Copilot CLIを使える場合は、CLIワーカー方式（`copilot-cli`、既定）を推奨します。
+>
+> **コストの目安:** 既定の inline 入力では、親エージェントが毎回 frozen input（最大 `maxReviewInputBytes`）をサブエージェント呼び出しへ書き写し、返ってきた翻訳ファイル全文を `answer.json` へもう一度書き出します。1単位あたり最大5回の呼び出しすべてで親の出力トークンが増え、親の文脈も早く埋まるため、CLI方式の数倍のトークンを使います。リポジトリコピー導入なら、下の [file 入力](#file-入力nativeinput-file) で入力側の書き写しをなくせます。
 
 `workerBackend: "native"` は、現在のVS Codeセッションの親エージェントが
 サブエージェントを起動する方式です。Copilot CLIは起動しません。
@@ -94,7 +96,9 @@ native設定の `doctor` はCLIを起動せず専用プロファイルを検査�
 最初のnative実行の前に、VS Codeで次を確認します（`doctor` の `native host requirements` に一覧を表示します。NodeからVS Codeの設定は読めません）。
 
 - VS Code 1.117以降。この版から `runSubagent` が呼び出し単位のモデル指定を受け付けます。モデルは「呼び出し時の指定 → プロファイルの `model` → 親の会話のモデル」の順で決まります。キットは常に呼び出し時の指定を使うため、プロファイルに `model` を書きません。
-- `chat.customAgentInSubagent.enabled` を有効にする。無効だと専用のnativeプロファイルをサブエージェントとして使えません。
+- カスタムエージェントをサブエージェントとして呼べること。現行のVS Codeでは既定で呼べます。設定一覧に `chat.customAgentInSubagent.enabled` が残っている古い版では、有効にします。
+- 親のセッションを Auto にしないこと。Copilot harness では、親が Auto のときサブエージェントは要求モデルではなく親が解決したモデルを引き継ぎます。
+- Local harness では、要求モデルが親モデルのコスト帯を超えないこと。超えるとサブエージェントは起動しません。最大級のモデルをレビュー担当に使うなら、親も同じ帯で動かします。
 - 指定モデルが、このアカウントでサブエージェントに使えること（使えないモデルがあります）。
 - 担当プロファイルは `user-invocable: false` でエージェント一覧に表示しません。CLI用の担当は `disable-model-invocation: true` で、親がサブエージェントとして呼ぶこともできません。native用は親が委譲するため呼び出し可能のままです。
 
@@ -121,6 +125,16 @@ Copilotランタイムは指定を実現できない場合に別モデルへフ�
 モデル自身の回答を使用モデルの証明として扱ったりしません。
 ホストによる申告をNodeが独立に検証する仕組みではないため、receiptの
 `observedModel` は引き続きnullです。
+
+## file 入力（nativeInput: file）
+
+リポジトリコピー導入の native では、`"nativeInput": "file"`（導入時は `--native-input file`）を選べます。
+
+- runner は各タスクのプロンプトを `migration/runs/RUN_ID/native/JOB_ID/prompt.txt` に書き、claim は全文ではなく短い `dispatch`（ファイルパスと SHA-256）を返します。親はこの `dispatch` だけをサブエージェントへ渡します。
+- 担当は `migration-native-ROLE-file` プロファイルです。`tools: ["read"]` で、frontmatter の PreToolUse hook（`migration_hook.mjs --native-file ROLE`）が、claim 済みで処理中の同じ担当の request ファイル以外の読み取りと、読み取り以外のツールをすべて拒否します。
+- hook は読み取りを許可したときに `reader.json` を残します。runner は提出時にこれを確認し、無ければ「ホストがエージェント固有の hook を実行していない」として失敗させます。hook が動かないホストで、制限のない読み取りが黙って通ることはありません。
+- エージェント固有の hook は、Copilot CLI 1.0.97 以降と VS Code Local（プレビュー、`chat.useHooks`、信頼済みワークスペース）が対応しています。VS Code の Copilot harness で動くかは未検証です。初回の `reader.json` 確認で判断してください。
+- 出力（返ってきた JSON）は inline と同じく親が提出します。読み切ったかどうか（部分読みの有無）は検証できません。plugin 導入では使えません。
 
 ## 親エージェントの実行手順
 

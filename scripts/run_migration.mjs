@@ -110,7 +110,7 @@ export async function doctor(root, config, { checkCLI = false, command = 'copilo
     // The hook also asks before approvals and denies guardrails edits, so an
     // untrusted folder disables protections even before guardrails exist.
     checks.push({ check: 'repository hooks load in Copilot CLI', ok: trust !== 'untrusted', status: trust,
-      note: 'Copilot CLI ignores .github/hooks in untrusted folders, silently disabling the guardrails, the approval confirmations and the guardrails-file protection. Start copilot interactively in this repository once and trust the folder.' });
+      note: 'Interactive Copilot CLI sessions ignore .github/hooks in untrusted folders, silently disabling the guardrails, the approval confirmations and the guardrails-file protection. Start copilot interactively in this repository once and trust the folder. Runner-started workers always load the repository hooks (GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS=true), so tool-assisted reviewers stay out of other workers\' records either way.' });
   }
   const unverifiedModels = native && nativeModelVerification(config) === 'requested-unverified';
   if (unverifiedModels) checks.push({ check: 'native model verification', ok: true, status: 'requested-unverified',
@@ -118,8 +118,13 @@ export async function doctor(root, config, { checkCLI = false, command = 'copilo
   // Host settings live in VS Code, not in files Node can read reliably; list
   // them so the parent confirms each one before dispatching.
   if (native) checks.push({ check: 'native host requirements', ok: null, status: 'confirm in the host',
-    requirements: ['VS Code 1.117 or later: runSubagent accepts a per-call model', 'chat.customAgentInSubagent.enabled is on, so the dedicated native profiles can run as subagents',
-      'The requested models in config.models are allowed for subagents on this account (some models are not)', 'Restart the chat after installing or updating profiles'] });
+    requirements: ['VS Code 1.117 or later: runSubagent accepts a per-call model',
+      'Custom agents can run as subagents: the current VS Code default; releases that still list chat.customAgentInSubagent.enabled need it turned on',
+      'The parent session is not on Auto: Copilot-harness subagents then inherit the resolved session model instead of the requested one',
+      'Local harness: each requested model is within the parent model\'s cost tier, otherwise the subagent does not run',
+      'The requested models in config.models are allowed for subagents on this account (some models are not)',
+      ...(config.nativeInput === 'file' ? ['nativeInput file: the host runs agent-scoped PreToolUse hooks from profile frontmatter in a trusted workspace (VS Code Local: chat.useHooks); otherwise every job fails with a missing reader receipt'] : []),
+      'Restart the chat after installing or updating profiles'] });
   if (native) checks.push({ check: 'native host capabilities', ok: null, status: 'unknown', experimental: !unverifiedModels, harness: config.nativeHarness,
     capabilities: Object.fromEntries(['modelSelection', 'modelExecutionEvidence', 'toolRestrictions', 'instructionIsolation', 'parallelDispatch', 'completionEvents', 'childCancellation'].map(name => [name, unverifiedModels && name === 'modelExecutionEvidence' ? 'not required (requested-unverified)' : 'unknown'])),
     note: 'EXPERIMENTAL: VS Code does not return the executed subagent model to the parent, so jobs cannot be submitted under the native contract; use the copilot-cli backend for real migrations. Static profiles do not verify this host. Before native execution, verify per-call model selection, execution-bound model metadata, tools, dispatch and cancellation on the installed host. Do not echo requested models or silently fall back to CLI.' });
