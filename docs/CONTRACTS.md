@@ -170,8 +170,11 @@ Each round records an ordinary build approval whose gate carries
 `loop: {grantId, round}`, runs build, diagnoses the recorded output and, unless
 clean, repairs the queue through `translate` with the normal reviews. It stops
 `clean`, `stalled` (three rounds without a falling error count), `budget` or
-`round-limit`. A build that could not run, a stale approval or an unmapped failure
-is an error, not a round. Only build approvals may carry `loop`. Until the grant
+`round-limit`. Once the loop's prompt bytes reach `maxRunInputBytes` it starts no
+further repair round. A build that could not run, a stale approval or an unmapped failure
+is an error, not a round. Only build approvals may carry `loop`. A loop takes
+`migration/build-loop.lock` before it saves its grant and holds it to the end, so a
+second loop stops at start; a lock whose pid is gone is retaken. Until the grant
 has `finishedAt`, and while its pid lives, every other process's runner lock is
 refused and `status` reports `buildLoop`. In strict phase mode, translate and
 build-loop also refuse to run when `migration/guardrails.json` is missing.
