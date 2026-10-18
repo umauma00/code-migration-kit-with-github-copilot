@@ -196,6 +196,10 @@ node migration-kit/scripts/run_migration.mjs source-spec check
 
 runnerのコマンドが失敗すると、`ERROR:` に続けて **原因・影響・選択肢（推奨1つと各理由・実行例）** を表示します。Copilotはこれを示したうえで、質問ツールで選択を求め、ユーザーの回答を待ちます。runner以外の失敗は `run_migration.mjs guidance --message "エラー文"` で同じ形式の案内を作れます。
 
+## 準備工程の調査を範囲ごとに任せる
+
+00・00b・02 では、親エージェントが全ファイルを自分で読む代わりに、`survey run --kind facts|contracts|inventory` でソースを範囲に分け、範囲ごとに新しい調査担当（CLI 方式では新しい `copilot` プロセス、native 方式では VS Code のサブエージェント）に任せられます。結果は `migration/surveys/` にファイルで保存され、`survey merge` で下書きにまとまります。中断しても残りの範囲から再開します。詳細は [準備工程の調査](docs/SURVEYS.md)。
+
 ## 工程を進める
 
 03の前に、`templates/guardrails.json`（コピー導入では `migration-kit/templates/guardrails.json`）を `migration/guardrails.json` へコピーし、対象言語のビルド・テストコマンドに合わせて編集してください。上流の `.claude/settings.json` の deny ルールに相当し、hookがすべてのエージェントの該当シェルコマンドを拒否します。runnerが実行するbuild等は対象外です。`phase start 03` / `04` は、このファイル（または免除の記録）がないと停止します。エージェントは作成しません。コピー導入方式のhookは、Copilot CLIで信頼済みのフォルダでしか読み込まれません。`doctor` で確認してください。

@@ -57,6 +57,10 @@ invalidated (review again from 00b).
 | 01 | `depmap/`, `manifest.tsv`, `review-dependencies.json`, `depmap/report.md` | Generated mechanically by the bundled parsers, never guessed |
 | 02 | `RULEBOOK.md`, `inventory.tsv`, `gap-report.md` | Decide policy from how the source actually behaves; undecidable sites stay UNKNOWN in the inventory with the most conservative translation and a TODO(port) |
 
+On large repositories, draft the contracts by scope with `survey run --kind
+contracts` and `survey merge --kind contracts` instead of the parent reading
+every file ([preparation surveys](SURVEYS.en.md)).
+
 Phase 00b cannot be recorded while `contracts.md` still contains `TODO(spec)`,
 so a skeleton is never approved as a specification.
 

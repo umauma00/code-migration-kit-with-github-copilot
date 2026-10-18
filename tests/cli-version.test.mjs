@@ -35,7 +35,7 @@ process.exit(1);
 }
 
 test('doctor proves every worker agent resolves and names the missing ones', async t => {
-  const f = prepare(t), ids = [...roles, ...assistedReviewerRoles].map(role => `migration-${role}`);
+  const f = prepare(t), ids = [...roles, ...assistedReviewerRoles, 'surveyor'].map(role => `migration-${role}`);
   const ok = await doctor(f.root, f.config, { checkCLI: true, command: agentCli(f, ['other', ...ids]) });
   const passed = ok.checks.find(c => c.check === 'worker agents resolve');
   assert.equal(passed.ok, true); assert.deepEqual(passed.missing, []);

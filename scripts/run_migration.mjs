@@ -13,6 +13,7 @@ import { runtimeLayout } from '../lib/runtime.mjs';
 import { migrationStatus, statusMarkdown, statusTodo, statusChecklist } from '../lib/status.mjs';
 import { failureGuidance, guidanceMarkdown, failureGuidanceList, guidanceListMarkdown, doctorGuidance } from '../lib/guidance.mjs';
 import { initSourceSpec, sourceSpecReadiness } from '../lib/source-spec.mjs';
+import { runSurvey, mergeSurvey, surveyStatus, planSurvey } from '../lib/survey.mjs';
 import { createNativeAdapter } from '../lib/native-workers.mjs';
 import { phaseCommand } from './phase_cli.mjs';
 import { diagnoseBuild } from './diagnostic_queue.mjs';
@@ -29,6 +30,8 @@ export const usage = `Usage: node migration-kit/scripts/run_migration.mjs COMMAN
                               Report language; whether the original can still run (guides recommendations)
   phase init | next | check ID | start ID | complete ID[,ID...] --note TEXT
                               Ordered workflow; optional --tokens N --subagents N --model ID
+  survey plan|run|status|merge --kind facts|contracts|inventory [--max-files N] [--sites migration/SITES.tsv]
+                              Split preparation reading into scopes for fresh tool-free workers; results are files
   source-spec init [--apply] | check
                               Source as the only specification: scaffold source-only preparation
   judge                       Runtime: original/mutation; source-only: validate preparation
@@ -49,7 +52,7 @@ export async function doctor(root, config, { checkCLI = false, command = 'copilo
   const checks = [{ check: 'configuration', ok: true }];
   const layout = runtimeLayout(root, config);
   const native = config.workerBackend === 'native';
-  for (const role of ['orchestrator', 'implementer', 'reviewer-semantics', 'reviewer-rules', 'arbiter', 'fixer', ...(native ? [] : assistedReviewerRoles)]) {
+  for (const role of ['orchestrator', 'implementer', 'reviewer-semantics', 'reviewer-rules', 'arbiter', 'fixer', 'surveyor', ...(native ? [] : assistedReviewerRoles)]) {
     const p = native && role !== 'orchestrator' ? layout.nativeAgentPath(role) : layout.agentPath(role), file = safePath(layout.root, p);
     checks.push({ check: p, ok: fs.existsSync(file) });
     if (role !== 'orchestrator' && fs.existsSync(file)) {
@@ -206,6 +209,21 @@ export async function main(argv = process.argv.slice(2)) {
     }
     else if (cmd === 'source-spec' && args._[1] === 'check') result = sourceSpecReadiness(root, config);
     else if (cmd === 'source-spec') throw new Error('Use source-spec init [--apply] | check');
+    else if (cmd === 'survey') {
+      // Delegated preparation surveys: scopes go to fresh tool-free surveyor workers.
+      const kind = args.kind, options = { maxFiles: args['max-files'] === undefined ? undefined : Number(args['max-files']), sitesFile: args.sites };
+      const action = args._[1];
+      if (action === 'plan') result = planSurvey(root, config, kind, options);
+      else if (action === 'status') result = surveyStatus(root, config, kind, options);
+      else if (action === 'merge') { const release = lockRun(root, 'survey-merge'); try { result = mergeSurvey(root, config, kind, options); } finally { release(); } }
+      else if (action === 'run') {
+        const native = config.workerBackend === 'native';
+        if (native && args.copilot) throw new Error('--copilot cannot be used with workerBackend: native');
+        if (native) console.error('Native workers: keep this runner active; use native_workers.mjs list/claim/submit from the host session. No Copilot CLI is launched.');
+        result = await runSurvey(root, config, kind, native ? createNativeAdapter() : createCopilotAdapter({ command: args.copilot }), { signal: controller.signal, ...options,
+          onProgress: event => console.error(`${event.unit}: ${event.stage} (agent calls ${event.calls})`) });
+      } else throw new Error('Use survey plan|run|status|merge --kind facts|contracts|inventory [--max-files N] [--sites migration/PATH.tsv]');
+    }
     else if (cmd === 'judge-prepare') result = await runJudgePreparation(root, config, { signal: controller.signal });
     else if (cmd === 'phase') result = phaseCommand(root,config,args._[1],args._[2],args);
     else if (cmd === 'doctor') {
