@@ -13,7 +13,7 @@ replace `migration-kit/` with the plugin's absolute path.
 | # | Do | Who | Check |
 |---|---|---|---|
 | 1 | Confirm 00–02 are recorded and judge succeeded | AI | `status --format checklist` shows "Current: 03" |
-| 2 | Copy `templates/guardrails.json` to `migration/guardrails.json` and adapt it to this target's build/test commands (or record a waiver with its reason) | **Human** | doctor `command guardrails` is installed / waived |
+| 2 | The AI proposes a deny list from `guardrails show` adapted to this target's build/test commands (or a waiver with its reason) in chat, and runs `guardrails install` after agreement | **Human** agrees; the host confirms | doctor `command guardrails` is installed / waived |
 | 3 | `phase start 03` | AI | A start record exists |
 | 4 | Pick 3 files that exercise the most risky rulebook sections and inventory rows; write the scores and file:line proof to `migration/stress-test/report.md` | AI | The report has a selection table |
 | 5 | Bakeoff A: translate by the rulebook to the letter (disposable workspace, never production) | AI (separate context) | Every nontrivial choice cites its rule |
@@ -45,7 +45,7 @@ cd /tmp/bakeoff-b && copilot -p "Port these files to TARGET_LANGUAGE the way a f
 
 | Message | Cause | What to do |
 |---|---|---|
-| `Phase 03 requires human-installed command guardrails` | Step 2 not done | The human installs `migration/guardrails.json`; the AI cannot (the hook denies it) |
+| `Phase 03 requires human-installed command guardrails` | Step 2 not done | Agree the deny list and allow `guardrails install` when the host asks; the AI cannot write the file directly (the hook denies it) |
 | `Phase 02 is not reviewed for current inputs` | RULEBOOK or another input changed, invalidating 02 | Review the change, record 02 again, rerun `judge` |
 | `Run judge successfully for these inputs` | Inputs changed since judge | Rerun `judge` |
 | `Pilot target must be a new directory` | The pilot workspace already exists | Choose a new outside directory |

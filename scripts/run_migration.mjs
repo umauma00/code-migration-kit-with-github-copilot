@@ -3,22 +3,21 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { lockRun, loadConfig, nativeModelVerification, readManifest, contextHash, unitState, done, safePath, readJSON, parseArgs, verificationFiles, loadReviewDependencies, reviewSources } from '../lib/core.mjs';
-import { validateWorkerProfile, validateNativeProfile, assistedReviewerRoles } from '../lib/review.mjs';
+import { lockRun, loadConfig, readManifest, contextHash, unitState, done, safePath, readJSON, parseArgs, verificationFiles, loadReviewDependencies, reviewSources } from '../lib/core.mjs';
+import { validateWorkerProfile, assistedReviewerRoles } from '../lib/review.mjs';
 import { runProcess } from '../lib/process.mjs';
 import { approve, runStage, translate, runPilot, runJudgePreparation } from '../lib/pipeline.mjs';
 import { preparePilot } from '../lib/pilot.mjs';
 import { createCopilotAdapter, requiredCopilotFlags, copilotEnv, probeWorkerAgents } from './copilot_adapter.mjs';
-import { runtimeLayout } from '../lib/runtime.mjs';
+import { runtimeLayout, pluginRoot } from '../lib/runtime.mjs';
 import { migrationStatus, statusMarkdown, statusTodo, statusChecklist } from '../lib/status.mjs';
 import { failureGuidance, guidanceMarkdown, failureGuidanceList, guidanceListMarkdown, doctorGuidance } from '../lib/guidance.mjs';
 import { initSourceSpec, sourceSpecReadiness } from '../lib/source-spec.mjs';
 import { runSurvey, mergeSurvey, surveyStatus, planSurvey } from '../lib/survey.mjs';
-import { createNativeAdapter } from '../lib/native-workers.mjs';
 import { phaseCommand } from './phase_cli.mjs';
 import { diagnoseBuild } from './diagnostic_queue.mjs';
 import { readPreferences, setPreferences, preferencesReport } from '../lib/preferences.mjs';
-import { readGuardrails, cliFolderTrust } from '../lib/guardrails.mjs';
+import { readGuardrails, cliFolderTrust, guardrailsProposal, installGuardrails } from '../lib/guardrails.mjs';
 
 export const usage = `Usage: node migration-kit/scripts/run_migration.mjs COMMAND [options]
   doctor [--check-cli] [--copilot /path/to/copilot]
@@ -28,6 +27,8 @@ export const usage = `Usage: node migration-kit/scripts/run_migration.mjs COMMAN
                               Explain a failure: cause, impact and choices with a recommendation
   preferences [--language ja|en] [--original-runtime available|unavailable]
                               Report language; whether the original can still run (guides recommendations)
+  guardrails show | install [--add CSV] [--remove CSV] [--deny CSV] [--waiver NOTE] [--replace]
+                             Propose / install migration/guardrails.json (install is a host-confirmed human gate)
   phase init | next | check ID | start ID | complete ID[,ID...] --note TEXT
                               Ordered workflow; optional --tokens N --subagents N --model ID
   survey plan|run|status|merge --kind facts|contracts|inventory [--max-files N] [--sites migration/SITES.tsv]
@@ -38,7 +39,7 @@ export const usage = `Usage: node migration-kit/scripts/run_migration.mjs COMMAN
   judge-prepare               Validate/reuse the judge at 00b before map/rules exist
   approve STAGE --note TEXT   Review/approve translation, build, smoke, parity, post-parity, handoff
                               translation may use --batch N or --targets PATH,PATH
-  translate                  Run/resume using config.workerBackend (copilot-cli or native)
+  translate                  Run/resume translation with Copilot CLI workers
   pilot prepare --target NEW_DIR --sources src/a,src/b --note TEXT [--through translation|build|smoke|parity]
   pilot run --root PILOT_DIR  Run only the explicitly authorized, isolated pilot
   repair --target PATH --evidence migration/PATH | repair --queue migration/QUEUE.json
@@ -51,12 +52,11 @@ Configuration: migration/config.json. No command commits or pushes changes.`;
 export async function doctor(root, config, { checkCLI = false, command = 'copilot' } = {}) {
   const checks = [{ check: 'configuration', ok: true }];
   const layout = runtimeLayout(root, config);
-  const native = config.workerBackend === 'native';
-  for (const role of ['orchestrator', 'implementer', 'reviewer-semantics', 'reviewer-rules', 'arbiter', 'fixer', 'surveyor', ...(native ? [] : assistedReviewerRoles)]) {
-    const p = native && role !== 'orchestrator' ? layout.nativeAgentPath(role) : layout.agentPath(role), file = safePath(layout.root, p);
+  for (const role of ['orchestrator', 'implementer', 'reviewer-semantics', 'reviewer-rules', 'arbiter', 'fixer', 'surveyor', ...assistedReviewerRoles]) {
+    const p = layout.agentPath(role), file = safePath(layout.root, p);
     checks.push({ check: p, ok: fs.existsSync(file) });
     if (role !== 'orchestrator' && fs.existsSync(file)) {
-      try { (native ? validateNativeProfile : validateWorkerProfile)(root, role, config); checks.push({ check: `${role}: model and tools`, ok: true }); }
+      try { validateWorkerProfile(root, role, config); checks.push({ check: `${role}: model and tools`, ok: true }); }
       catch (e) { checks.push({ check: `${role}: model and tools`, ok: false, detail: e.message }); }
     }
   }
@@ -68,7 +68,7 @@ export async function doctor(root, config, { checkCLI = false, command = 'copilo
     checks.push({ check: 'review dependency map', ok: true, units: units.map(u => ({ source: u.source, files: reviewSources(root, config, u.source, graph) })), note: 'Declared evidence scope; audit parser coverage and semantic dependencies in phase 01.' });
   } catch (e) { checks.push({ check: 'review dependency map', ok: false, detail: e.message }); }
   checks.push({ check: 'build artifact roots', ok: true, roots: config.buildArtifactRoots ?? [], note: 'Declare generated binaries, objects and reports here. Their file contents are excluded from command-input fingerprints; actual inputs must stay outside these roots.' });
-  if (!native) checks.push({ check: 'worker hook installed', ok: fs.existsSync(safePath(layout.root, layout.hookPath)) });
+  checks.push({ check: 'worker hook installed', ok: fs.existsSync(safePath(layout.root, layout.hookPath)) });
   // Copilot hooks fail open on timeout: a slow start silently disables the
   // guardrails. Run the exact command from the hook configuration twice: as a
   // worker (must deny a shell call) and as an interactive session (the slower
@@ -104,7 +104,7 @@ export async function doctor(root, config, { checkCLI = false, command = 'copilo
   checks.push({ check: 'command guardrails', ok: !guardrailError,
     status: guardrailError ? 'invalid' : !guardrails ? 'not installed' : guardrails.denyCommands.length ? 'installed' : guardrails.waiver ? 'waived' : 'empty',
     ...(guardrailError ? { detail: guardrailError } : {}), note: 'Phases 03/04 require migration/guardrails.json, copied by the human from templates/guardrails.json (or a recorded waiver).' });
-  if (!native && !layout.plugin) {
+  if (!layout.plugin) {
     // Repository hooks (worker backstop and guardrails) load only in a trusted folder.
     const trust = cliFolderTrust(root);
     // The hook also asks before approvals and denies guardrails edits, so an
@@ -112,23 +112,7 @@ export async function doctor(root, config, { checkCLI = false, command = 'copilo
     checks.push({ check: 'repository hooks load in Copilot CLI', ok: trust !== 'untrusted', status: trust,
       note: 'Interactive Copilot CLI sessions ignore .github/hooks in untrusted folders, silently disabling the guardrails, the approval confirmations and the guardrails-file protection. Start copilot interactively in this repository once and trust the folder. Runner-started workers always load the repository hooks (GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS=true), so tool-assisted reviewers stay out of other workers\' records either way.' });
   }
-  const unverifiedModels = native && nativeModelVerification(config) === 'requested-unverified';
-  if (unverifiedModels) checks.push({ check: 'native model verification', ok: true, status: 'requested-unverified',
-    note: 'VS Code-only mode: the parent passes each requested model to the host\'s per-call model parameter and submits; the executed model is recorded as unverified in every attempt, run summary and report. Use host-metadata (or the copilot-cli backend) when observed models are required.' });
-  // Host settings live in VS Code, not in files Node can read reliably; list
-  // them so the parent confirms each one before dispatching.
-  if (native) checks.push({ check: 'native host requirements', ok: null, status: 'confirm in the host',
-    requirements: ['VS Code 1.117 or later: runSubagent accepts a per-call model',
-      'Custom agents can run as subagents: the current VS Code default; releases that still list chat.customAgentInSubagent.enabled need it turned on',
-      'The parent session is not on Auto: Copilot-harness subagents then inherit the resolved session model instead of the requested one',
-      'Local harness: each requested model is within the parent model\'s cost tier, otherwise the subagent does not run',
-      'The requested models in config.models are allowed for subagents on this account (some models are not)',
-      ...(config.nativeInput === 'file' ? ['nativeInput file: the host runs agent-scoped PreToolUse hooks from profile frontmatter in a trusted workspace (VS Code Local: chat.useHooks); otherwise every job fails with a missing reader receipt'] : []),
-      'Restart the chat after installing or updating profiles'] });
-  if (native) checks.push({ check: 'native host capabilities', ok: null, status: 'unknown', experimental: !unverifiedModels, harness: config.nativeHarness,
-    capabilities: Object.fromEntries(['modelSelection', 'modelExecutionEvidence', 'toolRestrictions', 'instructionIsolation', 'parallelDispatch', 'completionEvents', 'childCancellation'].map(name => [name, unverifiedModels && name === 'modelExecutionEvidence' ? 'not required (requested-unverified)' : 'unknown'])),
-    note: 'EXPERIMENTAL: VS Code does not return the executed subagent model to the parent, so jobs cannot be submitted under the native contract; use the copilot-cli backend for real migrations. Static profiles do not verify this host. Before native execution, verify per-call model selection, execution-bound model metadata, tools, dispatch and cancellation on the installed host. Do not echo requested models or silently fall back to CLI.' });
-  if (checkCLI && !native) {
+  if (checkCLI) {
     try {
       // Same environment as workers: a launcher may pick a different build otherwise.
       const env = copilotEnv('reviewer-rules');
@@ -144,8 +128,7 @@ export async function doctor(root, config, { checkCLI = false, command = 'copilo
     } catch (e) { checks.push({ check: 'Copilot executable', ok: false, detail: e.message }); }
   }
   const staticValid = checks.every(x => x.ok !== false);
-  return { ok: staticValid && (!native || unverifiedModels), staticValid, executionReady: unverifiedModels ? 'models-unverified' : native ? 'unknown' : 'not-verified',
-    ...(native ? { modelVerification: nativeModelVerification(config) } : {}), checks, workerBackend: config.workerBackend ?? 'copilot-cli', requestedModels: config.models, requestedPhaseModels: config.phaseModels ?? {},
+  return { ok: staticValid, staticValid, executionReady: 'not-verified', checks, workerBackend: 'copilot-cli', requestedModels: config.models, requestedPhaseModels: config.phaseModels ?? {},
     note: 'Help checks do not authenticate, verify model availability, exercise hooks, or make AI calls. Run the live smoke procedure before production use.' };
 }
 export async function main(argv = process.argv.slice(2)) {
@@ -192,17 +175,14 @@ export async function main(argv = process.argv.slice(2)) {
     let result;
     if (cmd === 'pilot' && args._[1] === 'prepare') result = preparePilot(root, config, { target: args.target, sources: args.sources?.split(','), through: args.through, note: args.note });
     else if (cmd === 'pilot' && args._[1] === 'run') {
-      if (config.workerBackend === 'native' && args.copilot) throw new Error('--copilot cannot be used with a native pilot');
-      result = await runPilot(root, config, config.workerBackend === 'native' ? createNativeAdapter() : createCopilotAdapter({ command: args.copilot }), { signal: controller.signal, onProgress: event => console.error(`${event.unit}: ${event.stage}`) });
+      result = await runPilot(root, config, createCopilotAdapter({ command: args.copilot }), { signal: controller.signal, onProgress: event => console.error(`${event.unit}: ${event.stage}`) });
     }
     else if (cmd === 'diagnose') result = diagnoseBuild(root, config);
     else if (cmd === 'repair-round') {
       const diagnosis = diagnoseBuild(root, config);
       if (diagnosis.clean) result = { ...diagnosis, next: 'Build is clean; review it and approve smoke.' };
       else {
-        const native = config.workerBackend === 'native';
-        if (native && args.copilot) throw new Error('--copilot cannot be used with workerBackend: native');
-        const repair = await translate(root, config, native ? createNativeAdapter() : createCopilotAdapter({ command: args.copilot }), {
+        const repair = await translate(root, config, createCopilotAdapter({ command: args.copilot }), {
           signal: controller.signal, repairQueue: diagnosis.queue,
           onProgress: event => console.error(`${event.unit}: ${event.stage} (agent calls ${event.calls})`) });
         result = { diagnosis, repair, next: 'Review the repaired outputs and the round counts in migration/build-rounds.tsv, then approve build and run build for the next round.' };
@@ -222,15 +202,20 @@ export async function main(argv = process.argv.slice(2)) {
       else if (action === 'status') result = surveyStatus(root, config, kind, options);
       else if (action === 'merge') { const release = lockRun(root, 'survey-merge'); try { result = mergeSurvey(root, config, kind, options); } finally { release(); } }
       else if (action === 'run') {
-        const native = config.workerBackend === 'native';
-        if (native && args.copilot) throw new Error('--copilot cannot be used with workerBackend: native');
-        if (native) console.error('Native workers: keep this runner active; use native_workers.mjs list/claim/submit from the host session. No Copilot CLI is launched.');
-        result = await runSurvey(root, config, kind, native ? createNativeAdapter() : createCopilotAdapter({ command: args.copilot }), { signal: controller.signal, ...options,
+        result = await runSurvey(root, config, kind, createCopilotAdapter({ command: args.copilot }), { signal: controller.signal, ...options,
           onProgress: event => console.error(`${event.unit}: ${event.stage} (agent calls ${event.calls})`) });
       } else throw new Error('Use survey plan|run|status|merge --kind facts|contracts|inventory [--max-files N] [--sites migration/PATH.tsv]');
     }
     else if (cmd === 'judge-prepare') result = await runJudgePreparation(root, config, { signal: controller.signal });
     else if (cmd === 'phase') result = phaseCommand(root,config,args._[1],args._[2],args);
+    else if (cmd === 'guardrails') {
+      if (args._[1] === 'show') result = guardrailsProposal(root, pluginRoot, config);
+      else if (args._[1] === 'install') {
+        // A human gate: the hook makes the host ask the person to confirm this command.
+        const release = lockRun(root, 'guardrails-install');
+        try { result = installGuardrails(root, pluginRoot, { deny: args.deny, add: args.add, remove: args.remove, waiver: args.waiver, replace: args.replace }); } finally { release(); }
+      } else throw new Error('Use guardrails show | install [--add CSV] [--remove CSV] [--deny CSV] [--waiver NOTE] [--replace]');
+    }
     else if (cmd === 'doctor') {
       result = await doctor(root, config, { checkCLI: args['check-cli'], command: args.copilot });
       if (!result.ok) {
@@ -244,10 +229,7 @@ export async function main(argv = process.argv.slice(2)) {
     else if (['judge', 'build', 'smoke', 'parity', 'handoff'].includes(cmd)) result = await runStage(root, config, cmd, { signal: controller.signal });
     else if (['translate', 'repair'].includes(cmd)) {
       if (cmd === 'repair' && !args.target && !args.queue) throw new Error('repair requires --target or --queue');
-      const native = config.workerBackend === 'native';
-      if (native && args.copilot) throw new Error('--copilot cannot be used with workerBackend: native');
-      if (native) console.error('Native workers: keep this runner active; use native_workers.mjs list/claim/submit from the host session. No Copilot CLI is launched.');
-      result = await translate(root, config, native ? createNativeAdapter() : createCopilotAdapter({ command: args.copilot }), {
+      result = await translate(root, config, createCopilotAdapter({ command: args.copilot }), {
         signal: controller.signal, onlyTarget: cmd === 'repair' ? args.target : undefined, repairQueue: cmd === 'repair' ? args.queue : undefined, evidence: args.evidence,
         onProgress: event => console.error(`${event.unit}: ${event.stage} (agent calls ${event.calls})`) });
     } else throw new Error(`Unknown command ${cmd}\n${usage}`);

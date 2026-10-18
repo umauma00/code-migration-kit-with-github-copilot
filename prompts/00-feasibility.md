@@ -25,9 +25,9 @@ handoff. See [source-only requirements](../docs/SOURCE-ONLY.md).
 6. Check Node >=22, required target toolchain, account model availability and
    organization policy. Runtime also requires the source toolchain; source-only
    records its absence as an equivalence limitation, not an implementation blocker.
-   CLI backends check compatible flags with `doctor --check-cli`; native backends
-   use `doctor` and verify host capability/model isolation in the disposable pilot.
-   This check does not authenticate or make a model call.
+   Workers always run on the Copilot CLI, also from VS Code: check it with
+   `doctor --check-cli` (install it or start `copilot login` only after the
+   person agrees). This check does not authenticate or make a model call.
 7. Choose explicit model IDs per worker role in config. Estimate work as a visible
    multiplication — units × per-unit calls × referee price — in bands only (see
    the report contract below), or the word unknown. Keep unknowns explicit.

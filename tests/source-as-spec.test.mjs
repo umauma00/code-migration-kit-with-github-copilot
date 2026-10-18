@@ -166,7 +166,7 @@ test('review fixes: guidance does not misroute file/diagnostic errors and never 
   for (const [message, id] of [
     ['Build failed but no diagnostic maps to a manifest target (parsed 1, unmapped 1). src/login.ts:12', 'build-failed'],
     ['Invalid review result for src/login.py', 'worker-output'],
-    ['Native worker failed: tsc error at line 401', 'native-worker'],
+    ['Copilot implementer failed (exit 1): session.error rate_limit 429: Rate limit exceeded', 'rate-limit'],
     ['ENOENT: no such file or directory, open migration/RULEBOOK.md', 'unknown'],
     ['spawn copilot ENOENT', 'copilot-missing'],
     ['Copilot implementer failed (exit 1): To authenticate, you can use any of the following methods', 'copilot-auth']]) {

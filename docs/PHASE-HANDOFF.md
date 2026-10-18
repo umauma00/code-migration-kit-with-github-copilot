@@ -134,11 +134,13 @@ question. Only after a real answer authorizes it, record the appropriate runner
 approval and execute that stage. Never issue every future approval in advance.
 
 The kit's hook makes the host ask the person to confirm every `approve`,
-`phase complete`, `pilot prepare` and `source-spec init --apply` command, and it
-refuses any agent edit of `migration/guardrails.json`. That host confirmation is
-the person's act; never ask them to switch it off. When the session cannot ask
-(a non-interactive run reports "unable to ask user for confirmation"), give the
-person the exact command and let them run it in their own terminal. These hooks
+`phase complete`, `pilot prepare`, `source-spec init --apply` and
+`guardrails install` command, and it refuses any other agent write of
+`migration/guardrails.json`. That host confirmation is the person's act; never ask
+them to switch it off. The person works from chat only: run every command
+yourself. When the session cannot ask (autopilot or a non-interactive run reports
+"unable to ask user for confirmation"), stop and ask them to continue in an
+interactive chat session instead of working around it. These hooks
 work only where the host loads them (see `doctor`).
 If artifacts or predecessor results changed, refresh the report and authorization
 as required by the runner. A user's change request is not approval to proceed.
@@ -178,7 +180,8 @@ structure. Adapt it with what you actually observed, then report:
 Wait for the answer. Never pick an option on the user's behalf, never treat the
 recommendation as consent, and never route around a guardrail or weaken a test
 as an option. Options that are the human's own act (installing guardrails,
-approving a gate, changing models or limits) say so explicitly. After the chosen
+approving a gate, changing models or limits) say so explicitly; the agent runs
+the command and the person's act is the agreement plus the host confirmation. After the chosen
 option runs, report its result in the same format if it fails again; a third
 failure of the same kind is a rule problem and the recommendation becomes a
 rulebook amendment (upstream rule 6).

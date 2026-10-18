@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Regressions for the 2026-10-18 review against Copilot CLI 1.0.98 and current
 // VS Code documentation: JSON-mode errors, prompt-mode hooks, observed models,
-// scheduling, the upstream single-pass fix policy and native file input.
+// scheduling and the upstream single-pass fix policy.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -13,9 +13,6 @@ import { approve, runStage, translate } from '../lib/pipeline.mjs';
 import { loadConfig, contextHash, safePath, writeJSON, readJSON, done, unitState, atomicWrite, waitsForDependencies } from '../lib/core.mjs';
 import { createCopilotAdapter, copilotEnv, copilotStreamError, copilotStreamFacts, parseCopilotOutput } from '../scripts/copilot_adapter.mjs';
 import { isTransientFailure, isSystemicFailure } from '../lib/failures.mjs';
-import { createNativeAdapter, listNativeTasks, claimNativeTask, submitNativeTask } from '../lib/native-workers.mjs';
-import { validateNativeProfile } from '../lib/review.mjs';
-import { runProcess } from '../lib/process.mjs';
 
 const persist = f => writeJSON(safePath(f.root, 'migration/config.json'), f.config);
 async function approved(f) {
@@ -116,7 +113,7 @@ test('new installs fan out without dependency waits unless a unit typecheck need
 test('configuration rejects unknown scheduling values, none with typecheck and concurrency above 64', t => {
   const f = prepare(t);
   for (const [patch, pattern] of [[{ dependencyOrder: 'later' }, /dependencyOrder must be/], [{ dependencyOrder: 'none' }, /cannot be combined with a per-unit typecheck/],
-    [{ fixPolicy: 'twice' }, /fixPolicy must be/], [{ concurrency: 65 }, /Invalid concurrency/], [{ nativeInput: 'file' }, /applies only to workerBackend: native/]]) {
+    [{ fixPolicy: 'twice' }, /fixPolicy must be/], [{ concurrency: 65 }, /Invalid concurrency/]]) {
     writeJSON(safePath(f.root, 'migration/config.json'), { ...f.config, ...patch });
     assert.throws(() => loadConfig(f.root), pattern);
   }
@@ -166,78 +163,21 @@ test('fixPolicy single-pass flags an unchanged fix and keeps typecheck-only fixe
   assert.equal(unitState(g.root, g.units[0]).singlePass, undefined);
 });
 
-async function nativeFileReady(t) {
-  const f = prepare(t);
-  Object.assign(f.config, { workerBackend: 'native', nativeHarness: 'vscode-local', nativeModelVerification: 'requested-unverified', nativeInput: 'file', timeoutSeconds: 15 });
-  await approved(f);
-  return f;
-}
-const hook = (f, role, event) => runProcess(process.execPath, [safePath(f.root, 'migration-kit/scripts/migration_hook.mjs'), '--native-file', role],
-  { cwd: f.root, input: JSON.stringify({ cwd: f.root, ...event }), env: { ...process.env, MIGRATION_KIT_ROLE: '' } }).then(r => JSON.parse(r.stdout));
-
-test('native file input: the parent dispatches a short message and the reader hook gates and records the read', async t => {
-  const f = await nativeFileReady(t);
-  for (const role of ['implementer', 'reviewer-semantics', 'reviewer-rules', 'arbiter', 'fixer', 'surveyor']) {
-    assert.match(validateNativeProfile(f.root, role, f.config).id, new RegExp(`migration-native-${role}-file$`));
-  }
-  const controller = new AbortController();
-  const run = translate(f.root, f.config, createNativeAdapter({ pollMs: 5 }), { signal: controller.signal }).then(r => ({ r }), e => ({ e }));
-  t.after(async () => { controller.abort(); await run; });
-  let pending;
-  while (!(pending = listNativeTasks(f.root).tasks.find(x => x.status === 'pending'))) await delay(10);
-  const task = claimNativeTask(f.root, pending.task);
-  assert.equal(task.role, 'implementer');
-  assert.equal(task.prompt, undefined, 'the frozen input never passes through the parent');
-  assert.ok(task.dispatch.includes(task.promptFile));
-  assert.match(fs.readFileSync(safePath(f.root, task.promptFile), 'utf8'), /Set target to/);
-  const other = await hook(f, 'implementer', { tool_name: 'read_file', tool_input: { filePath: 'migration/RULEBOOK.md' } });
-  assert.equal(other.hookSpecificOutput.permissionDecision, 'deny');
-  const wrong = await hook(f, 'fixer', { tool_name: 'read_file', tool_input: { filePath: task.promptFile } });
-  assert.match(wrong.permissionDecisionReason, /This request is for implementer/);
-  const shell = await hook(f, 'implementer', { toolName: 'bash', toolArgs: { command: `cat ${task.promptFile}` } });
-  assert.equal(shell.permissionDecision, 'deny');
-  assert.equal(fs.existsSync(safePath(f.root, task.promptFile.replace('prompt.txt', 'reader.json'))), false);
-  // A host that never ran the agent-scoped hook leaves no reader receipt.
-  submitNativeTask(f.root, task.task, task.claimToken, { result: result(task.role, task.unit), model: task.model });
-  const outcome = await run;
-  assert.match(outcome.e.message, /not read through the profile's reader hook/);
-  // Resume: every task is read through the hook, and the run completes.
-  const resumed = translate(f.root, f.config, createNativeAdapter({ pollMs: 5 })).then(r => ({ r }), e => ({ e }));
-  let finished;
-  while (!(finished = await Promise.race([resumed, delay(10).then(() => null)]))) {
-    for (const pending of listNativeTasks(f.root).tasks.filter(x => x.status === 'pending')) {
-      const task = claimNativeTask(f.root, pending.task);
-      assert.deepEqual(await hook(f, task.role, { toolName: 'view', toolArgs: { path: path.join(f.root, task.promptFile) } }), {});
-      assert.equal(readJSON(safePath(f.root, task.promptFile.replace('prompt.txt', 'reader.json'))).role, task.role);
-      submitNativeTask(f.root, task.task, task.claimToken, { result: result(task.role, task.unit), model: task.model });
-    }
-  }
-  assert.equal(finished.e, undefined, finished.e?.message);
-  assert.equal(finished.r.done, 1);
-});
-
-test('native file input is limited to the repository-copy layout and native backend', t => {
-  const f = prepare(t, { layout: 'plugin' });
-  writeJSON(safePath(f.root, 'migration/config.json'), { ...f.config, workerBackend: 'native', nativeHarness: 'copilot', nativeModelVerification: 'requested-unverified', nativeInput: 'file' });
-  assert.throws(() => loadConfig(f.root), /requires the repository-copy layout/);
-});
-
 test('failure guidance names rate limits and stdout authentication errors', async () => {
   const { failureGuidance } = await import('../lib/guidance.mjs');
   assert.equal(failureGuidance('Copilot implementer failed (exit 1): session.error rate_limit 429: Last error: 429 Rate limit exceeded').id, 'rate-limit');
   assert.equal(failureGuidance('Copilot implementer failed (exit 1): session.error authentication 401: Authentication failed with provider').id, 'copilot-auth');
 });
 
-test('installer records the chosen fix policy and native input, and refuses unsupported combinations', async t => {
+test('installer records the chosen fix policy and refuses the removed native backend', async t => {
   const { install } = await import('../scripts/install.mjs');
   const os = await import('node:os');
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'install-policies-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
-  install(root, { apply: true, model: 'm', fixPolicy: 'single-pass', workerBackend: 'native', nativeHarness: 'vscode-local', nativeInput: 'file' });
+  install(root, { apply: true, model: 'm', fixPolicy: 'single-pass' });
   const config = readJSON(path.join(root, 'migration/config.json'));
-  assert.equal(config.fixPolicy, 'single-pass'); assert.equal(config.nativeInput, 'file'); assert.equal(config.dependencyOrder, 'auto');
-  assert.ok(fs.existsSync(path.join(root, '.github/agents/migration-native-reviewer-rules-file.agent.md')));
-  assert.throws(() => install(root, { model: 'm', nativeInput: 'file' }), /requires --worker-backend native/);
-  assert.throws(() => install(root, { model: 'm', layout: 'plugin', workerBackend: 'native', nativeHarness: 'copilot', nativeInput: 'file' }), /repository-copy layout/);
+  assert.equal(config.fixPolicy, 'single-pass'); assert.equal(config.dependencyOrder, 'auto'); assert.equal(config.workerBackend, 'copilot-cli');
+  assert.equal(fs.readdirSync(path.join(root, '.github/agents')).some(n => n.includes('-native-')), false);
+  assert.throws(() => install(root, { model: 'm', workerBackend: 'native' }), /native worker backend was removed/);
   assert.throws(() => install(root, { model: 'm', fixPolicy: 'never' }), /fixPolicy must be/);
 });

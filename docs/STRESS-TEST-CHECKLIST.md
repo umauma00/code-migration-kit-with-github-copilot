@@ -12,7 +12,7 @@
 | # | やること | 誰が | 確認方法 |
 |---|---|---|---|
 | 1 | 00〜02 の記録と judge の成功を確認する | AI | `status --format checklist` で「現在：03」 |
-| 2 | `templates/guardrails.json` を `migration/guardrails.json` にコピーし、対象のビルド・テストコマンドに合わせる（または免除の理由を記録） | **人間** | `doctor` の `command guardrails` が installed / waived |
+| 2 | AI が `guardrails show` を基に、対象のビルド・テストコマンドに合わせた禁止リスト（または免除の理由）をチャットで提案し、合意後に `guardrails install` を実行する | **人間**が合意し、ホストの確認で許可 | `doctor` の `command guardrails` が installed / waived |
 | 3 | `phase start 03` | AI | 成功すれば開始記録が残る |
 | 4 | RULEBOOK の危険な節と inventory の行を多く含むファイルを3つ選び、点数と根拠（file:line）を `migration/stress-test/report.md` に書く | AI | 報告に選定表がある |
 | 5 | 比較試験 A：ルールに厳密に従って訳す（使い捨ての作業場所。本番には混ぜない） | AI（独立した文脈） | 訳の各判断にルールの節を引用 |
@@ -43,7 +43,7 @@ cd /tmp/bakeoff-b && copilot -p "Port these files to TARGET_LANGUAGE the way a f
 
 | 表示 | 原因 | 対処 |
 |---|---|---|
-| `Phase 03 requires human-installed command guardrails` | 手順2が未実施 | 人間が `migration/guardrails.json` を置く。AI は作れません（hook が拒否します） |
+| `Phase 03 requires human-installed command guardrails` | 手順2が未実施 | 禁止リストに合意し、`guardrails install` の確認で許可する。AI がファイルを直接作ることはできません（hook が拒否します） |
 | `Phase 02 is not reviewed for current inputs` | RULEBOOK などを変えたため 02 の記録が失効 | 変更を確認して 02 を記録し直し、`judge` を再実行 |
 | `Run judge successfully for these inputs` | 入力が変わり judge の結果が古い | `judge` を再実行 |
 | `Pilot target must be a new directory` | pilot の作業場所が既に存在する | 新しい外部ディレクトリを指定 |

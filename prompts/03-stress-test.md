@@ -6,10 +6,11 @@ Work in the order of the [one-page checklist](../docs/STRESS-TEST-CHECKLIST.md)
 Read [phase reports and user decisions](../docs/PHASE-HANDOFF.md).
 End with its report; ask for the next decision only when needed.
 
-Command guardrails: `phase start 03` refuses to start until the human has copied
-`templates/guardrails.json` to `migration/guardrails.json` (adapted to this target) or
-recorded a waiver there. Never create, edit or relax that file yourself: installing it is
-the human's act, because that is when they decide the referee price. If a guardrail
+Command guardrails: `phase start 03` refuses to start without `migration/guardrails.json`
+(adapted to this target) or a recorded waiver. Installing it is the human's act, because
+that is when they decide the referee price: propose the list from `guardrails show` in
+chat, and only after their agreement run `guardrails install` with exactly those options;
+the host asks them to confirm it. Never create, edit or relax the file any other way. If a guardrail
 denies a command, that is the design working; report it instead of routing around it.
 Run `doctor` and confirm `repository hooks load in Copilot CLI` is not failing.
 
@@ -63,6 +64,6 @@ production fan-out based on your own favorable report.
 In source-only mode, prototype against source-derived contracts and adversarial
 target scenarios; do not require the original runtime. Clearly distinguish target
 execution from inferred parity, report unverified assumptions, and keep disposable
-receipts separate. Use the configured native backend for native pilots.
+receipts separate.
 Before resolving difficult prototype or test-design questions, follow
 [built-in Rubber Duck](../docs/RUBBER-DUCK.md); advice does not replace two reviews.

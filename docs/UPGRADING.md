@@ -1,6 +1,16 @@
-# 0.1.0〜0.1.4から0.1.5への更新
+# 更新手順（0.3.0 と以前の版）
 
 日本語 | [English](UPGRADING.en.md)
+
+## 0.3.0（native方式の削除・チャットだけで完遂）
+
+0.3.0ではVS Codeのサブエージェント方式（native）を削除しました。ワーカーは常にCopilot CLIで動きます。以下はすべてAIがチャットで提案し、同意を得て実行します。
+
+1. `workerBackend: "native"`、`nativeHarness`、`nativeModelVerification`、`nativeInput` を含む設定は、移行方法を表示して停止します。`"workerBackend": "copilot-cli"` に直し、これらのキーを削除してから、judgeと翻訳の承認をやり直します。
+2. コピー導入の案件に残る `.github/agents/migration-native-*.agent.md` は使われません。installerは削除しないので、AIが同意を得て削除します。
+3. Copilot CLIが未導入、または未サインインの場合、AIが `npm install -g @github/copilot` と `copilot login` を実行します。利用者はブラウザでサインインを承認するだけです。
+4. `migration/guardrails.json` は、AIが `guardrails show` を基に提案し、合意後に `guardrails install` で設置します。ホストが確認を求め、その許可が人間の設置行為になります。
+5. 既存の設定には `fixPolicy`・`dependencyOrder` を自動で追加しません。採用する場合は承認をやり直します。
 
 ## 2026-10-17の更新（CLI版の追従・ガードレール・ツール付きレビュー・診断・言語）
 

@@ -1,5 +1,15 @@
-# Unreleased
+# Unreleased (0.3.0)
 
+- Remove the VS Code subagent (native) worker backend: its runner adapter,
+  claim/submit CLI, profiles, doctor checks, guidance and docs. Workers always
+  run as Copilot CLI processes, also when the migration is driven from VS Code
+  chat. A configuration that still names the native backend or its keys stops
+  with migration instructions; the installer refuses `--worker-backend native`.
+- Chat-only operation: the skill and orchestrator run every command themselves,
+  install the Copilot CLI (`npm install -g @github/copilot`) and start
+  `copilot login` after the person agrees. `run_migration.mjs guardrails show`
+  proposes the deny list and `guardrails install` writes the agreed list as a
+  host-confirmed human gate, so phase 03/04 no longer needs a manual file copy.
 - 2026-10-18 review against Copilot CLI 1.0.98 and current VS Code docs:
   - JSON-mode failures: the CLI reports rate limits, 5xx and authentication only
     as stdout `session.error` events (stderr empty). The adapter now includes
@@ -15,10 +25,6 @@
     concurrency cap rises from 16 to 64 and the new-install default to 4.
   - `fixPolicy: single-pass` restores upstream Step 3 (one fix of the confirmed
     findings, then the build/test referees) with its own hash-bound receipt.
-  - Native `nativeInput: file` (repository copy): the parent passes a short
-    dispatch, the reader profile opens its request file, and an agent-scoped
-    hook restricts and records the read; the runner rejects results without
-    that record (hook behavior verified on 1.0.98 in a trusted folder).
   - Windows plugin hook uses `$env:PLUGIN_ROOT` in its PowerShell command.
   - Docs: upstream feasibility report contract restored in prompt 00; bakeoff B
     runs with `--available-tools` excluding `skill` (skill descriptions otherwise

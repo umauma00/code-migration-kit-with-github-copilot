@@ -22,8 +22,7 @@
 
 [変更対応表と残る実装](plans/2026-10-15-review-implementation.md)を参照。以下は以前の検証記録です。
 
-nativeホスト接続の仕様・検証範囲は [VS Codeネイティブワーカー](NATIVE-WORKERS.md#検証範囲)、
-追加テストは [native-workers.test.mjs](../tests/native-workers.test.mjs) を参照してください。
+VS Codeのnative方式は0.3.0で削除しました。以下のnative関連の記録は当時の履歴です。
 実VS Codeのモデル委譲はオフライン接続テストとは区別します。
 
 2026-10-12のコミット前再検証で、起動中の空の実行ロックをnativeクライアントが

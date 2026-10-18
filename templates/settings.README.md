@@ -49,9 +49,12 @@ judge files under version control. No worker may change its own grader.
 ## Command guardrails (upstream settings.json denies)
 
 Copilot has no repository setting that denies shell commands. The upstream
-`.claude/settings.json` deny list is therefore `templates/guardrails.json`,
-copied by the human to `migration/guardrails.json` before phase 03 and adapted
-to the target's build/test commands. The preToolUse hook denies matching shell
+`.claude/settings.json` deny list is therefore `migration/guardrails.json`,
+installed before phase 03 from `templates/guardrails.json` and adapted to the
+target's build/test commands. Installing it stays the human's act in chat-only
+use: the agent proposes the list (`run_migration.mjs guardrails show`) and runs
+`guardrails install` only after agreement, and the host asks the person to
+confirm that exact command. Any other agent write of the file is denied. The preToolUse hook denies matching shell
 commands (Copilot CLI `bash`, VS Code `run_in_terminal`) in every agent session;
 the runner's own build/test/typecheck processes are not tool calls and are not
 affected. `phase start 03|04` refuses to start without the file or a recorded

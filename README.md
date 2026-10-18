@@ -4,7 +4,7 @@
 
 Anthropicの[Code Migration Kit](https://github.com/anthropics/code-migration-kit-with-claude-code)を、GitHub Copilot CLIを中心に使える形へ変更した非公式版です。言語間移植の「事前調査 → ルール固定 → 変換 → 独立レビュー → ビルド → 新旧比較」を扱います。
 
-**0.2.0** はVS Code / Copilot CLIのAgent Plugins形式に対応しました。キット本体をプラグインとして導入し、案件側では設定と成果物を管理できます。[プラグイン導入手順](docs/PLUGIN.md)、[従来版の修正と再レビュー](docs/reviews/2026-10-10-copilot-rereview-fixes.md)、[既存版からの更新](docs/UPGRADING.md)を参照してください。
+**0.3.0** ではVS Codeのサブエージェント方式（native）を削除しました。ワーカーは常にCopilot CLIで動き、VS Codeから進める場合も同じです。利用者はAIチャットだけで移行を完遂でき、CLIの導入・サインインの開始、guardrailsの設置などのコマンドはAIが実行します。**0.2.0** はVS Code / Copilot CLIのAgent Plugins形式に対応しました。キット本体をプラグインとして導入し、案件側では設定と成果物を管理できます。[プラグイン導入手順](docs/PLUGIN.md)、[従来版の修正と再レビュー](docs/reviews/2026-10-10-copilot-rereview-fixes.md)、[既存版からの更新](docs/UPGRADING.md)を参照してください。
 
 参照したCLIは **1.0.98**（1.0.93・1.0.95でも疑似プロバイダーとの通信を確認。1.0.98ではrepository/plugin両構成の全ロールの往復、hookの読み込み、エラー出力の形式も確認）、VS Codeは **1.142** です。VS Code 1.142ではCopilot harnessが新規セッションの既定になりつつあり、prompt filesはLocal harness専用（`chat.promptFilesLocations` は非推奨）です。VS Codeでは共通スキル `/code-migration` を入口にしてください。固定した元コミットとSDK参照版は [UPSTREAM.json](UPSTREAM.json) に記録しています。Anthropic/GitHubの公式配布物ではありません。
 
@@ -18,42 +18,40 @@ Anthropicの[Code Migration Kit](https://github.com/anthropics/code-migration-ki
 
 | 項目 | この版の動作 |
 |---|---|
-| 指示・スキル | プラグインの `skills/code-migration/SKILL.md`、またはコピー導入の `.github/skills/code-migration/SKILL.md`。CLIワーカーは暗黙の指示読み込みを無効化。nativeはhost管理 |
+| 指示・スキル | プラグインの `skills/code-migration/SKILL.md`、またはコピー導入の `.github/skills/code-migration/SKILL.md`。ワーカーは暗黙の指示読み込みを無効化 |
 | 役割分担 | orchestrator / implementer / 独立reviewer 2種 / arbiter / fixerに、準備監査用のtool-free profileを追加 |
 | モデル | 5種類のワーカーに明示指定。利用できるモデルIDをユーザーが設定 |
-| 変換 | CLI担当は `view,grep,glob` のみ、native担当は固定入力・ツールなし。JSON応答を検証し、Nodeの調整役が対象ファイルだけを書き込む |
-| 独立レビュー | 2担当に同じ固定入力を渡す。レビュー担当はツールなし。入力が上限を超えた単位は、ハッシュ付きのファイル一覧と読み取り専用ツールで自動的にレビュー。CLIは `--no-custom-instructions`、nativeはホスト管理の指示環境 |
+| 変換 | Copilot CLIのワーカーは `view,grep,glob` のみ。JSON応答を検証し、Nodeの調整役が対象ファイルだけを書き込む |
+| 独立レビュー | 2担当に同じ固定入力を渡す。レビュー担当はツールなし。入力が上限を超えた単位は、ハッシュ付きのファイル一覧と読み取り専用ツールで自動的にレビュー。ワーカーは `--no-custom-instructions` |
 | 完了判定 | 出力、入力、2件のレビュー、必要な裁定結果のハッシュを保存。ファイルが存在するだけでは完了にしない |
 | 再開 | 中断した工程から再開。失われたレビューや変更された出力は再レビュー |
 | 工程の承認 | 入力・出力・前工程の実行IDに結び付ける。上流の再実行で下流結果・承認は失効 |
 | VS Code | Copilot harness（1.142で既定化が進行中）は共通スキル、Localは10工程のprompt files（Local専用・移行先はskill）とLocal用hooksを利用 |
 | Dynamic Workflows | 共通実行エンジンを使う任意の実験的アダプター |
 
-## VS Codeだけで動かす（native方式・実行モデル未検証）
+## チャットだけで進める
 
-Copilot CLIを導入せずにVS Codeだけで進めたい場合は、native方式を選びます。新規のnative導入は `nativeModelVerification: "requested-unverified"` になり、親エージェントが要求モデルをサブエージェント呼び出しのモデル引数に渡して結果を提出します。VS Codeはサブエージェントが**実際に使ったモデル**を返さないため、各実行記録・runの要約・status・doctorに「実行モデル未検証」と残ります。
+利用者はコマンドを打たず、VS Code（またはCopilot CLI）のAIチャットだけで移行を完遂できます。対象リポジトリを開き、Copilot Chatで次のように依頼してください。
 
-```bash
-node /path/to/code-migration-kit/scripts/install.mjs --target . --layout plugin --worker-backend native --native-harness copilot --model MODEL_ID --apply
-```
+> https://github.com/umauma00/code-migration-kit-with-github-copilot の `feat/github-copilot-migration-kit` ブランチを `../code-migration-kit` にcloneし、`scripts/install.mjs` でこのリポジトリへ導入して、`code-migration` スキルでPythonからTypeScriptへの移行を始めて
 
-Copilot CLIを使える場合は既定のCLIワーカー方式（`copilot-cli`）を推奨します。ワーカーごとに `--model` で固定したプロセスを起動し、暗黙の指示の隔離も実機で確認済みです。実行メタデータでの確認を必須にする従来の契約は `--native-model-verification host-metadata` で選べますが、VS Codeでは完了できない実験的な設定です。
+導入後は新しいチャットで `/code-migration` を呼ぶか、「移行の続きを進めて」と依頼します。AIは次をすべて自分で実行し、結果をチャットで報告します。
 
-`workerBackend: "native"` を選ぶと、現在のVS Codeセッションの親エージェントが
-実装・レビュー・裁定・修正をサブエージェントへ委譲します。Copilot CLIは起動しません。
-Node runnerが仕事を発行し、親が結果を提出します。検証・ファイル反映・承認・再開は
-CLI方式と共通です。初期化には `--worker-backend native` を指定します。
-Localはコピー導入、Copilot（Agent Host）はプラグインまたはコピーに対応します。
-詳細は [VS Codeネイティブワーカー](docs/NATIVE-WORKERS.md) を参照してください。
+- Copilot CLIの確認。未導入なら理由を説明し、同意を得てから `npm install -g @github/copilot` を実行します。サインインが必要なら `copilot login` を始め、表示されたURLとワンタイムコードをチャットに出します。VS Codeのサインインとは別に一度だけ必要です。
+- 初期化・設定・各工程のコマンド、長時間の変換（バックグラウンドのターミナルで実行し、進捗を報告）、失敗時の原因と選択肢の提示。
 
-既存設定では `workerBackend` 省略時の `copilot-cli` を維持します。
-native接続は自動テストとオフライン題材で検証し、実VS CodeセッションのAI委譲は未検証です。
-CLIとnativeでは暗黙指示の扱いが異なり、同じ隔離保証とは扱いません。
+利用者が行うのは、次の3つだけです。
+
+1. チャットでの質問への回答（言語・モデル・方針・各工程の判断）
+2. 人間が判断する操作の確認ダイアログでの許可（`approve`、`phase complete`、`pilot prepare`、`source-spec init --apply`、`guardrails install`）。AIが実行しようとすると、ホストが利用者に確認を求めます。
+3. Copilot CLIのサインインのブラウザでの承認（初回のみ）
+
+ワーカーは常にCopilot CLIのプロセスです。`--model` で担当ごとのモデルを固定し、ツール制限と暗黙指示の隔離は実CLIで確認しています。0.2.0までのnative方式の設定（`workerBackend: "native"` など）は停止して移行方法を表示します。AIが内容を示し、同意を得て設定を直します。
 
 ## 必要なもの
 
 - Node.js 22以上。ランナー本体は外部npm依存なし。
-- CLI方式ではログイン済みのCopilot CLI。native方式では委譲機能を使えるVS Codeセッション。いずれも指定モデルを利用できる契約・組織設定。
+- Copilot CLI（未導入ならAIが同意を得てインストールし、サインインを始めます）。指定モデルを利用できる契約・組織設定。
 - 対象言語の実行環境・ビルドツール。付属デモとPython/C依存解析にはPython 3が必要です。
 - Linuxの既存検証とmacOSでの自動テスト・CLI通信検証があります。Windowsでの実行は未検証です。WindowsではNodeから直接起動できるCopilot実行ファイルを使ってください。
 
@@ -110,7 +108,7 @@ node migration-kit/scripts/run_migration.mjs doctor --check-cli
 | `verificationRoots` | 比較器・テスト・テストデータ。例：`["tests"]` |
 | `verificationInputs` | 追加で変更を追跡するビルド設定・依存設定等のファイル。例：`["build/config.json", "packages/api/tsconfig.json"]` |
 | `buildArtifactRoots` | コマンドが生成するバイナリ・オブジェクト・レポートのディレクトリ。例：`["artifacts", "dist"]`。既定は空配列 |
-| `maxReviewInputBytes` | 固定レビュー入力のJSONサイズ上限。既定65536 bytes。CLI方式で超過した単位は、自動でツール付きレビュー（下記）に切り替わる。native方式は停止 |
+| `maxReviewInputBytes` | 固定レビュー入力のJSONサイズ上限。既定65536 bytes。超過した単位は、自動でツール付きレビュー（下記）に切り替わる |
 | `reviewDependencyMap` | 監査した依存宣言JSON。既定 `migration/review-dependencies.json`。phase 01で作成する必須成果物 |
 | `sourceLanguage`, `targetLanguage` | 対象言語。テンプレートのPython/JavaScriptを変更可能 |
 | `verificationMode` | `runtime`（省略時）：元環境と新旧比較を実行。`source-only`：ソース由来の準備と変換後build/smokeを検証し、動作同等性未検証として引き継ぐ。既存設定は自動変更しない |
@@ -121,13 +119,11 @@ node migration-kit/scripts/run_migration.mjs doctor --check-cli
 | `designInputs` | 全文を固定入力へ含め、保護する設計文書のパス配列。リンクだけでは本文を渡した扱いにしない。redesignのmodule runnerを有効化する設定ではない |
 | `packageMap` | 任意のsource→target package宣言JSON。指定時は01で別のpackage cycle監査を記録 |
 | `markerPolicy` | 新規は`todo-lines-v1`：TODO(port)のある行数と末尾todosを照合。未指定の既存案件は従来契約を維持 |
-| `workerBackend` | `copilot-cli`（省略時）または `native`。変更は承認を失効させる |
-| `nativeHarness` | native時に必須。`vscode-local` または `copilot`。現在のセッションと合わせる |
+| `workerBackend` | `copilot-cli` のみ（省略可）。0.3.0でnative方式を削除 |
 | `concurrency` | 同時AI呼び出し数。新規導入の初期値4、上限64。2つのレビューも含めてこの数以下。CLI方式では各呼び出しが別プロセスなので、Copilotのsubagent同時実行数ではなく、アカウントのレート制限が実質の上限 |
 | `dependencyOrder` | `auto`（新規導入）: 単位型チェックがあるときだけ、依存先のレビュー完了まで依存元を待たせる。型チェックがなければ上流と同じく承認範囲を一斉に展開する。`reviewed`（省略時・既存設定）: 常に待つ。`none`: 待たない（型チェックとは併用不可） |
 | `fixPolicy` | `rereview`（省略時）: 修正後に再レビューし、確定した指摘がなくなるまで繰り返す。`single-pass`: 上流Step 3と同じく、確定指摘の修正は1回で完了とし、build/smoke/parityが判定する。呼び出し数と停止する単位が減る |
 | `maxFixRounds`, `maxAgentCalls` | 1単位の修正回数、1回の実行のAI呼び出し数の上限。1単位はレビューに問題がなければ3回、上流と同じ修正1回なら4〜5回の呼び出し |
-| `nativeInput` | native専用。`inline`（省略時）または `file`（リポジトリコピー導入のみ）。`file` では親がfrozen inputを書き写さず、担当がrequestファイルを読み、専用hookが読み取りを制限・記録する |
 | `maxRunInputBytes` | 任意。1回の実行でワーカーへ送る入力の合計バイト数の上限。AI Creditsはトークン量で消費され、使い切ると利用が止まるため、区切って使用量を確認するための予算。runの要約の `usageEstimate` に実測バイト数と推定トークン数（バイト÷4、課金データではない）を残す。判定は完了した呼び出しの合計で行うため、実行中の呼び出し（最大 `concurrency` 件）の分だけ上限を超えることがある |
 | `timeoutSeconds` | 通常CLIの1ワーカー呼び出しの時間上限 |
 | `transientRetries`, `transientRetryDelayMs` | 任意。レート制限（429）・5xx・通信エラーの自動再試行の回数（既定2）と最初の待ち時間（既定5000ms、毎回倍）。再試行もAI呼び出し数に数える |
@@ -142,7 +138,7 @@ manifestに明示した元ファイルと変換先は走査除外ディレクト
 
 生成物のディレクトリは元ソース・変換後ソース・検証ルート・明示入力・キットの管理領域と重ねられません。実際に読み込む設定やスクリプトは生成物のディレクトリ外に置き、必要に応じて `verificationInputs` へ登録します。`doctor` に入力一覧と生成物のディレクトリを別々に表示します。生成物の内容は承認ハッシュで追跡しないため、build・smoke・parityの各コマンドでその正しさを検証してください。Node/Python/POSIX shellの認識したインラインコードはファイル扱いしませんが、`cc -c FILE` と `node -c FILE` のFILEは追跡します。
 
-レビュー入力は対象の元ファイルと宣言した依存の推移的な閉包、当該候補ファイル、RULEBOOK全文、その範囲に一致するinventory行と全体注記、指定した診断です。同じ内容を両担当へ渡し、ツールを無効化します。inventoryは `file` を先頭列とし、リポジトリ相対パスの完全一致で選びます。ファイル先頭のUTF-8 BOMはコメント・空行・ヘッダーの判定前に一度だけ除去します。不正な行や未知の先頭列は停止します。入力ファイルはUTF-8のテキストに限定し、不正なUTF-8やNULを含むファイルは名前を示して停止します。静的な元資料は実装・修正担当の呼び出し前にも検査します。他の変換後ファイルとの統合はbuild/smoke/parityで確認します。CLI方式で上限を超えた単位は止めずに、**ツール付きレビュー**へ自動で切り替えます。両担当には本文の代わりに「対象ファイルの一覧とSHA-256」を同じ内容で渡し、読み取り専用の `reviewer-*-read` プロファイルが各ファイルを読みます。他の担当の記録（`migration/runs` 等）はhookで読めません。固定入力より独立性の保証が弱いため、実行記録の `reviewInputMode`、runの `toolAssistedReviews` と `warnings` に残り、工程報告にも表示されます。native方式はツールがないため停止します。変更追跡のための全ソース走査は維持します。
+レビュー入力は対象の元ファイルと宣言した依存の推移的な閉包、当該候補ファイル、RULEBOOK全文、その範囲に一致するinventory行と全体注記、指定した診断です。同じ内容を両担当へ渡し、ツールを無効化します。inventoryは `file` を先頭列とし、リポジトリ相対パスの完全一致で選びます。ファイル先頭のUTF-8 BOMはコメント・空行・ヘッダーの判定前に一度だけ除去します。不正な行や未知の先頭列は停止します。入力ファイルはUTF-8のテキストに限定し、不正なUTF-8やNULを含むファイルは名前を示して停止します。静的な元資料は実装・修正担当の呼び出し前にも検査します。他の変換後ファイルとの統合はbuild/smoke/parityで確認します。上限を超えた単位は止めずに、**ツール付きレビュー**へ自動で切り替えます。両担当には本文の代わりに「対象ファイルの一覧とSHA-256」を同じ内容で渡し、読み取り専用の `reviewer-*-read` プロファイルが各ファイルを読みます。他の担当の記録（`migration/runs` 等）はhookで読めません。固定入力より独立性の保証が弱いため、実行記録の `reviewInputMode`、runの `toolAssistedReviews` と `warnings` に残り、工程報告にも表示されます。変更追跡のための全ソース走査は維持します。
 
 CLIの全5ワーカーは `--no-custom-instructions` を付けて新しいプロセスを起動します。`AGENTS.md`、リポジトリ・個人のCopilot指示などの自動注入を止め、指定した役割プロファイルとランナーの契約を使います。案件固有の移植方針は、承認対象の `migration/RULEBOOK.md` とinventoryへ取り込んでください。暗黙の指示ファイルを変更してもワーカーの方針は変わりません。通常の対話セッションでは引き続きCopilot指示を使えます。
 
@@ -201,11 +197,11 @@ runnerのコマンドが失敗すると、`ERROR:` に続けて **原因・影�
 
 ## 準備工程の調査を範囲ごとに任せる
 
-00・00b・02 では、親エージェントが全ファイルを自分で読む代わりに、`survey run --kind facts|contracts|inventory` でソースを範囲に分け、範囲ごとに新しい調査担当（CLI 方式では新しい `copilot` プロセス、native 方式では VS Code のサブエージェント）に任せられます。結果は `migration/surveys/` にファイルで保存され、`survey merge` で下書きにまとまります。中断しても残りの範囲から再開します。詳細は [準備工程の調査](docs/SURVEYS.md)。
+00・00b・02 では、親エージェントが全ファイルを自分で読む代わりに、`survey run --kind facts|contracts|inventory` でソースを範囲に分け、範囲ごとに新しい調査担当（新しい `copilot` プロセス）に任せられます。結果は `migration/surveys/` にファイルで保存され、`survey merge` で下書きにまとまります。中断しても残りの範囲から再開します。詳細は [準備工程の調査](docs/SURVEYS.md)。
 
 ## 工程を進める
 
-03の前に、`templates/guardrails.json`（コピー導入では `migration-kit/templates/guardrails.json`）を `migration/guardrails.json` へコピーし、対象言語のビルド・テストコマンドに合わせて編集してください。上流の `.claude/settings.json` の deny ルールに相当し、hookがすべてのエージェントの該当シェルコマンドを拒否します。runnerが実行するbuild等は対象外です。`phase start 03` / `04` は、このファイル（または免除の記録）がないと停止します。エージェントは作成しません。コピー導入方式のhookは、Copilot CLIで信頼済みのフォルダでしか読み込まれません。`doctor` で確認してください。
+03の前に、コマンド制限 `migration/guardrails.json` を設置します。上流の `.claude/settings.json` の deny ルールに相当し、hookがすべてのエージェントの該当シェルコマンドを拒否します（runnerが実行するbuild等は対象外）。設置は人間の判断です。AIが `run_migration.mjs guardrails show` を基に、対象のビルド・テストコマンドに合わせた禁止リスト（または免除理由）をチャットで提案します。合意後にAIが `guardrails install` を実行すると、ホストが利用者に確認を求めます。この許可が人間の設置行為です。AIがファイルを直接書くことはhookが拒否します。`phase start 03` / `04` は、このファイル（または免除の記録）がないと停止します。対話型のCopilot CLIで進める場合、コピー導入方式のhookは信頼済みのフォルダでしか読み込まれません。`doctor` で確認できます（runnerが起動するワーカーは常に読み込みます）。
 
 Copilotに該当プロンプトを読ませ、各工程の成果物を確認します。VS Codeの **Local** では、対応する `/migrate-…` のprompt fileを使えます。
 
@@ -313,7 +309,7 @@ npm run demo
 
 ## VS Codeでの進め方と検証方式
 
-親エージェントの役割（工程TODO・質問・nativeの仕事の配布）、読み取り専用の `status --format markdown`、source-only方式、Rubber Duckの扱いは [運用マニュアル](docs/OPERATING-MANUAL.md#vs-code-orchestration-and-verification-modes) にまとめています。
+親エージェントの役割（工程TODO・質問・コマンドの実行）、読み取り専用の `status --format markdown`、source-only方式、Rubber Duckの扱いは [運用マニュアル](docs/OPERATING-MANUAL.md#vs-code-orchestration-and-verification-modes) にまとめています。
 
 ## 工程順序と利用量の記録
 
