@@ -69,6 +69,14 @@
   - Shell parsing keeps a backslash between path characters, so Windows paths
     (`.\gradlew`, `migration-kit\scripts\run_migration.mjs`) are matched
     again; inside double quotes a backslash escapes only `$`, `` ` ``, `"`, `\`.
+  - Worker session names end with the first 8 characters of their (always
+    new) session ID, so retries and re-runs of a unit do not share a
+    `--resume` name.
+  - The `build-loop` confirmation says builds run model-written code, the grant
+    covers builds of repairs not yet written, and `maxRunInputBytes` also stops
+    the loop.
+  - Records of the removed native backend carry an archive banner; README and
+    CHANGELOG cite the VS Code pages for the harness and prompt-file notes.
 - 2026-10-18 review against Copilot CLI 1.0.98 and current VS Code docs:
   - JSON-mode failures: the CLI reports rate limits, 5xx and authentication only
     as stdout `session.error` events (stderr empty). The adapter now includes
