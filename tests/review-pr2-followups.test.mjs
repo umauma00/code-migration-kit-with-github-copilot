@@ -72,3 +72,9 @@ test('deny rules see through shell -c strings, wrapper and git options, quoted s
   assert.equal(humanGate('node migration-kit\\scripts\\run_migration.mjs approve build --note x'), 'approve build');
   assert.equal(humanGate('node migration-kit\\scripts\\run_migration.mjs guidance --message "approve translation"'), null);
 });
+
+test('the build-loop question says builds run model-written code under the input budget too', t => {
+  const f = prepare(t);
+  const reason = interactiveDecision({ toolName: 'bash', toolArgs: { command: 'node migration-kit/scripts/run_migration.mjs build-loop --note x' }, cwd: f.root }, f.root).reason;
+  assert.match(reason, /model-written code/); assert.match(reason, /maxRunInputBytes/);
+});
