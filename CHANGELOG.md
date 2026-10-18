@@ -37,8 +37,7 @@
     text match, a runner or kit module reached in a form it cannot read, with a
     human-act word in the same segment, asks the person ("unrecognized runner
     command"). Forms split across segments, variables or indirection
-    (`R=run_migration.mjs; node "$R" approve …`, `xargs`) are not detected, and
-    Windows `\` runner paths fall back to that generic question.
+    (`R=run_migration.mjs; node "$R" approve …`, `xargs`) are not detected.
   - `migration/guardrails.json`: globs, bare names after `cd migration` and
     removing or moving `migration/` itself are denied; strict-phase translate and
     build-loop refuse to run when the file is missing.
@@ -61,6 +60,15 @@
     same command line falls back to the name match).
   - HTTP 500 from the model (`session.error … 500`, `500 Internal Server
     Error`) is retried like 502-504; a bare 500 elsewhere in a message is not.
+  - Deny list matching splits commands like a shell and checks `bash -c` /
+    `pwsh -Command` strings and quoted `$(...)` as commands of their own; it
+    skips wrapper options (`env -u X`, `sudo -u user`), git global options
+    (`git -C . push`) and options between rule words (`cargo --locked build`).
+    Values of other options (`npm --prefix x run`) and indirect forms (`xargs`,
+    a variable) remain best effort.
+  - Shell parsing keeps a backslash between path characters, so Windows paths
+    (`.\gradlew`, `migration-kit\scripts\run_migration.mjs`) are matched
+    again; inside double quotes a backslash escapes only `$`, `` ` ``, `"`, `\`.
 - 2026-10-18 review against Copilot CLI 1.0.98 and current VS Code docs:
   - JSON-mode failures: the CLI reports rate limits, 5xx and authentication only
     as stdout `session.error` events (stderr empty). The adapter now includes
