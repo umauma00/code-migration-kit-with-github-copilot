@@ -15,7 +15,7 @@ The automated runner starts a fresh `copilot -p` call for each role with:
   repository hook even in an untrusted folder (otherwise CLI 1.0.98 skips it)
 - `--no-remote-export`, `--session-id <uuid>` and `--name "migration-kit ROLE TARGET ID8"` (the first 8 characters of the new ID):
   worker transcripts hold source code and prompts, so they stay on this machine
-  instead of syncing to the GitHub account (the CLI default). The runner journals
+  instead of syncing to the GitHub account (the CLI default; the flag is accepted by 1.0.98, its effect on an authenticated account is not verified yet). The runner journals
   each ID before the call (`migration/runs/<run>/cli-sessions.jsonl`) and the
   attempt or survey record keeps it as `cliSessionId`; `sessions status | prune`
   reports or deletes exactly those sessions, never the user's own

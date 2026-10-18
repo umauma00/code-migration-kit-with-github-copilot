@@ -4,6 +4,15 @@
   "cli": "GitHub Copilot CLI 1.0.98 (npm @github/copilot, linux-x64)",
   "provider": "loopback test double (COPILOT_PROVIDER_*); no authenticated GitHub account, no external AI",
   "liveVSCodeTested": false,
+  "liveChecks": {
+    "note": "null = not run yet; see docs/LIVE-SMOKE.en.md \"Human gates and worker sessions\"",
+    "liveCLIInteractiveAsk": null,
+    "liveCLIAutopilot": null,
+    "liveCLIAllowAll": null,
+    "liveVSCodeAsk": null,
+    "liveVSCodeCopilotHarnessRepoHooks": null,
+    "liveRemoteExportOff": null
+  },
   "checks": [
     {
       "name": "tests/verify_cli_transport.mjs (repository layout)",

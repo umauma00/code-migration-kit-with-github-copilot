@@ -18,7 +18,9 @@
   - `reviewFocus: shared` (new installs) gives both independent reviewers both
     checks, each from its own lens first; `specialized` keeps upstream's split.
   - Worker sessions: `--no-remote-export` keeps transcripts (source code and
-    prompts) off the GitHub account; each call gets `--session-id`/`--name`,
+    prompts) off the GitHub account (the CLI's help: no export to GitHub web and
+    mobile, no remote control; 1.0.98 accepts the flag, its effect on an
+    authenticated account is not verified yet); each call gets `--session-id`/`--name`,
     recorded as `cliSessionId`. `sessions status | prune` reports or deletes only
     those; `sessions prune` and `build-loop` are host-confirmed.
   - Open files: the CLI raises its own soft limit to the hard limit (soft 256 →
@@ -77,6 +79,10 @@
     the loop.
   - Records of the removed native backend carry an archive banner; README and
     CHANGELOG cite the VS Code pages for the harness and prompt-file notes.
+  - Human gates in practice: the skill and orchestrator say autopilot denies the
+    gate questions (run them interactively) and the CLI may ask a second time;
+    LIVE-SMOKE lists the interactive CLI, autopilot, VS Code and
+    `--no-remote-export` checks, with `liveChecks` slots (null) in the evidence.
 - 2026-10-18 review against Copilot CLI 1.0.98 and current VS Code docs:
   - JSON-mode failures: the CLI reports rate limits, 5xx and authentication only
     as stdout `session.error` events (stderr empty). The adapter now includes

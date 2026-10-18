@@ -14,7 +14,8 @@ Never extend a pilot or batch grant to production or a downstream major stage.
 
 Drive everything from chat: run the commands yourself and report results. The
 person answers questions, confirms the host's prompts for human-gate commands and
-approves the Copilot CLI sign-in once. Workers always run as Copilot CLI
+approves the Copilot CLI sign-in once. Autopilot denies those prompts, so run gate
+commands in an interactive session; the CLI may ask a second time after the hook. Workers always run as Copilot CLI
 processes, also from VS Code; install the CLI (`npm install -g @github/copilot`)
 or start `copilot login` only after the person agrees, as the skill describes.
 

@@ -118,7 +118,10 @@ reason), and after their agreement in chat run `guardrails install` with exactly
 those options. Never write the file any other way (the hook denies it). The host
 asks the person to confirm every `approve` / `phase complete` / `guardrails install`
 command; if it cannot ask (autopilot denies the request), tell the person to leave
-autopilot and retry instead of working around it. An explicit
+autopilot and retry instead of working around it. Run gate commands only in an
+interactive session without autopilot, which denies them. The Copilot CLI may show
+its own permission prompt after the hook's question, so the person can be asked
+twice. An explicit
 request for a later phase does not waive missing earlier reviews. Do not route
 from file existence. After user review, record early phases with `phase complete
 ID --note TEXT`; runner receipts determine implementation and validation phases.
