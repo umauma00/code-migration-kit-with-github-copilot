@@ -49,6 +49,13 @@
   - A hard open-file limit below 4096 is a doctor warning, not a failure.
   - Tool-assisted reviewers may read names that start with two dots (`..notes`).
   - The guardrails template note describes the chat-only install.
+- PR #2 review follow-ups:
+  - `migration/guardrails.json` protection no longer denies reads: output
+    redirections count by their target (`2>/dev/null`, `2>&1` and other files
+    are fine), `find` counts only with `-delete`/`-exec`/`-ok`/`-fprint`-style
+    actions, and `migration/` resolves from the shell's working directory
+    against the project root (`src/db/migration` is not protected; a `cd` in the
+    same command line falls back to the name match).
 - 2026-10-18 review against Copilot CLI 1.0.98 and current VS Code docs:
   - JSON-mode failures: the CLI reports rate limits, 5xx and authentication only
     as stdout `session.error` events (stderr empty). The adapter now includes
