@@ -6,7 +6,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { prepare } from './helpers.mjs';
 import { safePath } from '../lib/core.mjs';
-import { interactiveDecision } from '../lib/guardrails.mjs';
+import { interactiveDecision, deniedRule, humanGate, parseGuardrails } from '../lib/guardrails.mjs';
 import { isTransientFailure, isSystemicFailure } from '../lib/failures.mjs';
 
 test('reading migration/ is allowed while writes to the guardrails file and the directory stay denied', t => {
@@ -55,4 +55,20 @@ test('HTTP 500 from the model is retried like 502-504; 501, sign-in and quota ar
   for (const message of ['session.error not_implemented 501: Not Implemented', 'Copilot implementer failed (exit 1): output exceeded 500 lines']) {
     assert.equal(isTransientFailure(error(message)), false, message);
   }
+});
+
+test('deny rules see through shell -c strings, wrapper and git options, quoted substitutions and Windows paths', () => {
+  const rules = parseGuardrails({ schemaVersion: 1, denyCommands: ['git push', 'git reset', 'npm test', 'cargo build', 'gradlew', 'python3 -m pytest'] }).denyCommands;
+  for (const [command, rule] of [['bash -c "git push origin main"', 'git push'], [`sh -c 'npm test'`, 'npm test'], ['git -C . push', 'git push'],
+    ['env -u X git push', 'git push'], ['sudo -u bob git push', 'git push'], ['cargo --locked build', 'cargo build'], ['bash -lc "cd x && git push"', 'git push'],
+    ['pwsh -Command "git push"', 'git push'], ['echo "$(git push)"', 'git push'], ['git push origin main', 'git push'],
+    ['echo hi && git reset --hard', 'git reset'], ['cd sub && cargo build', 'cargo build'], ['.\\gradlew build', 'gradlew']]) {
+    assert.equal(deniedRule(command, rules), rule, command);
+  }
+  for (const command of ['git log --grep reset', 'git -c alias.x=reset log', 'echo "a; git push"', 'python3 -B -m pytest', 'xargs -I{} git push {}']) {
+    assert.equal(deniedRule(command, rules), null, command);
+  }
+  // Windows runner paths keep their separators, so the gate names the act.
+  assert.equal(humanGate('node migration-kit\\scripts\\run_migration.mjs approve build --note x'), 'approve build');
+  assert.equal(humanGate('node migration-kit\\scripts\\run_migration.mjs guidance --message "approve translation"'), null);
 });
