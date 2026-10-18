@@ -11,7 +11,7 @@
   proposes the deny list and `guardrails install` writes the agreed list as a
   host-confirmed human gate, so phase 03/04 no longer needs a manual file copy.
 - Review follow-ups:
-  - `build-loop --note TEXT [--max-rounds N]`: one host-confirmed grant runs
+  - `build-loop --note TEXT [--max-rounds N] [--max-calls N]`: one host-confirmed grant runs
     upstream Step 4's build → diagnose → reviewed repair → rebuild rounds until
     clean, the round limit (default 5) or a stalled error count; every round's
     build approval records `loop: {grantId, round}`.
@@ -30,6 +30,25 @@
     leaf) and compares record directories case-insensitively.
   - `.github/copilot-instructions.md` managed block trimmed to the always-needed
     rules (about 640 bytes); the skill carries the rest.
+- Second-opinion review fixes:
+  - Human gates: the hook now splits commands like a shell (quoted values with
+    spaces, `--option value` read exactly as the runner's parser does, globs on
+    the runner path, quoted `bash -c`/`$(...)` command lines). A runner or kit
+    module reached in a form it cannot read, with a human-act word in it, asks
+    the person ("unrecognized runner command") instead of passing.
+  - `migration/guardrails.json`: globs, bare names after `cd migration` and
+    removing or moving `migration/` itself are denied; strict-phase translate and
+    build-loop refuse to run when the file is missing.
+  - Sessions: the runner chooses and journals every worker session ID before the
+    call (`migration/runs/<run>/cli-sessions.jsonl`), so retried and interrupted
+    calls are pruned too; a relative `COPILOT_HOME` resolves against the project.
+  - `build-loop --max-calls N` (default `maxAgentCalls`) caps the AI calls of all
+    repair rounds together and stops with `budget`; the grant records its owner,
+    stage and usage, `status` reports a running loop, and other processes cannot
+    take the runner lock between its steps.
+  - A hard open-file limit below 4096 is a doctor warning, not a failure.
+  - Tool-assisted reviewers may read names that start with two dots (`..notes`).
+  - The guardrails template note describes the chat-only install.
 - 2026-10-18 review against Copilot CLI 1.0.98 and current VS Code docs:
   - JSON-mode failures: the CLI reports rate limits, 5xx and authentication only
     as stdout `session.error` events (stderr empty). The adapter now includes
