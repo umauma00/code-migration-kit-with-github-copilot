@@ -43,6 +43,7 @@
     {
       "name": "native file input reader hook (agent-scoped PreToolUse)",
       "result": "pass",
+      "removedIn": "0.3.0",
       "detail": "trusted folder: RULEBOOK read denied, prompt.txt allowed, reader.json written; untrusted folder: hook not run, no reader.json, so the runner rejects the result"
     },
     {

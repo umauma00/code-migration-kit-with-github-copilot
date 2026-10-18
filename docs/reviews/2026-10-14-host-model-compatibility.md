@@ -1,5 +1,8 @@
 # VS Code / Copilot CLIのモデル・専用ワーカー互換性調査
 
+> アーカイブ：0.3.0で削除したnative（VS Codeサブエージェント）ワーカー方式を扱う記録です。
+> 参照先の `docs/NATIVE-WORKERS.md`、`lib/native-workers.mjs`、`tests/native-workers.test.mjs` は現在存在しません。
+
 2026-10-14。対象は `feat/github-copilot-migration-kit`、HEAD
 `164aa47fa6555bef139b7c8545ec8b881d839684` と現在の未コミット変更。
 今回は調査であり、実行コード・プロンプトは変更していない。
@@ -42,10 +45,10 @@ VS Codeの利用者側のSession Targetとバージョンは不明なため、Co
 
 ### VS Code native
 
-[native transport](../../lib/native-workers.mjs)はタスクファイルを発行し、
+native transport（`lib/native-workers.mjs`）はタスクファイルを発行し、
 親が `list → claim → ホストの委譲ツール → submit` を処理する。
 NodeからSDKやVS Code APIを呼び出す自動接続はない。
-[運用手順](../NATIVE-WORKERS.md)は、実際のモデル引数で指定し、ホストの実行メタデータを
+運用手順（`docs/NATIVE-WORKERS.md`）は、実際のモデル引数で指定し、ホストの実行メタデータを
 確認し、確認できなければ失敗として提出するよう要求している。
 
 `submitNativeTask` は提出されたモデル文字列と要求文字列の一致を検査するが、

@@ -1,5 +1,8 @@
 # VS Codeでの移行体験改善：実装と親レビュー
 
+> アーカイブ：0.3.0で削除したnative（VS Codeサブエージェント）ワーカー方式を扱う記録です。
+> 参照先の `docs/NATIVE-WORKERS.md`、`lib/native-workers.mjs`、`tests/native-workers.test.mjs` は現在存在しません。
+
 この記録の後の再レビューで見つかった4件は、
 [2026-10-14の修正・再確認記録](2026-10-14-vscode-rereview-fixes.md)を参照。
 

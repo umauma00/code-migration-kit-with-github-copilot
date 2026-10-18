@@ -17,6 +17,6 @@
   "review20261018": {
     "date": "2026-10-18",
     "installedCopilotCLI": "1.0.98",
-    "note": "Loopback-provider checks on CLI 1.0.98: both layouts, prompt-mode hook loading, session.error reporting, agent-scoped reader hook; no authenticated AI or installed VS Code execution"
+    "note": "Loopback-provider checks on CLI 1.0.98: both layouts, prompt-mode hook loading, session.error reporting, agent-scoped reader hook (native backend, removed in 0.3.0); no authenticated AI or installed VS Code execution"
   }
 }
