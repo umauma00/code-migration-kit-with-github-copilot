@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { prepare } from './helpers.mjs';
 import { safePath } from '../lib/core.mjs';
 import { interactiveDecision } from '../lib/guardrails.mjs';
+import { isTransientFailure, isSystemicFailure } from '../lib/failures.mjs';
 
 test('reading migration/ is allowed while writes to the guardrails file and the directory stay denied', t => {
   const f = prepare(t);
@@ -39,4 +40,19 @@ test('reading migration/ is allowed while writes to the guardrails file and the 
   assert.equal(decide(`echo '{}' > guardrails.json`, safePath(f.root, 'migration')), 'deny');
   // The denial names the file only for writes.
   assert.match(interactiveDecision({ toolName: 'bash', toolArgs: { command: 'rm -rf migration' }, cwd: f.root }, f.root).reason, /guardrails install/);
+});
+
+test('HTTP 500 from the model is retried like 502-504; 501, sign-in and quota are not', () => {
+  const error = message => new Error(message);
+  for (const message of ['session.error server_error 500: Internal Server Error', 'session.error 500: boom', 'session.error rate_limit 429: slow down',
+    'session.error unavailable 502: Bad Gateway', 'session.error unavailable 503: Service Unavailable', 'session.error unavailable 504: Gateway Timeout']) {
+    assert.equal(isTransientFailure(error(message)), true, message);
+  }
+  for (const message of ['session.error authentication 401: Unauthorized', 'session.error quota_exceeded 402: no credits']) {
+    assert.equal(isSystemicFailure(error(message)), true, message);
+    assert.equal(isTransientFailure(error(message)), false, message);
+  }
+  for (const message of ['session.error not_implemented 501: Not Implemented', 'Copilot implementer failed (exit 1): output exceeded 500 lines']) {
+    assert.equal(isTransientFailure(error(message)), false, message);
+  }
 });
