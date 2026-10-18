@@ -2,8 +2,8 @@
 
 日本語 | [English](COST-LOG.en.md)
 
-要求modelと実modelを分けます。native submitのhostReportedModelは親からの入力であり、
-それだけでは実測として集計しません。正式adapterの観測がない間はunknownです。
+要求modelと実modelを分けます。実modelはCLIが報告したもの（`model.call_final_result`）だけを使い、
+設定値やワーカーの自己申告は実測として集計しません。
 pilotのAI呼出しは03、production repairは05、通常翻訳は04として記録します。
 judge-prepareと正式judgeの再利用は別の実行行ですが、再利用時に新しいAI呼出しは計上しません。
 

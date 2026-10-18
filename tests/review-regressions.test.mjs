@@ -178,18 +178,12 @@ test('R4: workflow CLI reviewers receive frozen input and reject a profile that 
   await assert.rejects(run(), /tools: \[\]/);
 });
 
-test('R4: oversized static review input is tool-assisted for CLI, blocks native before model calls; metadata cannot become a source root', async t => {
+test('R4: oversized static review input is tool-assisted; metadata cannot become a source root', async t => {
   const f = prepare(t); f.config.maxReviewInputBytes = 1024;
   write(f.root, 'migration/RULEBOOK.md', '# Required global rules\n' + 'X'.repeat(1024));
   persist(f); await runStage(f.root, f.config, 'judge'); approve(f.root, f.config, 'translation', 'Limit fixture');
   const report = await translate(f.root, f.config, fake);
   assert.deepEqual(report.toolAssistedReviews, [f.units[0].target]);
-  const g = prepare(t); Object.assign(g.config, { maxReviewInputBytes: 1024, workerBackend: 'native', nativeHarness: 'copilot' });
-  write(g.root, 'migration/RULEBOOK.md', '# Required global rules\n' + 'X'.repeat(1024));
-  persist(g); await runStage(g.root, g.config, 'judge'); approve(g.root, g.config, 'translation', 'Native limit fixture');
-  const calls = [];
-  await assert.rejects(translate(g.root, g.config, args => { calls.push(args.role); return fake(args); }), /Native workers have no tools/);
-  assert.deepEqual(calls, []);
   f.config.sourceRoots = ['migration']; persist(f);
   assert.throws(() => loadConfig(f.root), /metadata/);
 });

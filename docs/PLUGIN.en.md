@@ -2,7 +2,7 @@
 
 [日本語](PLUGIN.md) | English
 
-Requires Node.js 22 or later and VS Code / GitHub Copilot with Agent Plugins 1.0 support. The CLI worker backend needs a signed-in Copilot CLI. To work in VS Code only, without the Copilot CLI, select the [native backend](NATIVE-WORKERS.en.md), which records executed models as unverified. Verified CLI versions: 1.0.93, 1.0.95 and 1.0.98. You also need the languages and tests of the project being migrated.
+Requires Node.js 22 or later and VS Code / GitHub Copilot with Agent Plugins 1.0 support. Workers always run on the Copilot CLI, so it is required in VS Code too (if it is missing, the AI installs it and starts sign-in after you agree). Verified CLI versions: 1.0.93, 1.0.95 and 1.0.98. You also need the languages and tests of the project being migrated.
 
 ## Installation
 
@@ -42,11 +42,11 @@ At the end of each phase, Copilot reports links to the artifacts, review points,
 At start or resumption, the parent orchestrator creates the ten-phase list in Copilot's TODO and shows the current phase, approval waits, revisions and stops. Phase reports include the number of completed phases and the next phase. On resumption the list is reconciled with the saved artifacts and validation records; a TODO check alone never means approved or complete. Where no TODO tool exists, a chat list is used. See [phase TODO tracking](PHASE-HANDOFF.md#track-the-ten-phases-in-the-host-todo-list).
 
 ```bash
-node /path/to/code-migration-kit/scripts/install.mjs --target . --layout plugin --worker-backend copilot-cli --model MODEL_ID --language en
-node /path/to/code-migration-kit/scripts/install.mjs --target . --layout plugin --worker-backend copilot-cli --model MODEL_ID --language en --apply
+node /path/to/code-migration-kit/scripts/install.mjs --target . --layout plugin --model MODEL_ID --language en
+node /path/to/code-migration-kit/scripts/install.mjs --target . --layout plugin --model MODEL_ID --language en --apply
 ```
 
-Whether you start from VS Code or the Copilot CLI, use the CLI worker backend (`copilot-cli`). In VS Code too, the parent agent runs the runner in a terminal and the runner starts Copilot CLI workers. The native backend is **experimental** (see [native backend](NATIVE-WORKERS.en.md)). Initialization never switches the backend of an existing project.
+Whether you start from VS Code or the Copilot CLI, the parent agent runs the runner in a terminal and the runner starts Copilot CLI workers. The AI runs these commands from chat too.
 
 It creates three files, `migration/config.json`, `migration/RULEBOOK.md` and `migration/inventory.tsv`, plus `migration/preferences.json` (the report language) when `--language` is given. Models and rules of an already configured project are never overwritten. Initialization approves no phase. Configure the languages, source/output/test locations and validation commands.
 
@@ -61,13 +61,9 @@ In a new project, doctor reports missing items until phase 01 creates the depend
 
 ## Backends and verification scope
 
-`plugin.json` and `skills/` use the Agent Plugins 1.0 format. The worker roles, the five native workers and the CLI hooks live in `com.github.copilot/`. The default CLI backend mounts the plugin explicitly with `--plugin-dir` and selects workers with `--agent code-migration-kit:code-migration-plugin-ROLE`. Reviewers get a frozen input and no tools (or, for oversized units, read-only `-read` profiles); other workers are read-only too. The Node coordinator writes the output.
-
-**VS Code only:** initializing VS Code Copilot with `--worker-backend native --native-harness copilot` makes the host's parent agent start the dedicated native subagents. VS Code does not return the executed model to the parent, so new installations get `nativeModelVerification: requested-unverified`: the requested model is recorded and the executed model stays unverified. All native workers have no tools and exchange inputs and results with the Node runner. After installation, restart the chat to load the new profiles and follow the [native procedure](NATIVE-WORKERS.en.md). The installer never overwrites existing configuration.
+`plugin.json` and `skills/` use the Agent Plugins 1.0 format. The worker profiles and the CLI hooks live in `com.github.copilot/`. The runner mounts the plugin explicitly with `--plugin-dir` and selects workers with `--agent code-migration-kit:code-migration-plugin-ROLE`. Reviewers get a frozen input and no tools (or, for oversized units, read-only `-read` profiles); other workers are read-only too. The Node coordinator writes the output.
 
 If a custom agent in the project, a parent directory or your personal settings uses one of the fully qualified names above as its `name` or file-derived ID, doctor and the pre-launch check stop. YAML quoting, folding and aliases are resolved, and Markdown in subdirectories is checked. The unqualified `code-migration-plugin-ROLE` can coexist as a different name. Only regular UTF-8 files are checked; definitions whose YAML cannot be parsed, and symlinks, stop the check as unverifiable.
-
-Because native workers can also be selected by name on the host, the unqualified `code-migration-plugin-native-ROLE` names are reserved as well. A local agent with the same name is rejected regardless of its tools or model. CLI workers keep coexisting with unqualified names as before.
 
 `--no-custom-instructions` does not disable hooks of a trusted project. Audit project hooks at approval time and confirm they add no other context or other workers' results to frozen-input reviews. After adding, changing or removing project hooks, re-check judge and approvals before resuming.
 

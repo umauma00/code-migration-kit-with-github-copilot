@@ -1,6 +1,16 @@
-# Upgrading from 0.1.0–0.1.4 to 0.1.5
+# Upgrading (0.3.0 and earlier releases)
 
 [日本語](UPGRADING.md) | English
+
+## 0.3.0 (native backend removed; chat-only operation)
+
+0.3.0 removes the VS Code subagent (native) backend; workers always run on the Copilot CLI. The AI proposes each step below in chat and runs it after you agree.
+
+1. A configuration with `workerBackend: "native"`, `nativeHarness`, `nativeModelVerification` or `nativeInput` stops with migration instructions. Set `"workerBackend": "copilot-cli"`, remove those keys, then redo judge and the translation approval.
+2. A repository copy's leftover `.github/agents/migration-native-*.agent.md` files are no longer used. The installer does not delete them, so the AI removes them after you agree.
+3. If the Copilot CLI is missing or not signed in, the AI runs `npm install -g @github/copilot` and `copilot login`; you only approve the sign-in in the browser.
+4. The AI proposes `migration/guardrails.json` from `guardrails show` and installs the agreed list with `guardrails install`. The host asks you to confirm, and that confirmation is your act.
+5. Existing configurations do not get `fixPolicy` or `dependencyOrder` added automatically; adopting them restarts approvals.
 
 ## 2026-10-17 update (CLI version tracking, guardrails, tool-assisted review, diagnostics, language)
 

@@ -37,8 +37,8 @@ independent frozen two-reviewer receipts, build or smoke.
 
 03 uses source-derived adversarial cases in disposable target workspaces. Report
 actual target checks separately from source inferences and unavailable original
-checks. Native pilots use the same native backend, requested models and isolation
-contract as production; do not force Copilot CLI onto a native project.
+checks. Pilots use the same Copilot CLI workers, requested models and isolation
+contract as production.
 
 Approve translation, translate, approve/run build, then approve/run smoke using
 the normal gates. 05c is **unverified / not run in this mode**. Attempts to approve

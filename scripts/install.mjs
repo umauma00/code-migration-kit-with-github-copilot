@@ -29,7 +29,7 @@ function setModels(config, model, roleModels) {
   for (const role of Object.keys(config.models)) if (model) config.models[role] = model;
   Object.assign(config.models, roleModels);
 }
-export function install(target, { apply = false, model, harness = 'copilot', withWorkflow = false, layout = 'repository', workerBackend = 'copilot-cli', nativeHarness = harness, verificationMode, preparationProfile, language, nativeModelVerification, models, fixPolicy, nativeInput } = {}) {
+export function install(target, { apply = false, model, harness = 'copilot', withWorkflow = false, layout = 'repository', workerBackend = 'copilot-cli', verificationMode, preparationProfile, language, models, fixPolicy } = {}) {
   if (language !== undefined && !['ja', 'en'].includes(language)) throw new Error('language must be ja or en');
   // Upstream model plan: tier by blast radius (reviewers largest or mid tier,
   // high-volume implementers mid or small, fixers mid). --models overrides --model per role.
@@ -46,28 +46,15 @@ export function install(target, { apply = false, model, harness = 'copilot', wit
   }
   if (!['repository', 'plugin'].includes(layout)) throw new Error('layout must be repository or plugin');
   if (!['copilot', 'vscode-local'].includes(harness)) throw new Error('harness must be copilot or vscode-local');
-  if (!['copilot-cli', 'native'].includes(workerBackend)) throw new Error('workerBackend must be copilot-cli or native');
-  if (workerBackend === 'native' && (!['copilot', 'vscode-local'].includes(nativeHarness) || (layout === 'plugin' && nativeHarness !== 'copilot'))) throw new Error('Native harness must be copilot or vscode-local; vscode-local requires repository layout');
-  if (workerBackend === 'native' && withWorkflow) throw new Error('Native workers use the host session, not the experimental workflow');
-  // New native projects default to the VS Code-only mode: VS Code does not report
-  // the executed subagent model, so host-metadata cannot complete on it today.
-  if (nativeModelVerification !== undefined && workerBackend !== 'native') throw new Error('--native-model-verification requires --worker-backend native');
-  if (nativeModelVerification !== undefined && !['host-metadata', 'requested-unverified'].includes(nativeModelVerification)) throw new Error('nativeModelVerification must be host-metadata or requested-unverified');
-  if (workerBackend === 'native') nativeModelVerification ??= 'requested-unverified';
+  // Workers always run as Copilot CLI processes, also when the migration is driven
+  // from VS Code chat. The VS Code subagent (native) backend was removed in 0.3.0.
+  if (workerBackend !== 'copilot-cli') throw new Error('The native worker backend was removed: workers always run as Copilot CLI processes, also from VS Code chat. Install and sign in to the Copilot CLI, then omit --worker-backend');
   if (fixPolicy !== undefined && !['rereview', 'single-pass'].includes(fixPolicy)) throw new Error('fixPolicy must be rereview or single-pass');
-  if (nativeInput !== undefined && !['inline', 'file'].includes(nativeInput)) throw new Error('nativeInput must be inline or file');
-  if (nativeInput !== undefined && workerBackend !== 'native') throw new Error('--native-input requires --worker-backend native');
-  if (nativeInput === 'file' && layout === 'plugin') throw new Error('--native-input file requires the repository-copy layout');
-  const warnings = workerBackend !== 'native' ? [] : nativeModelVerification === 'requested-unverified'
-    ? ['workerBackend native runs inside VS Code without the Copilot CLI. nativeModelVerification is requested-unverified: requested models are passed to the host, but the executed subagent model is recorded as unverified. Use --native-model-verification host-metadata or the copilot-cli backend when observed models are required.']
-    : ['workerBackend native with host-metadata is EXPERIMENTAL: VS Code does not report the executed subagent model, so native jobs cannot be submitted under this contract. Use requested-unverified for VS Code-only runs, or the copilot-cli backend.'];
   const configureBackend = config => {
     config.workerBackend = workerBackend;
     if (verificationMode !== undefined) config.verificationMode = verificationMode;
     if (preparationProfile !== undefined) config.preparationProfile = preparationProfile;
-    if (workerBackend === 'native') Object.assign(config, { nativeHarness, nativeModelVerification });
     if (fixPolicy !== undefined) config.fixPolicy = fixPolicy;
-    if (nativeInput !== undefined) config.nativeInput = nativeInput;
   };
   if (layout === 'plugin' && (harness !== 'copilot' || withWorkflow)) throw new Error('Plugin layout uses Copilot hooks and does not include the experimental workflow extension');
   const root = fs.realpathSync(path.resolve(target));
@@ -93,7 +80,7 @@ export function install(target, { apply = false, model, harness = 'copilot', wit
     }
     if (preferences) files.set('migration/preferences.json', preferences);
     if (apply) for (const [name, content] of files) atomicWrite(safePath(root, name), content);
-    return { applied: apply, target: root, layout, changes: [...files.keys()], ...(warnings.length ? { warnings } : {}),
+    return { applied: apply, target: root, layout, changes: [...files.keys()],
       next: 'Edit migration/config.json (languages, paths, models and commands), then invoke the code-migration skill from the installed plugin. Existing configuration is retained.' };
   }
   const files = new Map();
@@ -136,13 +123,13 @@ export function install(target, { apply = false, model, harness = 'copilot', wit
     changes.push(rel);
   }
   if (apply) for (const rel of changes) atomicWrite(safePath(root, rel), files.get(rel));
-  return { applied: apply, target: root, harness, changes, ...(warnings.length ? { warnings } : {}),
+  return { applied: apply, target: root, harness, changes,
     next: 'Edit migration/config.json, draft the rulebook and inventory, then follow migration-kit/README.md. Existing configuration is retained.' };
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
   try {
     const args = parseArgs(process.argv.slice(2));
-    if (!args.target) throw new Error('Usage: node scripts/install.mjs --target PATH [--layout repository|plugin] [--model MODEL_ID] [--harness copilot|vscode-local] [--worker-backend copilot-cli|native] [--native-harness copilot|vscode-local] [--verification-mode runtime|source-only] [--preparation-profile standard|source-as-spec] [--native-model-verification requested-unverified|host-metadata] [--models implementer=ID,reviewers=ID,arbiter=ID,fixer=ID] [--language ja|en] [--fix-policy rereview|single-pass] [--native-input inline|file] [--with-workflow] [--apply]');
-    console.log(JSON.stringify(install(args.target, { apply: args.apply, model: args.model, harness: args.harness, withWorkflow: args['with-workflow'], layout: args.layout, workerBackend: args['worker-backend'], nativeHarness: args['native-harness'], verificationMode: args['verification-mode'], preparationProfile: args['preparation-profile'], nativeModelVerification: args['native-model-verification'], models: args.models, language: args.language, fixPolicy: args['fix-policy'], nativeInput: args['native-input'] }), null, 2));
+    if (!args.target) throw new Error('Usage: node scripts/install.mjs --target PATH [--layout repository|plugin] [--model MODEL_ID] [--harness copilot|vscode-local] [--verification-mode runtime|source-only] [--preparation-profile standard|source-as-spec] [--models implementer=ID,reviewers=ID,arbiter=ID,fixer=ID] [--language ja|en] [--fix-policy rereview|single-pass] [--with-workflow] [--apply]');
+    console.log(JSON.stringify(install(args.target, { apply: args.apply, model: args.model, harness: args.harness, withWorkflow: args['with-workflow'], layout: args.layout, workerBackend: args['worker-backend'], verificationMode: args['verification-mode'], preparationProfile: args['preparation-profile'], models: args.models, language: args.language, fixPolicy: args['fix-policy'] }), null, 2));
   } catch (e) { console.error(`ERROR: ${e.message}`); process.exitCode = 1; }
 }

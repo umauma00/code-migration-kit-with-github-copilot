@@ -3,10 +3,11 @@
 Read [phase reports and user decisions](../docs/PHASE-HANDOFF.md).
 End with its report; ask for the next decision only when needed.
 
-Command guardrails: `phase start 04` refuses to start until the human has copied
-`templates/guardrails.json` to `migration/guardrails.json` (adapted to this target) or
-recorded a waiver there. Never create, edit or relax that file yourself: installing it is
-the human's act, because that is when they decide the referee price. If a guardrail
+Command guardrails: `phase start 04` refuses to start without `migration/guardrails.json`
+(adapted to this target) or a recorded waiver. Installing it is the human's act, because
+that is when they decide the referee price: propose the list from `guardrails show` in
+chat, and only after their agreement run `guardrails install` with exactly those options;
+the host asks them to confirm it. Never create, edit or relax the file any other way. If a guardrail
 denies a command, that is the design working; report it instead of routing around it.
 Run `doctor` and confirm `repository hooks load in Copilot CLI` is not failing.
 
@@ -35,12 +36,6 @@ The configured `fixPolicy` decides whether a fixed output is reviewed again
 upstream); `dependencyOrder` decides whether dependents wait for reviewed
 dependencies. Report both settings with the burndown.
 
-Select the execution path from config.workerBackend. For native, follow
-[native workers](../docs/NATIVE-WORKERS.md): keep the Node runner active, claim
-pending tasks, invoke the named tool-free host subagents with the requested model
-and exact prompt, and submit their unchanged JSON. Do not wait on the runner
-without servicing its tasks. Never silently fall back to Copilot CLI.
-
 The runner performs implementation → two independent reviews → arbitration of
 disputed findings (a finding both reviewers raise at the same source path:line is
 agreed and confirmed without the arbiter; the arbiter defaults to not confirmed)
@@ -50,9 +45,7 @@ explicit models from config and structured results. Reviewers have no tools and
 receive identical frozen inputs; other CLI workers have read/search-only tools.
 If a unit's evidence exceeds maxReviewInputBytes, the CLI runner automatically
 gives both reviewers the same SHA-256-bound file list on read-only `-read`
-profiles. Report every `toolAssistedReviews` target and warning to the human;
-native runs stop instead.
-Native workers all have no tools and receive self-contained frozen inputs.
+profiles. Report every `toolAssistedReviews` target and warning to the human.
 Only the coordinator writes the assigned manifest target. Existing output files
 without reviewed receipts are unfinished and must be reviewed.
 
@@ -73,10 +66,10 @@ available. Unknown usage stays unknown. Stop before build approval.
 
 <!-- Copilot adaptation: migration control and instructions updated on 2026-10-08; see NOTICE. -->
 
-Keep orchestration in the user-facing parent. For native, launch translate in a
-continuing terminal and service claim/delegate/submit while it runs; do not block
-the parent waiting for the terminal to finish. The runner refills available slots
-and orders manifest jobs by audited dependencies. Non-manifest dependencies stay
+Keep orchestration in the user-facing parent: launch translate in a background
+or continuing terminal and poll status while it runs; do not block the parent
+waiting for the terminal to finish. The runner refills available slots and, per
+`dependencyOrder`, orders manifest jobs by audited dependencies. Non-manifest dependencies stay
 fixed source evidence. Cycles use fixed source when typecheck is deferred; with
 unit typecheck configured, resolve/group the cycle or explicitly defer that check
 with user authorization. All AI calls, including both reviewers, share concurrency.

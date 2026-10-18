@@ -19,16 +19,10 @@ Implementer, fixer and arbiter profiles use the concrete CLI tools view,grep,glo
 The read/search aliases are not accepted for these workers because the reference
 CLI loses search tools with those aliases.
 
-With workerBackend: native, the host session launches tool-free subagents instead.
-The [native protocol](NATIVE-WORKERS.md) binds each request and one-time claim to
-the active runner, immutable inputs and candidate. The host submits unchanged
-JSON; the shared runner validates it and alone writes targets and receipts.
-All five roles receive self-contained input. Native receipts explicitly record
-host-managed instruction isolation and a host-reported (not observed) model.
-The parent must select the model through the host's per-call parameter and check
-host execution metadata before submission. Missing or mismatched execution
-metadata is a failed job, not permission to echo the requested model. The runner
-compares the submitted model string; it does not independently attest execution.
+Workers always run as Copilot CLI processes, also when the migration is driven from
+VS Code chat. The VS Code subagent (native) backend and its claim/submit protocol
+were removed in 0.3.0; a configuration that still names it fails with migration
+instructions.
 
 ## Implementation and fix
 
@@ -99,9 +93,7 @@ CLI worker attempts also record `observedModel` (the CLI's `model.call_final_res
 for the main agent, null when absent or ambiguous), `cliUsage` (`premiumRequests`,
 `totalApiDurationMs`, `sessionDurationMs` from the JSONL result) and, when the
 reported model differs from the request, `modelWarning`; run summaries list
-`observedModels` and the warning. Native file-input attempts record
-`nativeInput: "file"`; their tasks keep `prompt.txt` and the hook's `reader.json`
-next to `request.json`.
+`observedModels` and the warning.
 
 Validation records have an `executionId` and reference their predecessor's
 execution ID. Gates reference the predecessor too. Starting a retry publishes

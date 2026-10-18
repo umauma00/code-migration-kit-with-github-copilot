@@ -8,7 +8,7 @@ import { runtimeLayout } from '../lib/runtime.mjs';
 export function copilotArgs(role, model, prompt, layout) {
   // A CLI worker is a fresh session agent: tools: [] alone does not prevent
   // automatic repository/personal instructions from entering its system prompt.
-  // No --no-auto-update: native-installer launchers then run their bundled
+  // No --no-auto-update: installer-based launchers then run their bundled
   // (possibly much older) build instead of the version the user and doctor see.
   return [...(prompt === undefined ? [] : ['-p', prompt]), ...(layout?.plugin ? ['--plugin-dir', layout.root] : []), '-s', '--output-format', 'json', '--stream', 'off', '--no-color', '--no-ask-user', '--no-custom-instructions', '--disable-builtin-mcps', '--agent', layout?.agentId(role) ?? `migration-${role}`, '--model', model,
     '--available-tools', 'view,grep,glob', ...(isToolFree(role) ? ['--deny-tool', 'read,write,shell'] : ['--allow-tool', 'read', '--deny-tool', 'write,shell'])];
@@ -138,7 +138,6 @@ export function createCopilotAdapter({ command = 'copilot', prefixArgs = [] } = 
   let baseline;
   const warned = new Set();
   return async ({ root, config, role, unit, extra, signal, reviewInput, reviewMode = 'frozen' }) => {
-    if (config.workerBackend === 'native') throw new Error('Native workers must be delegated by the host; refusing a Copilot CLI fallback');
     // Oversized reviews run on the read-only twin profile of the same reviewer.
     const worker = isReviewer(role) && reviewMode === 'tool-assisted' ? toolAssistedRole(role) : role;
     validateWorkerProfile(root, worker, config);
