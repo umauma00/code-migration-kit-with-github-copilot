@@ -14,6 +14,7 @@ import { createWorkflowDefinition } from '../lib/workflow.mjs';
 import { approve, runStage, translate } from '../lib/pipeline.mjs';
 import { runProcess } from '../lib/process.mjs';
 import { doctor } from '../scripts/run_migration.mjs';
+import { sessionsStatus, pruneSessions, sessionStateDir } from '../lib/sessions.mjs';
 
 const command = process.argv[2];
 if (!command || !path.isAbsolute(command)) throw new Error('Supply an absolute Copilot executable path');
@@ -107,6 +108,15 @@ try {
   atomicWrite(safePath(f.root, 'AGENTS.md'), canaries.root + '_EDITED\n');
   const resumed = await runTranslation(); assert.equal(resumed.agentCalls, 0);
   if (providerError) throw providerError;
+  // Workers ran as runner-named sessions: each recorded ID exists in this CLI
+  // home, and prune removes exactly those (the control run's session stays).
+  const stateDir = sessionStateDir(), before = fs.readdirSync(stateDir);
+  const recorded = sessionsStatus(f.root);
+  assert.ok(recorded.recorded >= 9); assert.equal(recorded.present, recorded.recorded);
+  const pruned = pruneSessions(f.root), after = fs.readdirSync(stateDir);
+  assert.equal(pruned.removed, recorded.present); assert.equal(before.length - after.length, pruned.removed);
+  assert.ok(after.length >= 1, 'the unrecorded control session is left alone');
+  const sessions = { recorded: recorded.recorded, present: recorded.present, removed: pruned.removed, untouched: after.length };
   const version = await runProcess(command, ['--version'], { cwd: f.root });
   console.log(JSON.stringify({ schemaVersion: 1, date: new Date().toISOString(), cli: version.stdout.trim(),
     platform: `${process.platform}/${process.arch}`, node: process.version, localProviderIsTestDouble: true,
@@ -114,7 +124,7 @@ try {
     controlDiscovered: [...discovered].sort(),
     instructionIsolationOK: records.filter(r => !r.control).every(r => [...discovered].every(name => !r.ambient[name]) && r.profileIncluded),
     translation: { done: translation.done, total: translation.total, agentCalls: translation.agentCalls },
-    stages, resumedAgentCalls: resumed.agentCalls, records, outputHashes: f.units.map(u => ({ target: u.target, hash: fileHash(safePath(f.root, u.target)) })) }, null, 2));
+    stages, resumedAgentCalls: resumed.agentCalls, sessions, records, outputHashes: f.units.map(u => ({ target: u.target, hash: fileHash(safePath(f.root, u.target)) })) }, null, 2));
 } finally {
   for (const key of Object.keys(process.env)) if (!(key in savedEnv)) delete process.env[key];
   Object.assign(process.env, savedEnv);

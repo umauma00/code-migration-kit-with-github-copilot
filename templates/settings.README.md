@@ -13,6 +13,14 @@ The automated runner starts a fresh `copilot -p` call for each role with:
 - `MIGRATION_KIT_ROLE` for the installed preToolUse backstop, and
   `GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS=true` so prompt-mode workers load the
   repository hook even in an untrusted folder (otherwise CLI 1.0.98 skips it)
+- `--no-remote-export`, `--session-id <uuid>` and `--name "migration-kit ROLE TARGET"`:
+  worker transcripts hold source code and prompts, so they stay on this machine
+  instead of syncing to the GitHub account (the CLI default). The attempt or
+  survey record keeps the ID as `cliSessionId`; `sessions status | prune` reports
+  or deletes exactly those sessions, never the user's own
+- no launcher wrapper: the CLI (Node) raises its own soft open-file limit to the
+  hard limit (macOS defaults the soft limit to 256). `doctor --check-cli` checks
+  the hard limit; one below 4096 needs the person or an administrator
 
 Workers run the CLI version the user normally runs. Each call records that
 version; a change during a run is a warning in the run summary, not a stop.

@@ -143,13 +143,25 @@ then build/smoke/parity judge it; fewer calls and fewer blocked units).
 `dependencyOrder: auto` (new installs) lets the approved scope fan out like
 upstream and holds dependents for reviewed dependencies only when a per-unit
 typecheck needs them. `concurrency` (up to 64, both reviewers included) should
-stay within the account's rate limits. Changing any of them revokes approvals.
+stay within the account's rate limits. `reviewFocus`: `shared` (new installs; both
+reviewers check semantics and rules, each from its own lens first) or
+`specialized` (one check each, upstream's split). Changing any of them revokes approvals.
 
-Run a long `translate` in a background or continuing
+Run a long `translate` or `build-loop` in a background or continuing
 terminal and poll `status --format markdown`; never block the parent on it or kill
-it for being slow. Each worker call leaves a Copilot CLI session under
-`~/.copilot/session-state`; after the migration, point the user to the CLI's
-`/session` cleanup subcommands.
+it for being slow. When status shows a worker retrying after a transient failure
+(rate limit, service error), tell the user at once: the runner waits and retries
+by itself; if it persists, offer a lower `concurrency` after the run.
+
+After a failed build, propose `build-loop --note TEXT [--max-rounds N]` (default
+5): one host-confirmed grant that rebuilds, parses errors into the repair queue,
+runs reviewed repairs and stops when clean, at the round limit or when the error
+count stops falling (then propose a rule amendment). Show the round counts.
+
+Workers are local-only (`--no-remote-export`), named Copilot CLI sessions whose
+IDs the run records keep; their transcripts contain source code. After the
+migration, report `sessions status` and, only if the user agrees, run
+`sessions prune` (it deletes only the kit's own worker sessions).
 
 Use `run_migration.mjs status` for progress. Never silently install policies,
 change models, approve a stage, increase limits, weaken tests, or declare partial

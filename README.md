@@ -123,7 +123,8 @@ node migration-kit/scripts/run_migration.mjs doctor --check-cli
 | `concurrency` | 同時AI呼び出し数。新規導入の初期値4、上限64。2つのレビューも含めてこの数以下。CLI方式では各呼び出しが別プロセスなので、Copilotのsubagent同時実行数ではなく、アカウントのレート制限が実質の上限 |
 | `dependencyOrder` | `auto`（新規導入）: 単位型チェックがあるときだけ、依存先のレビュー完了まで依存元を待たせる。型チェックがなければ上流と同じく承認範囲を一斉に展開する。`reviewed`（省略時・既存設定）: 常に待つ。`none`: 待たない（型チェックとは併用不可） |
 | `fixPolicy` | `rereview`（省略時）: 修正後に再レビューし、確定した指摘がなくなるまで繰り返す。`single-pass`: 上流Step 3と同じく、確定指摘の修正は1回で完了とし、build/smoke/parityが判定する。呼び出し数と停止する単位が減る |
-| `maxFixRounds`, `maxAgentCalls` | 1単位の修正回数、1回の実行のAI呼び出し数の上限。1単位はレビューに問題がなければ3回、上流と同じ修正1回なら4〜5回の呼び出し |
+| `reviewFocus` | `shared`（新規導入）: 2人のレビュアーがそれぞれ自分の観点を先に、両方の観点（元の動作・ルール順守）を確認し、見つけた欠陥をすべて報告する。互いの結果は見ない。`specialized`（省略時・既存設定）: 上流と同じく1人1観点 |
+| `maxFixRounds`, `maxAgentCalls` | 1単位の修正回数、1回の実行（translate・repair 1回ごと）のAI呼び出し数の上限。`maxAgentCalls` は同時実行数ではなく呼び出しの総数（同時実行数は `concurrency`）。1単位はレビューに問題がなければ3回、上流と同じ修正1回なら4〜5回の呼び出し |
 | `maxRunInputBytes` | 任意。1回の実行でワーカーへ送る入力の合計バイト数の上限。AI Creditsはトークン量で消費され、使い切ると利用が止まるため、区切って使用量を確認するための予算。runの要約の `usageEstimate` に実測バイト数と推定トークン数（バイト÷4、課金データではない）を残す。判定は完了した呼び出しの合計で行うため、実行中の呼び出し（最大 `concurrency` 件）の分だけ上限を超えることがある |
 | `timeoutSeconds` | 通常CLIの1ワーカー呼び出しの時間上限 |
 | `transientRetries`, `transientRetryDelayMs` | 任意。レート制限（429）・5xx・通信エラーの自動再試行の回数（既定2）と最初の待ち時間（既定5000ms、毎回倍）。再試行もAI呼び出し数に数える |
@@ -250,9 +251,11 @@ node migration-kit/scripts/run_migration.mjs approve parity --note "基本動作
 node migration-kit/scripts/run_migration.mjs parity
 ```
 
-ビルドが失敗したら `repair-round` を実行します。同梱のパーサー（Python・Java/Maven・JavaScript/Node/ESLint/tsc・シェル/ShellCheck・Rust・汎用の `file:line:col: error` 形式）が記録済みのビルド出力からエラーを読み取り、manifestの変換先ごとの修正キューを作って修正まで実行します。manifestに対応しない行は推測せず一覧で報告します。ラウンドごとのエラー件数は `migration/build-rounds.tsv` に残ります。修正後のbuildには、従来どおり承認が必要です。
+ビルドが失敗したら、チャットで合意したうえでAIが `build-loop` を実行します（ホストが確認を求めます）。上流のビルドデーモンと同じく「build → エラー解析 → レビュー付き修正 → 再build」を、クリーンになるか、指定回数（既定5）に達するか、エラー件数が減らなくなる（`stalled`：ルール改訂を提案）まで繰り返します。各回の承認は1つの許可（`migration/gates/build-loop-<id>.json`）の下に記録されます。1回ずつ進める場合は `repair-round` を使います。同梱のパーサー（Python・Java/Maven・JavaScript/Node/ESLint/tsc・シェル/ShellCheck・Rust・汎用の `file:line:col: error` 形式）が記録済みのビルド出力からエラーを読み取り、manifestの変換先ごとの修正キューを作って修正まで実行します。manifestに対応しない行は推測せず一覧で報告します。ラウンドごとのエラー件数は `migration/build-rounds.tsv` に残ります。修正後のbuildには、従来どおり承認が必要です。
 
 ```bash
+node migration-kit/scripts/run_migration.mjs build-loop --note "ビルド修正を最大5回まで許可" --max-rounds 5
+# 1回ずつ進める場合
 node migration-kit/scripts/run_migration.mjs repair-round
 node migration-kit/scripts/run_migration.mjs approve build --note "修正結果を確認"
 node migration-kit/scripts/run_migration.mjs build
@@ -299,7 +302,9 @@ npm run demo
 - CLI応答は1つのJSONです。ワーカー応答の取り込み上限は16 MiB。モデル自体の出力上限にも制約されます。
 - ログには要求モデルと時間を保存します。CLI方式では、CLIがJSONLで報告する実行モデル（`model.call_final_result`）と `premiumRequests` などの使用量も記録し、要求と違うモデルはrunの警告にします。実測できないトークン・AI creditsは `null` です。呼び出し上限は料金上限ではありません。
 - CLIは `--output-format json` のとき、レート制限・5xx・認証エラーをstdoutの `session.error` だけに出します（stderrは空）。runnerはこれを読み、429/5xxは再試行、認証・クレジット切れは全体停止として扱い、エラーメッセージに原因を残します。
-- CLIワーカーの呼び出しごとに `~/.copilot/session-state` にセッションが残ります。移行後はCLIの `/session` のcleanup系サブコマンドで整理してください。
+- CLIワーカーは呼び出しごとに名前付き（`migration-kit 役割 対象`）のローカル専用セッション（`--no-remote-export`、GitHubアカウントへ同期しない）として `~/.copilot/session-state` に残り、IDは実行記録の `cliSessionId` に残ります。ソースコードを含むため、移行後にAIが `sessions status` で件数と容量を報告し、同意があれば `sessions prune` でキットのワーカー分だけを削除します（ホストが確認を求めます）。
+- 並列ワーカーは多くのファイルを開きます。Copilot CLI（Node）は起動時に自分で開けるファイル数（soft limit）をhard limitまで引き上げるため（1.0.98で256→hard limitを確認）、キット側の引き上げは不要です。上げられないのはhard limitだけなので、`doctor --check-cli` がhard limitを確認し、4096未満なら引き上げ方を案内します。
+- レート制限（429）やサービス障害は自動で再試行します。再試行中は `status` に表示され、AIがその旨を伝えます。
 - 権限制限とhooksは作業上の制御であり、OSの隔離境界ではありません。SDK拡張と設定コマンドはローカルコードとして動作します。
 - Bashの旧 `build_daemon.sh` は互換用です。共通ランナーと同時実行せず、通常はNodeの `build` 工程を使ってください。
 
