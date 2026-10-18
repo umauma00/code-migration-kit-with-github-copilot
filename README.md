@@ -251,10 +251,10 @@ node migration-kit/scripts/run_migration.mjs approve parity --note "基本動作
 node migration-kit/scripts/run_migration.mjs parity
 ```
 
-ビルドが失敗したら、チャットで合意したうえでAIが `build-loop` を実行します（ホストが確認を求めます）。上流のビルドデーモンと同じく「build → エラー解析 → レビュー付き修正 → 再build」を、クリーンになるか、指定回数（既定5）に達するか、エラー件数が減らなくなる（`stalled`：ルール改訂を提案）まで繰り返します。各回の承認は1つの許可（`migration/gates/build-loop-<id>.json`）の下に記録されます。1回ずつ進める場合は `repair-round` を使います。同梱のパーサー（Python・Java/Maven・JavaScript/Node/ESLint/tsc・シェル/ShellCheck・Rust・汎用の `file:line:col: error` 形式）が記録済みのビルド出力からエラーを読み取り、manifestの変換先ごとの修正キューを作って修正まで実行します。manifestに対応しない行は推測せず一覧で報告します。ラウンドごとのエラー件数は `migration/build-rounds.tsv` に残ります。修正後のbuildには、従来どおり承認が必要です。
+ビルドが失敗したら、チャットで合意したうえでAIが `build-loop` を実行します（ホストが確認を求めます）。上流のビルドデーモンと同じく「build → エラー解析 → レビュー付き修正 → 再build」を、クリーンになるか、指定回数（`--max-rounds`、既定5）かループ全体のAI呼び出し数（`--max-calls`、既定は `maxAgentCalls`）に達するか、エラー件数が減らなくなる（`stalled`：ルール改訂を提案）まで繰り返します。AIは提案時に両方の数を伝えます。各回の承認は1つの許可（`migration/gates/build-loop-<id>.json`）の下に記録され、実行中は `status` に表示され、ほかのrunnerコマンドは拒否されます。1回ずつ進める場合は `repair-round` を使います。同梱のパーサー（Python・Java/Maven・JavaScript/Node/ESLint/tsc・シェル/ShellCheck・Rust・汎用の `file:line:col: error` 形式）が記録済みのビルド出力からエラーを読み取り、manifestの変換先ごとの修正キューを作って修正まで実行します。manifestに対応しない行は推測せず一覧で報告します。ラウンドごとのエラー件数は `migration/build-rounds.tsv` に残ります。修正後のbuildには、従来どおり承認が必要です。
 
 ```bash
-node migration-kit/scripts/run_migration.mjs build-loop --note "ビルド修正を最大5回まで許可" --max-rounds 5
+node migration-kit/scripts/run_migration.mjs build-loop --note "ビルド修正を最大5回・AI呼び出し100回まで許可" --max-rounds 5 --max-calls 100
 # 1回ずつ進める場合
 node migration-kit/scripts/run_migration.mjs repair-round
 node migration-kit/scripts/run_migration.mjs approve build --note "修正結果を確認"
@@ -302,7 +302,7 @@ npm run demo
 - CLI応答は1つのJSONです。ワーカー応答の取り込み上限は16 MiB。モデル自体の出力上限にも制約されます。
 - ログには要求モデルと時間を保存します。CLI方式では、CLIがJSONLで報告する実行モデル（`model.call_final_result`）と `premiumRequests` などの使用量も記録し、要求と違うモデルはrunの警告にします。実測できないトークン・AI creditsは `null` です。呼び出し上限は料金上限ではありません。
 - CLIは `--output-format json` のとき、レート制限・5xx・認証エラーをstdoutの `session.error` だけに出します（stderrは空）。runnerはこれを読み、429/5xxは再試行、認証・クレジット切れは全体停止として扱い、エラーメッセージに原因を残します。
-- CLIワーカーは呼び出しごとに名前付き（`migration-kit 役割 対象`）のローカル専用セッション（`--no-remote-export`、GitHubアカウントへ同期しない）として `~/.copilot/session-state` に残り、IDは実行記録の `cliSessionId` に残ります。ソースコードを含むため、移行後にAIが `sessions status` で件数と容量を報告し、同意があれば `sessions prune` でキットのワーカー分だけを削除します（ホストが確認を求めます）。
+- CLIワーカーは呼び出しごとに名前付き（`migration-kit 役割 対象`）のローカル専用セッション（`--no-remote-export`、GitHubアカウントへ同期しない）として `~/.copilot/session-state` に残り、IDはrunnerが呼び出し前に実行記録（`cli-sessions.jsonl`、再試行・中断した呼び出しも含む）へ残します。ソースコードを含むため、移行後にAIが `sessions status` で件数と容量を報告し、同意があれば `sessions prune` でキットのワーカー分だけを削除します（ホストが確認を求めます）。
 - 並列ワーカーは多くのファイルを開きます。Copilot CLI（Node）は起動時に自分で開けるファイル数（soft limit）をhard limitまで引き上げるため（1.0.98で256→hard limitを確認）、キット側の引き上げは不要です。上げられないのはhard limitだけなので、`doctor --check-cli` がhard limitを確認し、4096未満なら引き上げ方を案内します。
 - レート制限（429）やサービス障害は自動で再試行します。再試行中は `status` に表示され、AIがその旨を伝えます。
 - 権限制限とhooksは作業上の制御であり、OSの隔離境界ではありません。SDK拡張と設定コマンドはローカルコードとして動作します。

@@ -49,9 +49,9 @@ export const usage = `Usage: node migration-kit/scripts/run_migration.mjs COMMAN
   repair --target PATH --evidence migration/PATH | repair --queue migration/QUEUE.json
   diagnose                   Parse the current failed build into a TSV and repair queue
   repair-round               diagnose, then repair the queue; a fresh build still needs approval
-  build-loop --note TEXT [--max-rounds N]
+  build-loop --note TEXT [--max-rounds N] [--max-calls N]
                              One host-confirmed grant: build, diagnose, repair with reviews and rebuild until clean,
-                             N rounds (default 5) or the error count stops falling
+                             N rounds (default 5), N AI calls in total (default maxAgentCalls) or a stalled error count
   build | smoke | parity | handoff     Run one approved validation stage and stop
   unlock --pid PID           Remove a lock only after its owning process has stopped
 Options: --root PATH (default cwd), --copilot PATH (default copilot)
@@ -133,11 +133,13 @@ export async function doctor(root, config, { checkCLI = false, command = 'copilo
       const agents = await probeWorkerAgents(command, [], { cwd: root, layout });
       checks.push({ check: 'worker agents resolve', ...agents });
       checks.push({ check: 'file descriptor limit', ...await fileLimits(), minimum: fileLimitMinimum,
-        note: 'Parallel CLI workers need many open files (EMFILE "Too many open files" otherwise). Each CLI process raises its soft limit to the hard limit by itself; a hard limit below the minimum must be raised by the person or an administrator.' });
+        note: 'Each CLI process raises its soft open-file limit to the hard limit by itself. A hard limit below the minimum is a warning: workers may hit EMFILE "Too many open files", which stops the run with guidance.' });
     } catch (e) { checks.push({ check: 'Copilot executable', ok: false, detail: e.message }); }
   }
   const staticValid = checks.every(x => x.ok !== false);
-  return { ok: staticValid, staticValid, executionReady: 'not-verified', checks, workerBackend: 'copilot-cli', requestedModels: config.models, requestedPhaseModels: config.phaseModels ?? {},
+  // Passing checks can still carry a warning the person should hear.
+  const warnings = checks.filter(x => typeof x.warning === 'string').map(x => `${x.check}: ${x.warning}`);
+  return { ok: staticValid, staticValid, executionReady: 'not-verified', checks, ...(warnings.length ? { warnings } : {}), workerBackend: 'copilot-cli', requestedModels: config.models, requestedPhaseModels: config.phaseModels ?? {},
     note: 'Help checks do not authenticate, verify model availability, exercise hooks, or make AI calls. Run the live smoke procedure before production use.' };
 }
 export async function main(argv = process.argv.slice(2)) {
@@ -220,7 +222,8 @@ export async function main(argv = process.argv.slice(2)) {
     else if (cmd === 'build-loop') {
       // One host-confirmed grant for build → diagnose → reviewed repairs → rebuild rounds.
       const maxRounds = args['max-rounds'] === undefined ? 5 : Number(args['max-rounds']);
-      result = await buildLoop(root, config, createCopilotAdapter({ command: args.copilot }), { maxRounds, note: args.note, signal: controller.signal,
+      const maxCalls = args['max-calls'] === undefined ? config.maxAgentCalls : Number(args['max-calls']);
+      result = await buildLoop(root, config, createCopilotAdapter({ command: args.copilot }), { maxRounds, maxCalls, note: args.note, signal: controller.signal,
         onProgress: event => console.error(`${event.unit}: ${event.stage}${event.calls === undefined ? '' : ` (agent calls ${event.calls})`}`) });
     }
     else if (cmd === 'sessions') {

@@ -139,13 +139,18 @@ test('sessions status and prune touch only recorded worker session directories',
   assert.equal(fs.readFileSync(path.join(outside, 'keep'), 'utf8'), 'keep', 'symlinked directories are skipped');
 });
 
-test('the descriptor check reports the hard limit, which the CLI cannot raise by itself', { skip: process.platform === 'win32' }, async () => {
+test('the descriptor check reports the hard limit and only warns when it is low', { skip: process.platform === 'win32' }, async () => {
   const limits = await fileLimits();
+  assert.equal(limits.ok, true);
   assert.ok(limits.unknown || limits.hard === 'unlimited' || Number.isInteger(limits.hard));
-  assert.equal(limits.ok, limits.unknown || limits.hard === 'unlimited' || limits.hard >= fileLimitMinimum);
+  // A lowered hard limit (allowed without privileges) is inherited and reported.
+  const probe = `import(${JSON.stringify(path.join(kitRoot, 'scripts/copilot_adapter.mjs'))}).then(m => m.fileLimits()).then(r => console.log(JSON.stringify(r)))`;
+  const low = await runProcess('/bin/sh', ['-c', 'ulimit -n 1024 && exec "$0" --input-type=module -e "$1"', process.execPath, probe], {});
+  const reported = JSON.parse(low.stdout);
+  assert.equal(reported.hard, 1024); assert.equal(reported.ok, true);
+  assert.match(reported.warning, /below 4096/); assert.equal(fileLimitMinimum, 4096);
   // Workers start directly: no shell wrapper in front of the CLI.
-  const f = { argv: copilotArgs('implementer', 'm') };
-  assert.ok(!f.argv.includes('ulimit'));
+  assert.ok(!copilotArgs('implementer', 'm').includes('ulimit'));
 });
 
 test('EMFILE stops the run with descriptor-limit guidance', () => {

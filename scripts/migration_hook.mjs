@@ -33,7 +33,7 @@ export function decide(event, role, cwd) {
     };
     const relative = path.relative(real(base), real(path.resolve(base, target))).split(path.sep).join('/');
     const records = /^migration\/(runs|state|results|gates|phases|pilots?)(\/|$)/i;
-    if (!relative || /^migration$/i.test(relative) || relative.startsWith('..') || path.isAbsolute(relative) || records.test(relative)) return `Tool-assisted reviewers may not read ${target}; use only the listed evidence files`;
+    if (!relative || /^migration$/i.test(relative) || relative.split('/')[0] === '..' || path.isAbsolute(relative) || records.test(relative)) return `Tool-assisted reviewers may not read ${target}; use only the listed evidence files`;
   }
   return null;
 }

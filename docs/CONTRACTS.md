@@ -94,9 +94,10 @@ of a typecheck-only finding has no reviews of its own, so it is reviewed as usua
 with a unit typecheck configured, `verify-fix` runs it once and a failure returns
 the unit to the full review loop.
 
-CLI worker attempts and survey records also record `cliSessionId`, the
-runner-chosen `--session-id` of that worker's local-only CLI session (used only by
-`sessions status | prune`; receipts never depend on it), and `observedModel` (the CLI's `model.call_final_result`
+Before every worker call (retries included) the runner appends `{id, role,
+target, at}` to `migration/runs/<run>/cli-sessions.jsonl` and passes that `id` as
+the CLI's `--session-id`; attempt and survey records also keep it as
+`cliSessionId`. Only `sessions status | prune` use them (receipts never do), and `observedModel` (the CLI's `model.call_final_result`
 for the main agent, null when absent or ambiguous), `cliUsage` (`premiumRequests`,
 `totalApiDurationMs`, `sessionDurationMs` from the JSONL result) and, when the
 reported model differs from the request, `modelWarning`; run summaries list
@@ -159,15 +160,21 @@ select the affected manifest targets for `repair`; then approve a fresh build.
 
 ## Validation commands
 
-`build-loop --note TEXT [--max-rounds N]` is one host-confirmed grant (default 5,
-at most 50 rounds) stored as `migration/gates/build-loop-<id>.json` with its note
-and per-round `{round, buildExecutionId, success, errors, targets, unmapped}`.
+`build-loop --note TEXT [--max-rounds N] [--max-calls N]` is one host-confirmed
+grant (default 5, at most 50 rounds; `--max-calls` defaults to `maxAgentCalls` and
+caps the AI calls of all its repair rounds together, as does `maxRunInputBytes`
+for prompt bytes) stored as `migration/gates/build-loop-<id>.json` with its note,
+owner `pid`, current `stage`, `agentCalls`, `promptBytes` and per-round
+`{round, buildExecutionId, success, errors, targets, unmapped}`.
 Each round records an ordinary build approval whose gate carries
 `loop: {grantId, round}`, runs build, diagnoses the recorded output and, unless
 clean, repairs the queue through `translate` with the normal reviews. It stops
-`clean`, `stalled` (three rounds without a falling error count) or `round-limit`.
-A build that could not run, a stale approval or an unmapped failure is an error,
-not a round. Only build approvals may carry `loop`.
+`clean`, `stalled` (three rounds without a falling error count), `budget` or
+`round-limit`. A build that could not run, a stale approval or an unmapped failure
+is an error, not a round. Only build approvals may carry `loop`. Until the grant
+has `finishedAt`, and while its pid lives, every other process's runner lock is
+refused and `status` reports `buildLoop`. In strict phase mode, translate and
+build-loop also refuse to run when `migration/guardrails.json` is missing.
 
 See [execution scopes](EXECUTION-SCOPES.md) for exact translation target grants,
 single-lock repair queues and the explicit todo-lines-v1 count contract. New

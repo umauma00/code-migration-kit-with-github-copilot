@@ -5,6 +5,7 @@ import { roles, workerModel } from '../lib/core.mjs';
 import { parseResult, validateResult } from '../lib/results.mjs';
 import { isReviewer, isToolFree, toolAssistedRole, assistedReviewerRoles, validateWorkerProfile } from '../lib/review.mjs';
 import { runtimeLayout } from '../lib/runtime.mjs';
+import { sessionIdPattern } from '../lib/sessions.mjs';
 
 // Worker sessions hold source code and prompts. They stay local
 // (--no-remote-export: no sync to the GitHub account, no remote control) and
@@ -40,7 +41,8 @@ export async function copilotVersion(command = 'copilot', prefixArgs = [], { cwd
 // Parallel CLI workers each open many files. Node, and so the Copilot CLI,
 // raises its own soft descriptor limit to the hard limit at startup (observed on
 // 1.0.98: soft 256 -> hard), so only a low hard limit ends in EMFILE ("Too many
-// open files"). Doctor reports it; raising a hard limit needs the person.
+// open files"). The need is per CLI process and not documented, so a low hard
+// limit is a doctor warning, not a failure; raising it needs the person.
 export const fileLimitMinimum = 4096;
 export async function fileLimits() {
   if (process.platform === 'win32') return { platform: 'win32', ok: true };
@@ -48,7 +50,8 @@ export async function fileLimits() {
     const r = await runProcess('/bin/sh', ['-c', 'ulimit -Hn'], { timeoutMs: 5000 });
     const value = r.stdout.trim(), hard = value === 'unlimited' ? 'unlimited' : Number(value);
     if (hard !== 'unlimited' && !(hard > 0)) return { ok: true, unknown: true };
-    return { hard, ok: hard === 'unlimited' || hard >= fileLimitMinimum };
+    const low = hard !== 'unlimited' && hard < fileLimitMinimum;
+    return { hard, ok: true, ...(low ? { warning: `The hard open-file limit is ${hard} (below ${fileLimitMinimum}). Workers may fail with EMFILE "Too many open files"; if they do, lower concurrency or have an administrator raise the hard limit.` } : {}) };
   } catch { return { ok: true, unknown: true }; }
 }
 export const probeAgentName = '__migration_kit_probe_missing_agent__';
@@ -165,7 +168,7 @@ export function createCopilotAdapter({ command = 'copilot', prefixArgs = [] } = 
   // Record the version before every call and warn once per change; continue.
   let baseline;
   const warned = new Set();
-  return async ({ root, config, role, unit, extra, signal, reviewInput, reviewMode = 'frozen' }) => {
+  return async ({ root, config, role, unit, extra, signal, reviewInput, reviewMode = 'frozen', sessionId }) => {
     // Oversized reviews run on the read-only twin profile of the same reviewer.
     const worker = isReviewer(role) && reviewMode === 'tool-assisted' ? toolAssistedRole(role) : role;
     validateWorkerProfile(root, worker, config);
@@ -184,7 +187,8 @@ export function createCopilotAdapter({ command = 'copilot', prefixArgs = [] } = 
         if (!warned.has(cliVersion)) { warned.add(cliVersion); console.error(`WARNING: ${cliVersionWarning}`); }
       }
     }
-    const session = { id: crypto.randomUUID(), name: `migration-kit ${worker} ${unit.target}`.slice(0, 200) };
+    // The runner journals sessionId before this call; direct callers get a fresh one.
+    const session = { id: sessionIdPattern.test(sessionId ?? '') ? sessionId : crypto.randomUUID(), name: `migration-kit ${worker} ${unit.target}`.slice(0, 200) };
     const versionFields = { cliVersion, ...(cliVersionWarning ? { cliVersionWarning } : {}), cliSessionId: session.id };
     let result;
     // Surveyors get their scope as a frozen input, like tool-free reviewers.

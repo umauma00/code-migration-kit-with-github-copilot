@@ -177,13 +177,16 @@ it for being slow. When status shows a worker retrying after a transient failure
 (rate limit, service error), tell the user at once: the runner waits and retries
 by itself; if it persists, offer a lower `concurrency` after the run.
 
-After a failed build, propose `build-loop --note TEXT [--max-rounds N]` (default
-5): one host-confirmed grant that rebuilds, parses errors into the repair queue,
-runs reviewed repairs and stops when clean, at the round limit or when the error
-count stops falling (then propose a rule amendment). Show the round counts.
+After a failed build, propose `build-loop --note TEXT [--max-rounds N]
+[--max-calls N]` (defaults 5 rounds and `maxAgentCalls` AI calls for the whole
+loop; say both numbers): one host-confirmed grant that rebuilds, parses errors
+into the repair queue, runs reviewed repairs and stops when clean, at the round
+or call limit, or when the error count stops falling (then propose a rule
+amendment). While it runs, other runner commands are refused; poll `status`.
+Show the round counts and calls used.
 
 Workers are local-only (`--no-remote-export`), named Copilot CLI sessions whose
-IDs the run records keep; their transcripts contain source code. After the
+IDs the runner journals before each call (retries and interrupted calls included); their transcripts contain source code. After the
 migration, report `sessions status` and, only if the user agrees, run
 `sessions prune` (it deletes only the kit's own worker sessions).
 

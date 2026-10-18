@@ -42,13 +42,16 @@ fixers apply confirmed changes and receive no compiler tool. Review again.
 Approve and run a fresh build after repaired outputs invalidate the previous gate.
 
 Upstream's build daemon repeats this until clean. Here, once the human agrees in
-chat, run `run_migration.mjs build-loop --note "what was agreed" [--max-rounds N]`
-(default 5; the host asks the human to confirm it). Each round records its build
+chat, run `run_migration.mjs build-loop --note "what was agreed" [--max-rounds N]
+[--max-calls N]` (defaults: 5 rounds, `maxAgentCalls` AI calls for the whole loop;
+state both in the proposal; the host asks the human to confirm the command). Each round records its build
 approval under that one grant in `migration/gates/build-loop-<id>.json`, runs the
 build, diagnoses it and repairs the queue with the normal reviews. It stops when
 the build is clean, at the round limit, or when the error count fails to fall for
-two rounds (`stalled`). An unmapped failure stops it with the build record. Each
-repair round has its own `maxAgentCalls` budget. Report every round's counts.
+two rounds (`stalled`), or when its call budget is spent (`budget`; unfinished
+repairs resume with translate). An unmapped failure, a build that times out or a
+stale approval stops it with an error. While it runs, `status` shows it and other
+runner commands are refused. Report every round's counts and the calls used.
 
 If several rounds repeat the same error class, stop and propose a rule amendment.
 Do not have every worker independently build the whole tree. Report counts by

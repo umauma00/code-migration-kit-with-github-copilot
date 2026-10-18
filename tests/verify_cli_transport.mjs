@@ -110,7 +110,7 @@ try {
   if (providerError) throw providerError;
   // Workers ran as runner-named sessions: each recorded ID exists in this CLI
   // home, and prune removes exactly those (the control run's session stays).
-  const stateDir = sessionStateDir(), before = fs.readdirSync(stateDir);
+  const stateDir = sessionStateDir(f.root), before = fs.readdirSync(stateDir);
   const recorded = sessionsStatus(f.root);
   assert.ok(recorded.recorded >= 9); assert.equal(recorded.present, recorded.recorded);
   const pruned = pruneSessions(f.root), after = fs.readdirSync(stateDir);
