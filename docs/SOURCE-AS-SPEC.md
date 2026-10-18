@@ -52,6 +52,8 @@ node migration-kit/scripts/run_migration.mjs source-spec init --apply  # ユー�
 | 01 | `depmap/`、`manifest.tsv`、`review-dependencies.json`、`depmap/report.md` | 同梱の解析器で機械的に生成（推測しない） |
 | 02 | `RULEBOOK.md`、`inventory.tsv`、`gap-report.md` | ソースの実際の使われ方から方針を決める。判断できない箇所はinventoryにUNKNOWNとして残し、最も保守的な訳とTODO(port)を指定 |
 
+大きなリポジトリでは、契約メモを親が全ファイル読んで書く代わりに `survey run --kind contracts` → `survey merge --kind contracts` で範囲ごとに作れます（[準備工程の調査](SURVEYS.md)）。
+
 `contracts.md` に `TODO(spec)` が残っている間は、00bを完了として記録できません（雛形のままの承認を防ぐため）。
 
 ### 準備監査を軽くする

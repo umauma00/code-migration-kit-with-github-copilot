@@ -1,5 +1,12 @@
 # Unreleased
 
+- Delegated preparation surveys: `survey plan|run|status|merge --kind
+  facts|contracts|inventory` splits the source into directory/size scopes, sends
+  each to a fresh tool-free surveyor (new Copilot CLI process, or a host subagent
+  in native mode) and saves each answer as a hash-bound file under
+  `migration/surveys/`; merges build facts.md, fill the source-as-spec contracts
+  skeleton, or publish inventory shards through the existing census merge.
+  New surveyor profiles; `phaseModels.survey` (default: implementer model).
 - Upstream fidelity: phase 02 refuses untouched RULEBOOK/inventory templates;
   findings both reviewers raise at the same source line are agreed and skip the
   arbiter (upstream: a third rules only on disagreements); a failing in-loop

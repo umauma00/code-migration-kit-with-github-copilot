@@ -59,3 +59,8 @@ runtime harness above: run `source-spec init`, fill `migration/source-spec/contr
 from cited source lines (write "unknown" where the source cannot decide), write
 `judge-report.md`, and continue straight into 01 and 02 without stopping for a
 00b-only review. The user reviews 00b–02 once as a package.
+
+For source-as-spec, draft the contracts with `survey run --kind contracts` and
+`survey merge --kind contracts` instead of reading every file yourself; the merge
+fills `migration/source-spec/contracts.md` only while it is the untouched skeleton.
+See [surveys](../docs/SURVEYS.md).

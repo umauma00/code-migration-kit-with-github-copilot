@@ -63,6 +63,15 @@ In source-as-spec, draft 00b, 01 and 02 together from the source, run one
 independent review of the package, show one report and record
 `phase complete 00b,01,02 --note TEXT` only after the user's OK.
 
+## Keep the parent's context small
+
+In 00, 00b (source-as-spec) and 02, do not read the whole codebase yourself on
+anything but a small repository. Use [surveys](../../../docs/SURVEYS.md): `survey run --kind
+facts|contracts|inventory` sends each scope to a fresh tool-free surveyor (a new
+Copilot CLI process, or a host subagent in native mode) and saves its answer as a
+file; `survey merge` builds the draft you review. Check cited lines before relying
+on them; merged drafts still go through the phase's audits and the human gate.
+
 ## When a step fails
 
 Follow [When a step fails](../../../docs/PHASE-HANDOFF.md#when-a-step-fails) for every

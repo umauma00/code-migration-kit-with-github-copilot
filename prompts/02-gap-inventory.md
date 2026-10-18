@@ -50,3 +50,12 @@ dependency map) in a separate context, fix its findings, then show ONE report fo
 open findings) and choices: proceed to migration (recommended), revise, pause.
 Only after the user's OK run `phase complete 00b,01,02 --note TEXT`, then `judge`.
 See [source-as-spec](../docs/SOURCE-AS-SPEC.md).
+
+## Delegate classification by scope
+
+After the mechanical census (`migration/inventory-sites.tsv`: file, symbol,
+source_construct), run `survey run --kind inventory --sites migration/inventory-sites.tsv`
+and `survey merge --kind inventory --sites …`. Each scope's surveyor receives the
+RULEBOOK, the scope's sources and its census sites; results are per-scope shards
+merged by the existing inventory merge, which refuses an incomplete census. The
+paired independent audits and the joint audit still follow. See [surveys](../docs/SURVEYS.md).

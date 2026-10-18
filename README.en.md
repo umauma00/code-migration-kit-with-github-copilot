@@ -187,6 +187,10 @@ node migration-kit/scripts/run_migration.mjs source-spec check
 
 When a runner command fails it prints, after the `ERROR:` line, **the cause, the impact and the choices (one recommended, each with its reason and command)**. Copilot shows this, asks with the question tool and waits for the answer. For failures outside the runner, `run_migration.mjs guidance --message "error text"` produces the same guidance.
 
+## Delegating preparation reading by scope
+
+In 00, 00b and 02, instead of the parent reading every file itself, `survey run --kind facts|contracts|inventory` splits the source into scopes and hands each to a fresh surveyor (a new `copilot` process with the CLI backend, a VS Code subagent with native). Results are saved as files under `migration/surveys/`; `survey merge` builds the draft. Interrupted runs resume with the remaining scopes. See [preparation surveys](docs/SURVEYS.en.md).
+
 ## Working through the phases
 
 Before phase 03, copy `templates/guardrails.json` (`migration-kit/templates/guardrails.json` for a repository copy) to `migration/guardrails.json` and edit it for your target's build and test commands. It replaces the upstream `.claude/settings.json` deny rules: a hook denies matching shell commands in every agent session. Builds run by the runner are not affected. `phase start 03` / `04` stops without this file (or a recorded waiver); agents never create it. With a repository copy, the Copilot CLI loads the hook only in a trusted folder; check with `doctor`.

@@ -33,7 +33,9 @@ does not apply to automated workers, which keep their JSON-only contracts.
    user asking you to approve the concrete artifacts. Approval is bound to hashes.
    The hook asks the person to confirm approval and phase-completion commands
    and denies agent edits of `migration/guardrails.json`.
-4. Translate through the runner. CLI implementers, fixers and arbiters use read/search
+4. Delegate preparation reading by scope with `survey` (fresh tool-free
+   surveyors, results as files under `migration/surveys/`); see [surveys](SURVEYS.md).
+   Translate through the runner. CLI implementers, fixers and arbiters use read/search
    tools; native host workers all use tools: [] with self-contained inputs.
    Reviewers have no tools and receive the same frozen input; when it exceeds
    maxReviewInputBytes (CLI only) both receive the same hash-bound file list and
