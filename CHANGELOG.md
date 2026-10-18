@@ -33,9 +33,12 @@
 - Second-opinion review fixes:
   - Human gates: the hook now splits commands like a shell (quoted values with
     spaces, `--option value` read exactly as the runner's parser does, globs on
-    the runner path, quoted `bash -c`/`$(...)` command lines). A runner or kit
-    module reached in a form it cannot read, with a human-act word in it, asks
-    the person ("unrecognized runner command") instead of passing.
+    the runner path, quoted `bash -c`/`$(...)` command lines). As a best-effort
+    text match, a runner or kit module reached in a form it cannot read, with a
+    human-act word in the same segment, asks the person ("unrecognized runner
+    command"). Forms split across segments, variables or indirection
+    (`R=run_migration.mjs; node "$R" approve …`, `xargs`) are not detected, and
+    Windows `\` runner paths fall back to that generic question.
   - `migration/guardrails.json`: globs, bare names after `cd migration` and
     removing or moving `migration/` itself are denied; strict-phase translate and
     build-loop refuse to run when the file is missing.

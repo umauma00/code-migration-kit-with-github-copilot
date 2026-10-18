@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
-// Second-opinion review fixes: quote-aware human gates that fail closed,
-// guardrails-file protection, runner-chosen session IDs, the build-loop's
-// shared budget and visibility, and path edge cases.
+// Second-opinion review fixes: quote-aware human gates with a best-effort
+// fallback for unreadable forms, guardrails-file protection, runner-chosen
+// session IDs, the build-loop's shared budget and visibility, and path edge
+// cases.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -31,7 +32,7 @@ async function approvedWith(t, options, change = () => {}) {
 }
 const failingBuild = [process.execPath, '-e', 'console.error("ported/math_ops.mjs:1:1: error: still broken"); process.exit(1)'];
 
-test('human gates read quoted values and fail closed on forms they cannot parse', t => {
+test('human gates read quoted values and ask on unreadable forms within a segment', t => {
   for (const [command, gate] of [
     [`${R} --note "reviewed all of it" build-loop`, 'build-loop'],
     [`${R} --root "/Users/me/My Project" approve build`, 'approve build'],
