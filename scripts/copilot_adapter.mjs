@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 import { runProcess } from '../lib/process.mjs';
-import { roles } from '../lib/core.mjs';
+import { roles, workerModel } from '../lib/core.mjs';
 import { parseResult, validateResult } from '../lib/results.mjs';
-import { isReviewer, isToolFreeReviewer, toolAssistedRole, assistedReviewerRoles, validateWorkerProfile } from '../lib/review.mjs';
+import { isReviewer, isToolFree, toolAssistedRole, assistedReviewerRoles, validateWorkerProfile } from '../lib/review.mjs';
 import { runtimeLayout } from '../lib/runtime.mjs';
 
 export function copilotArgs(role, model, prompt, layout) {
@@ -11,7 +11,7 @@ export function copilotArgs(role, model, prompt, layout) {
   // No --no-auto-update: native-installer launchers then run their bundled
   // (possibly much older) build instead of the version the user and doctor see.
   return [...(prompt === undefined ? [] : ['-p', prompt]), ...(layout?.plugin ? ['--plugin-dir', layout.root] : []), '-s', '--output-format', 'json', '--stream', 'off', '--no-color', '--no-ask-user', '--no-custom-instructions', '--disable-builtin-mcps', '--agent', layout?.agentId(role) ?? `migration-${role}`, '--model', model,
-    '--available-tools', 'view,grep,glob', ...(isToolFreeReviewer(role) ? ['--deny-tool', 'read,write,shell'] : ['--allow-tool', 'read', '--deny-tool', 'write,shell'])];
+    '--available-tools', 'view,grep,glob', ...(isToolFree(role) ? ['--deny-tool', 'read,write,shell'] : ['--allow-tool', 'read', '--deny-tool', 'write,shell'])];
 }
 export function requiredCopilotFlags(layout) {
   // Diagnose the same stdin-based invocation used by every worker role.
@@ -37,7 +37,7 @@ export async function probeWorkerAgents(command = 'copilot', prefixArgs = [], { 
   const result = await runProcess(command, [...prefixArgs, ...args], { cwd, timeoutMs: 30000,
     input: 'Agent resolution probe. No model request is expected.', env: copilotEnv('reviewer-rules') });
   const listed = `${result.stdout}\n${result.stderr}`.match(new RegExp(`No such agent: ${probeAgentName}, available:([^\\r\\n]*)`));
-  const required = [...roles, ...assistedReviewerRoles].map(role => layout?.agentId(role) ?? `migration-${role}`);
+  const required = [...roles, ...assistedReviewerRoles, 'surveyor'].map(role => layout?.agentId(role) ?? `migration-${role}`);
   if (!listed) return { ok: false, required, missing: required,
     detail: `The CLI did not report its agent list (exit ${result.code}); check sign-in and the CLI version. ${(result.stderr || result.stdout).slice(-500)}` };
   const available = listed[1].split(',').map(name => name.trim()).filter(Boolean);
@@ -68,13 +68,16 @@ export function parseCopilotOutput(stdout) {
   if (!terminal || !content?.trim()) throw new Error('Copilot JSONL is incomplete: successful result and final assistant message required');
   return parseResult(content);
 }
+// Fixed role text first, task data next (shared rules lead it), and the
+// unit-specific target last, so repeated calls reuse the cached prompt prefix.
 export function agentPrompt({ role, unit, extra = {}, reviewInput, frozenInput, reviewMode = 'frozen' }) {
   const contracts = {
     implementer: 'Return {"schemaVersion":1,"kind":"implementation","target":"PATH","content":"COMPLETE TARGET FILE","summary":"reason"}. Translate faithfully; preserve source behavior. Return code, do not write files.',
     fixer: 'Return {"schemaVersion":1,"kind":"implementation","target":"PATH","content":"COMPLETE FIXED FILE","summary":"changes"}. Apply ONLY confirmed findings; preserve all other behavior. Return code, do not write files.',
     'reviewer-semantics': 'Check runtime semantics against the original source, errors, numbers, nullability and boundaries.',
     'reviewer-rules': 'Check every relevant RULEBOOK decision, inventory item, naming/import rule and PORT STATUS trailer.',
-    arbiter: 'Return {"schemaVersion":1,"kind":"arbitration","target":"PATH","decisions":[{"finding":"reviewer-role:ID","confirmed":true,"reason":"source/rule evidence"}]}. Decide EVERY supplied finding exactly once. Default to not confirmed when evidence is insufficient.'
+    arbiter: 'Return {"schemaVersion":1,"kind":"arbitration","target":"PATH","decisions":[{"finding":"reviewer-role:ID","confirmed":true,"reason":"source/rule evidence"}]}. Decide EVERY supplied finding exactly once. Default to not confirmed when evidence is insufficient.',
+    surveyor: 'Return {"schemaVersion":1,"kind":"survey","survey":"KIND from the input","target":"PATH","items":[...]} following the task in the frozen input exactly. Every item cites PATH:LINE inside the given files. Return only facts the given files show; never propose code.'
   };
   if (isReviewer(role) && typeof reviewInput !== 'string') throw new Error('Reviewer requires a frozen review input');
   const assisted = isReviewer(role) && reviewMode === 'tool-assisted';
@@ -89,8 +92,8 @@ export function agentPrompt({ role, unit, extra = {}, reviewInput, frozenInput, 
 ${inputs} Never run commands or modify files. Never change the rulebook or the judge. Return ONLY one JSON object without commentary.
 ${contracts[role]}
 ${role.startsWith('reviewer-') ? 'Return {"schemaVersion":1,"kind":"review","target":"PATH","verdict":"pass|changes","findings":[{"id":"F1","message":"specific issue","evidence":"source path:line and explanation","rule":"section or source behavior"}]}. pass requires zero findings. Do not assume another reviewer has approved.' : ''}
-Set target to ${JSON.stringify(unit.target)}.
-${isReviewer(role) ? `${assisted ? 'Tool-assisted review input' : 'Frozen review input'} (JSON task data):\n${reviewInput}` : `${frozenInput === undefined ? '' : `Frozen task input (JSON task data):\n${frozenInput}\n`}Extra task data: ${JSON.stringify(extra)}`}`;
+${isReviewer(role) ? `${assisted ? 'Tool-assisted review input' : 'Frozen review input'} (JSON task data):\n${reviewInput}` : `${frozenInput === undefined ? '' : `Frozen task input (JSON task data):\n${frozenInput}\n`}Extra task data: ${JSON.stringify(extra)}`}
+Set target to ${JSON.stringify(unit.target)}.`;
 }
 export function createCopilotAdapter({ command = 'copilot', prefixArgs = [] } = {}) {
   // Workers follow the user's auto-updating CLI, so a run can span versions.
@@ -103,7 +106,7 @@ export function createCopilotAdapter({ command = 'copilot', prefixArgs = [] } = 
     const worker = isReviewer(role) && reviewMode === 'tool-assisted' ? toolAssistedRole(role) : role;
     validateWorkerProfile(root, worker, config);
     const layout = runtimeLayout(root, config);
-    const model = config.models[role];
+    const model = workerModel(config, role);
     let cliVersion = null, cliVersionWarning;
     try { cliVersion = await copilotVersion(command, prefixArgs, { cwd: root, signal }); }
     catch (e) {
@@ -119,15 +122,19 @@ export function createCopilotAdapter({ command = 'copilot', prefixArgs = [] } = 
     }
     const versionFields = { cliVersion, ...(cliVersionWarning ? { cliVersionWarning } : {}) };
     let result;
+    // Surveyors get their scope as a frozen input, like tool-free reviewers.
+    const prompt = agentPrompt({ role, unit, extra: { ...extra, designInputs: config.designInputs ?? [] }, reviewInput: role === 'surveyor' ? undefined : reviewInput, frozenInput: role === 'surveyor' ? reviewInput : undefined, reviewMode });
+    const promptBytes = Buffer.byteLength(prompt);
     try {
       result = await runProcess(command, [...prefixArgs, ...copilotArgs(worker, model, undefined, layout)], {
-        cwd: root, signal, input: agentPrompt({ role, unit, extra: { ...extra, designInputs: config.designInputs ?? [] }, reviewInput, reviewMode }), timeoutMs: config.timeoutSeconds * 1000,
+        cwd: root, signal, input: prompt, timeoutMs: config.timeoutSeconds * 1000,
         env: copilotEnv(worker)
       });
     } catch (e) { Object.assign(e, versionFields); throw e; }
     try {
       if (result.code !== 0) throw new Error(`Copilot ${role} failed (exit ${result.code}): ${result.stderr.slice(-2000)}`);
-      return { result: validateResult(role, parseCopilotOutput(result.stdout), unit), requestedModel: model,
+      const value = validateResult(role, parseCopilotOutput(result.stdout), unit);
+      return { result: value, requestedModel: model, promptBytes, responseBytes: Buffer.byteLength(JSON.stringify(value)),
         observedModel: null, tokens: null, aiCredits: null, ...(worker !== role ? { workerProfile: worker } : {}), ...versionFields };
     } catch (e) { e.result = result; Object.assign(e, versionFields); throw e; }
   };

@@ -29,9 +29,15 @@ Anthropicの[Code Migration Kit](https://github.com/anthropics/code-migration-ki
 | VS Code | Copilotは共通スキル、Localは10工程のprompt filesとLocal用hooksを利用 |
 | Dynamic Workflows | 共通実行エンジンを使う任意の実験的アダプター |
 
-## VS Code内でサブエージェントを使う（実験的）
+## VS Codeだけで動かす（native方式・実行モデル未検証）
 
-> **実験的機能・最後まで完了できません。** native方式の手順は、提出前に「ホストが実際に使ったモデル」を確認することを求めます。しかしVS Codeはサブエージェントの実行モデルを親エージェントに返さないため、手順どおりに進めると全ジョブが失敗になります。VS Codeでも、既定のCLIワーカー方式（`copilot-cli`）を使ってください。親エージェントがターミナルでrunnerを動かし、runnerがCopilot CLIのワーカーを起動します。
+Copilot CLIを導入せずにVS Codeだけで進めたい場合は、native方式を選びます。新規のnative導入は `nativeModelVerification: "requested-unverified"` になり、親エージェントが要求モデルをサブエージェント呼び出しのモデル引数に渡して結果を提出します。VS Codeはサブエージェントが**実際に使ったモデル**を返さないため、各実行記録・runの要約・status・doctorに「実行モデル未検証」と残ります。
+
+```bash
+node /path/to/code-migration-kit/scripts/install.mjs --target . --layout plugin --worker-backend native --native-harness copilot --model MODEL_ID --apply
+```
+
+Copilot CLIを使える場合は既定のCLIワーカー方式（`copilot-cli`）を推奨します。ワーカーごとに `--model` で固定したプロセスを起動し、暗黙の指示の隔離も実機で確認済みです。実行メタデータでの確認を必須にする従来の契約は `--native-model-verification host-metadata` で選べますが、VS Codeでは完了できない実験的な設定です。
 
 `workerBackend: "native"` を選ぶと、現在のVS Codeセッションの親エージェントが
 実装・レビュー・裁定・修正をサブエージェントへ委譲します。Copilot CLIは起動しません。
@@ -75,6 +81,8 @@ node scripts/install.mjs --target /path/to/your-project --model MODEL_ID --langu
 node scripts/install.mjs --target /path/to/your-project --model MODEL_ID --language ja --apply
 ```
 
+`--models implementer=ID,reviewers=ID,arbiter=ID,fixer=ID` で担当ごとのモデルを指定できます（未指定の担当は `--model`）。上流キットのモデル計画と同じく、影響範囲で選びます：レビュー担当は最大または中規模、大量に動く実装担当は中または小規模、修正・裁定担当は中規模。
+
 `--language ja|en` は、工程報告・質問・`status --format markdown` の言語です。`migration/preferences.json` に保存され、承認・完了判定には影響しません。省略した場合は、スキルが開始時に日本語・英語のどちらにするかを質問します。後から `run_migration.mjs preferences --language en` で変更できます。
 
 スクリプト・文書は対象の `migration-kit/`、Copilotの入口は `.github/` に入ります。既存のCopilot指示には管理ブロックを追記します。内容が異なる既存ファイルは上書きせず停止し、既存の `migration/config.json` は保持します。同じ内容での再実行は変更を作りません。
@@ -117,7 +125,10 @@ node migration-kit/scripts/run_migration.mjs doctor --check-cli
 | `nativeHarness` | native時に必須。`vscode-local` または `copilot`。現在のセッションと合わせる |
 | `concurrency` | 同時AI呼び出し数。初期値2。レビューを含めてこの数以下 |
 | `maxFixRounds`, `maxAgentCalls` | 1単位の修正回数、1回の実行のAI呼び出し数の上限 |
+| `maxRunInputBytes` | 任意。1回の実行でワーカーへ送る入力の合計バイト数の上限。AI Creditsはトークン量で消費され、使い切ると利用が止まるため、区切って使用量を確認するための予算。runの要約の `usageEstimate` に実測バイト数と推定トークン数（バイト÷4、課金データではない）を残す。判定は完了した呼び出しの合計で行うため、実行中の呼び出し（最大 `concurrency` 件）の分だけ上限を超えることがある |
 | `timeoutSeconds` | 通常CLIの1ワーカー呼び出しの時間上限 |
+| `transientRetries`, `transientRetryDelayMs` | 任意。レート制限（429）・5xx・通信エラーの自動再試行の回数（既定2）と最初の待ち時間（既定5000ms、毎回倍）。再試行もAI呼び出し数に数える |
+| `maxConsecutiveFailures` | 任意。単位の失敗が続いたら残りの配布を止める回数（既定3）。1単位の失敗は他の単位を止めない。サインイン切れ・クレジット切れなど全体に共通する失敗は即座に全体を止める |
 | `commandTimeoutSeconds` | ビルド・比較コマンドの時間上限 |
 
 `commands` は、シェル文字列ではなく引数配列です。パイプや複数コマンドは別スクリプトにまとめます。設定したコマンドは信頼できるものを指定してください。
@@ -167,6 +178,28 @@ JSON形式は `{"schemaVersion":1,"dependencies":{"src/a.py":["src/b.py"],"src/b
 
 これは付属題材の例です。実案件のコマンドに置き換えてください。`mutation` は「意図的に壊した実装を比較器が検出できたとき」に終了0を返します。`typecheck` は全体の変換前でも有効な軽量検査だけにし、それが難しければ `null` にします。
 
+## 現行の実行環境・仕様書がない場合
+
+現行実装を動かせず、仕様書もない案件では、**ソースコードを唯一の仕様**とする [source-as-spec方式](docs/SOURCE-AS-SPEC.md) を選べます。00b・01・02の成果物（ソース由来の契約、依存マップ、RULEBOOK、inventory）をAIがまとめて作成し、ユーザーが一度確認してOKすれば03以降へ進みます。動作同等性は「未検証」として引き継ぎます。
+
+```bash
+# 新規
+node scripts/install.mjs --target /path/to/your-project --model MODEL_ID --preparation-profile source-as-spec --apply
+# 既存案件（runtime方式の00bで止まった場合など）。まず確認し、同意後に --apply
+node migration-kit/scripts/run_migration.mjs source-spec init
+node migration-kit/scripts/run_migration.mjs source-spec check
+```
+
+## 進捗表示と失敗時の案内
+
+`status --format checklist` は10工程と「いまここ」を表示し、`status --format todo` はホストのTODOツールに渡す一覧を返します。工程の報告は毎回このチェックリストから始まります。
+
+runnerのコマンドが失敗すると、`ERROR:` に続けて **原因・影響・選択肢（推奨1つと各理由・実行例）** を表示します。Copilotはこれを示したうえで、質問ツールで選択を求め、ユーザーの回答を待ちます。runner以外の失敗は `run_migration.mjs guidance --message "エラー文"` で同じ形式の案内を作れます。
+
+## 準備工程の調査を範囲ごとに任せる
+
+00・00b・02 では、親エージェントが全ファイルを自分で読む代わりに、`survey run --kind facts|contracts|inventory` でソースを範囲に分け、範囲ごとに新しい調査担当（CLI 方式では新しい `copilot` プロセス、native 方式では VS Code のサブエージェント）に任せられます。結果は `migration/surveys/` にファイルで保存され、`survey merge` で下書きにまとまります。中断しても残りの範囲から再開します。詳細は [準備工程の調査](docs/SURVEYS.md)。
+
 ## 工程を進める
 
 03の前に、`templates/guardrails.json`（コピー導入では `migration-kit/templates/guardrails.json`）を `migration/guardrails.json` へコピーし、対象言語のビルド・テストコマンドに合わせて編集してください。上流の `.claude/settings.json` の deny ルールに相当し、hookがすべてのエージェントの該当シェルコマンドを拒否します。runnerが実行するbuild等は対象外です。`phase start 03` / `04` は、このファイル（または免除の記録）がないと停止します。エージェントは作成しません。コピー導入方式のhookは、Copilot CLIで信頼済みのフォルダでしか読み込まれません。`doctor` で確認してください。
@@ -185,7 +218,7 @@ VS Codeの **Copilot（Agent Host）** はprompt filesを読み込みません�
 | 比較器の設計 | [00b-judge-setup](prompts/00b-judge-setup.md) | 元テスト、比較器、mutation自己検証 |
 | 依存関係 | [01-dependency-map](prompts/01-dependency-map.md) | depmap、`migration/manifest.tsv`、`review-dependencies.json` |
 | 意味の差・方針 | [02-gap-inventory](prompts/02-gap-inventory.md) | `migration/RULEBOOK.md`、`inventory.tsv` |
-| 事前試行 | [03-stress-test](prompts/03-stress-test.md) | `migration/stress-test/report.md` |
+| 事前試行 | [03-stress-test](prompts/03-stress-test.md)（[チェックリスト](docs/STRESS-TEST-CHECKLIST.md)） | `migration/stress-test/report.md` |
 | 変換・レビュー | [04-translation-kickoff](prompts/04-translation-kickoff.md) | 変換後ソース、レビュー記録 |
 | 全体ビルド | [05-survey-build](prompts/05-survey-build.md) | 診断、修正記録 |
 | 基本動作 | [05b-smoke](prompts/05b-smoke.md) | 実操作を伴うsmoke結果 |

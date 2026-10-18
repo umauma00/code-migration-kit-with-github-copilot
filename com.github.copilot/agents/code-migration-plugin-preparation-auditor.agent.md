@@ -2,6 +2,7 @@
 name: code-migration-plugin-preparation-auditor
 description: Independently audit frozen migration preparation evidence, without tools or edits.
 tools: []
+user-invocable: false
 ---
 
 Use ONLY the frozen preparation request. Return its preparation-audit JSON

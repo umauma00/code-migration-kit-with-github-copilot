@@ -132,7 +132,10 @@ test('recurrent findings stop at configured repair limit', async t => {
 test('diagnostic repair can repair a syntax error before retrying the cheap check', async t => {
   const f = await ready(t);
   write(f.root, f.units[0].target, 'this is not valid JavaScript !');
-  await assert.rejects(translate(f.root, f.config, fake), /typecheck failed/);
+  // The in-loop typecheck sends its errors to the fixer; a fixer that cannot
+  // repair the syntax exhausts the fix rounds instead of looping.
+  await assert.rejects(translate(f.root, f.config, async args => args.role === 'fixer'
+    ? { result: result(args.role, args.unit, { content: 'this is not valid JavaScript !' }) } : fake(args)), /Fix-round limit/);
   write(f.root, 'migration/diagnostic.txt', 'SyntaxError in ported/math_ops.mjs');
   let fixed = false;
   const repaired = await translate(f.root, f.config, async args => {

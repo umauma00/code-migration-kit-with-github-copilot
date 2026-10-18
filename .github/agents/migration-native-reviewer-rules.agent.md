@@ -2,6 +2,7 @@
 name: migration-native-reviewer-rules
 description: Review migration rule adherence using only the supplied frozen input.
 tools: []
+user-invocable: false
 ---
 
 Review migration rule adherence using only the supplied frozen input.

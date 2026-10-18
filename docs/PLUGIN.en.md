@@ -2,7 +2,7 @@
 
 [日本語](PLUGIN.md) | English
 
-Requires Node.js 22 or later and VS Code / GitHub Copilot with Agent Plugins 1.0 support. The CLI worker backend needs a signed-in Copilot CLI. VS Code Copilot sessions can also select the experimental [native backend](NATIVE-WORKERS.en.md), which currently cannot complete. Verified CLI versions: 1.0.93, 1.0.95 and 1.0.98. You also need the languages and tests of the project being migrated.
+Requires Node.js 22 or later and VS Code / GitHub Copilot with Agent Plugins 1.0 support. The CLI worker backend needs a signed-in Copilot CLI. To work in VS Code only, without the Copilot CLI, select the [native backend](NATIVE-WORKERS.en.md), which records executed models as unverified. Verified CLI versions: 1.0.93, 1.0.95 and 1.0.98. You also need the languages and tests of the project being migrated.
 
 ## Installation
 
@@ -63,7 +63,7 @@ In a new project, doctor reports missing items until phase 01 creates the depend
 
 `plugin.json` and `skills/` use the Agent Plugins 1.0 format. The worker roles, the five native workers and the CLI hooks live in `com.github.copilot/`. The default CLI backend mounts the plugin explicitly with `--plugin-dir` and selects workers with `--agent code-migration-kit:code-migration-plugin-ROLE`. Reviewers get a frozen input and no tools (or, for oversized units, read-only `-read` profiles); other workers are read-only too. The Node coordinator writes the output.
 
-**Experimental:** initializing VS Code Copilot with `--worker-backend native --native-harness copilot` makes the host's parent agent start the dedicated native subagents. However, VS Code does not return the executed model to the parent, so the native procedure cannot currently complete. All native workers have no tools and exchange inputs and results with the Node runner. After installation, restart the chat to load the new profiles and follow the [native procedure](NATIVE-WORKERS.en.md). The installer never overwrites existing configuration.
+**VS Code only:** initializing VS Code Copilot with `--worker-backend native --native-harness copilot` makes the host's parent agent start the dedicated native subagents. VS Code does not return the executed model to the parent, so new installations get `nativeModelVerification: requested-unverified`: the requested model is recorded and the executed model stays unverified. All native workers have no tools and exchange inputs and results with the Node runner. After installation, restart the chat to load the new profiles and follow the [native procedure](NATIVE-WORKERS.en.md). The installer never overwrites existing configuration.
 
 If a custom agent in the project, a parent directory or your personal settings uses one of the fully qualified names above as its `name` or file-derived ID, doctor and the pre-launch check stop. YAML quoting, folding and aliases are resolved, and Markdown in subdirectories is checked. The unqualified `code-migration-plugin-ROLE` can coexist as a different name. Only regular UTF-8 files are checked; definitions whose YAML cannot be parsed, and symlinks, stop the check as unverifiable.
 

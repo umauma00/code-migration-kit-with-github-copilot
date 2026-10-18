@@ -39,3 +39,23 @@ read-only during worker loops. Stop at the inventory gate.
 <!-- Copilot adaptation: migration control and instructions updated on 2026-10-08; see NOTICE. -->
 
 Save the concrete phase report to `migration/gap-report.md`. After its actual user review, record `phase complete 02 --note TEXT` as described in [ordered workflow](../docs/ORDERED-WORKFLOW.md).
+
+## Source as the only specification
+
+With `preparationProfile: source-as-spec`, draft RULEBOOK and inventory from how the
+source actually behaves, without the first-20-rows stop or paired batch audits.
+Run one independent review of the whole package (contracts, RULEBOOK, inventory,
+dependency map) in a separate context, fix its findings, then show ONE report for
+00b–02 with links, review points (high-impact inferred contracts, UNKNOWN rows,
+open findings) and choices: proceed to migration (recommended), revise, pause.
+Only after the user's OK run `phase complete 00b,01,02 --note TEXT`, then `judge`.
+See [source-as-spec](../docs/SOURCE-AS-SPEC.md).
+
+## Delegate classification by scope
+
+After the mechanical census (`migration/inventory-sites.tsv`: file, symbol,
+source_construct), run `survey run --kind inventory --sites migration/inventory-sites.tsv`
+and `survey merge --kind inventory --sites …`. Each scope's surveyor receives the
+RULEBOOK, the scope's sources and its census sites; results are per-scope shards
+merged by the existing inventory merge, which refuses an incomplete census. The
+paired independent audits and the joint audit still follow. See [surveys](../docs/SURVEYS.md).

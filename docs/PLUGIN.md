@@ -2,7 +2,7 @@
 
 日本語 | [English](PLUGIN.en.md)
 
-Node.js 22以上、Agent Plugins 1.0対応のVS Code / GitHub Copilotを使います。CLIワーカー方式にはログイン済みCopilot CLIが必要です。VS Code Copilotセッションでは実験的な [native方式](NATIVE-WORKERS.md) も選択できますが、現状では最後まで完了できません。確認したCLIは1.0.93・1.0.95・1.0.98です。移行対象の言語環境とテストも必要です。
+Node.js 22以上、Agent Plugins 1.0対応のVS Code / GitHub Copilotを使います。CLIワーカー方式にはログイン済みCopilot CLIが必要です。Copilot CLIなしでVS Codeだけで進める場合は [native方式](NATIVE-WORKERS.md)（実行モデル未検証として記録）を選べます。確認したCLIは1.0.93・1.0.95・1.0.98です。移行対象の言語環境とテストも必要です。
 
 ## インストール
 
@@ -63,7 +63,7 @@ node /path/to/code-migration-kit/scripts/run_migration.mjs status
 
 `plugin.json` と `skills/` はAgent Plugins 1.0形式です。従来の6役、native専用の5ワーカー、CLI用hooksは `com.github.copilot/` に配置しています。既定のCLI方式ではプラグインを `--plugin-dir` で明示し、`--agent code-migration-kit:code-migration-plugin-担当名` で選択します。レビュー担当は固定入力のみ・ツールなし、他担当も読み取りだけです。出力はNodeの調整役が書き込みます。
 
-**実験的機能**：VS Code Copilotで初期化に `--worker-backend native --native-harness copilot` を指定すると、ホストの親エージェントがnative専用サブエージェントを起動します。ただし、VS Codeは実行したモデルを親に返さないため、現状のnative手順では最後まで完了できません。全ワーカーはツールなしで、入力・結果をNode runnerと受け渡します。導入後はチャットを再起動して新しいプロファイルを読み込み、[native手順](NATIVE-WORKERS.md)に従ってください。既存設定はinstallerで上書きしません。
+**VS Codeだけで動かす**：VS Code Copilotで初期化に `--worker-backend native --native-harness copilot` を指定すると、ホストの親エージェントがnative専用サブエージェントを起動します。VS Codeは実行したモデルを親に返さないため、新規導入では `nativeModelVerification: requested-unverified` となり、要求モデルを記録して実行モデルは未検証として残します。全ワーカーはツールなしで、入力・結果をNode runnerと受け渡します。導入後はチャットを再起動して新しいプロファイルを読み込み、[native手順](NATIVE-WORKERS.md)に従ってください。既存設定はinstallerで上書きしません。
 
 案件・親ディレクトリ・個人設定のカスタムエージェントに、上記の完全修飾名を `name` またはファイル由来IDとして使う定義がある場合、doctorとワーカー起動前の検査で停止します。YAMLの引用符・折り畳み・別名参照も解釈し、サブディレクトリのMarkdownも確認します。非修飾の `code-migration-plugin-担当名` は別の名前として共存できます。検査対象は通常のUTF-8ファイルです。YAMLを解析できない定義やシンボリックリンクは、検査不能として停止します。
 

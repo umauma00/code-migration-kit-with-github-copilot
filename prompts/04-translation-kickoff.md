@@ -35,7 +35,9 @@ and exact prompt, and submit their unchanged JSON. Do not wait on the runner
 without servicing its tasks. Never silently fall back to Copilot CLI.
 
 The runner performs implementation → two independent reviews → arbitration of
-findings → confirmed fixes → re-review → hash-bound completion. Workers use
+disputed findings (a finding both reviewers raise at the same source path:line is
+agreed and confirmed without the arbiter; the arbiter defaults to not confirmed)
+→ confirmed fixes → re-review → hash-bound completion. Workers use
 explicit models from config and structured results. Reviewers have no tools and
 receive identical frozen inputs; other CLI workers have read/search-only tools.
 If a unit's evidence exceeds maxReviewInputBytes, the CLI runner automatically
@@ -50,7 +52,8 @@ Keep source, judge, rulebook, inventory, review dependency map and execution set
 the run. Missing decisions get TODO(port), BUG(port) or PERF(port) markers.
 No source “improvement” is mixed into faithful translation. Expensive compiler
 and test commands wait for their phases; an explicitly configured cheap
-per-target typecheck is owned by the coordinator.
+per-target typecheck is owned by the coordinator; its failure becomes a confirmed
+finding for the fixer within maxFixRounds (README Step 4 dissolved into Step 3).
 
 On timeout, rejected permission, invalid JSON or interrupted execution, inspect
 `migration/state/units/` and the run summary. Reinvoke `translate` to resume.

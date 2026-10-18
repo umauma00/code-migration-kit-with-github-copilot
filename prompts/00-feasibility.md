@@ -48,3 +48,11 @@ fix, owner (AI/user/environment), completion criterion, and whether it blocks
 implementation. Identify checks that can be deferred. Perform authorized AI fixes
 and group only necessary user decisions. 00 assesses suitability/scope; 00b
 prepares comparison evidence; 03 prototypes; 04 begins production implementation.
+
+## Delegate the reading
+
+Do not read the whole codebase into this conversation. Run
+`run_migration.mjs survey run --kind facts` (fresh tool-free surveyors per scope,
+results as files), then `survey merge --kind facts`, and build the report from
+`migration/surveys/facts.md`, checking the cited lines you rely on. Small
+repositories may be read directly. See [surveys](../docs/SURVEYS.md).

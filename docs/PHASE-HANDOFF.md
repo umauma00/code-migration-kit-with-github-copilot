@@ -22,6 +22,14 @@ The orchestrator profiles enable the documented [`todo` alias](https://docs.gith
 exposed by the current host rather than assuming a fixed API name. Only the
 parent manages this list; automated workers keep their JSON-only contracts.
 
+Build the items from `run_migration.mjs status --format todo`: it returns the
+ten phases as `{ "todoList": [{ id, title, status, description }] }` in the
+user's language, with exactly one `in-progress` item (the first incomplete
+phase) and statuses computed from receipts. Map it onto the host tool's actual
+schema. `status --format checklist` prints the same list for chat; include that
+checklist in **every** phase report and failure report, whether or not the TODO
+tool rendered, so the user always sees the current phase.
+
 Keep these ten phase items, with stable phase identifiers and names in the
 user's language, in this order:
 
@@ -124,14 +132,56 @@ For translation/build/smoke and runtime parity/post-parity or source-only handof
 say **approve and run the named stage**, identifying the current artifacts in the
 question. Only after a real answer authorizes it, record the appropriate runner
 approval and execute that stage. Never issue every future approval in advance.
+
+The kit's hook makes the host ask the person to confirm every `approve`,
+`phase complete`, `pilot prepare` and `source-spec init --apply` command, and it
+refuses any agent edit of `migration/guardrails.json`. That host confirmation is
+the person's act; never ask them to switch it off. When the session cannot ask
+(a non-interactive run reports "unable to ask user for confirmation"), give the
+person the exact command and let them run it in their own terminal. These hooks
+work only where the host loads them (see `doctor`).
 If artifacts or predecessor results changed, refresh the report and authorization
 as required by the runner. A user's change request is not approval to proceed.
 
-For a failed phase or a recommendation against migration, offer relevant choices
-such as "Investigate the failure", "Revise the plan" and "Pause". Do not recommend
-a blocked next stage. Once the final report is complete, offer follow-up work
+For a failed phase, follow [When a step fails](#when-a-step-fails). For a
+recommendation against migration, offer relevant choices such as "Revise the
+plan" and "Pause" with a recommended option and reasons. Do not recommend a
+blocked next stage. Once the final report is complete, offer follow-up work
 appropriate to the result; commit, push, merge and deployment need their own user
 instruction. Do not create a question merely to end the conversation.
+
+## When a step fails
+
+Every failed command, failed phase check, blocked unit or refused gate ends with
+a **failure report**, never with a bare error or a silent retry. Runner commands
+print it after the `ERROR:` line (one section per distinct cause when several
+units failed), `doctor` prints it for every failed check, and
+`status --format markdown` appends it for blocked units; for failures from any other tool (host TODO,
+question tool, a script, a worker), run
+`run_migration.mjs guidance --message "<the error text>"` to get the same
+structure. Adapt it with what you actually observed, then report:
+
+1. **What failed:** the phase and command, and the progress checklist.
+2. **Cause:** the concrete reason in plain words, with the file or receipt that
+   shows it. Separate what you verified from what you suspect.
+3. **Impact:** what is blocked and what is still valid (completed units and
+   receipts stay on disk).
+4. **Choices:** at least two options plus pausing. Mark exactly one
+   **recommended**, put it first, and give the reason for every option: why it
+   fixes the cause, what it costs or changes (for example "changes config, so
+   approvals restart"), and when another option is better. Include the
+   command each option runs, if any.
+5. **Question:** ask with the question tool, recommended option first and
+   labelled `（推奨）` / `(recommended)`. Without a question tool, show the same
+   numbered choices in chat with a reply example such as 「1で進めて」.
+
+Wait for the answer. Never pick an option on the user's behalf, never treat the
+recommendation as consent, and never route around a guardrail or weaken a test
+as an option. Options that are the human's own act (installing guardrails,
+approving a gate, changing models or limits) say so explicitly. After the chosen
+option runs, report its result in the same format if it fails again; a third
+failure of the same kind is a rule problem and the recommendation becomes a
+rulebook amendment (upstream rule 6).
 
 ## Phase routing and durable evidence
 
