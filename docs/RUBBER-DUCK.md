@@ -11,9 +11,8 @@ Use at milestones: before settling the migration/comparison plan, for a difficul
 prototype/change, after test design, or on recurring failures. Supply scope,
 proposed approach, source-derived evidence and unresolved questions. Do not add
 per-file calls or unbounded loops. Keep all AI calls including Rubber Duck within
-config.concurrency: defer milestone advice to a phase boundary with no active native runner or host
-workers. During native fan-out the parent keeps servicing jobs; never stop dispatch
-to wait for a continually refilled queue to drain just to request advice. After
+config.concurrency: defer milestone advice to a phase boundary with no active runner;
+never stop a running translation to wait for its queue to drain just to request advice. After
 runner completion, inspect the milestone findings before the next approved stage. Do not change configured models
 or limits to obtain this capability.
 

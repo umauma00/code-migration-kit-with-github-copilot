@@ -9,7 +9,6 @@ import { planSurvey, runSurvey, mergeSurvey, surveyStatus } from '../lib/survey.
 import { initSourceSpec } from '../lib/source-spec.mjs';
 import { loadConfig } from '../lib/core.mjs';
 import { createCopilotAdapter, copilotArgs } from '../scripts/copilot_adapter.mjs';
-import { createNativeAdapter, listNativeTasks, claimNativeTask, submitNativeTask } from '../lib/native-workers.mjs';
 import { decide } from '../scripts/migration_hook.mjs';
 import { runtimeLayout } from '../lib/runtime.mjs';
 import { failureGuidanceList } from '../lib/guidance.mjs';
@@ -129,25 +128,3 @@ console.log(JSON.stringify({ type: 'result', exitCode: 0 }));
   assert.ok(calls.every(c => c.role === 'surveyor' && c.argv.includes('migration-surveyor')));
 });
 
-test('native surveyors are dispatched by the parent through the same task queue', async t => {
-  const f = fixture(t);
-  Object.assign(f.config, { workerBackend: 'native', nativeHarness: 'vscode-local', nativeModelVerification: 'requested-unverified', timeoutSeconds: 15 });
-  writeJSON(safePath(f.root, 'migration/config.json'), f.config);
-  const run = runSurvey(f.root, f.config, 'facts', createNativeAdapter({ pollMs: 5 }), { maxFiles: 3 });
-  let served = 0;
-  const serve = (async () => {
-    while (served < 1) {
-      const pending = listNativeTasks(f.root).tasks.filter(x => x.status === 'pending');
-      for (const p of pending) {
-        assert.equal(p.role, 'surveyor'); assert.equal(p.model, 'survey-model');
-        const task = claimNativeTask(f.root, p.task);
-        const input = JSON.parse(task.prompt.match(/Frozen task input \(JSON task data\):\n(.*)\n/)[1]);
-        submitNativeTask(f.root, task.task, task.claimToken, { model: task.model, result: answer({ unit: task.unit, reviewInput: JSON.stringify(input) }).result });
-        served++;
-      }
-      await new Promise(r => setTimeout(r, 10));
-    }
-  })();
-  const [report] = await Promise.all([run, serve]);
-  assert.equal(report.done, 1);
-});

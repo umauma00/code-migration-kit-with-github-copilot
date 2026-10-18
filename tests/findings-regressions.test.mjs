@@ -6,7 +6,7 @@ import { prepare, ready, fake, result, finding, cliOutput } from './helpers.mjs'
 import { safePath, atomicWrite, writeJSON, readJSON, loadConfig, readManifest, contextHash, done, roles } from '../lib/core.mjs';
 import { approve, runStage, translate } from '../lib/pipeline.mjs';
 import { runProcess } from '../lib/process.mjs';
-import { copilotArgs } from '../scripts/copilot_adapter.mjs';
+import { requiredCopilotFlags } from '../scripts/copilot_adapter.mjs';
 import { doctor } from '../scripts/run_migration.mjs';
 
 const write = (f, name, content) => atomicWrite(safePath(f.root, name), content);
@@ -157,7 +157,7 @@ test('repair may complete its selected target while other translation units rema
 
 test('doctor rejects every required worker flag missing from help, including short flags', async t => {
   const f = prepare(t), command = safePath(f.root, 'help-cli');
-  const flags = [...new Set(roles.flatMap(role => copilotArgs(role, 'test-double').filter(arg => arg.startsWith('-'))))];
+  const flags = requiredCopilotFlags();
   for (const missing of [null, ...flags]) {
     const help = flags.filter(flag => flag !== missing).join(' ') + (missing ? ` ${missing}-unsupported` : '');
     write(f, 'help-cli', `#!/bin/sh\nprintf '%s\\n' '${help}'\n`);

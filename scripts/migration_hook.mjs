@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
+import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { interactiveDecision } from '../lib/guardrails.mjs';
@@ -19,8 +20,20 @@ export function decide(event, role, cwd) {
     // repository or another worker's records and receipts.
     const target = args?.path ?? args?.file_path;
     if (typeof target !== 'string' || !target.trim()) return 'Tool-assisted reviewers must name a listed file or directory';
-    const base = event.cwd ?? cwd ?? process.cwd(), rel = path.relative(base, path.resolve(base, target)).split(path.sep).join('/');
-    if (!rel || rel === 'migration' || rel.startsWith('..') || /^migration\/(runs|state|results|gates|phases|pilots?)(\/|$)/.test(rel)) return `Tool-assisted reviewers may not read ${target}; use only the listed evidence files`;
+    const base = path.resolve(event.cwd ?? cwd ?? process.cwd());
+    // Resolve links (a listed path must not alias a record directory) and compare
+    // case-insensitively: macOS and Windows treat Migration/Runs as migration/runs.
+    // A missing leaf resolves through its nearest existing ancestor.
+    const real = p => {
+      const rest = [];
+      for (let dir = path.resolve(p); ; dir = path.dirname(dir)) {
+        try { return path.join(fs.realpathSync(dir), ...rest.reverse()); }
+        catch { if (path.dirname(dir) === dir) return path.resolve(p); rest.push(path.basename(dir)); }
+      }
+    };
+    const relative = path.relative(real(base), real(path.resolve(base, target))).split(path.sep).join('/');
+    const records = /^migration\/(runs|state|results|gates|phases|pilots?)(\/|$)/i;
+    if (!relative || /^migration$/i.test(relative) || relative.split('/')[0] === '..' || path.isAbsolute(relative) || records.test(relative)) return `Tool-assisted reviewers may not read ${target}; use only the listed evidence files`;
   }
   return null;
 }

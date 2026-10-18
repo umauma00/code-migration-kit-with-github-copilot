@@ -41,10 +41,8 @@ scope, then authorized smoke/parity. Failure stops the sequence. Input amendment
 invalidate the grant; amend the production rules at the human gate and create a
 new risk-weighted pilot. Never forge a phase-03 report to bootstrap an experiment.
 
-For native, the user-facing parent must service list/claim/delegate/submit while
-the continuing terminal runs, exactly as in [native workers](NATIVE-WORKERS.md).
-The grant does not prove host models, isolation, parallelism or cancellation.
-On Stop, stop both the runner and host children. Late responses remain invalid.
+Pilot workers are the same Copilot CLI processes as production. On Stop, stop the
+runner; late responses remain invalid.
 
 Commands must use project-relative inputs and cannot name the production path.
 They are trusted project commands, not an OS sandbox: a deliberately escaping

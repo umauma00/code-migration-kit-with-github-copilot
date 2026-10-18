@@ -1,5 +1,113 @@
-# Unreleased
+# Unreleased (0.3.0)
 
+- Remove the VS Code subagent (native) worker backend: its runner adapter,
+  claim/submit CLI, profiles, doctor checks, guidance and docs. Workers always
+  run as Copilot CLI processes, also when the migration is driven from VS Code
+  chat. A configuration that still names the native backend or its keys stops
+  with migration instructions; the installer refuses `--worker-backend native`.
+- Chat-only operation: the skill and orchestrator run every command themselves,
+  install the Copilot CLI (`npm install -g @github/copilot`) and start
+  `copilot login` after the person agrees. `run_migration.mjs guardrails show`
+  proposes the deny list and `guardrails install` writes the agreed list as a
+  host-confirmed human gate, so phase 03/04 no longer needs a manual file copy.
+- Review follow-ups:
+  - `build-loop --note TEXT [--max-rounds N] [--max-calls N]`: one host-confirmed grant runs
+    upstream Step 4's build → diagnose → reviewed repair → rebuild rounds until
+    clean, the round limit (default 5) or a stalled error count; every round's
+    build approval records `loop: {grantId, round}`.
+  - `reviewFocus: shared` (new installs) gives both independent reviewers both
+    checks, each from its own lens first; `specialized` keeps upstream's split.
+  - Worker sessions: `--no-remote-export` keeps transcripts (source code and
+    prompts) off the GitHub account (the CLI's help: no export to GitHub web and
+    mobile, no remote control; 1.0.98 accepts the flag, its effect on an
+    authenticated account is not verified yet); each call gets `--session-id`/`--name`,
+    recorded as `cliSessionId`. `sessions status | prune` reports or deletes only
+    those; `sessions prune` and `build-loop` are host-confirmed.
+  - Open files: the CLI raises its own soft limit to the hard limit (soft 256 →
+    hard observed on 1.0.98), so `doctor --check-cli` checks the hard limit (at
+    least 4096) and EMFILE stops the run with `file-limit` guidance.
+  - `status` shows workers retrying after a rate limit or service error and adds
+    a next action to tell the person.
+  - Tool-assisted reviewer path check resolves symlinks (also through a missing
+    leaf) and compares record directories case-insensitively.
+  - `.github/copilot-instructions.md` managed block trimmed to the always-needed
+    rules (about 640 bytes); the skill carries the rest.
+- Second-opinion review fixes:
+  - Human gates: the hook now splits commands like a shell (quoted values with
+    spaces, `--option value` read exactly as the runner's parser does, globs on
+    the runner path, quoted `bash -c`/`$(...)` command lines). As a best-effort
+    text match, a runner or kit module reached in a form it cannot read, with a
+    human-act word in the same segment, asks the person ("unrecognized runner
+    command"). Forms split across segments, variables or indirection
+    (`R=run_migration.mjs; node "$R" approve …`, `xargs`) are not detected.
+  - `migration/guardrails.json`: globs, bare names after `cd migration` and
+    removing or moving `migration/` itself are denied; strict-phase translate and
+    build-loop refuse to run when the file is missing.
+  - Sessions: the runner chooses and journals every worker session ID before the
+    call (`migration/runs/<run>/cli-sessions.jsonl`), so retried and interrupted
+    calls are pruned too; a relative `COPILOT_HOME` resolves against the project.
+  - `build-loop --max-calls N` (default `maxAgentCalls`) caps the AI calls of all
+    repair rounds together and stops with `budget`; the grant records its owner,
+    stage and usage, `status` reports a running loop, and other processes cannot
+    take the runner lock between its steps.
+  - A hard open-file limit below 4096 is a doctor warning, not a failure.
+  - Tool-assisted reviewers may read names that start with two dots (`..notes`).
+  - The guardrails template note describes the chat-only install.
+- PR #2 review follow-ups:
+  - `migration/guardrails.json` protection no longer denies reads: output
+    redirections count by their target (`2>/dev/null`, `2>&1` and other files
+    are fine), `find` counts only with `-delete`/`-exec`/`-ok`/`-fprint`-style
+    actions, and `migration/` resolves from the shell's working directory
+    against the project root (`src/db/migration` is not protected; a `cd` in the
+    same command line falls back to the name match).
+  - HTTP 500 from the model (`session.error … 500`, `500 Internal Server
+    Error`) is retried like 502-504; a bare 500 elsewhere in a message is not.
+  - Deny list matching splits commands like a shell and checks `bash -c` /
+    `pwsh -Command` strings and quoted `$(...)` as commands of their own; it
+    skips wrapper options (`env -u X`, `sudo -u user`), git global options
+    (`git -C . push`) and options between rule words (`cargo --locked build`).
+    Values of other options (`npm --prefix x run`) and indirect forms (`xargs`,
+    a variable) remain best effort.
+  - Shell parsing keeps a backslash between path characters, so Windows paths
+    (`.\gradlew`, `migration-kit\scripts\run_migration.mjs`) are matched
+    again; inside double quotes a backslash escapes only `$`, `` ` ``, `"`, `\`.
+  - Worker session names end with the first 8 characters of their (always
+    new) session ID, so retries and re-runs of a unit do not share a
+    `--resume` name.
+  - The `build-loop` confirmation says builds run model-written code, the grant
+    covers builds of repairs not yet written, and `maxRunInputBytes` also stops
+    the loop.
+  - Records of the removed native backend carry an archive banner; README and
+    CHANGELOG cite the VS Code pages for the harness and prompt-file notes.
+  - Human gates in practice: the skill and orchestrator say autopilot denies the
+    gate questions (run them interactively) and the CLI may ask a second time;
+    LIVE-SMOKE lists the interactive CLI, autopilot, VS Code and
+    `--no-remote-export` checks, with `liveChecks` slots (null) in the evidence.
+- 2026-10-18 review against Copilot CLI 1.0.98 and current VS Code docs:
+  - JSON-mode failures: the CLI reports rate limits, 5xx and authentication only
+    as stdout `session.error` events (stderr empty). The adapter now includes
+    `errorType`, `statusCode` and the message, so 429/5xx retry and
+    authentication/credit failures stop the run (verified on 1.0.98).
+  - Prompt-mode hooks: tool-assisted reviewers set
+    `GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS=true`. Without it, an untrusted
+    repository-copy folder skipped the hook and such a reviewer could read
+    `migration/runs` (reproduced on 1.0.98). The variable admits every
+    `.github/hooks` file regardless of folder trust, so other roles (limited by
+    their CLI tool flags) do not set it.
+  - Observed model and usage: CLI attempts record `model.call_final_result` and
+    `result.usage`; a model different from the request is a run warning.
+  - Scheduling: `dependencyOrder` (`auto` for new installs) stops holding
+    dependents when no unit typecheck needs translated dependencies; the
+    concurrency cap rises from 16 to 64 and the new-install default to 4.
+  - `fixPolicy: single-pass` restores upstream Step 3 (one fix of the confirmed
+    findings, then the build/test referees) with its own hash-bound receipt.
+  - Windows plugin hook uses `$env:PLUGIN_ROOT` in its PowerShell command.
+  - Docs: upstream feasibility report contract restored in prompt 00; bakeoff B
+    runs with `--available-tools` excluding `skill` (skill descriptions otherwise
+    reach it); VS Code 1.142 Copilot harness, Local-only prompt files, Auto and
+    cost-tier subagent limits; skill reads documents only as the phase needs.
+    Sources (checked 2026-10-18): [1.142 release notes](https://code.visualstudio.com/updates/v1_142),
+    [Prompt files](https://code.visualstudio.com/docs/agent-customization/prompt-files), [AI settings reference](https://code.visualstudio.com/docs/agents/reference/ai-settings), [Subagents](https://code.visualstudio.com/docs/agents/run/subagents).
 - Review fixes: the hook asks for confirmation when an approval or phase
   completion is chained after another command (`status && approve …`);
   `survey merge --kind contracts` replaces contracts.md only while it is the

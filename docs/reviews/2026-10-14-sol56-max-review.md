@@ -1,5 +1,8 @@
 # GPT-5.6 Sol（max）による互換性レビュー
 
+> アーカイブ：0.3.0で削除したnative（VS Codeサブエージェント）ワーカー方式を扱う記録です。
+> 参照先の `docs/NATIVE-WORKERS.md`、`lib/native-workers.mjs`、`tests/native-workers.test.mjs` は現在存在しません。
+
 2026-10-14。GPT-5.6 Sol、推論強度maxのサブエージェントが独立にレビューし、
 親エージェントも以下の根拠を照合した。
 対象は `feat/github-copilot-migration-kit` の現在の未コミット変更を含む実装と、
@@ -11,7 +14,7 @@
 ### P1：Localの標準経路ではnativeのモデル確認を完了できない
 
 [共通スキル](../../skills/code-migration/SKILL.md#L74)と
-[native手順](../NATIVE-WORKERS.md#モデルの指定と確認)は、ホストの実行メタデータで
+native手順（`docs/NATIVE-WORKERS.md`）は、ホストの実行メタデータで
 モデルを確認してから提出することを要求する。
 しかし公開VS Code mainの
 [runSubagentTool.ts](https://github.com/microsoft/vscode/blob/main/src/vs/workbench/contrib/chat/common/tools/builtinTools/runSubagentTool.ts#L423)
@@ -21,7 +24,7 @@
 キットには、このメタデータをnativeタスクへ結び付けて取得する接続がない。
 
 標準の親AI経路で手順を守れば、結果を提出できず失敗・タイムアウトになり得る。
-要求モデルの転記で提出しても、[Nodeの比較](../../lib/native-workers.mjs#L83)は
+要求モデルの転記で提出しても、Nodeの比較（`lib/native-workers.mjs`）は
 申告文字列の一致しか検査しないため、実モデルの確認にはならない。
 [cost集計](../../lib/pipeline.mjs#L235)も `hostReportedModel` を使用するため、
 親による確認のない転記値を実績として残してはいけない。
@@ -40,7 +43,7 @@ Copilot Agent Hostにはモデルイベントがあるが、親AIの取得経路
 [設定](../../templates/migration-config.json#L15)の各役の文字列は、そのままホストへ渡される。
 LocalはCLI IDではなく表示名または `Model Name (Vendor)` で検索する
 （[languageModels.ts](https://github.com/microsoft/vscode/blob/main/src/vs/workbench/contrib/chat/common/languageModels.ts#L384)）。
-返却モデル名は表示名単体だが、[submit](../../lib/native-workers.mjs#L92)は要求文字列との
+返却モデル名は表示名単体だが、submit（`lib/native-workers.mjs`）は要求文字列との
 完全一致を求める。
 
 CLI用IDでは検索に失敗する環境があり、修飾名で起動に成功しても表示名の提出が拒否される。

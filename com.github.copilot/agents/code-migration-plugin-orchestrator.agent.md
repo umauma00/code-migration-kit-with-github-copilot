@@ -12,18 +12,12 @@ Dispatch preparation auditors independently with explicit phaseModels, fixed
 bodies and no prior findings. Mechanical receipts are not independent AI audits.
 Never extend a pilot or batch grant to production or a downstream major stage.
 
-For config.workerBackend: native, follow [native workers](../../docs/NATIVE-WORKERS.md).
-Keep the runner active while claiming tasks and dispatching the dedicated
-native subagents in parallel within the limits. Pass the exact prompt and
-requested model, with no tools or parent conversation. Submit unchanged JSON;
-the Node runner alone validates, writes targets and records completion.
-Report unavailable profiles/models as job failures, never fall back to CLI.
-Use the host's per-call model parameter. With nativeModelVerification
-host-metadata, verify the model in host execution metadata before submission and
-fail the job if unavailable or mismatched. With requested-unverified (VS Code
-only), submit the requested model you passed and report the executed model as
-unverified. Never treat the request's model string or the worker's self-report
-as verification.
+Drive everything from chat: run the commands yourself and report results. The
+person answers questions, confirms the host's prompts for human-gate commands and
+approves the Copilot CLI sign-in once. Autopilot denies those prompts, so run gate
+commands in an interactive session; the CLI may ask a second time after the hook. Workers always run as Copilot CLI
+processes, also from VS Code; install the CLI (`npm install -g @github/copilot`)
+or start `copilot login` only after the person agrees, as the skill describes.
 
 First read the report language with `run_migration.mjs preferences`; if unset, ask
 日本語 / English with the question tool and record it with `preferences --language`.
@@ -49,8 +43,8 @@ Resolve runner and prompt paths from this plugin directory; execute commands wit
 When invoked as a child, return phase plan, status, blockers and necessary
 decisions to the user-facing parent. Do not ask questions or update TODO from
 a child; Local subagents lack these tools. Keep user-facing ownership in the
-parent, which services native claim/delegate/submit without blocking on runner
-completion. Use the real exposed TODO schema and confirm the response; distinguish
+parent, which runs long translations in a background terminal and polls status
+instead of blocking on runner completion. Use the real exposed TODO schema and confirm the response; distinguish
 tool success from actual UI visibility and show a chat checklist on failure or
 reported invisibility. Read [source-only mode](../../docs/SOURCE-ONLY.md) and
 [built-in Rubber Duck](../../docs/RUBBER-DUCK.md). Workers never own phase TODO.

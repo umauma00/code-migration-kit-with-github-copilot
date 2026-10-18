@@ -4,9 +4,9 @@
 
 An unofficial adaptation of Anthropic's [Code Migration Kit](https://github.com/anthropics/code-migration-kit-with-claude-code) for GitHub Copilot, centered on the Copilot CLI. It covers cross-language ports end to end: feasibility → fixed rules → translation → independent review → build → old-versus-new comparison.
 
-**0.2.0** supports the Agent Plugins format for VS Code and the Copilot CLI. Install the kit itself as a plugin and keep only configuration and artifacts in the project. See [plugin installation](docs/PLUGIN.en.md), [fixes and re-review of the previous version](docs/reviews/2026-10-10-copilot-rereview-fixes.md) and [upgrading an existing install](docs/UPGRADING.en.md).
+**0.3.0** removes the VS Code subagent (native) backend: workers always run on the Copilot CLI, also from VS Code. People complete the migration from AI chat alone; the AI runs the commands, including installing the CLI, starting its sign-in and installing the guardrails. **0.2.0** supports the Agent Plugins format for VS Code and the Copilot CLI. Install the kit itself as a plugin and keep only configuration and artifacts in the project. See [plugin installation](docs/PLUGIN.en.md), [fixes and re-review of the previous version](docs/reviews/2026-10-10-copilot-rereview-fixes.md) and [upgrading an existing install](docs/UPGRADING.en.md).
 
-Reference versions: Copilot CLI **1.0.93** (provider transport also checked on 1.0.95 and 1.0.98) and VS Code **1.141.0**. The pinned upstream commit and SDK reference are recorded in [UPSTREAM.json](UPSTREAM.json). This is not an official Anthropic or GitHub distribution.
+Reference versions: Copilot CLI **1.0.98** (provider transport also checked on 1.0.93 and 1.0.95; on 1.0.98 every role's round trip in both layouts, hook loading and the error output format were checked too) and VS Code **1.142**. In VS Code 1.142 the Copilot harness is becoming the default for new sessions, and prompt files are Local-harness only (`chat.promptFilesLocations` is deprecated; sources: [1.142 release notes](https://code.visualstudio.com/updates/v1_142), [Prompt files](https://code.visualstudio.com/docs/agent-customization/prompt-files), [AI settings reference](https://code.visualstudio.com/docs/agents/reference/ai-settings), checked 2026-10-18); use the shared `/code-migration` skill as the entry point in VS Code. The pinned upstream commit and SDK reference are recorded in [UPSTREAM.json](UPSTREAM.json). This is not an official Anthropic or GitHub distribution.
 
 **Verification status: automated tests, the offline fixture and real-CLI transport against a loopback test provider on macOS are verified. Real Copilot authentication, AI translation quality, interactive use in VS Code and live Dynamic Workflows sessions are not.** Run the small check in [LIVE-SMOKE.en.md](docs/LIVE-SMOKE.en.md) before a real project.
 
@@ -16,35 +16,40 @@ Following reviews 1 and 2, this version adds [isolated pilots](docs/PILOT.md) be
 
 | Area | Behavior in this version |
 |---|---|
-| Instructions and skill | The plugin's `skills/code-migration/SKILL.md`, or `.github/skills/code-migration/SKILL.md` for a repository copy. CLI workers disable implicit instruction loading; native workers are host-managed |
+| Instructions and skill | The plugin's `skills/code-migration/SKILL.md`, or `.github/skills/code-migration/SKILL.md` for a repository copy. Workers disable implicit instruction loading |
 | Roles | Orchestrator / implementer / two independent reviewers / arbiter / fixer, plus a tool-free profile for preparation audits |
 | Models | Set explicitly for each of the five worker roles, using model IDs available to your account |
-| Translation | CLI workers get only `view,grep,glob`; native workers get a frozen input and no tools. JSON responses are validated and the Node coordinator writes only the target file |
-| Independent review | Both reviewers receive the same frozen input and have no tools. A unit whose evidence exceeds the limit is reviewed automatically from a hash-bound file list with read-only tools. CLI uses `--no-custom-instructions`; native relies on the host's instruction environment |
+| Translation | Copilot CLI workers get only `view,grep,glob`. JSON responses are validated and the Node coordinator writes only the target file |
+| Independent review | Both reviewers receive the same frozen input and have no tools. A unit whose evidence exceeds the limit is reviewed automatically from a hash-bound file list with read-only tools. Workers use `--no-custom-instructions` |
 | Completion | Hashes of output, inputs, both reviews and any arbitration are recorded. A file merely existing is never "done" |
 | Resumption | Resumes from the interrupted stage. Missing reviews or changed outputs are reviewed again |
 | Approvals | Bound to inputs, outputs and the previous stage's run ID. Re-running an upstream stage revokes downstream results and approvals |
-| VS Code | Copilot uses the shared skill; Local uses the ten phase prompt files and Local hooks |
+| VS Code | The Copilot harness (becoming the default in 1.142) uses the shared skill; Local uses the ten phase prompt files (Local only; skills are their successor) and Local hooks |
 | Dynamic Workflows | Optional experimental adapter on the same execution engine |
 
-## Running inside VS Code only (native backend, executed model unverified)
+## Chat only
 
-To work in VS Code without installing the Copilot CLI, choose the native backend. New native installations get `nativeModelVerification: "requested-unverified"`: the parent passes the requested model to the subagent call's model parameter and submits the result. VS Code does not return the model a subagent **actually ran**, so every attempt record, run summary, status and doctor report says the executed model is unverified.
+People never type commands: the whole migration runs from AI chat in VS Code (or the Copilot CLI). Open the target repository and ask Copilot Chat, for example:
 
-```bash
-node /path/to/code-migration-kit/scripts/install.mjs --target . --layout plugin --worker-backend native --native-harness copilot --model MODEL_ID --apply
-```
+> Clone the `feat/github-copilot-migration-kit` branch of https://github.com/umauma00/code-migration-kit-with-github-copilot into `../code-migration-kit`, install it into this repository with `scripts/install.mjs`, and start a Python to TypeScript migration with the `code-migration` skill
 
-When the Copilot CLI is available, the default CLI worker backend (`copilot-cli`) is still recommended: each worker is a process fixed by `--model`, and implicit-instruction isolation is verified on a real CLI. The previous contract that requires host execution metadata is available as `--native-model-verification host-metadata`; it is experimental and cannot complete on VS Code.
+After installation, invoke `/code-migration` in a new chat, or ask to continue the migration. The AI runs everything itself and reports in chat:
 
-With `workerBackend: "native"`, the parent agent of the current VS Code session delegates implementation, review, arbitration and fixing to subagents, and the Copilot CLI is not started. The Node runner issues jobs and the parent submits results; validation, writes, approvals and resumption are shared with the CLI backend. Initialize with `--worker-backend native`. Local supports the repository copy; Copilot (Agent Host) supports the plugin or the copy. See [VS Code native workers](docs/NATIVE-WORKERS.en.md).
+- It checks the Copilot CLI. If it is missing, the AI explains why it is required and runs `npm install -g @github/copilot` after you agree. If sign-in is needed, it starts `copilot login` and shows the URL and one-time code in chat. This is needed once, separately from the VS Code sign-in.
+- It runs initialization, configuration and every phase command, runs long translations in a background terminal with progress reports, and presents cause and choices when something fails.
 
-Existing configurations keep `copilot-cli` when `workerBackend` is omitted. The native connection is verified by automated tests and the offline fixture only; real AI delegation in a VS Code session is not. CLI and native treat implicit instructions differently and do not offer the same isolation guarantee.
+Your part is limited to three things:
+
+1. Answering questions in chat (language, models, policies, each phase's decisions).
+2. Allowing the host's confirmation prompt for human-decision commands (`approve`, `phase complete`, `pilot prepare`, `source-spec init --apply`, `guardrails install`). When the AI runs one, the host asks you first.
+3. Approving the Copilot CLI sign-in in the browser (first time only).
+
+Workers are always Copilot CLI processes: `--model` fixes each role's model, and tool limits and implicit-instruction isolation are verified on a real CLI. A 0.2.0 configuration with the native backend (`workerBackend: "native"` and so on) stops with migration instructions; the AI shows them and fixes the configuration after you agree.
 
 ## Requirements
 
 - Node.js 22 or later. The runner has no external npm dependencies.
-- For the CLI backend, a signed-in Copilot CLI; for native, a VS Code session that can delegate. Either way, a plan or organization setting that allows the configured models.
+- The Copilot CLI (if it is missing, the AI installs it and starts sign-in after you agree) and a plan or organization setting that allows the configured models.
 - The runtime and build tools of the languages involved. The bundled demo and the Python/C dependency mappers need Python 3.
 - Previously verified on Linux; automated tests and CLI transport verified on macOS. Windows is untested; on Windows use a Copilot executable that Node can start directly.
 
@@ -101,7 +106,7 @@ The minimum settings in `migration/config.json`:
 | `verificationRoots` | Comparators, tests and test data, e.g. `["tests"]` |
 | `verificationInputs` | Extra build/dependency settings whose changes are tracked, e.g. `["build/config.json", "packages/api/tsconfig.json"]` |
 | `buildArtifactRoots` | Directories where commands write binaries, objects and reports, e.g. `["artifacts", "dist"]`. Defaults to an empty array |
-| `maxReviewInputBytes` | JSON size limit of the frozen review input; default 65536 bytes. On the CLI backend an oversized unit switches automatically to tool-assisted review (below); native stops |
+| `maxReviewInputBytes` | JSON size limit of the frozen review input; default 65536 bytes. An oversized unit switches automatically to tool-assisted review (below) |
 | `reviewDependencyMap` | Audited dependency declaration JSON; default `migration/review-dependencies.json`. A required phase 01 artifact |
 | `sourceLanguage`, `targetLanguage` | The languages; the template's Python/JavaScript can be changed |
 | `verificationMode` | `runtime` (default): runs the original environment and old-versus-new comparison. `source-only`: validates source-derived preparation and the translated build/smoke, and hands off with behavioral equivalence unverified. Existing settings are never changed automatically |
@@ -112,10 +117,12 @@ The minimum settings in `migration/config.json`:
 | `designInputs` | Design documents included in full in the frozen input and protected. A link alone does not count as the body. This does not enable a redesign module runner |
 | `packageMap` | Optional source→target package declaration JSON. When set, phase 01 records a separate package-cycle audit |
 | `markerPolicy` | `todo-lines-v1` for new installs: the number of lines with TODO(port) must match the trailer's todos. Existing projects without it keep the old contract |
-| `workerBackend` | `copilot-cli` (default) or `native`. Changing it revokes approvals |
-| `nativeHarness` | Required for native: `vscode-local` or `copilot`, matching the current session |
-| `concurrency` | Concurrent AI calls, default 2, reviews included |
-| `maxFixRounds`, `maxAgentCalls` | Fix rounds per unit and AI calls per run |
+| `workerBackend` | `copilot-cli` only (may be omitted). The native backend was removed in 0.3.0 |
+| `concurrency` | Concurrent AI calls, 4 for new installs, at most 64, both reviews included. CLI workers are separate processes, so the account's rate limits, not Copilot's subagent concurrency, are the practical limit |
+| `dependencyOrder` | `auto` (new installs): hold a dependent until its dependencies have reviewed receipts only when a per-unit typecheck needs them; without one the approved scope fans out as upstream does. `reviewed` (unset, existing configs): always wait. `none`: never wait (not combinable with a typecheck) |
+| `fixPolicy` | `rereview` (unset): review a fixed output again until no confirmed finding remains. `single-pass`: as in upstream Step 3, one fix of the confirmed findings completes the unit and build/smoke/parity judge it; fewer calls and fewer blocked units |
+| `reviewFocus` | `shared` (new installs): both reviewers check source behavior and rule adherence, each from its own lens first, and report every defect either check finds; they never see each other's output. `specialized` (unset, existing configs): one check each, as upstream |
+| `maxFixRounds`, `maxAgentCalls` | Fix rounds per unit and AI calls per run (each translate or repair). `maxAgentCalls` is a total, not a concurrency (that is `concurrency`). A unit takes 3 calls when the reviews pass and 4–5 with one upstream-style fix |
 | `maxRunInputBytes` | Optional cap on the prompt bytes a run sends to workers. AI Credits are metered on tokens and usage stops when they run out, so this budgets runs between usage checks. The run summary's `usageEstimate` records measured bytes and estimated tokens (bytes ÷ 4, not billing data). The check uses completed calls, so calls already in flight (up to `concurrency`) can overshoot it |
 | `transientRetries`, `transientRetryDelayMs` | Optional. Automatic retries for rate limits (429), 5xx and network errors (default 2) and the first wait (default 5000 ms, doubling). Retries count as AI calls |
 | `maxConsecutiveFailures` | Optional. Stop dispatching after this many unit failures in a row (default 3). One unit's failure does not stop the others; failures shared by every call (sign-in, credits) stop the run at once |
@@ -130,7 +137,7 @@ When a command argument also names an output, declare the output directory in `b
 
 Artifact directories cannot overlap original sources, translated sources, verification roots, explicit inputs or the kit's managed areas. Keep the settings and scripts that are actually loaded outside them and register them in `verificationInputs` as needed. `doctor` lists inputs and artifact directories separately. Artifact contents are not part of approval hashes, so validate them with the build, smoke and parity commands. Recognized inline Node/Python/POSIX shell code is not treated as a file, but FILE in `cc -c FILE` and `node -c FILE` is tracked.
 
-The review input contains the unit's original file and the transitive closure of its declared dependencies, the candidate file, the whole RULEBOOK, the matching inventory rows plus global notes, and any diagnostic. Both reviewers get the same content and no tools. Inventory rows are selected by an exact repository-relative match on the leading `file` column. A UTF-8 BOM at the start of the file is removed once before comments, blank lines and the header are detected. Malformed rows or unknown leading columns stop the run. Input files must be UTF-8 text; files with invalid UTF-8 or NUL bytes stop the run by name. Static sources are also checked before implementer and fixer calls. Integration with other translated files is checked by build/smoke/parity. On the CLI backend, a unit over the limit does not stop: it switches automatically to **tool-assisted review**. Both reviewers receive the same "file list with SHA-256" instead of contents, and read-only `reviewer-*-read` profiles read the files. A hook keeps other workers' records (`migration/runs` and so on) out of reach. Because this guarantees less independence than a frozen input, it is recorded in `reviewInputMode`, the run's `toolAssistedReviews` and `warnings`, and shown in phase reports. Native stops, as it has no tools. The full source scan for change tracking is kept.
+The review input contains the unit's original file and the transitive closure of its declared dependencies, the candidate file, the whole RULEBOOK, the matching inventory rows plus global notes, and any diagnostic. Both reviewers get the same content and no tools. Inventory rows are selected by an exact repository-relative match on the leading `file` column. A UTF-8 BOM at the start of the file is removed once before comments, blank lines and the header are detected. Malformed rows or unknown leading columns stop the run. Input files must be UTF-8 text; files with invalid UTF-8 or NUL bytes stop the run by name. Static sources are also checked before implementer and fixer calls. Integration with other translated files is checked by build/smoke/parity. A unit over the limit does not stop: it switches automatically to **tool-assisted review**. Both reviewers receive the same "file list with SHA-256" instead of contents, and read-only `reviewer-*-read` profiles read the files. A hook keeps other workers' records (`migration/runs` and so on) out of reach. Because this guarantees less independence than a frozen input, it is recorded in `reviewInputMode`, the run's `toolAssistedReviews` and `warnings`, and shown in phase reports. The full source scan for change tracking is kept.
 
 All five CLI workers start a new process with `--no-custom-instructions`. This stops automatic injection of `AGENTS.md` and repository or personal Copilot instructions, so workers use only their role profile and the runner's contract. Put project-specific porting policy into the approved `migration/RULEBOOK.md` and inventory; changing implicit instruction files does not change worker behavior. Normal interactive sessions still use Copilot instructions.
 
@@ -189,11 +196,11 @@ When a runner command fails it prints, after the `ERROR:` line, **the cause, the
 
 ## Delegating preparation reading by scope
 
-In 00, 00b and 02, instead of the parent reading every file itself, `survey run --kind facts|contracts|inventory` splits the source into scopes and hands each to a fresh surveyor (a new `copilot` process with the CLI backend, a VS Code subagent with native). Results are saved as files under `migration/surveys/`; `survey merge` builds the draft. Interrupted runs resume with the remaining scopes. See [preparation surveys](docs/SURVEYS.en.md).
+In 00, 00b and 02, instead of the parent reading every file itself, `survey run --kind facts|contracts|inventory` splits the source into scopes and hands each to a fresh surveyor (a new `copilot` process). Results are saved as files under `migration/surveys/`; `survey merge` builds the draft. Interrupted runs resume with the remaining scopes. See [preparation surveys](docs/SURVEYS.en.md).
 
 ## Working through the phases
 
-Before phase 03, copy `templates/guardrails.json` (`migration-kit/templates/guardrails.json` for a repository copy) to `migration/guardrails.json` and edit it for your target's build and test commands. It replaces the upstream `.claude/settings.json` deny rules: a hook denies matching shell commands in every agent session. Builds run by the runner are not affected. `phase start 03` / `04` stops without this file (or a recorded waiver); agents never create it. With a repository copy, the Copilot CLI loads the hook only in a trusted folder; check with `doctor`.
+Before phase 03, install the command guardrails `migration/guardrails.json`. They replace the upstream `.claude/settings.json` deny rules: a hook denies matching shell commands in every agent session (builds run by the runner are not affected). Installing them is the human's decision: the AI proposes a deny list (or a waiver with its reason) in chat from `run_migration.mjs guardrails show`, adapted to the target's build and test commands. Once you agree, it runs `guardrails install`, and the host asks you to confirm; that confirmation is your act. The hook denies the AI writing the file directly. `phase start 03` / `04` stops without this file (or a recorded waiver). When you drive the migration from an interactive Copilot CLI session, its repository-copy hook loads only in a trusted folder; `doctor` checks this (runner-started workers always load it).
 
 Have Copilot read the matching prompt and review each phase's artifacts. In VS Code **Local**, the matching `/migrate-…` prompt files are available.
 
@@ -242,9 +249,11 @@ node migration-kit/scripts/run_migration.mjs approve parity --note "Confirmed ba
 node migration-kit/scripts/run_migration.mjs parity
 ```
 
-When the build fails, run `repair-round`. The bundled parsers (Python, Java/Maven, JavaScript/Node/ESLint/tsc, shell/ShellCheck, Rust and the generic `file:line:col: error` form) read the recorded build output, build a repair queue per manifest target and run the repairs. Lines that map to no manifest target are listed, never guessed. Error counts per round are kept in `migration/build-rounds.tsv`. A fresh build after repairs still needs approval.
+When the build fails and the person agrees in chat, the AI runs `build-loop` (the host asks them to confirm). Like upstream's build daemon it repeats build → parse errors → reviewed repairs → rebuild until clean, the round limit (`--max-rounds`, default 5) or the whole loop's AI call budget (`--max-calls`, default `maxAgentCalls`) is reached, or the error count stops falling (`stalled`: propose a rule amendment). The AI states both numbers when proposing it. Every round's approval is recorded under one grant in `migration/gates/build-loop-<id>.json`; while it runs, `status` shows it and other runner commands are refused. To go one round at a time, run `repair-round`. The bundled parsers (Python, Java/Maven, JavaScript/Node/ESLint/tsc, shell/ShellCheck, Rust and the generic `file:line:col: error` form) read the recorded build output, build a repair queue per manifest target and run the repairs. Lines that map to no manifest target are listed, never guessed. Error counts per round are kept in `migration/build-rounds.tsv`. A fresh build after repairs still needs approval.
 
 ```bash
+node migration-kit/scripts/run_migration.mjs build-loop --note "Up to five repair rounds and 100 AI calls agreed" --max-rounds 5 --max-calls 100
+# One round at a time
 node migration-kit/scripts/run_migration.mjs repair-round
 node migration-kit/scripts/run_migration.mjs approve build --note "Reviewed the repairs"
 node migration-kit/scripts/run_migration.mjs build
@@ -289,7 +298,11 @@ The demo replaces worker responses with prepared code and really runs the Python
 - The operating rules are language-neutral, but this is not a universal translator that prepares dependency mapping, builds and equivalence checks for every language automatically.
 - Large real projects, very large single files, units that rewrite several files as one and automatic redesign are untested or unsupported.
 - A CLI response is one JSON object. Worker responses are capped at 16 MiB and are also limited by the model's own output limit.
-- Logs record the requested model and timing. Models, tokens and AI credits that cannot be measured are `null`. Call limits are not spending limits.
+- Logs record the requested model and timing. With the CLI backend they also record the model the CLI reports in its JSONL (`model.call_final_result`) and usage such as `premiumRequests`; a model different from the request is a run warning. Tokens and AI credits that cannot be measured are `null`. Call limits are not spending limits.
+- With `--output-format json` the CLI reports rate limits, 5xx and authentication errors only as `session.error` on stdout (stderr is empty). The runner reads it: 429/5xx are retried, authentication and exhausted credits stop the run, and the error message keeps the cause.
+- Each CLI worker call is a named (`migration-kit ROLE TARGET ID8`), local-only session (`--no-remote-export` turns off the sync to the GitHub account; its effect on an authenticated account is not verified yet) under `~/.copilot/session-state`; the runner journals its ID in the run records before the call (`cli-sessions.jsonl`, retried and interrupted calls included). The transcripts contain source code, so after the migration the AI reports `sessions status` and, if the person agrees, runs `sessions prune`, which deletes only the kit's worker sessions (the host asks to confirm).
+- Parallel workers open many files. The Copilot CLI (Node) raises its own soft open-file limit to the hard limit at startup (256 → hard limit observed on 1.0.98), so the kit needs no wrapper. Only the hard limit cannot be raised that way: `doctor --check-cli` checks it and explains how to raise one below 4096.
+- Rate limits (429) and service errors are retried automatically; `status` shows a retrying worker and the AI tells the person.
 - Permission restrictions and hooks are workflow controls, not an OS isolation boundary. SDK extensions and configured commands run as local code.
 - The old Bash `build_daemon.sh` is kept for compatibility. Do not run it alongside the shared runner; normally use the Node `build` stage.
 
@@ -297,7 +310,7 @@ The upstream records are kept in [UPSTREAM-README.md](docs/UPSTREAM-README.md), 
 
 ## VS Code orchestration and verification modes
 
-The parent agent's responsibilities (phase TODO, questions, distributing native jobs), the read-only `status --format markdown`, source-only mode and Rubber Duck are described in the [operating manual](docs/OPERATING-MANUAL.md#vs-code-orchestration-and-verification-modes).
+The parent agent's responsibilities (phase TODO, questions, running the commands), the read-only `status --format markdown`, source-only mode and Rubber Duck are described in the [operating manual](docs/OPERATING-MANUAL.md#vs-code-orchestration-and-verification-modes).
 
 ## Phase order and usage records
 

@@ -13,12 +13,13 @@ import { agentMetadata } from '../lib/runtime.mjs';
 import { doctor } from '../scripts/run_migration.mjs';
 import { failureGuidance } from '../lib/guidance.mjs';
 
-test('worker profiles stay out of the picker; only parent-dispatched profiles remain model-invocable', () => {
+test('worker profiles stay out of the picker; only the parent-dispatched auditor remains model-invocable', () => {
   for (const dir of ['.github/agents', 'com.github.copilot/agents']) for (const name of fs.readdirSync(path.join(kitRoot, dir))) {
     const front = agentMetadata(fs.readFileSync(path.join(kitRoot, dir, name), 'utf8'), name);
     if (name.includes('orchestrator')) { assert.equal(front['user-invocable'], undefined, name); continue; }
     assert.equal(front['user-invocable'], false, name);
-    const dispatched = name.includes('-native-') || name.includes('preparation-auditor');
+    assert.ok(!name.includes('-native-'), `removed native profile still shipped: ${name}`);
+    const dispatched = name.includes('preparation-auditor');
     assert.equal(front['disable-model-invocation'], dispatched ? undefined : true, name);
   }
 });
@@ -30,17 +31,15 @@ test('hook configurations allow 30 seconds because Copilot hooks fail open on ti
   assert.equal(readJSON(path.join(kitRoot, 'templates/hooks.vscode-local.json')).hooks.PreToolUse[0].timeout, 30);
 });
 
-test('doctor times the hook and lists native host prerequisites', async t => {
+test('doctor times the hook', async t => {
   const f = prepare(t);
   const report = await doctor(f.root, f.config);
   const hook = report.checks.find(c => c.check === 'hook responds before its timeout');
   assert.equal(hook.ok, true);
   assert.equal(hook.timeoutSec, 30);
   assert.ok(Number.isInteger(hook.durationMs));
-  Object.assign(f.config, { workerBackend: 'native', nativeHarness: 'vscode-local', nativeModelVerification: 'requested-unverified' });
-  writeJSON(safePath(f.root, 'migration/config.json'), f.config);
-  const native = await doctor(f.root, loadConfig(f.root));
-  assert.match(native.checks.find(c => c.check === 'native host requirements').requirements.join('\n'), /1\.117[\s\S]*chat\.customAgentInSubagent\.enabled/);
+  assert.equal(report.workerBackend, 'copilot-cli');
+  assert.equal(report.checks.some(c => /native/.test(c.check)), false);
 });
 
 test('prompts put shared rules first and the unit-specific target last for prompt caching', t => {

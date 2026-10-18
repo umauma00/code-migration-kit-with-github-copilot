@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-10-18",
+  "cli": "GitHub Copilot CLI 1.0.98 (npm @github/copilot, linux-x64)",
+  "provider": "loopback test double (COPILOT_PROVIDER_*); no authenticated GitHub account, no external AI",
+  "liveVSCodeTested": false,
+  "liveChecks": {
+    "note": "null = not run yet; see docs/LIVE-SMOKE.en.md \"Human gates and worker sessions\"",
+    "liveCLIInteractiveAsk": null,
+    "liveCLIAutopilot": null,
+    "liveCLIAllowAll": null,
+    "liveVSCodeAsk": null,
+    "liveVSCodeCopilotHarnessRepoHooks": null,
+    "liveRemoteExportOff": null,
+    "liveRepoHooksAssistedReviewersOnly": "pass on linux-x64 loopback (2026-10-18); not run on macOS/Windows"
+  },
+  "checks": [
+    {
+      "name": "tests/verify_cli_transport.mjs (repository layout)",
+      "result": "pass",
+      "detail": "doctor OK, 9 agent calls for 3 units, tools view/grep/glob or none, ambient instructions isolated, build/smoke/parity pass"
+    },
+    {
+      "name": "transport with layout plugin (probe variant of the same script)",
+      "result": "pass",
+      "detail": "plugin profile body reached the model; isolation and tool restrictions as above"
+    },
+    {
+      "name": "tests/verify_plugin.mjs",
+      "result": "pass",
+      "detail": "marketplace add/install and qualified agent IDs"
+    },
+    {
+      "name": "user-invocable: false profiles selected with --agent",
+      "result": "pass",
+      "detail": "CLI workers resolve and run (profiles added after the 2026-10-14 evidence)"
+    },
+    {
+      "name": "stdout-only session.error",
+      "result": "fixed",
+      "detail": "429/503/401 arrive only as stdout session.error with empty stderr and exit 1; before the fix the adapter reported 'failed (exit 1): ' and classified none of them; after it, 429 is transient and 401 systemic, with the cause in the message"
+    },
+    {
+      "name": "prompt-mode repository hooks",
+      "result": "fixed",
+      "detail": "untrusted repository-copy folder: hook not loaded and a tool-assisted reviewer read migration/runs; trusted folder, plugin layout, or GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS=true: denied. Workers now set the variable; re-run denied in the untrusted folder. Follow-up: only tool-assisted reviewers set it; see the PR #2 follow-up check below"
+    },
+    {
+      "name": "bakeoff B skill exposure",
+      "result": "documented",
+      "detail": "with --no-custom-instructions and default tools a user skill description reached the request; with --available-tools view,create,edit,glob,grep it did not"
+    },
+    {
+      "name": "native file input reader hook (agent-scoped PreToolUse)",
+      "result": "pass",
+      "removedIn": "0.3.0",
+      "detail": "trusted folder: RULEBOOK read denied, prompt.txt allowed, reader.json written; untrusted folder: hook not run, no reader.json, so the runner rejects the result"
+    },
+    {
+      "name": "JSONL model and usage facts",
+      "result": "implemented",
+      "detail": "model.call_final_result.model and result.usage (premiumRequests, totalApiDurationMs, sessionDurationMs) are present on success"
+    },
+    {
+      "name": "worker sessions (follow-up, both layouts)",
+      "result": "pass",
+      "detail": "Real CLI 1.0.98 accepted --no-remote-export, --session-id and --name on every worker call; all 9 recorded cliSessionId directories existed under the temporary COPILOT_HOME session-state; sessions prune removed exactly those 9 and left the 5 unrecorded sessions (control, direct calls, doctor probe)"
+    },
+    {
+      "name": "open-file limit (follow-up)",
+      "result": "pass",
+      "detail": "Started under ulimit -Sn 256 (hard 20000), both the npm loader and the native copilot process ran with soft 20000: the CLI raises its own soft limit, so the kit adds no wrapper and doctor checks only the hard limit"
+    },
+    {
+      "name": "transport with layout plugin, follow-up rerun",
+      "result": "pass",
+      "detail": "doctor OK, 9 agent calls, no ambient instruction canary in any of 11 worker requests; profile canary intentionally not injected in this variant"
+    },
+    {
+      "name": "PR #2 follow-up: repository hooks admitted for tool-assisted reviewers only (untrusted folder, loopback)",
+      "result": "pass",
+      "detail": "2026-10-18, CLI 1.0.98 linux-x64, Node v22.22.0. tests/verify_cli_transport.mjs passed (doctor OK, 9 agent calls for 3 units, build/smoke/parity pass) with the variable only on -read roles. A probe made reviewer-rules-read view migration/runs/probe/secret.txt: with copilotEnv the hook denied it ('Tool-assisted reviewers may not read ...'); with the variable removed (control) the file content was returned"
+    }
+  ]
+}

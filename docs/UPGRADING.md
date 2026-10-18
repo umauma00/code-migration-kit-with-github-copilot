@@ -1,6 +1,19 @@
-# 0.1.0〜0.1.4から0.1.5への更新
+# 更新手順（0.3.0 と以前の版）
 
 日本語 | [English](UPGRADING.en.md)
+
+## 0.3.0（native方式の削除・チャットだけで完遂）
+
+0.3.0ではVS Codeのサブエージェント方式（native）を削除しました。ワーカーは常にCopilot CLIで動きます。以下はすべてAIがチャットで提案し、同意を得て実行します。
+
+1. `workerBackend: "native"`、`nativeHarness`、`nativeModelVerification`、`nativeInput` を含む設定は、移行方法を表示して停止します。`"workerBackend": "copilot-cli"` に直し、これらのキーを削除してから、judgeと翻訳の承認をやり直します。
+2. コピー導入の案件に残る `.github/agents/migration-native-*.agent.md` は使われません。installerは削除しないので、AIが同意を得て削除します。
+3. Copilot CLIが未導入、または未サインインの場合、AIが `npm install -g @github/copilot` と `copilot login` を実行します。利用者はブラウザでサインインを承認するだけです。
+4. `migration/guardrails.json` は、AIが `guardrails show` を基に提案し、合意後に `guardrails install` で設置します。ホストが確認を求め、その許可が人間の設置行為になります。
+5. 既存の設定には `fixPolicy`・`dependencyOrder`・`reviewFocus` を自動で追加しません。採用する場合は承認をやり直します。
+6. `.github/copilot-instructions.md` の管理ブロックを短くしました（詳細はスキルにあります）。コピー導入で再インストールすると「Existing managed instructions differ」で止まるので、AIが同意を得て `<!-- code-migration-kit:start -->`〜`end` の間を新しい内容に置き換えます。ブロック外の利用者の記述は変えません。
+7. ワーカーはローカル専用（`--no-remote-export`）の名前付きセッションで動き、IDを実行記録に残します。0.3.0より前のワーカーのセッションはIDが記録されていないため `sessions prune` の対象外です。GitHubアカウントに同期済みのものは、Copilot CLIの `/session` から整理してください。
+8. ビルド修正の反復は、合意のうえで `build-loop` 1回の許可にまとめられます。
 
 ## 2026-10-17の更新（CLI版の追従・ガードレール・ツール付きレビュー・診断・言語）
 
@@ -8,7 +21,7 @@
 
 1. ワーカーは `--no-auto-update` を付けずに起動し、普段使っているCLIの版で動きます。実行中に版が変わると警告し、runの `cliVersions` と `warnings` に残します。`doctor --check-cli` で全担当IDが解決できることを確認してください。
 2. コピー導入では、新しいプロファイル `.github/agents/migration-reviewer-semantics-read.agent.md` と `migration-reviewer-rules-read.agent.md` を一時導入先から取り込みます（ツール付きレビュー用）。プラグインは更新だけで入ります。
-3. 03・04の開始には `migration/guardrails.json` が必要です。`templates/guardrails.json` をコピーし、対象のビルド・テストコマンドに合わせて編集してください（エージェントは作成しません）。コピー導入ではCopilot CLIでフォルダを信頼済みにしてください。
+3. 03・04の開始には `migration/guardrails.json` が必要です。`templates/guardrails.json` をコピーし、対象のビルド・テストコマンドに合わせて編集してください（エージェントは作成しません）。0.3.0以降は、AIが `guardrails show` で提案し、合意後に `guardrails install`（ホストが確認を求める）で設置します。コピー導入ではCopilot CLIでフォルダを信頼済みにしてください。
 4. ビルド失敗時は `repair-round` で診断・修正キュー・修正をまとめて実行できます。
 5. 報告の言語は `run_migration.mjs preferences --language ja|en` で設定します。設定は `migration/preferences.json` に保存され、承認には影響しません。
 6. VS Codeでもnative方式ではなく、既定のCLIワーカー方式を使ってください。native方式は実験的です。

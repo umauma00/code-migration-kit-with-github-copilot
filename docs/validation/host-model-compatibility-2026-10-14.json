@@ -1,5 +1,6 @@
 {
   "schemaVersion": 1,
+  "archived": "Native worker backend evidence; 0.3.0 removed the backend, its tests and its agents, so the command below no longer runs.",
   "date": "2026-10-14",
   "branch": "feat/github-copilot-migration-kit",
   "head": "164aa47fa6555bef139b7c8545ec8b881d839684",

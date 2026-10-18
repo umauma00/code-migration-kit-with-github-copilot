@@ -2,7 +2,7 @@
 
 [日本語](COST-LOG.md) | English
 
-The requested model and the actual model are kept apart. A native submission's hostReportedModel is input from the parent and is not counted as a measurement on its own; it stays unknown until a formal adapter observes it. Pilot AI calls are recorded as 03, production repair as 05 and normal translation as 04. judge-prepare and reuse by the formal judge are separate execution rows, but reuse counts no new AI calls.
+The requested model and the actual model are kept apart. Only the model the CLI reports (`model.call_final_result`) counts as actual; configured values and a worker's own claim never do. Pilot AI calls are recorded as 03, production repair as 05 and normal translation as 04. judge-prepare and reuse by the formal judge are separate execution rows, but reuse counts no new AI calls.
 
 The same `migration/cost-log.tsv` as upstream main is written, with these six columns:
 
@@ -18,7 +18,7 @@ node migration-kit/scripts/run_migration.mjs phase complete 01 --note "Reviewed 
 
 Omit options whose values are unknown. Confirm the model from actual host execution information; never copy the configured value or a worker's own claim as the actual model. Never estimate costs or token counts.
 
-The runner records each judge, translate/repair, build, smoke, parity and handoff run automatically. Failures and interruptions are recorded too, once collection and the run summary are saved. 04's subagents is the number of adapter calls actually made, excluding reservations cancelled before the call. If usage of even one call is unknown, the total tokens is unknown. When the CLI cannot provide the actual model or usage, they are unknown.
+The runner records each judge, translate/repair, build, smoke, parity and handoff run automatically. Failures and interruptions are recorded too, once collection and the run summary are saved. 04's subagents is the number of adapter calls actually made, excluding reservations cancelled before the call. If usage of even one call is unknown, the total tokens is unknown. With the CLI backend the model column records the model the CLI reports in its JSONL `model.call_final_result` events (only when every call reported one; a model different from the request is a run warning). When the CLI does not provide the model, and for tokens, which it does not report, the value is unknown.
 
 Automatic time and usage cover activity inside the runner; they are not the total bill, which also includes the parent conversation and Rubber Duck. Verification commands that call no AI record tokens=0, subagents=0, model=none. The formal judge is recorded additionally as 00b validation activity. Several rows are separate runs or retries, not counts of completed phases.
 
