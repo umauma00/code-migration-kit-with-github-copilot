@@ -11,7 +11,7 @@ import { contextHash, safePath, writeJSON, readJSON, atomicWrite, done, loadConf
 import { createCopilotAdapter, copilotArgs, readUsageFile, sessionName, sessionNameLimit } from '../scripts/copilot_adapter.mjs';
 import { waitForProgress } from '../scripts/run_migration.mjs';
 import { freezeAudit, runAudit } from '../scripts/audit_inputs.mjs';
-import { diagnoseBuild } from '../scripts/diagnostic_queue.mjs';
+import { diagnoseBuild, makeRepairQueue } from '../scripts/diagnostic_queue.mjs';
 import { decide } from '../scripts/migration_hook.mjs';
 
 const persist = f => writeJSON(safePath(f.root, 'migration/config.json'), f.config);
@@ -21,7 +21,7 @@ test('run limits, timeouts, documents and Copilot instructions do not revoke rev
   await translate(f.root, f.config, fake);
   const context = contextHash(f.root, f.config);
   const changed = { ...f.config, concurrency: 1, maxAgentCalls: 500, maxFixRounds: 3, timeoutSeconds: 900, commandTimeoutSeconds: 900,
-    transientRetries: 4, transientRetryDelayMs: 100, maxConsecutiveFailures: 5, maxRunInputBytes: 4096, maxAiCreditsPerCall: 2 };
+    transientRetries: 4, transientRetryDelayMs: 100, maxConsecutiveFailures: 5, maxRunInputBytes: 4096, maxAiCreditsPerCall: 30 };
   assert.deepEqual(Object.keys(changed).filter(k => changed[k] !== f.config[k]).sort(), [...operationalConfigKeys].sort());
   writeJSON(safePath(f.root, 'migration/config.json'), changed);
   fs.appendFileSync(safePath(f.root, '.github/copilot-instructions.md'), '\nTeam note.\n');
@@ -71,7 +71,7 @@ if (!argv.includes('--version') && at > 0) fs.writeFileSync(argv[at + 1], JSON.s
   modelMetrics: { 'test-double': { usage: { inputTokens: 2400, outputTokens: 30, cacheReadTokens: 2000, cacheWriteTokens: 0 } } } }));
 await import(${JSON.stringify(transport.prefixArgs[0])});
 `);
-  f.config.maxAiCreditsPerCall = 3; persist(f);
+  f.config.maxAiCreditsPerCall = 30; persist(f);
   const adapter = createCopilotAdapter({ command: process.execPath, prefixArgs: [safePath(f.root, 'usage-cli.mjs')] });
   const response = await adapter({ ...f, config: f.config, role: 'implementer', unit: f.units[0], extra: {} });
   assert.equal(response.tokens, 2430);
@@ -79,7 +79,7 @@ await import(${JSON.stringify(transport.prefixArgs[0])});
   assert.equal(response.aiCredits, null);
   const calls = fs.readFileSync(safePath(f.root, 'cli-double-calls.jsonl'), 'utf8').trim().split('\n').map(JSON.parse);
   const argv = calls.at(-1).argv;
-  assert.equal(argv[argv.indexOf('--max-ai-credits') + 1], '3');
+  assert.equal(argv[argv.indexOf('--max-ai-credits') + 1], '30');
   assert.ok(!argv[argv.indexOf('--usage-output-file') + 1].startsWith(f.root), 'usage files stay outside the project');
   assert.equal(readUsageFile(safePath(f.root, 'missing.json')), null);
 });
@@ -118,6 +118,17 @@ test('a failed parity run becomes a reviewed repair queue; an original-suite fai
   const file = safePath(f.root, 'migration/results/parity.json'), recorded = fs.readFileSync(file, 'utf8'), record = JSON.parse(recorded);
   record.commands[0].status = 'failed'; writeJSON(file, record);
   assert.throws(() => diagnoseBuild(f.root, f.config, { stage: 'parity' }), /original suite failed/);
+  // A hand-written TSV is refused the same way.
+  atomicWrite(safePath(f.root, 'migration/manual-parity.tsv'), 'file\tmodule\tcode\tmessage\nported/math_ops.mjs\tmath\tP1\tcase 3 differs\n');
+  assert.throws(() => makeRepairQueue(f.root, f.config, { stage: 'parity', diagnostics: 'migration/manual-parity.tsv', out: 'migration/manual-queue.json' }), /original suite failed/);
+  assert.equal(fs.existsSync(safePath(f.root, 'migration/manual-queue.json')), false);
+  fs.writeFileSync(file, recorded);
+  // A queue made while the original passed is re-checked when it is read.
+  makeRepairQueue(f.root, f.config, { stage: 'parity', diagnostics: 'migration/manual-parity.tsv', out: 'migration/manual-queue.json' });
+  writeJSON(file, record);
+  let workers = 0;
+  await assert.rejects(translate(f.root, f.config, async args => { workers++; return fake(args); }, { repairQueue: 'migration/manual-queue.json' }), /original suite failed/);
+  assert.equal(workers, 0);
   fs.writeFileSync(file, recorded);
   const diagnosis = diagnoseBuild(f.root, f.config, { stage: 'parity' });
   assert.equal(diagnosis.stage, 'parity'); assert.deepEqual(diagnosis.targets, ['ported/math_ops.mjs']);
@@ -140,4 +151,52 @@ test('worker session names stay within the CLI limit and keep the role, file nam
   }
   assert.match(sessionName('implementer', deep, id), /module_with_a_long_name\.mjs 0123abcd$/);
   assert.equal(sessionName('implementer', 'ported/a.mjs', id), 'migration-kit implementer ported/a.mjs 0123abcd');
+});
+
+test('maxAiCreditsPerCall follows the CLI minimum of 30', t => {
+  const f = prepare(t), file = safePath(f.root, 'migration/config.json');
+  for (const value of [29, 0, -1, '30', Infinity]) {
+    writeJSON(file, { ...f.config, maxAiCreditsPerCall: value });
+    assert.throws(() => loadConfig(f.root), /at least 30/, String(value));
+  }
+  for (const value of [30, 30.5, 500]) {
+    writeJSON(file, { ...f.config, maxAiCreditsPerCall: value });
+    assert.equal(loadConfig(f.root).maxAiCreditsPerCall, value);
+  }
+});
+
+test('a semantic configuration change during a preparation audit voids its result; a run limit does not', async t => {
+  const f = prepare(t), file = safePath(f.root, 'migration/config.json');
+  f.config.phaseModels = { inventoryAudit: 'model-a' }; persist(f);
+  const answer = args => { const q = JSON.parse(args.reviewInput);
+    return { result: { schemaVersion: 1, kind: 'preparation-audit', task: q.task, inputHash: q.inputHash, target: args.unit.target, verdict: 'pass', findings: [] }, observedModel: 'model-a' }; };
+  const first = freezeAudit(f.root, f.config, { type: 'inventory', files: ['migration/RULEBOOK.md'] });
+  await assert.rejects(runAudit(f.root, f.config, async args => {
+    writeJSON(file, { ...f.config, phaseModels: { inventoryAudit: 'model-b' } }); return answer(args);
+  }, { directory: first.directory }), /inputs changed/);
+  assert.equal(fs.existsSync(safePath(f.root, `${first.directory}/result.json`)), false);
+  persist(f);
+  const second = freezeAudit(f.root, f.config, { type: 'inventory', files: ['migration/RULEBOOK.md'] });
+  const record = await runAudit(f.root, f.config, async args => { writeJSON(file, { ...f.config, concurrency: 1 }); return answer(args); }, { directory: second.directory });
+  assert.equal(record.result.verdict, 'pass');
+});
+
+test('a retried call counts the failed attempt\'s usage, or leaves the run total unknown', async t => {
+  const transient = usage => Object.assign(new Error('Copilot implementer failed (exit 1): session.error rate_limit 429: slow down'), usage ? { tokens: 7, cliUsage: { inputTokens: 5, outputTokens: 2 } } : {});
+  const measured = args => ({ ...fakeUsage(args), tokens: 10, cliUsage: { inputTokens: 8, outputTokens: 2 } });
+  const fakeUsage = args => ({ result: result(args.role, args.unit), observedModel: 'test-double' });
+  for (const [withUsage, expected] of [[false, 'unknown'], [true, String(3 * 10 + 7)]]) {
+    const f = await ready(t);
+    f.config.transientRetryDelayMs = 0; persist(f);
+    let failed = false;
+    const report = await translate(f.root, f.config, async args => {
+      if (!failed) { failed = true; throw transient(withUsage); }
+      return measured(args);
+    });
+    assert.equal(report.agentCalls, 4);
+    assert.equal(report.measuredUsage.complete, withUsage);
+    assert.equal(report.measuredUsage.calls, withUsage ? 4 : 3);
+    const row = fs.readFileSync(safePath(f.root, 'migration/cost-log.tsv'), 'utf8').trimEnd().split('\n').at(-1).split('\t');
+    assert.equal(row[3], expected);
+  }
 });

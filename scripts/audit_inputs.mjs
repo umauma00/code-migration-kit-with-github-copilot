@@ -13,7 +13,11 @@ import { recordSession } from '../lib/sessions.mjs';
 import { createCopilotAdapter } from './copilot_adapter.mjs';
 import { readReviewText, validatePreparationProfile } from '../lib/review.mjs';
 const models = { judge: 'judgeAudit', dependencies: 'dependencyAudit', inventory: 'inventoryAudit', design: 'designAudit' };
-function snapshot(root, config) { return hash(JSON.stringify({ source: treeHash(root, config.sourceRoots), verification: treeHash(root, config.verificationRoots), config: hash(JSON.stringify(semanticConfig(config))), profile: validatePreparationProfile(root, config) })); }
+// The configuration on disk counts too: run waits for a worker with the config it
+// loaded at the start, and a model or rule change meanwhile must void the result.
+// Run limits (semanticConfig) may change.
+function snapshot(root, config) { return hash(JSON.stringify({ source: treeHash(root, config.sourceRoots), verification: treeHash(root, config.verificationRoots),
+  config: hash(JSON.stringify(semanticConfig(config))), configFile: hash(JSON.stringify(semanticConfig(readJSON(safePath(root, 'migration/config.json'))))), profile: validatePreparationProfile(root, config) })); }
 export function freezeAudit(root, config, { type, files, out } = {}) {
   if (!Object.hasOwn(models, type) || !Array.isArray(files) || !files.length || new Set(files).size !== files.length) throw new Error('Select judge|dependencies|inventory|design and explicit unique input files');
   const model = config.phaseModels?.[models[type]];

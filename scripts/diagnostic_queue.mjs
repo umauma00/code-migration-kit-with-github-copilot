@@ -11,6 +11,7 @@ import { loadConfig, parseArgs, safePath, readJSON, readManifest, fileHash, cont
 import { outputFingerprint } from '../lib/pipeline.mjs';
 import { readReviewText } from '../lib/review.mjs';
 import { diagnosticsForUnits, diagnosticTsv } from '../lib/diagnostics.mjs';
+import { assertRepairableRun } from '../lib/scopes.mjs';
 export const repairStages = ['build', 'smoke', 'parity'];
 const stageCommands = { build: ['build'], smoke: ['smoke'], parity: ['parity'] };
 const roundsFiles = { build: 'migration/build-rounds.tsv', smoke: 'migration/smoke-rounds.tsv', parity: 'migration/parity-rounds.tsv' };
@@ -23,6 +24,7 @@ export function makeRepairQueue(root, config, { diagnostics, out = 'migration/re
   try {
     const context = contextHash(root, config), build = readJSON(safePath(root, `migration/results/${stage}.json`));
     if (!build.executionId || build.stage !== stage || build.invalidatedAt || build.contextHash !== context || build.outputHash !== outputFingerprint(root, config)) throw new Error(`Diagnostics need a current ${stage} attempt for these inputs and outputs`);
+    assertRepairableRun(build, stage);
     const units = new Map(readManifest(root, config).map(u => [u.target, u]));
     const lines = readReviewText(root, diagnostics).replace(/^\uFEFF/, '').trimEnd().split(/\r?\n/);
     if (lines.shift() !== 'file\tmodule\tcode\tmessage') throw new Error('Diagnostic TSV header must be file<TAB>module<TAB>code<TAB>message');
@@ -77,10 +79,7 @@ export function diagnoseBuild(root, config, { out = 'migration/repair-queue.json
     const round = recordRound(root, build, { diagnostics: 0, targets: 0, unmapped: 0 }, roundsFile);
     return { clean: true, stage, buildExecutionId: build.executionId, round, rounds: roundsFile };
   }
-  // The original suite runs on the original code: its failure is inherited or
-  // environmental, never a translation repair (upstream Step 6 triage).
-  const original = (build.commands ?? []).find(c => c.name === 'original');
-  if (stage === 'parity' && original && original.status !== 'success') throw new Error(`The original suite failed in ${record}: an inherited or environmental failure, not a translation defect. Show it to the person; do not repair translated outputs for it`);
+  assertRepairableRun(build, stage, record);
   const text = (build.commands ?? []).filter(c => stageCommands[stage].includes(c.name)).map(c => `${c.stdout ?? ''}\n${c.stderr ?? ''}`).join('\n');
   const { rows, unmapped, formats, parsed } = diagnosticsForUnits(root, readManifest(root, config), text);
   const diagnostics = `migration/${stage}-diagnostics/${build.executionId}.tsv`;
