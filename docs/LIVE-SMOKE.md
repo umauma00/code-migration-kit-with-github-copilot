@@ -44,6 +44,7 @@ Dynamic Workflowsは [専用の確認事項](DYNAMIC-WORKFLOWS.md) を追加し�
 
 - **対話CLI（信頼済みフォルダ）**：`node migration-kit/scripts/run_migration.mjs approve translation --note test` をAIに実行させます。確認が出ること、「No」で実行されないこと、「Yes」の後にCLI自身の許可確認がもう一度出るか（[copilot-cli#3042](https://github.com/github/copilot-cli/issues/3042)）を記録します（`liveCLIInteractiveAsk`）。
 - **autopilot**：同じコマンドが確認なしに拒否されることを確認します（CLI 1.0.97以降の仕様、`liveCLIAutopilot`）。`--allow-all` / `--yolo` のときに確認が出るかも記録します（公式の記載なし、`liveCLIAllowAll`）。
+- **autopilotでの質問**：autopilotで選択が必要な場面（例：失敗時の選択）を作ります。`ask_user` に自動の応答（利用者は不在なので自律的に進めるよう求める文面）が返ったとき、AIが何も選ばず、保留の判断を伝えて止まるかを記録します。応答の文面も残します（CLI 1.0.98の変更履歴ではautopilotが `ask_user` を自動処理、`liveCLIAutopilotAskUser`）。
 - **VS Code**：LocalとCopilotの各実行方式で同じことを確認し（`liveVSCodeAsk`）、Copilot実行方式で `.github/hooks` が読み込まれるかを記録します（`liveVSCodeCopilotHarnessRepoHooks`）。権限レベル「Allow all」、Autopilot、`/yolo` のときに確認が出るか、拒否されるか、確認なしに通るかも記録します（`liveVSCodeAllowAll`）。通る場合は、ゲートのコマンドを実行する間は「Manual permissions」に戻すよう案内します。
 - **未信頼フォルダのhook**：未信頼のコピー導入で `node tests/verify_cli_transport.mjs` を再実行し、ツール付きレビュアーでhookが効くこと（`migration/runs` を読めない）と、他のロールが動くことを記録します（`liveRepoHooksAssistedReviewersOnly`）。疑似モデルでの同じ確認は `doctor --check-cli` の `tool-assisted reviewer hook loads in prompt mode` が毎回行います。
 - **sandbox**：VS Code・Copilot CLIのローカルsandbox（2026-10-07 GA。既定はオフ）を有効にした状態で `doctor --check-cli` と1単位の `translate` を実行し、端末から起動したワーカーCLIが `~/.copilot` への書き込みとCopilot APIへの通信を行えるかを記録します（`liveSandboxWorkers`）。失敗する場合はsandboxの許可設定を見直すか、runnerをsandbox外で実行する承認を利用者に求めます。sandboxを回避する設定をAIが勝手に変えてはいけません。

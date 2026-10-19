@@ -51,13 +51,16 @@ never revokes approvals). Write every user-facing report, question, TODO label
 and next-instruction example in that language, and link the matching documents:
 `X.md` for Japanese, `X.en.md` for English (for example [README](../../../README.md) /
 [README.en](../../../README.en.md)). Worker prompts and JSON stay in English. Before
-initialization, ask the language together with the model and migration
-languages and pass `--language ja|en` to the installer.
+initialization, ask the language, the model IDs and the migration languages
+(one question per call with Copilot CLI `ask_user`; VS Code `vscode/askQuestions`
+takes them together) and pass `--language ja|en` to the installer.
 
 Follow [phase reports and user decisions](../../../docs/PHASE-HANDOFF.md) at every
 phase boundary. Show the actual artifacts, review points and a copyable next
 instruction before asking. Use the available question tool for missing decisions;
 otherwise present the choices in chat and wait. Reuse answers already given.
+An automatic reply that the user is not available (Copilot CLI autopilot) is not
+an answer: choose nothing and ask the person to continue interactively.
 After a phase, resolve the next step from the user's instruction and current
 evidence, not just a report/template's existence.
 
@@ -77,7 +80,7 @@ for review; they do not route directly to a later phase. Respect redesign mode.
 ## No runnable original or no specification
 
 Before choosing a verification mode (at initialization, and whenever runtime 00b
-blocks), ask two questions with the question tool: can the original
+blocks), ask two yes/no questions with the question tool, one per call: can the original
 implementation still run here, and does a specification or portable test suite
 exist? Record the first answer with `run_migration.mjs preferences --original-runtime
 available|unavailable` (presentation only; failure guidance uses it to pick its

@@ -1,5 +1,30 @@
 # Unreleased (0.3.0)
 
+- 2026-10-19 follow-up (questions, failure reports and progress):
+  - Failure guidance: every rule offers at least two choices plus pause, with
+    the recommendation first; a contract test holds each rule to it.
+    `guidance --format json` adds `choices`, the option labels for the host
+    question tool. New rules: `cannot-ask` (a refused confirmation, or the
+    Copilot CLI autopilot answering `ask_user` itself, is not an answer),
+    `guardrail-denied` and `guardrails-write` (the kit's own hook denials).
+  - Phase order: an error names only the immediate predecessor, and its
+    guidance recommended recording that phase, which failed the same way while
+    an earlier phase was incomplete. The guidance now leads with the phase
+    `phase next` reports. Source-only 05c recommends the unverified
+    acknowledgment (`phase complete 05c`) instead of a runner stage.
+  - `doctor` shows the review dependency map as pending until phase 01 is
+    recorded, so a new project's phase 00 check no longer fails with a command
+    that cannot run yet; the guidance points at phase 01 until a map exists.
+  - Questions: Copilot CLI `ask_user` takes one question per call with optional
+    string choices (CLI 1.0.98), so setup questions are asked one at a time
+    there and grouped only with VS Code `vscode/askQuestions`. A free-text reply
+    that picks no choice is not consent. The plugin orchestrator also lists
+    `vscode/askQuestions`.
+  - Progress: `status --format todo` descriptions follow the report language.
+    PHASE-HANDOFF notes that Copilot CLI `update_todo` takes one markdown
+    checklist (`status --format checklist`), and that TODO and question tool
+    failures use their chat fallbacks rather than a failure report.
+
 - 2026-10-19 review (Copilot CLI 1.0.98 and 1.0.100-1, current VS Code docs):
   - Resumption: the receipt context hashes only what reaches workers. Run limits
     (`concurrency`, `maxAgentCalls`, `maxFixRounds`, timeouts, retries,

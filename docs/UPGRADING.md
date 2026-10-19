@@ -9,6 +9,7 @@
 1. `doctor --check-cli` に、ツール付きレビューのhookを実CLIで確かめる項目が加わります（loopback、AI利用なし）。
 2. 準備監査は `audit_inputs.mjs run --directory migration/audits/ID` でCLIワーカーとして実行できます。既存の未提出requestは設定のハッシュ方式が変わるため、freezeからやり直します。
 3. `maxAiCreditsPerCall` は任意です。既存設定には追加しません。
+4. 同じ日の追補（失敗時の選択肢、工程順の案内、質問とTODOの表示）も、キットのファイルを変えます。追補の前に再検証を済ませた案件は、もう一度だけ失効します（完了済みの出力は保持されます）。`doctor` は、phase 01を記録するまでは依存宣言がなくても失敗にしません。
 
 ## 0.3.0（native方式の削除・チャットだけで完遂）
 

@@ -57,7 +57,7 @@ node /path/to/code-migration-kit/scripts/run_migration.mjs doctor --check-cli
 node /path/to/code-migration-kit/scripts/run_migration.mjs status
 ```
 
-新規案件ではphase 01で依存マップを作るまでdoctorに不足が表示されます。以降の成果物・実行記録・承認は対象の `migration/`、変換結果は設定した `outputRoots` に保存します。プラグインの更新、案件側の `.github/hooks/`・`.github/agents/`・`.claude/agents/` の変更で、既存の承認と完了判定が失効します。hookが参照する、対象リポジトリ内の追加スクリプト等は `verificationInputs` に指定して追跡してください。
+新規案件では、phase 01を記録するまで、doctorは依存宣言を `pending`（まだ不要）と表示します。以降の成果物・実行記録・承認は対象の `migration/`、変換結果は設定した `outputRoots` に保存します。プラグインの更新、案件側の `.github/hooks/`・`.github/agents/`・`.claude/agents/` の変更で、既存の承認と完了判定が失効します。hookが参照する、対象リポジトリ内の追加スクリプト等は `verificationInputs` に指定して追跡してください。
 
 ## 実行方式と検証範囲
 
