@@ -126,7 +126,7 @@ node migration-kit/scripts/run_migration.mjs doctor --check-cli
 | `reviewFocus` | `shared`（新規導入）: 2人のレビュアーがそれぞれ自分の観点を先に、両方の観点（元の動作・ルール順守）を確認し、見つけた欠陥をすべて報告する。互いの結果は見ない。`specialized`（省略時・既存設定）: 上流と同じく1人1観点 |
 | `maxFixRounds`, `maxAgentCalls` | 1単位の修正回数、1回の実行（translate・repair 1回ごと）のAI呼び出し数の上限。`maxAgentCalls` は同時実行数ではなく呼び出しの総数（同時実行数は `concurrency`）。1単位はレビューに問題がなければ3回、上流と同じ修正1回なら4〜5回の呼び出し。実行上限なので、変更してもレビュー済みの単位と承認は失効しない。1回だけ変える場合は `translate --max-calls N` |
 | `maxRunInputBytes` | 任意。1回の実行でワーカーへ送る入力の合計バイト数の上限。AI Creditsはトークン量で消費され、使い切ると利用が止まるため、区切って使用量を確認するための予算。runの要約の `usageEstimate` に実測バイト数と推定トークン数（バイト÷4、課金データではない）を残す。判定は完了した呼び出しの合計で行うため、実行中の呼び出し（最大 `concurrency` 件）の分だけ上限を超えることがある |
-| `maxAiCreditsPerCall` | 任意。各ワーカー呼び出しに `--max-ai-credits` として渡す、CLIが強制する1呼び出しあたりのAI Credits上限。実アカウントでの上限到達時の動作は未検証 |
+| `maxAiCreditsPerCall` | 任意。各ワーカー呼び出しに `--max-ai-credits` として渡す1呼び出しあたりのAI Credits上限。CLIの下限は30で、30未満は設定検証で拒否（CLI 1.0.98・1.0.100-1は30未満で起動しない）。GitHubの説明では処理中の応答の分だけ超え得るソフト上限（この環境からは未確認）。実アカウントでの上限到達時の動作は未検証 |
 | `timeoutSeconds` | 通常CLIの1ワーカー呼び出しの時間上限 |
 | `transientRetries`, `transientRetryDelayMs` | 任意。レート制限（429）・5xx・通信エラーの自動再試行の回数（既定2）と最初の待ち時間（既定5000ms、毎回倍）。再試行もAI呼び出し数に数える |
 | `maxConsecutiveFailures` | 任意。単位の失敗が続いたら残りの配布を止める回数（既定3）。1単位の失敗は他の単位を止めない。サインイン切れ・クレジット切れなど全体に共通する失敗は即座に全体を止める |

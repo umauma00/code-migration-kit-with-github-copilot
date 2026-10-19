@@ -244,6 +244,9 @@ export function sessionName(worker, target, id) {
   }
   return base + suffix;
 }
+// A failed call still spent tokens; its usage, when the CLI wrote it, travels
+// with the error so run totals stay complete (or are marked unknown).
+const usageFields = usage => usage ? { tokens: usage.inputTokens + usage.outputTokens, cliUsage: usage } : {};
 export function createCopilotAdapter({ command = 'copilot', prefixArgs = [], versionRecheckMs = 10 * 60 * 1000 } = {}) {
   // Workers follow the user's auto-updating CLI, so a run can span versions.
   // Each version check starts a CLI process, so concurrent calls share one check
@@ -294,7 +297,11 @@ export function createCopilotAdapter({ command = 'copilot', prefixArgs = [], ver
         env: copilotEnv(worker)
       });
       usage = readUsageFile(usageFile);
-    } catch (e) { Object.assign(e, versionFields); throw e; }
+    } catch (e) {
+      // A killed or timed-out CLI may still have written its usage.
+      usage = readUsageFile(usageFile);
+      Object.assign(e, versionFields, usageFields(usage)); throw e;
+    }
     finally { fs.rmSync(usageDir, { recursive: true, force: true }); }
     try {
       if (result.code !== 0) throw new Error(`Copilot ${role} failed (exit ${result.code}): ${[copilotStreamError(result.stdout), result.stderr.slice(-2000)].filter(Boolean).join('\n')}`);
@@ -307,6 +314,6 @@ export function createCopilotAdapter({ command = 'copilot', prefixArgs = [], ver
         observedModel, tokens: usage ? usage.inputTokens + usage.outputTokens : null, aiCredits: null,
         ...(cliUsage || usage ? { cliUsage: { ...cliUsage, ...usage } } : {}), ...(modelWarning ? { modelWarning } : {}),
         ...(worker !== role ? { workerProfile: worker } : {}), ...versionFields };
-    } catch (e) { e.result = result; Object.assign(e, versionFields); throw e; }
+    } catch (e) { e.result = result; Object.assign(e, versionFields, usageFields(usage)); throw e; }
   };
 }

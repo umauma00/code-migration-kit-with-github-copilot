@@ -34,6 +34,12 @@
     `grep`, `glob` and `update_todo`, which 1.0.98 does not map from the `search`
     and `todo` aliases; a prerelease CLI version is recorded without the
     trailing period.
+  - Review follow-ups (PR #3): `maxAiCreditsPerCall` must be at least 30, the
+    CLI minimum; parity repair queues are refused when the original suite failed
+    or did not run, on every path (parsed output, hand-written TSV, and when a
+    queue is read); preparation audits compare the on-disk configuration, so a
+    model change during an audit voids its result; a retried call counts the
+    failed attempt's usage or leaves the run total unknown.
 
 - Remove the VS Code subagent (native) worker backend: its runner adapter,
   claim/submit CLI, profiles, doctor checks, guidance and docs. Workers always
