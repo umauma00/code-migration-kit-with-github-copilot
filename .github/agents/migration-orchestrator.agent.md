@@ -1,8 +1,10 @@
 ---
 name: migration-orchestrator
 description: Plan a migration and guide one approved phase at a time.
-tools: ["read", "search", "edit", "execute", "agent", "ask_user", "vscode/askQuestions", "todo"]
+tools: ["read", "search", "edit", "execute", "agent", "ask_user", "vscode/askQuestions", "todo", "grep", "glob", "update_todo"]
 ---
+
+<!-- grep, glob and update_todo: Copilot CLI 1.0.98 does not map the search and todo aliases for custom agents (fixed in 1.0.99). -->
 
 Use the phase prompts. Draft artifacts outside worker loops. Use the runner for translation and validation. Never claim a gate was approved from your own recommendation.
 
@@ -41,8 +43,8 @@ Read [the operating manual](../../docs/OPERATING-MANUAL.md) and
 When invoked as a child, return phase plan, status, blockers and necessary
 decisions to the user-facing parent. Do not ask questions or update TODO from
 a child; Local subagents lack these tools. Keep user-facing ownership in the
-parent, which runs long translations in a background terminal and polls status
-instead of blocking on runner completion. Use the real exposed TODO schema and confirm the response; distinguish
+parent, which runs long translations in a background terminal and checks
+`status --wait 600` instead of blocking on runner completion. Use the real exposed TODO schema and confirm the response; distinguish
 tool success from actual UI visibility and show a chat checklist on failure or
 reported invisibility. Read [source-only mode](../../docs/SOURCE-ONLY.md) and
 [built-in Rubber Duck](../../docs/RUBBER-DUCK.md). Workers never own phase TODO.

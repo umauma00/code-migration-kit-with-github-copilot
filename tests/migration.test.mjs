@@ -80,8 +80,10 @@ test('edited output invalidates completion; changed judge/source/config invalida
   const second = contextHash(f.root, f.config);
   fs.appendFileSync(safePath(f.root, 'src/math_ops.py'), '\n# source edit\n');
   assert.notEqual(contextHash(f.root, f.config), second);
-  const third = contextHash(f.root, f.config);
-  fs.appendFileSync(safePath(f.root, 'migration/config.json'), '\n');
+  const third = contextHash(f.root, f.config), file = safePath(f.root, 'migration/config.json');
+  fs.appendFileSync(file, '\n');
+  assert.equal(contextHash(f.root, f.config), third, 'formatting is not a configuration change');
+  writeJSON(file, { ...f.config, models: { ...f.config.models, fixer: 'another-model' } });
   assert.notEqual(contextHash(f.root, f.config), third, 'detect on-disk edits even with an in-memory config');
 });
 

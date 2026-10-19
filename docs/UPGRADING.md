@@ -2,6 +2,14 @@
 
 日本語 | [English](UPGRADING.en.md)
 
+## 2026-10-19の更新（再開時の失効範囲、使用量、監査、parity修正）
+
+キットのファイルが変わるため、既存の承認・完了記録は一度だけ失効します。judgeから再検証してください。完了済みの出力は保持され、再実行時はレビューだけが行われます（1単位2回）。この更新以降は、実行上限（`concurrency`・`maxAgentCalls` など）、文書・工程プロンプト・スキル・`.github/copilot-instructions.md` を変えても失効しません。
+
+1. `doctor --check-cli` に、ツール付きレビューのhookを実CLIで確かめる項目が加わります（loopback、AI利用なし）。
+2. 準備監査は `audit_inputs.mjs run --directory migration/audits/ID` でCLIワーカーとして実行できます。既存の未提出requestは設定のハッシュ方式が変わるため、freezeからやり直します。
+3. `maxAiCreditsPerCall` は任意です。既存設定には追加しません。
+
 ## 0.3.0（native方式の削除・チャットだけで完遂）
 
 0.3.0ではVS Codeのサブエージェント方式（native）を削除しました。ワーカーは常にCopilot CLIで動きます。以下はすべてAIがチャットで提案し、同意を得て実行します。

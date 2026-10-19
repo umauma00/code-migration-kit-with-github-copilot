@@ -42,6 +42,8 @@ does not apply to automated workers, which keep their JSON-only contracts.
    run on read-only `reviewer-*-read` profiles, recorded as tool-assisted. All return
    JSON. The coordinator validates and writes only the manifest target.
    Never route around a tool denial or substitute an unrestricted agent session.
+   Independent preparation audits run the same way: `audit_inputs.mjs run` sends
+   a frozen request to the tool-free auditor as a fresh CLI worker on its phaseModels entry.
 5. Two independent reviewers examine every output: source behavior and rule
    adherence (with `reviewFocus: shared`, the new-install default, each covers
    both from its own lens first). The runner supplies source files, candidate, rules, inventory and
@@ -59,6 +61,9 @@ does not apply to automated workers, which keep their JSON-only contracts.
    outputs without a receipt are reviewed again. Partial work is not done.
    Retrying an upstream stage revokes downstream results and approvals even
    if the inputs did not change. A fresh success requires fresh downstream runs.
+   Run limits (concurrency, maxAgentCalls, maxFixRounds, timeouts, retries,
+   maxRunInputBytes, maxAiCreditsPerCall), documents, phase prompts, skills and
+   Copilot instructions do not reach workers' outputs and never revoke them.
 7. Only the coordinator runs configured commands. Expensive builds and suites
    run once per round. A configured cheap unit typecheck may run inside the loop.
    A unit is one source file to one target file in this version.
@@ -78,6 +83,8 @@ does not apply to automated workers, which keep their JSON-only contracts.
    After the human agrees, `build-loop` runs upstream's build-until-clean rounds
    under one host-confirmed grant and stops by itself when the error count stalls.
    When status reports a worker retrying (rate limit, service error), tell the user.
+   Smoke and parity regressions follow the same path (`repair-round --stage smoke|parity`);
+   a failing original suite is never repaired in translated outputs.
 10. Separate redesign from structural translation. In redesign mode, replace the
     rulebook bakeoff with adversarial design review and disposable module trials.
 

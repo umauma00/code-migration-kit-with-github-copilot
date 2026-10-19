@@ -93,7 +93,7 @@ VS Code **Local** のhooksを使う場合は、両方のコマンドに `--harne
 node migration-kit/scripts/run_migration.mjs doctor --check-cli
 ```
 
-`doctor` は設定、プロファイル、CLIバージョンと必要なオプションに加え、ワーカーと同じ引数・環境変数でCLIを起動し、全担当エージェントを実際に解決できるかを確認します（AI呼び出しなし）。新規導入直後はphase 01で作る依存宣言が不足と表示されます。作成・監査後に再実行してください。モデルの利用可否やhooksの実動作を保証するものではありません。
+`doctor` は設定、プロファイル、CLIバージョンと必要なオプションに加え、ワーカーと同じ引数・環境変数でCLIを起動し、全担当エージェントを実際に解決できるかを確認します（AI呼び出しなし）。新規導入直後はphase 01で作る依存宣言が不足と表示されます。作成・監査後に再実行してください。さらに、ローカルの疑似モデル（loopback、アカウント・通信・AI利用なし）で実CLIを動かし、ツール付きレビューのワーカーがhookにより `migration/runs` を読めないことを実際に確認します。このhookの読み込みは非公開の環境変数 `GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS` に依存するため、CLIの更新で効かなくなった場合はここで失敗します（CLI 1.0.98・1.0.100-1で確認）。モデルの利用可否や対話セッションでのhookの実動作を保証するものではありません。
 
 ## 設定する
 
@@ -124,8 +124,9 @@ node migration-kit/scripts/run_migration.mjs doctor --check-cli
 | `dependencyOrder` | `auto`（新規導入）: 単位型チェックがあるときだけ、依存先のレビュー完了まで依存元を待たせる。型チェックがなければ上流と同じく承認範囲を一斉に展開する。`reviewed`（省略時・既存設定）: 常に待つ。`none`: 待たない（型チェックとは併用不可） |
 | `fixPolicy` | `rereview`（省略時）: 修正後に再レビューし、確定した指摘がなくなるまで繰り返す。`single-pass`: 上流Step 3と同じく、確定指摘の修正は1回で完了とし、build/smoke/parityが判定する。呼び出し数と停止する単位が減る |
 | `reviewFocus` | `shared`（新規導入）: 2人のレビュアーがそれぞれ自分の観点を先に、両方の観点（元の動作・ルール順守）を確認し、見つけた欠陥をすべて報告する。互いの結果は見ない。`specialized`（省略時・既存設定）: 上流と同じく1人1観点 |
-| `maxFixRounds`, `maxAgentCalls` | 1単位の修正回数、1回の実行（translate・repair 1回ごと）のAI呼び出し数の上限。`maxAgentCalls` は同時実行数ではなく呼び出しの総数（同時実行数は `concurrency`）。1単位はレビューに問題がなければ3回、上流と同じ修正1回なら4〜5回の呼び出し |
+| `maxFixRounds`, `maxAgentCalls` | 1単位の修正回数、1回の実行（translate・repair 1回ごと）のAI呼び出し数の上限。`maxAgentCalls` は同時実行数ではなく呼び出しの総数（同時実行数は `concurrency`）。1単位はレビューに問題がなければ3回、上流と同じ修正1回なら4〜5回の呼び出し。実行上限なので、変更してもレビュー済みの単位と承認は失効しない。1回だけ変える場合は `translate --max-calls N` |
 | `maxRunInputBytes` | 任意。1回の実行でワーカーへ送る入力の合計バイト数の上限。AI Creditsはトークン量で消費され、使い切ると利用が止まるため、区切って使用量を確認するための予算。runの要約の `usageEstimate` に実測バイト数と推定トークン数（バイト÷4、課金データではない）を残す。判定は完了した呼び出しの合計で行うため、実行中の呼び出し（最大 `concurrency` 件）の分だけ上限を超えることがある |
+| `maxAiCreditsPerCall` | 任意。各ワーカー呼び出しに `--max-ai-credits` として渡す、CLIが強制する1呼び出しあたりのAI Credits上限。実アカウントでの上限到達時の動作は未検証 |
 | `timeoutSeconds` | 通常CLIの1ワーカー呼び出しの時間上限 |
 | `transientRetries`, `transientRetryDelayMs` | 任意。レート制限（429）・5xx・通信エラーの自動再試行の回数（既定2）と最初の待ち時間（既定5000ms、毎回倍）。再試行もAI呼び出し数に数える |
 | `maxConsecutiveFailures` | 任意。単位の失敗が続いたら残りの配布を止める回数（既定3）。1単位の失敗は他の単位を止めない。サインイン切れ・クレジット切れなど全体に共通する失敗は即座に全体を止める |
@@ -268,11 +269,13 @@ node migration-kit/scripts/run_migration.mjs repair \
   --target ported/example.mjs --evidence migration/diagnostic-slice.txt
 ```
 
-修正はレビュー→裁定→確認された指摘の修正→再レビューを通ります。出力が変わると古いビルド以降の承認は無効になるため、改めて確認・承認してください。元ソース、設定、ルール、比較器が変わった場合は、judgeから再検証し、事前試行の更新を確認してtranslationを再承認します。
+修正はレビュー→裁定→確認された指摘の修正→再レビューを通ります。出力が変わると古いビルド以降の承認は無効になるため、改めて確認・承認してください。元ソース、設定、ルール、比較器が変わった場合は、judgeから再検証し、事前試行の更新を確認してtranslationを再承認します。ただし実行上限（`concurrency`、`maxAgentCalls`、`maxFixRounds`、各タイムアウト・再試行、`maxRunInputBytes`、`maxAiCreditsPerCall`）、文書・工程プロンプト・スキル・Copilot指示の変更はワーカーの出力に影響しないため、レビュー済みの単位・工程記録・承認を失効させません。
+
+smoke・parityの失敗も同じ経路で修正します（上流Step 6）。元の実装で同じ入力を実行して分類したうえで、`repair-round --stage smoke|parity` を使うと、変換後ファイルを指す出力行がレビュー付き修正のキューになります。比較器がケース単位でしか報告しない場合は、確認した退行を `file<TAB>module<TAB>code<TAB>message` 形式で書き、`diagnostic_queue.mjs --stage parity --diagnostics migration/PATH.tsv` → `repair --queue` を実行します。元テスト（original）の失敗は継承・環境の問題なので、runnerはキューにしません。修正後はbuild・smoke・parityを改めて承認・実行します。
 
 同じ入力であっても、build等の再実行を開始すると下流の結果と承認は失効します。再実行が成功した場合も、smoke以降を改めて確認・承認・実行してください。judgeを再実行した場合はtranslationの承認からやり直します。
 
-中断後は `translate` を再実行します。通常の `translate` は開始時に完了していた単位も終了時に再確認し、全単位の有効なレビュー記録が揃わなければ失敗します。`repair` の成功条件は指定した単位の完了です。異常終了でロックが残った場合のみ、所有プロセスの終了を確認して `unlock --pid OWNER_PID` を使います。稼働中のPIDでは解除できません。
+長い実行中の進捗確認は `status --wait 600 --format markdown` を使います。runnerが最大600秒待ち、単位の完了や停止があった時点で返すので、親エージェントの確認回数（＝AI呼び出し）を減らせます。中断後は `translate` を再実行します。通常の `translate` は開始時に完了していた単位も終了時に再確認し、全単位の有効なレビュー記録が揃わなければ失敗します。`repair` の成功条件は指定した単位の完了です。異常終了でロックが残った場合のみ、所有プロセスの終了を確認して `unlock --pid OWNER_PID` を使います。稼働中のPIDでは解除できません。
 
 ## 任意：Dynamic Workflows
 
@@ -300,7 +303,7 @@ npm run demo
 - 運用ルールは言語共通ですが、各言語の依存解析・ビルド・同等性判定を自動で用意する万能変換器ではありません。
 - 大規模実案件、巨大な1ファイル、複数ファイルを一体で書き換える単位、再設計の自動実行は未検証・未対応です。
 - CLI応答は1つのJSONです。ワーカー応答の取り込み上限は16 MiB。モデル自体の出力上限にも制約されます。
-- ログには要求モデルと時間を保存します。CLI方式では、CLIがJSONLで報告する実行モデル（`model.call_final_result`）と `premiumRequests` などの使用量も記録し、要求と違うモデルはrunの警告にします。実測できないトークン・AI creditsは `null` です。呼び出し上限は料金上限ではありません。
+- ログには要求モデルと時間を保存します。CLI方式では、CLIがJSONLで報告する実行モデル（`model.call_final_result`）と `premiumRequests` などの使用量も記録し、要求と違うモデルはrunの警告にします。さらに各呼び出しで `--usage-output-file` を使い、CLI自身が報告する入力・出力・キャッシュのトークン数とAI unit（nano AIU）を `cliUsage` に、runの合計を `measuredUsage` に記録します。AI Creditsへの換算はCLIが報告しないため `null` のままです。呼び出し上限は料金上限ではありません。
 - CLIは `--output-format json` のとき、レート制限・5xx・認証エラーをstdoutの `session.error` だけに出します（stderrは空）。runnerはこれを読み、429/5xxは再試行、認証・クレジット切れは全体停止として扱い、エラーメッセージに原因を残します。
 - CLIワーカーは呼び出しごとに名前付き（`migration-kit 役割 対象 ID先頭8文字`）のローカル専用セッション（`--no-remote-export` を付けてGitHubアカウントへの同期を止める。実アカウントでの効果は未検証）として `~/.copilot/session-state` に残り、IDはrunnerが呼び出し前に実行記録（`cli-sessions.jsonl`、再試行・中断した呼び出しも含む）へ残します。ソースコードを含むため、移行後にAIが `sessions status` で件数と容量を報告し、同意があれば `sessions prune` でキットのワーカー分だけを削除します（ホストが確認を求めます）。
 - 並列ワーカーは多くのファイルを開きます。Copilot CLI（Node）は起動時に自分で開けるファイル数（soft limit）をhard limitまで引き上げるため（1.0.98で256→hard limitを確認）、キット側の引き上げは不要です。上げられないのはhard limitだけなので、`doctor --check-cli` がhard limitを確認し、4096未満なら引き上げ方を案内します。

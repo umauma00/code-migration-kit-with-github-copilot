@@ -118,9 +118,14 @@ node migration-kit/scripts/audit_inputs.mjs submit \
   --directory migration/audits/REQUEST_ID --response migration/auditor-answer.json
 ```
 
-Delegate the entire returned request to migration-preparation-auditor (or the
-plugin equivalent), selecting the requested model using the real host schema in
-a fresh context with no tools. Two requests can share the same frozen input
+Run the request with `node migration-kit/scripts/audit_inputs.mjs run --directory
+migration/audits/REQUEST_ID`: a fresh Copilot CLI process on migration-preparation-auditor
+(or the plugin equivalent) with no tools and `--model` set to the requested
+phaseModels entry; the result records the model the CLI reported, the CLI
+version, session ID and usage. Host subagents cannot guarantee the model: the
+CLI task tool only overrides it on an explicit user request and VS Code Local
+refuses a model above the parent's cost tier. A response obtained another way
+can still be checked with `submit`. Two requests can share the same frozen input
 but always have distinct task IDs. Do not forward prior findings, parent history
 or a link instead of file bodies. The JSON contract binds task/input hash and
 requires pass with no findings or changes with evidence-bearing findings.

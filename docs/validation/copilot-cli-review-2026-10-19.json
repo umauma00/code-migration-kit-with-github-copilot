@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-10-19",
+  "platform": "linux/x64",
+  "node": "v22.22.0",
+  "cliVersions": {
+    "1.0.98": "npm dist-tag latest, published 2026-10-14; pinned with COPILOT_AUTO_UPDATE=false because a launcher otherwise runs a newer cached build",
+    "1.0.100-1": "npm dist-tag prerelease, published 2026-10-16"
+  },
+  "localProviderIsTestDouble": true,
+  "externalAIUsed": false,
+  "automatedTests": { "pass": 258, "fail": 0 },
+  "checks": {
+    "verifyCliTransport": { "1.0.98": "pass", "1.0.100-1": "pass", "detail": "doctor ok, instruction isolation ok, 3/3 units in 9 calls, build/smoke/parity pass, resumed run 0 calls" },
+    "verifyPlugin": { "1.0.98": "pass" },
+    "pluginWorkerAgentsResolve": { "1.0.98": "pass", "detail": "8 worker profiles including surveyor, preparation-auditor and -read twins" },
+    "doctorReviewerHookProbe": { "1.0.98": "pass", "1.0.100-1": "pass", "negativeControl": "fails without .github/hooks as expected" },
+    "preparationAuditAsCliWorker": { "1.0.98": "pass", "1.0.100-1": "pass", "detail": "no tools offered to the model, requested model sent, observed model and usage recorded" },
+    "usageOutputFile": { "detail": "inputTokens/outputTokens/cache tokens/totalNanoAiu reported by the CLI and recorded as cliUsage" },
+    "agentScopedHooksInPromptMode": { "1.0.98": "do not run", "1.0.100-1": "do not run", "detail": "Copilot (preToolUse/bash) and VS Code (PreToolUse/command) frontmatter shapes, with and without GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS or --trust-folder" },
+    "repositoryHookInPromptMode": { "untrusted": "not loaded", "GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS=true": "loaded (1.0.98, 1.0.100-1)", "--trust-folder": "loaded (1.0.100-1 only)" },
+    "orchestratorToolAliases": { "1.0.98": "search/todo aliases not mapped; explicit grep, glob, update_todo added", "1.0.100-1": "mapped" },
+    "sessionNameLimit": { "1.0.98": "names over 100 characters rejected; names now capped" }
+  },
+  "notVerified": ["authenticated Copilot account and real models", "installed VS Code (Local and Copilot harness)", "behavior when --max-ai-credits is reached on a real account", "local sandboxing with runner-started workers"]
+}

@@ -10,6 +10,7 @@ export function decide(event, role, cwd) {
   if (!role) { const d = interactiveDecision(event, cwd); return d?.decision === 'deny' ? d.reason : d; }
   if (role.startsWith('reviewer-') && !role.endsWith('-read')) return 'Independent reviewers have no tools; use only the supplied frozen input.';
   if (role === 'surveyor') return 'Surveyors have no tools; use only the supplied frozen scope input.';
+  if (role === 'preparation-auditor') return 'Preparation auditors have no tools; use only the supplied frozen audit request.';
   const name = event.toolName ?? event.tool_name;
   if (!name) return 'Malformed hook event: tool name missing';
   if (!['view', 'Read', 'read', 'grep', 'rg', 'Grep', 'glob', 'Glob', 'search'].includes(name)) return `Migration ${role} is read-only; the coordinator performs writes and commands.`;
