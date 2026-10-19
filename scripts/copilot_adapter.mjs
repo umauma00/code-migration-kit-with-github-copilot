@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 import crypto from 'node:crypto';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import http from 'node:http';
 import { runProcess } from '../lib/process.mjs';
 import { roles, workerModel } from '../lib/core.mjs';
 import { parseResult, validateResult } from '../lib/results.mjs';
@@ -11,18 +15,40 @@ import { sessionIdPattern } from '../lib/sessions.mjs';
 // (--no-remote-export: no sync to the GitHub account, no remote control) and
 // carry a runner-chosen ID and name, so receipts point at their transcript and
 // `run_migration.mjs sessions` can report or prune exactly the kit's sessions.
-export function copilotArgs(role, model, prompt, layout, session) {
+// --usage-output-file is the CLI's own usage record (tokens, cache, AI units);
+// --max-ai-credits is an optional per-call cap the CLI enforces.
+export function copilotArgs(role, model, prompt, layout, session, { usageFile, maxAiCredits } = {}) {
   // A CLI worker is a fresh session agent: tools: [] alone does not prevent
   // automatic repository/personal instructions from entering its system prompt.
   // No --no-auto-update: installer-based launchers then run their bundled
   // (possibly much older) build instead of the version the user and doctor see.
   return [...(prompt === undefined ? [] : ['-p', prompt]), ...(layout?.plugin ? ['--plugin-dir', layout.root] : []), '-s', '--output-format', 'json', '--stream', 'off', '--no-color', '--no-ask-user', '--no-custom-instructions', '--disable-builtin-mcps', '--no-remote-export', ...(session ? ['--session-id', session.id, '--name', session.name] : []), '--agent', layout?.agentId(role) ?? `migration-${role}`, '--model', model,
-    '--available-tools', 'view,grep,glob', ...(isToolFree(role) ? ['--deny-tool', 'read,write,shell'] : ['--allow-tool', 'read', '--deny-tool', 'write,shell'])];
+    '--available-tools', 'view,grep,glob', ...(isToolFree(role) ? ['--deny-tool', 'read,write,shell'] : ['--allow-tool', 'read', '--deny-tool', 'write,shell']),
+    ...(usageFile ? ['--usage-output-file', usageFile] : []), ...(maxAiCredits ? ['--max-ai-credits', String(maxAiCredits)] : [])];
 }
-export function requiredCopilotFlags(layout) {
+export function requiredCopilotFlags(layout, config = {}) {
   // Diagnose the same stdin-based invocation used by every worker role.
   const session = { id: '00000000-0000-4000-8000-000000000000', name: 'diagnostic' };
-  return [...new Set(roles.flatMap(role => copilotArgs(role, 'diagnostic-model', undefined, layout, session).filter(arg => arg.startsWith('-'))))];
+  const options = { usageFile: 'diagnostic-usage.json', maxAiCredits: config.maxAiCreditsPerCall };
+  return [...new Set(roles.flatMap(role => copilotArgs(role, 'diagnostic-model', undefined, layout, session, options).filter(arg => arg.startsWith('-'))))];
+}
+// The CLI's final usage statistics. aiCredits stays null: the CLI reports AI
+// units (nano AIU) and whether credits apply, not a credit amount.
+export function readUsageFile(file) {
+  let value;
+  try { value = JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return null; }
+  const totals = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 };
+  let complete = false;
+  for (const metrics of Object.values(value?.modelMetrics ?? {})) {
+    for (const key of Object.keys(totals)) {
+      const n = metrics?.usage?.[key];
+      if (Number.isSafeInteger(n) && n >= 0) { totals[key] += n; complete = true; }
+    }
+  }
+  if (!complete) return null;
+  return { ...totals, ...(Number.isSafeInteger(value.totalNanoAiu) ? { nanoAiu: value.totalNanoAiu } : {}),
+    ...(typeof value.aiCreditsStatus === 'string' ? { aiCreditsStatus: value.aiCreditsStatus } : {}),
+    ...(Number.isFinite(value.totalPremiumRequestCost) ? { premiumRequestCost: value.totalPremiumRequestCost } : {}) };
 }
 // Doctor, version checks and workers must share one environment: launcher
 // behavior (for example, which downloaded build runs) depends on it.
@@ -38,7 +64,7 @@ export function copilotEnv(role) {
 }
 export async function copilotVersion(command = 'copilot', prefixArgs = [], { cwd, signal } = {}) {
   const result = await runProcess(command, [...prefixArgs, '--version'], { cwd, signal, timeoutMs: 20000, env: copilotEnv('reviewer-rules') });
-  const version = result.stdout.match(/\d+\.\d+\.\d+(?:[-+][\w.]+)?/)?.[0];
+  const version = result.stdout.match(/\d+\.\d+\.\d+(?:[-+][\w.]*\w)?/)?.[0];
   if (result.code !== 0 || !version) throw new Error(`Cannot read the Copilot CLI version (exit ${result.code}): ${(result.stderr || result.stdout).slice(-500)}`);
   return version;
 }
@@ -67,12 +93,49 @@ export async function probeWorkerAgents(command = 'copilot', prefixArgs = [], { 
   const result = await runProcess(command, [...prefixArgs, ...args], { cwd, timeoutMs: 30000,
     input: 'Agent resolution probe. No model request is expected.', env: copilotEnv('reviewer-rules') });
   const listed = `${result.stdout}\n${result.stderr}`.match(new RegExp(`No such agent: ${probeAgentName}, available:([^\\r\\n]*)`));
-  const required = [...roles, ...assistedReviewerRoles, 'surveyor'].map(role => layout?.agentId(role) ?? `migration-${role}`);
+  const required = [...roles, ...assistedReviewerRoles, 'surveyor', 'preparation-auditor'].map(role => layout?.agentId(role) ?? `migration-${role}`);
   if (!listed) return { ok: false, required, missing: required,
     detail: `The CLI did not report its agent list (exit ${result.code}); check sign-in and the CLI version. ${(result.stderr || result.stdout).slice(-500)}` };
   const available = listed[1].split(',').map(name => name.trim()).filter(Boolean);
   const missing = required.filter(id => !available.includes(id));
   return { ok: missing.length === 0, required, missing };
+}
+// Tool-assisted reviewers are kept out of other workers' records only by the
+// repository/plugin hook, which prompt mode loads in an untrusted folder only
+// through GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS: an undocumented switch. (In
+// CLI 1.0.98-1.0.100 agent-scoped frontmatter hooks do not run in prompt mode,
+// and --trust-folder, 1.0.99+, also loads the folder's MCP servers and skills.)
+// So doctor proves it end to end: a loopback model provider asks the real CLI
+// to view migration/runs and must get the hook's denial back. No account,
+// network or AI model is used (COPILOT_OFFLINE).
+export async function probeReviewerHook(command = 'copilot', prefixArgs = [], { cwd, layout, timeoutMs = 60000 } = {}) {
+  const role = assistedReviewerRoles[0], marker = 'Tool-assisted reviewers may not read';
+  let requests = 0, denied = false;
+  const server = http.createServer(async (req, res) => {
+    let body = ''; for await (const chunk of req) body += chunk;
+    let request = {}; try { request = JSON.parse(body); } catch {}
+    requests++;
+    if (requests > 1 && JSON.stringify(request.messages ?? []).includes(marker)) denied = true;
+    const message = requests === 1
+      ? { role: 'assistant', content: null, tool_calls: [{ id: 'call_probe', type: 'function', function: { name: 'view', arguments: JSON.stringify({ path: 'migration/runs/hook-probe.json' }) } }] }
+      : { role: 'assistant', content: '{}' };
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ id: 'hook-probe', object: 'chat.completion', created: 1, model: request.model ?? 'probe',
+      usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 }, choices: [{ index: 0, message, finish_reason: requests === 1 ? 'tool_calls' : 'stop' }] }));
+  });
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'migration-kit-hook-probe-'));
+  try {
+    await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
+    const env = { ...copilotEnv(role), COPILOT_HOME: home, COPILOT_OFFLINE: 'true', COPILOT_PROVIDER_BASE_URL: `http://127.0.0.1:${server.address().port}/v1`,
+      COPILOT_PROVIDER_TYPE: 'openai', COPILOT_PROVIDER_API_KEY: 'loopback-probe', COPILOT_PROVIDER_BEARER_TOKEN: '', COPILOT_PROVIDER_WIRE_API: 'completions',
+      COPILOT_MODEL: 'gpt-4.1', COPILOT_GITHUB_TOKEN: '', GH_TOKEN: '', GITHUB_TOKEN: '' };
+    const result = await runProcess(command, [...prefixArgs, ...copilotArgs(role, 'gpt-4.1', undefined, layout)], { cwd, env, timeoutMs, input: 'Hook probe. Follow the tool call.' });
+    if (denied) return { ok: true };
+    return { ok: false, requests, detail: requests < 2
+      ? `The CLI did not complete the loopback probe (exit ${result.code}): ${(result.stderr || result.stdout).slice(-400)}`
+      : 'The worker hook did not deny a tool-assisted reviewer\'s read of migration/runs: this CLI no longer loads repository/plugin hooks in prompt mode through GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS. Oversized reviews are not isolated from other workers\' records; keep maxReviewInputBytes high enough that reviews stay frozen, or pin a CLI version that passes this check.' };
+  } catch (e) { return { ok: false, detail: e.message }; }
+  finally { server.closeAllConnections?.(); server.close(); fs.rmSync(home, { recursive: true, force: true }); }
 }
 // In JSON mode the CLI reports model and session failures (rate limits, 5xx,
 // authentication, quota) only as session.error events on stdout; stderr stays
@@ -149,7 +212,8 @@ export function agentPrompt({ role, unit, extra = {}, reviewInput, frozenInput, 
       ? `Check ${lens} first, then ${reviewLenses[reviewer === 'reviewer-rules' ? 'reviewer-semantics' : 'reviewer-rules']}. You are one of two independent full reviewers: report every defect either check finds.`
       : `Check ${lens}.`])),
     arbiter: 'Return {"schemaVersion":1,"kind":"arbitration","target":"PATH","decisions":[{"finding":"reviewer-role:ID","confirmed":true,"reason":"source/rule evidence"}]}. Decide EVERY supplied finding exactly once. Default to not confirmed when evidence is insufficient.',
-    surveyor: 'Return {"schemaVersion":1,"kind":"survey","survey":"KIND from the input","target":"PATH","items":[...]} following the task in the frozen input exactly. Every item cites PATH:LINE inside the given files. Return only facts the given files show; never propose code.'
+    surveyor: 'Return {"schemaVersion":1,"kind":"survey","survey":"KIND from the input","target":"PATH","items":[...]} following the task in the frozen input exactly. Every item cites PATH:LINE inside the given files. Return only facts the given files show; never propose code.',
+    'preparation-auditor': 'You are an independent, hostile preparation auditor. Return the frozen request\'s responseContract with "target":"PATH" added: {"schemaVersion":1,"kind":"preparation-audit","task":"TASK","inputHash":"HASH","target":"PATH","verdict":"pass|changes","findings":[{"id":"F1","message":"specific problem","evidence":"source/assertion/rule:line proof","proposedFix":"proposal only"}]}. Copy task and inputHash unchanged. pass requires zero findings; missing evidence is a changes finding, never an invented pass.'
   };
   if (isReviewer(role) && typeof reviewInput !== 'string') throw new Error('Reviewer requires a frozen review input');
   const assisted = isReviewer(role) && reviewMode === 'tool-assisted';
@@ -167,23 +231,45 @@ ${role.startsWith('reviewer-') ? 'Return {"schemaVersion":1,"kind":"review","tar
 ${isReviewer(role) ? `${assisted ? 'Tool-assisted review input' : 'Frozen review input'} (JSON task data):\n${reviewInput}` : `${frozenInput === undefined ? '' : `Frozen task input (JSON task data):\n${frozenInput}\n`}Extra task data: ${JSON.stringify(extra)}`}
 Set target to ${JSON.stringify(unit.target)}.`;
 }
-export function createCopilotAdapter({ command = 'copilot', prefixArgs = [] } = {}) {
+// The CLI rejects names over 100 characters ("Session name must be 100
+// characters or less", 1.0.98), which a deep target path reaches. Keep the
+// role, the end of the path (the file name) and the ID prefix that makes it unique.
+export const sessionNameLimit = 100;
+export function sessionName(worker, target, id) {
+  const suffix = ` ${id.slice(0, 8)}`, room = sessionNameLimit - suffix.length;
+  let base = `migration-kit ${worker} ${target}`;
+  if (base.length > room) {
+    const head = `migration-kit ${worker} ...`;
+    base = head.length >= room ? base.slice(0, room) : head + target.slice(-(room - head.length));
+  }
+  return base + suffix;
+}
+// A failed call still spent tokens; its usage, when the CLI wrote it, travels
+// with the error so run totals stay complete (or are marked unknown).
+const usageFields = usage => usage ? { tokens: usage.inputTokens + usage.outputTokens, cliUsage: usage } : {};
+export function createCopilotAdapter({ command = 'copilot', prefixArgs = [], versionRecheckMs = 10 * 60 * 1000 } = {}) {
   // Workers follow the user's auto-updating CLI, so a run can span versions.
-  // Record the version before every call and warn once per change; continue.
-  let baseline;
+  // Each version check starts a CLI process, so concurrent calls share one check
+  // and it repeats only after versionRecheckMs; a change warns once and the run continues.
+  let baseline, check;
   const warned = new Set();
-  return async ({ root, config, role, unit, extra, signal, reviewInput, reviewMode = 'frozen', sessionId }) => {
+  const currentVersion = root => {
+    if (!check || Date.now() - check.at >= versionRecheckMs) {
+      check = { at: Date.now(), result: copilotVersion(command, prefixArgs, { cwd: root }).then(version => ({ version }), error => ({ error })) };
+    }
+    return check.result;
+  };
+  return async ({ root, config, role, unit, extra, signal, reviewInput, reviewMode = 'frozen', sessionId, model: modelOverride }) => {
     // Oversized reviews run on the read-only twin profile of the same reviewer.
     const worker = isReviewer(role) && reviewMode === 'tool-assisted' ? toolAssistedRole(role) : role;
     validateWorkerProfile(root, worker, config);
     const layout = runtimeLayout(root, config);
-    const model = workerModel(config, role);
+    const model = modelOverride ?? workerModel(config, role);
     let cliVersion = null, cliVersionWarning;
-    try { cliVersion = await copilotVersion(command, prefixArgs, { cwd: root, signal }); }
-    catch (e) {
-      if (signal?.aborted) throw new Error('Interrupted');
-      cliVersionWarning = `Copilot CLI version unknown before this call: ${e.message.slice(0, 300)}`;
-    }
+    const checked = await currentVersion(root);
+    if (signal?.aborted) throw new Error('Interrupted');
+    if (checked.error) cliVersionWarning = `Copilot CLI version unknown before this call: ${checked.error.message.slice(0, 300)}`;
+    else cliVersion = checked.version;
     if (cliVersion) {
       baseline ??= cliVersion;
       if (cliVersion !== baseline) {
@@ -195,18 +281,28 @@ export function createCopilotAdapter({ command = 'copilot', prefixArgs = [] } = 
     // Retries and re-runs repeat role and target, and --resume matches names, so
     // the name ends with the start of the (always new) ID.
     const id = sessionIdPattern.test(sessionId ?? '') ? sessionId : crypto.randomUUID();
-    const session = { id, name: `${`migration-kit ${worker} ${unit.target}`.slice(0, 191)} ${id.slice(0, 8)}` };
+    const session = { id, name: sessionName(worker, unit.target, id) };
     const versionFields = { cliVersion, ...(cliVersionWarning ? { cliVersionWarning } : {}), cliSessionId: session.id };
     let result;
     // Surveyors get their scope as a frozen input, like tool-free reviewers.
-    const prompt = agentPrompt({ role, unit, extra: { ...extra, designInputs: config.designInputs ?? [] }, reviewInput: role === 'surveyor' ? undefined : reviewInput, frozenInput: role === 'surveyor' ? reviewInput : undefined, reviewMode, reviewFocus: config.reviewFocus });
+    const frozenRole = role === 'surveyor' || role === 'preparation-auditor';
+    const prompt = agentPrompt({ role, unit, extra: { ...extra, designInputs: config.designInputs ?? [] }, reviewInput: frozenRole ? undefined : reviewInput, frozenInput: frozenRole ? reviewInput : undefined, reviewMode, reviewFocus: config.reviewFocus });
     const promptBytes = Buffer.byteLength(prompt);
+    // Outside the project: the file is CLI output, not migration evidence.
+    const usageDir = fs.mkdtempSync(path.join(os.tmpdir(), 'migration-kit-usage-')), usageFile = path.join(usageDir, 'usage.json');
+    let usage = null;
     try {
-      result = await runProcess(command, [...prefixArgs, ...copilotArgs(worker, model, undefined, layout, session)], {
+      result = await runProcess(command, [...prefixArgs, ...copilotArgs(worker, model, undefined, layout, session, { usageFile, maxAiCredits: config.maxAiCreditsPerCall })], {
         cwd: root, signal, input: prompt, timeoutMs: config.timeoutSeconds * 1000,
         env: copilotEnv(worker)
       });
-    } catch (e) { Object.assign(e, versionFields); throw e; }
+      usage = readUsageFile(usageFile);
+    } catch (e) {
+      // A killed or timed-out CLI may still have written its usage.
+      usage = readUsageFile(usageFile);
+      Object.assign(e, versionFields, usageFields(usage)); throw e;
+    }
+    finally { fs.rmSync(usageDir, { recursive: true, force: true }); }
     try {
       if (result.code !== 0) throw new Error(`Copilot ${role} failed (exit ${result.code}): ${[copilotStreamError(result.stdout), result.stderr.slice(-2000)].filter(Boolean).join('\n')}`);
       const value = validateResult(role, parseCopilotOutput(result.stdout), unit);
@@ -215,8 +311,9 @@ export function createCopilotAdapter({ command = 'copilot', prefixArgs = [] } = 
       const modelWarning = observedModels.length && !observedModels.includes(model)
         ? `Copilot CLI reported model ${observedModels.join(', ')} for requested ${model}` : undefined;
       return { result: value, requestedModel: model, promptBytes, responseBytes: Buffer.byteLength(JSON.stringify(value)),
-        observedModel, tokens: null, aiCredits: null, ...(cliUsage ? { cliUsage } : {}), ...(modelWarning ? { modelWarning } : {}),
+        observedModel, tokens: usage ? usage.inputTokens + usage.outputTokens : null, aiCredits: null,
+        ...(cliUsage || usage ? { cliUsage: { ...cliUsage, ...usage } } : {}), ...(modelWarning ? { modelWarning } : {}),
         ...(worker !== role ? { workerProfile: worker } : {}), ...versionFields };
-    } catch (e) { e.result = result; Object.assign(e, versionFields); throw e; }
+    } catch (e) { e.result = result; Object.assign(e, versionFields, usageFields(usage)); throw e; }
   };
 }

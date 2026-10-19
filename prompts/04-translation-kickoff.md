@@ -28,8 +28,12 @@ repository for repository-copy installations. For plugin installations, use
 `node "<absolute-plugin-root>/scripts/run_migration.mjs" translate` with the same
 target repository as cwd. Resolve the plugin root from the loaded skill/agent.
 Do not replace the runner with fleet or an unrestricted chat loop.
-Run `translate` in a background or continuing terminal and poll
-`status --format markdown`; never block on it or kill it for being slow.
+Run `translate` in a background or continuing terminal and check it with
+`status --wait 600 --format markdown` (the runner waits until a unit finishes or
+the run stops); never block on it or kill it for being slow. A stop at the AI
+call budget is not a failure: rerun `translate`, or use `translate --max-calls N`
+with the number the person agreed. Run limits (concurrency, maxAgentCalls,
+timeouts, retries) can change between runs without revoking reviewed units.
 Failures name the CLI's own cause (for example `session.error rate_limit 429`).
 The configured `fixPolicy` decides whether a fixed output is reviewed again
 (`rereview`) or judged by build/smoke/parity after one fix (`single-pass`,
@@ -67,7 +71,7 @@ available. Unknown usage stays unknown. Stop before build approval.
 <!-- Copilot adaptation: migration control and instructions updated on 2026-10-08; see NOTICE. -->
 
 Keep orchestration in the user-facing parent: launch translate in a background
-or continuing terminal and poll status while it runs; do not block the parent
+or continuing terminal and check `status --wait` while it runs; do not block the parent
 waiting for the terminal to finish. The runner refills available slots and, per
 `dependencyOrder`, orders manifest jobs by audited dependencies. Non-manifest dependencies stay
 fixed source evidence. Cycles use fixed source when typecheck is deferred; with

@@ -8,7 +8,7 @@ import { validateWorkerProfile, assistedReviewerRoles } from '../lib/review.mjs'
 import { runProcess } from '../lib/process.mjs';
 import { approve, runStage, translate, runPilot, runJudgePreparation } from '../lib/pipeline.mjs';
 import { preparePilot } from '../lib/pilot.mjs';
-import { createCopilotAdapter, requiredCopilotFlags, copilotEnv, probeWorkerAgents, fileLimits, fileLimitMinimum } from './copilot_adapter.mjs';
+import { createCopilotAdapter, requiredCopilotFlags, copilotEnv, probeWorkerAgents, probeReviewerHook, fileLimits, fileLimitMinimum } from './copilot_adapter.mjs';
 import { runtimeLayout, pluginRoot } from '../lib/runtime.mjs';
 import { migrationStatus, statusMarkdown, statusTodo, statusChecklist } from '../lib/status.mjs';
 import { failureGuidance, guidanceMarkdown, failureGuidanceList, guidanceListMarkdown, doctorGuidance } from '../lib/guidance.mjs';
@@ -23,8 +23,9 @@ import { readGuardrails, cliFolderTrust, guardrailsProposal, installGuardrails }
 
 export const usage = `Usage: node migration-kit/scripts/run_migration.mjs COMMAND [options]
   doctor [--check-cli] [--copilot /path/to/copilot]
-  status [--format json|markdown|todo|checklist]
-                              Read-only evidence; todo = host task-list items, checklist = chat progress
+  status [--format json|markdown|todo|checklist] [--wait SECONDS]
+                              Read-only evidence; todo = host task-list items, checklist = chat progress.
+                              --wait (1-1800) returns once a running runner makes progress, stops or the time is up
   guidance --message TEXT [--format json|markdown]
                               Explain a failure: cause, impact and choices with a recommendation
   preferences [--language ja|en] [--original-runtime available|unavailable]
@@ -43,12 +44,15 @@ export const usage = `Usage: node migration-kit/scripts/run_migration.mjs COMMAN
   judge-prepare               Validate/reuse the judge at 00b before map/rules exist
   approve STAGE --note TEXT   Review/approve translation, build, smoke, parity, post-parity, handoff
                               translation may use --batch N or --targets PATH,PATH
-  translate                  Run/resume translation with Copilot CLI workers
+  translate [--max-calls N]  Run/resume translation with Copilot CLI workers; --max-calls is this run's
+                              AI call budget (default maxAgentCalls), agreed with the person
   pilot prepare --target NEW_DIR --sources src/a,src/b --note TEXT [--through translation|build|smoke|parity]
   pilot run --root PILOT_DIR  Run only the explicitly authorized, isolated pilot
-  repair --target PATH --evidence migration/PATH | repair --queue migration/QUEUE.json
-  diagnose                   Parse the current failed build into a TSV and repair queue
-  repair-round               diagnose, then repair the queue; a fresh build still needs approval
+  repair --target PATH --evidence migration/PATH | repair --queue migration/QUEUE.json [--max-calls N]
+  diagnose [--stage build|smoke|parity]
+                             Parse the current failed run into a TSV and repair queue (default build)
+  repair-round [--stage build|smoke|parity]
+                             diagnose, then repair the queue; fresh build (and smoke/parity) runs still need approval
   build-loop --note TEXT [--max-rounds N] [--max-calls N]
                              One host-confirmed grant: build, diagnose, repair with reviews and rebuild until clean,
                              N rounds (default 5), N AI calls in total (default maxAgentCalls) or a stalled error count
@@ -59,7 +63,7 @@ Configuration: migration/config.json. No command commits or pushes changes.`;
 export async function doctor(root, config, { checkCLI = false, command = 'copilot' } = {}) {
   const checks = [{ check: 'configuration', ok: true }];
   const layout = runtimeLayout(root, config);
-  for (const role of ['orchestrator', 'implementer', 'reviewer-semantics', 'reviewer-rules', 'arbiter', 'fixer', 'surveyor', ...assistedReviewerRoles]) {
+  for (const role of ['orchestrator', 'implementer', 'reviewer-semantics', 'reviewer-rules', 'arbiter', 'fixer', 'surveyor', 'preparation-auditor', ...assistedReviewerRoles]) {
     const p = layout.agentPath(role), file = safePath(layout.root, p);
     checks.push({ check: p, ok: fs.existsSync(file) });
     if (role !== 'orchestrator' && fs.existsSync(file)) {
@@ -128,10 +132,12 @@ export async function doctor(root, config, { checkCLI = false, command = 'copilo
       const text = help.stdout + help.stderr;
       checks.push({ check: 'Copilot executable', ok: version.code === 0, detail: version.stdout.trim() });
       const advertised = new Set(text.match(/(?<![\w-])--?[A-Za-z][A-Za-z0-9-]*/g) ?? []);
-      const missing = requiredCopilotFlags(layout).filter(flag => !advertised.has(flag));
+      const missing = requiredCopilotFlags(layout, config).filter(flag => !advertised.has(flag));
       checks.push({ check: 'required flags', ok: help.code === 0 && missing.length === 0, missing });
       const agents = await probeWorkerAgents(command, [], { cwd: root, layout });
       checks.push({ check: 'worker agents resolve', ...agents });
+      if (agents.ok) checks.push({ check: 'tool-assisted reviewer hook loads in prompt mode', ...await probeReviewerHook(command, [], { cwd: root, layout }),
+        note: 'Live check with a loopback model provider: no account, network or AI usage. It proves the hook keeps tool-assisted reviewers out of migration/runs.' });
       checks.push({ check: 'file descriptor limit', ...await fileLimits(), minimum: fileLimitMinimum,
         note: 'Each CLI process raises its soft open-file limit to the hard limit by itself. A hard limit below the minimum is a warning: workers may hit EMFILE "Too many open files", which stops the run with guidance.' });
     } catch (e) { checks.push({ check: 'Copilot executable', ok: false, detail: e.message }); }
@@ -141,6 +147,23 @@ export async function doctor(root, config, { checkCLI = false, command = 'copilo
   const warnings = checks.filter(x => typeof x.warning === 'string').map(x => `${x.check}: ${x.warning}`);
   return { ok: staticValid, staticValid, executionReady: 'not-verified', checks, ...(warnings.length ? { warnings } : {}), workerBackend: 'copilot-cli', requestedModels: config.models, requestedPhaseModels: config.phaseModels ?? {},
     note: 'Help checks do not authenticate, verify model availability, exercise hooks, or make AI calls. Run the live smoke procedure before production use.' };
+}
+// A long translate or build-loop runs in a background terminal. Each status
+// poll by the parent agent is a model turn over its whole conversation, so the
+// runner waits here instead and answers once something changed.
+const progressKey = report => JSON.stringify([report.ok, report.running, report.lock?.runId, report.done, report.total,
+  report.units?.filter(u => u.status === 'blocked').length, report.buildLoop && [report.buildLoop.stage, report.buildLoop.rounds, report.buildLoop.agentCalls]]);
+export async function waitForProgress(root, seconds, { intervalMs = 5000 } = {}) {
+  if (!Number.isInteger(seconds) || seconds < 1 || seconds > 1800) throw new Error('--wait must be a number of seconds from 1 to 1800');
+  const deadline = Date.now() + seconds * 1000;
+  let report = migrationStatus(root);
+  const start = progressKey(report);
+  while ((report.running || report.buildLoop) && Date.now() < deadline) {
+    await new Promise(resolve => setTimeout(resolve, Math.min(intervalMs, Math.max(0, deadline - Date.now()))));
+    report = migrationStatus(root);
+    if (progressKey(report) !== start) break;
+  }
+  return report;
 }
 export async function main(argv = process.argv.slice(2)) {
   const args = parseArgs(argv), cmd = args._[0];
@@ -162,7 +185,7 @@ export async function main(argv = process.argv.slice(2)) {
   try { language = readPreferences(root).userLanguage ?? 'en'; } catch {}
   if (cmd === 'status') {
     if (args.format && !['json', 'markdown', 'todo', 'checklist'].includes(args.format)) throw new Error('status format must be json, markdown, todo or checklist');
-    const report = migrationStatus(root);
+    const report = args.wait === undefined ? migrationStatus(root) : await waitForProgress(root, Number(args.wait));
     if (!report.ok) process.exitCode = 1;
     // Problems that need the person's decision: blocked units and unreadable state.
     const problems = !report.ok ? [{ targets: [report.blockers[0]?.path].filter(Boolean), guidance: failureGuidance(report.blockers[0]?.reason ?? 'status failed', { root, language }) }]
@@ -188,15 +211,15 @@ export async function main(argv = process.argv.slice(2)) {
     else if (cmd === 'pilot' && args._[1] === 'run') {
       result = await runPilot(root, config, createCopilotAdapter({ command: args.copilot }), { signal: controller.signal, onProgress: event => console.error(`${event.unit}: ${event.stage}`) });
     }
-    else if (cmd === 'diagnose') result = diagnoseBuild(root, config);
+    else if (cmd === 'diagnose') result = diagnoseBuild(root, config, { stage: args.stage });
     else if (cmd === 'repair-round') {
-      const diagnosis = diagnoseBuild(root, config);
-      if (diagnosis.clean) result = { ...diagnosis, next: 'Build is clean; review it and approve smoke.' };
+      const diagnosis = diagnoseBuild(root, config, { stage: args.stage });
+      if (diagnosis.clean) result = { ...diagnosis, next: `${diagnosis.stage} is clean; review it and approve the next stage.` };
       else {
         const repair = await translate(root, config, createCopilotAdapter({ command: args.copilot }), {
           signal: controller.signal, repairQueue: diagnosis.queue,
           onProgress: event => console.error(`${event.unit}: ${event.stage} (agent calls ${event.calls})`) });
-        result = { diagnosis, repair, next: 'Review the repaired outputs and the round counts in migration/build-rounds.tsv, then approve build and run build for the next round.' };
+        result = { diagnosis, repair, next: `Review the repaired outputs and the round counts in ${diagnosis.rounds}, then approve and run build${diagnosis.stage === 'build' ? '' : `, smoke${diagnosis.stage === 'parity' ? ' and parity' : ''}`} for the next round.` };
       }
     }
     else if (cmd === 'source-spec' && args._[1] === 'init') {
@@ -254,6 +277,7 @@ export async function main(argv = process.argv.slice(2)) {
       if (cmd === 'repair' && !args.target && !args.queue) throw new Error('repair requires --target or --queue');
       result = await translate(root, config, createCopilotAdapter({ command: args.copilot }), {
         signal: controller.signal, onlyTarget: cmd === 'repair' ? args.target : undefined, repairQueue: cmd === 'repair' ? args.queue : undefined, evidence: args.evidence,
+        maxCalls: args['max-calls'] === undefined ? undefined : Number(args['max-calls']),
         onProgress: event => console.error(`${event.unit}: ${event.stage} (agent calls ${event.calls})`) });
     } else throw new Error(`Unknown command ${cmd}\n${usage}`);
     console.log(JSON.stringify(result, null, 2));

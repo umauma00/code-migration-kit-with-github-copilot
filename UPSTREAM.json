@@ -18,5 +18,13 @@
     "date": "2026-10-18",
     "installedCopilotCLI": "1.0.98",
     "note": "Loopback-provider checks on CLI 1.0.98: both layouts, prompt-mode hook loading, session.error reporting, agent-scoped reader hook (native backend, removed in 0.3.0); no authenticated AI or installed VS Code execution"
+  },
+  "review20261019": {
+    "date": "2026-10-19",
+    "installedCopilotCLI": [
+      "1.0.98",
+      "1.0.100-1"
+    ],
+    "note": "Loopback-provider checks on CLI 1.0.98 (latest) and 1.0.100-1 (prerelease): transport, instruction isolation, plugin agent resolution, doctor hook probe (positive and negative). Agent-scoped frontmatter hooks did not run in prompt mode on either version; --trust-folder (1.0.99+) loads repository hooks but also the folder's other configuration, so the narrower GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS stays and doctor proves it. No authenticated AI or installed VS Code execution."
   }
 }
