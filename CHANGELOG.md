@@ -1,5 +1,46 @@
 # Unreleased (0.3.0)
 
+- 2026-10-19 review (Copilot CLI 1.0.98 and 1.0.100-1, current VS Code docs):
+  - Resumption: the receipt context hashes only what reaches workers. Run limits
+    (`concurrency`, `maxAgentCalls`, `maxFixRounds`, timeouts, retries,
+    `maxRunInputBytes`, `maxAiCreditsPerCall`), formatting of `config.json`,
+    documents, phase prompts, skills and `.github/copilot-instructions.md` no
+    longer revoke reviewed units, phase records and approvals. Before, lowering
+    `concurrency` after rate limits sent a finished translation back to phase 02.
+  - `translate|repair --max-calls N` sets one run's AI call budget without
+    editing the configuration; `status --wait SECONDS` waits runner-side for
+    progress so the parent agent checks a long run with few model turns.
+  - Usage: every worker passes `--usage-output-file`; attempts record the CLI's
+    own token, cache and AI-unit counts as `cliUsage`, run summaries total them
+    as `measuredUsage`, and cost-log rows get measured tokens. Optional
+    `maxAiCreditsPerCall` passes `--max-ai-credits`. The CLI version is checked
+    once per 10 minutes per run instead of before every call.
+  - Preparation audits: `audit_inputs.mjs run` runs a frozen request on the
+    tool-free auditor as a fresh CLI worker with `--model` from phaseModels and
+    records the CLI-reported model, version, session and usage.
+  - Upstream Step 6: `diagnose|repair-round --stage smoke|parity` and
+    `diagnostic_queue.mjs --stage` turn smoke/parity regressions into reviewed
+    repair queues; a failing original suite is refused as inherited.
+  - `doctor --check-cli` proves with a loopback model (no account or AI use)
+    that the tool-assisted reviewer hook still loads in prompt mode, the one
+    undocumented CLI behavior the kit depends on. Agent-scoped hooks do not run
+    in prompt mode, and `--trust-folder` (1.0.99+) also loads the folder's other
+    configuration, so the narrower switch stays.
+  - LIVE-SMOKE adds VS Code Allow all/Autopilot gate checks and local sandboxing.
+  - Fixes found on a pinned CLI 1.0.98 (`COPILOT_AUTO_UPDATE=false`; otherwise a
+    cached newer build runs): worker session names are capped at the CLI's
+    100-character limit (a deep target path made every call fail with "Session
+    name must be 100 characters or less"); the orchestrator profiles also list
+    `grep`, `glob` and `update_todo`, which 1.0.98 does not map from the `search`
+    and `todo` aliases; a prerelease CLI version is recorded without the
+    trailing period.
+  - Review follow-ups (PR #3): `maxAiCreditsPerCall` must be at least 30, the
+    CLI minimum; parity repair queues are refused when the original suite failed
+    or did not run, on every path (parsed output, hand-written TSV, and when a
+    queue is read); preparation audits compare the on-disk configuration, so a
+    model change during an audit voids its result; a retried call counts the
+    failed attempt's usage or leaves the run total unknown.
+
 - Remove the VS Code subagent (native) worker backend: its runner adapter,
   claim/submit CLI, profiles, doctor checks, guidance and docs. Workers always
   run as Copilot CLI processes, also when the migration is driven from VS Code

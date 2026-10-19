@@ -2,6 +2,14 @@
 
 [日本語](UPGRADING.md) | English
 
+## 2026-10-19 update (resumption scope, usage, audits, parity repairs)
+
+Existing approvals and completion records are revoked once because the kit's files change. Re-validate from judge. Completed outputs are kept; the re-run only reviews them again (2 calls per unit). From this update on, changing run limits (`concurrency`, `maxAgentCalls` and the like), documents, phase prompts, skills or `.github/copilot-instructions.md` no longer revokes anything.
+
+1. `doctor --check-cli` gains a live check that the tool-assisted reviewer hook loads in the real CLI (loopback, no AI usage).
+2. Preparation audits can run as CLI workers with `audit_inputs.mjs run --directory migration/audits/ID`. Pending requests that were not submitted must be frozen again because the configuration hash changed.
+3. `maxAiCreditsPerCall` is optional and is not added to existing configurations.
+
 ## 0.3.0 (native backend removed; chat-only operation)
 
 0.3.0 removes the VS Code subagent (native) backend; workers always run on the Copilot CLI. The AI proposes each step below in chat and runs it after you agree.
