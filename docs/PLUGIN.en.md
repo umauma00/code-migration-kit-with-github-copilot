@@ -57,7 +57,7 @@ node /path/to/code-migration-kit/scripts/run_migration.mjs doctor --check-cli
 node /path/to/code-migration-kit/scripts/run_migration.mjs status
 ```
 
-In a new project, doctor reports missing items until phase 01 creates the dependency map. From then on, artifacts, run records and approvals live in the target's `migration/`, and translated output in the configured `outputRoots`. Updating the plugin, or changing the project's `.github/hooks/`, `.github/agents/` or `.claude/agents/`, revokes existing approvals and completion. Track additional scripts inside the target repository that a hook uses via `verificationInputs`.
+In a new project, doctor shows the dependency declaration as `pending` (not needed yet) until phase 01 is recorded. From then on, artifacts, run records and approvals live in the target's `migration/`, and translated output in the configured `outputRoots`. Updating the plugin, or changing the project's `.github/hooks/`, `.github/agents/` or `.claude/agents/`, revokes existing approvals and completion. Track additional scripts inside the target repository that a hook uses via `verificationInputs`.
 
 ## Backends and verification scope
 

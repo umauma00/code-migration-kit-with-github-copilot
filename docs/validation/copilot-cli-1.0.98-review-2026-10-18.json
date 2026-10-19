@@ -8,6 +8,7 @@
     "note": "null = not run yet; see docs/LIVE-SMOKE.en.md \"Human gates and worker sessions\"",
     "liveCLIInteractiveAsk": null,
     "liveCLIAutopilot": null,
+    "liveCLIAutopilotAskUser": null,
     "liveCLIAllowAll": null,
     "liveVSCodeAsk": null,
     "liveVSCodeCopilotHarnessRepoHooks": null,
