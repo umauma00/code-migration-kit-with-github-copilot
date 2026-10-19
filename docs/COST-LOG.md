@@ -36,4 +36,4 @@ mainの既存TSV行は保持する。イベントIDをmigration/phases/cost-inde
 同じ完了記録の再出力では重複させない。TSVの削除や保存途中の停止はインデックスから再出力できる。
 管理済みの行を手で編集した場合は、不一致を知らせて停止する。新しい行の追記は保持する。
 
-runの要約 `migration/runs/RUN_ID/summary.json` の `usageEstimate` は、ワーカーへ送った入力と応答の実測バイト数と、バイト÷4による推定トークン数です。AI Creditsの課金データではないため、cost-log.tsvの `tokens` には入れず、unknownのままにします。
+runの要約 `migration/runs/RUN_ID/summary.json` の `usageEstimate` は、ワーカーへ送った入力と応答の実測バイト数と、バイト÷4による推定トークン数です。AI Creditsの課金データではないため、cost-log.tsvの `tokens` には入れません。CLIワーカーは呼び出しごとに `--usage-output-file` でCLI自身の使用量（入力・出力・キャッシュのトークン数、AI unit）を記録し、runの要約の `measuredUsage` に合計します。全呼び出しで取得できたrunだけ、cost-log.tsvの `tokens` に入力＋出力トークンの合計を記録します。

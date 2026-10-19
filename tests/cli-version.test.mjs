@@ -35,7 +35,7 @@ process.exit(1);
 }
 
 test('doctor proves every worker agent resolves and names the missing ones', async t => {
-  const f = prepare(t), ids = [...roles, ...assistedReviewerRoles, 'surveyor'].map(role => `migration-${role}`);
+  const f = prepare(t), ids = [...roles, ...assistedReviewerRoles, 'surveyor', 'preparation-auditor'].map(role => `migration-${role}`);
   const ok = await doctor(f.root, f.config, { checkCLI: true, command: agentCli(f, ['other', ...ids]) });
   const passed = ok.checks.find(c => c.check === 'worker agents resolve');
   assert.equal(passed.ok, true); assert.deepEqual(passed.missing, []);
@@ -66,7 +66,8 @@ if (process.argv.includes('--version')) {
 }
 await import(${JSON.stringify(transport.prefixArgs[0])});
 `);
-  const adapter = createCopilotAdapter({ command: process.execPath, prefixArgs: [safePath(f.root, 'versioned-cli.mjs')] });
+  // Recheck before every call here; by default a run rechecks every 10 minutes.
+  const adapter = createCopilotAdapter({ command: process.execPath, prefixArgs: [safePath(f.root, 'versioned-cli.mjs')], versionRecheckMs: 0 });
   const errors = [], original = console.error;
   console.error = (...args) => errors.push(args.join(' '));
   let report;

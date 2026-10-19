@@ -1,15 +1,19 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
-// Fixed preparation inputs/results only. The parent supplies actual independent
-// host calls; this transport does not attest a model or invent an AI response.
+// Fixed preparation inputs/results. `run` sends a frozen request to the
+// tool-free auditor as a fresh Copilot CLI process with --model set to the
+// request's phaseModels entry, so the plan is enforced and the CLI-reported
+// model is recorded. A response obtained elsewhere is still accepted by submit.
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { loadConfig, parseArgs, safePath, hash, fileHash, treeHash, readJSON, writeJSON, lockRun } from '../lib/core.mjs';
+import { loadConfig, parseArgs, safePath, hash, fileHash, treeHash, readJSON, writeJSON, lockRun, semanticConfig } from '../lib/core.mjs';
+import { recordSession } from '../lib/sessions.mjs';
+import { createCopilotAdapter } from './copilot_adapter.mjs';
 import { readReviewText, validatePreparationProfile } from '../lib/review.mjs';
 const models = { judge: 'judgeAudit', dependencies: 'dependencyAudit', inventory: 'inventoryAudit', design: 'designAudit' };
-function snapshot(root, config) { return hash(JSON.stringify({ source: treeHash(root, config.sourceRoots), verification: treeHash(root, config.verificationRoots), config: fileHash(safePath(root, 'migration/config.json')), profile: validatePreparationProfile(root, config) })); }
+function snapshot(root, config) { return hash(JSON.stringify({ source: treeHash(root, config.sourceRoots), verification: treeHash(root, config.verificationRoots), config: hash(JSON.stringify(semanticConfig(config))), profile: validatePreparationProfile(root, config) })); }
 export function freezeAudit(root, config, { type, files, out } = {}) {
   if (!Object.hasOwn(models, type) || !Array.isArray(files) || !files.length || new Set(files).size !== files.length) throw new Error('Select judge|dependencies|inventory|design and explicit unique input files');
   const model = config.phaseModels?.[models[type]];
@@ -34,21 +38,41 @@ export function freezeAudit(root, config, { type, files, out } = {}) {
     return { directory, request, note: 'Delegate the exact frozen input to the tool-free preparation auditor in a fresh context. This is a request, not completed review.' };
   } finally { release(); }
 }
-export function submitAudit(root, config, { directory, response } = {}) {
-  if (!/^migration\/audits\/[A-Za-z0-9_-]+$/.test(directory)) throw new Error('Invalid audit directory');
-  const release = lockRun(root, 'audit-submit');
-  try {
-    const request = readJSON(safePath(root, `${directory}/request.json`));
-    if (request.schemaVersion !== 1 || request.kind !== 'preparation-audit-request' || !Object.hasOwn(models, request.type) || request.requestedModel !== config.phaseModels?.[models[request.type]] ||
+function currentRequest(root, config, directory) {
+  if (!/^migration\/audits\/[A-Za-z0-9_-]+$/.test(directory ?? '')) throw new Error('Invalid audit directory');
+  const request = readJSON(safePath(root, `${directory}/request.json`));
+  if (request.schemaVersion !== 1 || request.kind !== 'preparation-audit-request' || !Object.hasOwn(models, request.type) || request.requestedModel !== config.phaseModels?.[models[request.type]] ||
         !request.input || !Array.isArray(request.input.files) || request.snapshot !== snapshot(root, config) || hash(JSON.stringify(request.input)) !== request.inputHash ||
         request.input.files.some(f => typeof f.content !== 'string' || hash(f.content) !== f.hash || fileHash(safePath(root, f.path)) !== f.hash)) throw new Error('Preparation audit inputs changed; use fresh contexts and requests');
+  return request;
+}
+export async function runAudit(root, config, adapter, { directory, signal } = {}) {
+  const request = currentRequest(root, config, directory);
+  if (fileHash(safePath(root, `${directory}/result.json`))) throw new Error('Audit result already submitted; freeze a new request for another independent audit');
+  // A fresh session per request; the journal lets sessions status/prune cover it.
+  const sessionId = recordSession(root, `audit-${request.task}`, { role: 'preparation-auditor', target: directory });
+  const unit = { source: null, target: `${directory}/request.json` };
+  const frozen = JSON.stringify({ task: request.task, type: request.type, inputHash: request.inputHash, input: request.input, responseContract: request.responseContract });
+  const response = await adapter({ root, config, role: 'preparation-auditor', unit, extra: {}, signal, reviewInput: frozen, sessionId, model: request.requestedModel });
+  const { target, ...result } = response.result;
+  writeJSON(safePath(root, `${directory}/response.json`), result);
+  return submitAudit(root, config, { directory, response: `${directory}/response.json`, execution: {
+    worker: 'copilot-cli', observedModel: response.observedModel ?? null, cliVersion: response.cliVersion ?? null, cliSessionId: response.cliSessionId ?? sessionId,
+    ...(response.cliUsage ? { cliUsage: response.cliUsage } : {}), ...(response.modelWarning ? { modelWarning: response.modelWarning } : {}) } });
+}
+export function submitAudit(root, config, { directory, response, execution } = {}) {
+  const release = lockRun(root, 'audit-submit');
+  try {
+    const request = currentRequest(root, config, directory);
     if (fileHash(safePath(root, `${directory}/result.json`))) throw new Error('Audit result already submitted; do not overwrite evidence');
     const result = readJSON(safePath(root, response));
     if (result.schemaVersion !== 1 || result.kind !== 'preparation-audit' || result.task !== request.task || result.inputHash !== request.inputHash ||
         !['pass', 'changes'].includes(result.verdict) || !Array.isArray(result.findings) || (result.verdict === 'pass') !== (result.findings.length === 0) ||
         new Set(result.findings.map(f => f.id)).size !== result.findings.length || result.findings.some(f => ['id', 'message', 'evidence', 'proposedFix'].some(k => typeof f[k] !== 'string' || !f[k].trim()))) throw new Error('Invalid preparation audit response or task/input binding');
     const record = { schemaVersion: 1, task: request.task, inputHash: request.inputHash, requestedModel: request.requestedModel,
-      observedModel: null, result, completedAt: new Date().toISOString(), note: 'Result binding verified; actual host/model/isolation remains separately verified. Findings require confirmation and fresh review after changes.' };
+      observedModel: execution?.observedModel ?? null, ...(execution ? { execution } : {}), result, completedAt: new Date().toISOString(),
+      note: execution ? 'Run as a fresh tool-free Copilot CLI worker with --model set to the requested model; observedModel is the model the CLI reported. Findings require confirmation and fresh review after changes.'
+        : 'Result binding verified; actual host/model/isolation remains separately verified. Findings require confirmation and fresh review after changes.' };
     writeJSON(safePath(root, `${directory}/result.json`), record); return record;
   } finally { release(); }
 }
@@ -56,7 +80,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   try {
     const args = parseArgs(process.argv.slice(2)), root = fs.realpathSync(path.resolve(args.root ?? '.')), config = loadConfig(root);
     const result = args._[0] === 'freeze' ? freezeAudit(root, config, { type: args.type, files: args.files?.split(','), out: args.out })
-      : args._[0] === 'submit' ? submitAudit(root, config, { directory: args.directory, response: args.response }) : (() => { throw new Error('Use freeze --type TYPE --files LIST | submit --directory PATH --response PATH'); })();
+      : args._[0] === 'run' ? await runAudit(root, config, createCopilotAdapter({ command: args.copilot }), { directory: args.directory })
+      : args._[0] === 'submit' ? submitAudit(root, config, { directory: args.directory, response: args.response }) : (() => { throw new Error('Use freeze --type TYPE --files LIST | run --directory PATH [--copilot PATH] | submit --directory PATH --response PATH'); })();
     console.log(JSON.stringify(result, null, 2));
   } catch (e) { console.error(`ERROR: ${e.message}`); process.exitCode = 1; }
 }

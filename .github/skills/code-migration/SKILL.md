@@ -96,6 +96,10 @@ anything but a small repository. Use [surveys](../../../docs/SURVEYS.md): `surve
 facts|contracts|inventory` sends each scope to a fresh tool-free surveyor (a new
 Copilot CLI process) and saves its answer as a file; `survey merge` builds the draft you review. Check cited lines before relying
 on them; merged drafts still go through the phase's audits and the human gate.
+Run each independent preparation audit (00b/01/02) as `audit_inputs.mjs freeze`
+then `audit_inputs.mjs run --directory DIR`: a fresh tool-free Copilot CLI
+worker with `--model` set to the planned phaseModels entry, recording the model
+the CLI reports. Two requests on disjoint batches can run in parallel.
 
 ## When a step fails
 
@@ -148,21 +152,37 @@ upstream and holds dependents for reviewed dependencies only when a per-unit
 typecheck needs them. `concurrency` (up to 64, both reviewers included) should
 stay within the account's rate limits. `reviewFocus`: `shared` (new installs; both
 reviewers check semantics and rules, each from its own lens first) or
-`specialized` (one check each, upstream's split). Changing any of them revokes approvals.
+`specialized` (one check each, upstream's split). Changing `fixPolicy`,
+`dependencyOrder` or `reviewFocus` revokes approvals. Run limits (`concurrency`,
+`maxAgentCalls`, `maxFixRounds`, timeouts, retry settings, `maxRunInputBytes`,
+`maxAiCreditsPerCall`) can change between runs and keep reviewed work and approvals.
 
 Run a long `translate` or `build-loop` in a background or continuing
-terminal and poll `status --format markdown`; never block the parent on it or kill
-it for being slow. When status shows a worker retrying after a transient failure
+terminal and check it with `status --wait 600 --format markdown`: the runner
+itself waits up to that many seconds and answers as soon as a unit finishes or
+the run stops, so each check costs one model turn, not one per poll. Never
+block the parent on the run or kill it for being slow. When status shows a worker retrying after a transient failure
 (rate limit, service error), tell the user at once: the runner waits and retries
-by itself; if it persists, offer a lower `concurrency` after the run.
+by itself; if it persists, offer a lower `concurrency` after the run (it keeps
+reviewed work). A run that stops at its AI call budget is a budget stop: rerun
+`translate`, or propose `translate --max-calls N` with the number the person agrees.
 
 After a failed build, propose `build-loop --note TEXT [--max-rounds N]
 [--max-calls N]` (defaults 5 rounds and `maxAgentCalls` AI calls for the whole
 loop; say both numbers): one host-confirmed grant that rebuilds, parses errors
 into the repair queue, runs reviewed repairs and stops when clean, at the round
 or call limit, or when the error count stops falling (then propose a rule
-amendment). While it runs, other runner commands are refused; poll `status`.
+amendment). While it runs, other runner commands are refused; check `status --wait`.
 Show the round counts and calls used.
+
+After a failed smoke or parity (upstream Step 6), triage every divergence against
+the original first: regression, inherited, environment or comparator defect.
+For regressions run `repair-round --stage smoke|parity`: output lines that name
+translated files become the reviewed repair queue; when none do, write the
+confirmed regressions as `file<TAB>module<TAB>code<TAB>message` rows and run
+`diagnostic_queue.mjs --stage parity --diagnostics migration/PATH.tsv`, then
+`repair --queue`. The person then approves build, smoke and parity again. A
+failing original suite is never repaired in translated outputs.
 
 Workers are local-only (`--no-remote-export`), named Copilot CLI sessions whose
 IDs the runner journals before each call (retries and interrupted calls included); their transcripts contain source code. After the
