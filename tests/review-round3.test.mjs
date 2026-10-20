@@ -102,21 +102,31 @@ test('depmap commands follow the import base: src layout re-prefixes, a package 
   assert.doesNotMatch(pkg.manifest, /--prefix/);
 });
 
-test('agreed findings skip the arbiter; disputed findings alone are arbitrated', async t => {
+test('findings at the same source line still go to the arbiter, which keeps one side of a conflict', async t => {
   const f = fixture(t); await approved(f);
-  const calls = [], fixerInputs = [];
+  const calls = [], fixerInputs = [], arbiterInputs = [];
   let round = 0;
+  // Same line, opposite changes: citing one place is not agreeing on the fix.
+  const conflict = { ...finding, id: 'R1', message: 'Round the quotient toward zero' };
   await translate(f.root, f.config, async args => {
     calls.push(args.role);
-    if (args.role.startsWith('reviewer-') && round === 0) return { result: result(args.role, args.unit, { findings: [finding] }) };
+    if (args.role.startsWith('reviewer-') && round === 0) return { result: result(args.role, args.unit, { findings: [args.role === 'reviewer-rules' ? conflict : finding] }) };
+    if (args.role === 'arbiter') {
+      arbiterInputs.push(args.extra);
+      return { result: result(args.role, args.unit, { decisions: args.extra.findings.map(x => ({ finding: x.reference, confirmed: x.reference === 'reviewer-semantics:F1', reason: x.evidence })) }) };
+    }
     if (args.role === 'fixer') { fixerInputs.push(args.extra.confirmedFindings.map(x => x.reference)); round++; }
     return fake(args);
   });
-  assert.equal(calls.includes('arbiter'), false, 'same source line from both reviewers is agreement');
-  assert.deepEqual(fixerInputs, [['reviewer-semantics:F1', 'reviewer-rules:F1']]);
+  assert.equal(calls.filter(r => r === 'arbiter').length, 1);
+  assert.deepEqual(arbiterInputs[0].findings.map(x => x.reference), ['reviewer-semantics:F1', 'reviewer-rules:R1']);
+  assert.deepEqual(arbiterInputs[0].samePlace, [['reviewer-semantics:F1', 'reviewer-rules:R1']]);
+  assert.deepEqual(fixerInputs, [['reviewer-semantics:F1']], 'only the confirmed side reaches the fixer');
+  assert.ok(done(f.root, f.units[0], contextHash(f.root, f.config)));
   const pair = pairFindings({ 'reviewer-semantics': { result: { findings: [finding, { ...finding, id: 'F2', evidence: 'src/math_ops.py:9 other' }] } },
     'reviewer-rules': { result: { findings: [{ ...finding, evidence: 'see ./src/math_ops.py:4' }] } } });
-  assert.deepEqual([pair.agreed.map(x => x.reference), pair.disputed.map(x => x.reference)], [['reviewer-semantics:F1', 'reviewer-rules:F1'], ['reviewer-semantics:F2']]);
+  assert.deepEqual(pair.findings.map(x => x.reference), ['reviewer-semantics:F1', 'reviewer-semantics:F2', 'reviewer-rules:F1']);
+  assert.deepEqual(pair.samePlace, [['reviewer-semantics:F1', 'reviewer-rules:F1']]);
 });
 
 test('a failing in-loop typecheck becomes a confirmed finding for the fixer', async t => {

@@ -26,5 +26,12 @@
       "1.0.100-1"
     ],
     "note": "Loopback-provider checks on CLI 1.0.98 (latest) and 1.0.100-1 (prerelease): transport, instruction isolation, plugin agent resolution, doctor hook probe (positive and negative). Agent-scoped frontmatter hooks did not run in prompt mode on either version; --trust-folder (1.0.99+) loads repository hooks but also the folder's other configuration, so the narrower GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS stays and doctor proves it. No authenticated AI or installed VS Code execution."
+  },
+  "review20261019Followup": {
+    "date": "2026-10-19",
+    "copilotCLIPackage": "1.0.98",
+    "githubDocsCommit": "4256ba0c02ef6f670710611bcb399b1355388bec",
+    "vscodeDocsCommit": "c391542bd563ee3a7fdf9591785b76e0dc5bf3b1",
+    "note": "Read without running the CLI: the shipped 1.0.98 package's tool schemas (ask_user takes one question with optional string choices; update_todo takes one markdown checklist string) and its changelog (autopilot auto-handles ask_user). GitHub Docs: unrecognized custom-agent tool names are ignored. VS Code docs: vscode/askQuestions and todo exist and are unavailable to Local subagents. No authenticated AI or installed VS Code execution."
   }
 }

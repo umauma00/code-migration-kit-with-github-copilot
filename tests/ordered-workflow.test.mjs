@@ -12,6 +12,7 @@ import { migrationStatus } from '../lib/status.mjs';
 import { costHeader } from '../lib/cost.mjs';
 import { install, kitRoot } from '../scripts/install.mjs';
 import { runProcess } from '../lib/process.mjs';
+import { failureGuidance } from '../lib/guidance.mjs';
 
 function fixture(t, mode = 'runtime') {
   const f = prepare(t);
@@ -94,7 +95,12 @@ test('source-only parity requires explicit applicability acknowledgment before h
   for(const stage of ['build','smoke']) {approve(f.root,f.config,stage,'Reviewed current evidence');await runStage(f.root,f.config,stage);}
   assert.equal(phaseCommand(f.root,f.config,'next').next,'05c');
   atomicWrite(safePath(f.root,'migration/handoff.md'),'Source-based complete; equivalence unverified; runtime parity pending.');
-  assert.throws(()=>approve(f.root,f.config,'handoff','Try skipping acknowledgment'),/Phase 05c/);
+  const refusal=(()=>{try{approve(f.root,f.config,'handoff','Try skipping acknowledgment');}catch(e){return e;}})();
+  assert.match(refusal?.message??'',/Phase 05c/);
+  // Source-only 05c is the person's acknowledgment, not a runner stage to rerun.
+  const ack=failureGuidance(refusal,{root:f.root,language:'en'});
+  assert.equal(ack.recommended,'acknowledge-unverified');assert.match(ack.options[0].command,/phase complete 05c --note/);
+  assert.ok(!ack.options.some(o=>o.id==='finish-runner-phase'));
   complete(f,'05c');assert.equal(readJSON(safePath(f.root,'migration/phases/05c.json')).equivalence,'unverified');
   approve(f.root,f.config,'handoff','Reviewed smoke and limitations');await runStage(f.root,f.config,'handoff');
   assert.equal(migrationStatus(f.root).workflow.done,10);assert.equal(migrationStatus(f.root).equivalence,'unverified');

@@ -23,10 +23,14 @@ exposed by the current host rather than assuming a fixed API name. Only the
 parent manages this list; automated workers keep their JSON-only contracts.
 
 Build the items from `run_migration.mjs status --format todo`: it returns the
-ten phases as `{ "todoList": [{ id, title, status, description }] }` in the
-user's language, with exactly one `in-progress` item (the first incomplete
-phase) and statuses computed from receipts. Map it onto the host tool's actual
-schema. `status --format checklist` prints the same list for chat; include that
+ten phases as `{ "todoList": [{ id, title, status, description }], "current": {…} }`
+in the user's language, with statuses computed from receipts. `current` names
+the first incomplete phase in every state. Its item is `in-progress` only while
+it runs or is worked on; waiting, blocked or not yet started it stays
+`not-started` with its state in the title (the three-state rule below), so at
+most one item is in progress. Pass only `todoList` to the host tool. Map it onto the host tool's actual
+schema; Copilot CLI's `update_todo` takes one markdown checklist string, so pass
+it the item lines of `status --format checklist`. That command prints the same list for chat; include that
 checklist in **every** phase report and failure report, whether or not the TODO
 tool rendered, so the user always sees the current phase.
 
@@ -82,10 +86,16 @@ reports still follow the contract below.
 ## Ask when a decision is missing
 
 Check the user's current request and earlier answers first. Use an available
-question tool (`ask_user` in Copilot, or the host's equivalent) when a required
-answer or phase authorization is missing. Do not repeat a question whose answer
-is already clear. Group closely related setup questions, such as migration
-languages and available model IDs; never guess an account's available models.
+question tool (`ask_user` in the Copilot CLI, `vscode/askQuestions` in VS Code)
+when a required answer or phase authorization is missing. Do not repeat a
+question whose answer is already clear. Give choices for every finite set of
+answers (language, proceed/revise/pause, failure options). Model IDs are free
+text: never guess an account's available models or offer invented ones as
+choices. `ask_user` takes one question per call, so ask related setup questions
+such as migration languages and model IDs one after another; group them only
+where the host takes several questions in one call (`vscode/askQuestions`). A
+free-text reply that does not clearly pick a choice is a new instruction, not
+consent: clarify it before acting on a gate.
 
 Finish and show the concrete artifacts before requesting permission for the next
 phase. If the user already instructed that phase for the current artifacts,
@@ -95,7 +105,11 @@ for feasibility authorizes feasibility, not production translation.
 If the question tool is unavailable or rejects interactive use, present the same
 question and choices in chat, including exact example replies, then wait for the
 user. Do not simulate a tool result or treat a default selection, timeout, empty
-answer or closed dialog as authorization. A nonblocking question stays pending;
+answer or closed dialog as authorization. An automatic reply is not an answer
+either: in Copilot CLI autopilot the host answers `ask_user` itself (for example,
+that the user is not available and you should work autonomously). Choose
+nothing, report the pending question, and ask the person to continue in an
+interactive session or to answer in chat. A nonblocking question stays pending;
 only independent work may continue while waiting for a required answer.
 
 ## Finish every phase with a report
@@ -158,12 +172,15 @@ Every failed command, failed phase check, blocked unit or refused gate ends with
 a **failure report**, never with a bare error or a silent retry. Runner commands
 print it after the `ERROR:` line (one section per distinct cause when several
 units failed), `doctor` prints it for every failed check, and
-`status --format markdown` appends it for blocked units; for failures from any other tool (host TODO,
-question tool, a script, a worker), run
+`status --format markdown` appends it for blocked units; for failures from any other tool (a
+script, a worker, a hook denial), run
 `run_migration.mjs guidance --message "<the error text>"` to get the same
-structure. Adapt it with what you actually observed, then report:
+structure. A TODO or question tool that is unavailable or rejects a call is not
+a failed step: use the chat fallbacks above. Adapt the guidance with what you
+actually observed, then report:
 
-1. **What failed:** the phase and command, and the progress checklist.
+1. **What failed:** the phase and command, and the progress checklist
+   (`status --format checklist`; `status --format markdown` starts with it).
 2. **Cause:** the concrete reason in plain words, with the file or receipt that
    shows it. Separate what you verified from what you suspect.
 3. **Impact:** what is blocked and what is still valid (completed units and
@@ -174,7 +191,8 @@ structure. Adapt it with what you actually observed, then report:
    approvals restart"), and when another option is better. Include the
    command each option runs, if any.
 5. **Question:** ask with the question tool, recommended option first and
-   labelled `（推奨）` / `(recommended)`. Without a question tool, show the same
+   labelled `（推奨）` / `(recommended)`; `guidance --format json` returns these
+   labels as `choices`. Without a question tool, show the same
    numbered choices in chat with a reply example such as 「1で進めて」.
 
 Wait for the answer. Never pick an option on the user's behalf, never treat the
