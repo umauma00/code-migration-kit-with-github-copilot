@@ -23,9 +23,12 @@ exposed by the current host rather than assuming a fixed API name. Only the
 parent manages this list; automated workers keep their JSON-only contracts.
 
 Build the items from `run_migration.mjs status --format todo`: it returns the
-ten phases as `{ "todoList": [{ id, title, status, description }] }` in the
-user's language, with exactly one `in-progress` item (the first incomplete
-phase) and statuses computed from receipts. Map it onto the host tool's actual
+ten phases as `{ "todoList": [{ id, title, status, description }], "current": {…} }`
+in the user's language, with statuses computed from receipts. `current` names
+the first incomplete phase in every state. Its item is `in-progress` only while
+it runs or is worked on; waiting, blocked or not yet started it stays
+`not-started` with its state in the title (the three-state rule below), so at
+most one item is in progress. Pass only `todoList` to the host tool. Map it onto the host tool's actual
 schema; Copilot CLI's `update_todo` takes one markdown checklist string, so pass
 it the item lines of `status --format checklist`. That command prints the same list for chat; include that
 checklist in **every** phase report and failure report, whether or not the TODO

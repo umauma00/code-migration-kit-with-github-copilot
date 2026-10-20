@@ -72,8 +72,12 @@ before implementer/fixer calls; the final candidate is checked after generation.
 {"schemaVersion":1,"kind":"arbitration","target":"ported/example.mjs","decisions":[{"finding":"reviewer-semantics:F1","confirmed":true,"reason":"The input -1 demonstrates the mismatch"}]}
 ```
 
-Every finding is decided exactly once. Only confirmed findings reach the fixer.
-The fixed output goes through both independent reviews again.
+The arbiter receives every finding from both reviews (`findings`) and the
+`samePlace` pairs of semantics and rules findings that cite the same source
+location. A pair is a candidate, not an agreement: both are confirmed only if
+they ask for compatible changes. Every finding is decided exactly once. Only
+confirmed findings reach the fixer. The fixed output goes through both
+independent reviews again.
 
 ## Receipts
 

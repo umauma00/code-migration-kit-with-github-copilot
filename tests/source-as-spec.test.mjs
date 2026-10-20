@@ -108,13 +108,19 @@ test('status lists ten phases with exactly one current phase for TODO and chat',
   const root = project(t);
   phaseCommand(root, loadConfig(root), 'init');
   const report = migrationStatus(root);
-  const todo = statusTodo(report, 'ja').todoList;
-  assert.equal(todo.length, 10);
-  assert.deepEqual(todo.map(i => i.status).filter(s => s === 'in-progress'), ['in-progress']);
-  assert.equal(todo[0].title, '00 事前調査');
+  const todo = statusTodo(report, 'ja');
+  assert.equal(todo.todoList.length, 10);
+  // Nothing runs yet: no item is in progress, while current still names 00.
+  assert.ok(todo.todoList.every(i => i.status === 'not-started'));
+  assert.deepEqual(todo.current, { id: 1, phase: '00', title: '00 事前調査', state: 'not-started' });
+  assert.equal(todo.todoList[0].title, '00 事前調査');
   const checklist = statusChecklist(report, 'en');
   assert.match(checklist, /^Migration flow: 0\/10 phases complete\. Current: 00 Feasibility/);
   assert.match(checklist, /▶ 00 Feasibility {2}← you are here/);
+  // Started work is the one item in progress.
+  phaseCommand(root, loadConfig(root), 'start', '00');
+  const started = statusTodo(migrationStatus(root), 'ja').todoList;
+  assert.deepEqual(started.filter(i => i.status === 'in-progress').map(i => i.title), ['00 事前調査【作業中】']);
 });
 
 test('failure guidance names the cause and recommends one of several choices with reasons', async t => {
@@ -139,7 +145,9 @@ test('failure guidance names the cause and recommends one of several choices wit
   const runtimeMessage = 'Prepare runtime judge inputs and original/mutation/parity commands';
   const runtime = failureGuidance(runtimeMessage, { root, language: 'en' });
   assert.equal(runtime.recommended, 'answer-runtime');
-  assert.match(runtime.options[0].command, /preferences --original-runtime available\|unavailable$/);
+  // The person answers first, so there is no command line to run yet.
+  assert.equal(runtime.options[0].command, undefined);
+  assert.match(runtime.options[0].reason, /preferences --original-runtime available \(or unavailable\)/);
   setPreferences(root, { originalRuntime: 'unavailable' });
   const unavailable = failureGuidance(runtimeMessage, { root, language: 'en' });
   assert.equal(unavailable.recommended, 'switch-source-as-spec');

@@ -41,9 +41,9 @@ upstream); `dependencyOrder` decides whether dependents wait for reviewed
 dependencies. Report both settings with the burndown.
 
 The runner performs implementation → two independent reviews → arbitration of
-disputed findings (a finding both reviewers raise at the same source path:line is
-agreed and confirmed without the arbiter; the arbiter defaults to not confirmed)
-→ confirmed fixes → re-review (skipped with `fixPolicy: single-pass`) →
+every finding (findings both reviewers raise at the same source path:line reach
+the arbiter as a pair, since they can still ask for different changes; the
+arbiter defaults to not confirmed) → confirmed fixes → re-review (skipped with `fixPolicy: single-pass`) →
 hash-bound completion. Workers use
 explicit models from config and structured results. Reviewers have no tools and
 receive identical frozen inputs; other CLI workers have read/search-only tools.

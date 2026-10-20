@@ -24,6 +24,22 @@
     PHASE-HANDOFF notes that Copilot CLI `update_todo` takes one markdown
     checklist (`status --format checklist`), and that TODO and question tool
     failures use their chat fallbacks rather than a failure report.
+  - Review follow-ups (PR #4):
+    - Arbitration: two findings citing the same source path:line were confirmed
+      without the arbiter, even when they asked for opposite changes (for
+      example rounding toward negative infinity and toward zero). Every
+      finding now goes to the arbiter; same-location pairs reach it as
+      `samePlace` candidates, and it confirms both only if they ask for
+      compatible changes (upstream rule 4). A unit whose findings were all
+      paired makes one more arbiter call.
+    - TODO status: the current phase is `in-progress` only while it runs or is
+      worked on; waiting, blocked or not yet started it is `not-started` with
+      its state in the title, as PHASE-HANDOFF's three-state rule says.
+      `status --format todo` adds `current`, and the checklist arrow follows it.
+    - Guidance commands run as written: `survey status` takes the kind the
+      error names (none when unknown), and the original-runtime question has
+      no `a|b` placeholder command. A git denial recommends keeping history
+      (`git status --short`) instead of running a runner stage.
 
 - 2026-10-19 review (Copilot CLI 1.0.98 and 1.0.100-1, current VS Code docs):
   - Resumption: the receipt context hashes only what reaches workers. Run limits
