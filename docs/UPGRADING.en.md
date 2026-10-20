@@ -9,7 +9,7 @@ Existing approvals and completion records are revoked once because the kit's fil
 1. `doctor --check-cli` gains a live check that the tool-assisted reviewer hook loads in the real CLI (loopback, no AI usage).
 2. Preparation audits can run as CLI workers with `audit_inputs.mjs run --directory migration/audits/ID`. Pending requests that were not submitted must be frozen again because the configuration hash changed.
 3. `maxAiCreditsPerCall` is optional and is not added to existing configurations.
-4. The same-day follow-up (failure choices, phase-order guidance, questions and TODO display) also changes the kit's files, so a project re-validated before it is revoked once more (completed outputs are kept). `doctor` no longer fails on a missing dependency declaration before phase 01 is recorded.
+4. The same-day follow-up (failure choices, phase-order guidance, questions and TODO display) also changes the kit's files, so a project re-validated before it is revoked once more (completed outputs are kept). `doctor` no longer fails on a missing dependency declaration before phase 01 is recorded. Findings both reviewers raise at the same line are now arbitrated too, so such a unit makes one more arbiter call. In the TODO list, a phase that waits for approval or review or is blocked is `not-started` (its state is in the title) rather than `in-progress`.
 
 ## 0.3.0 (native backend removed; chat-only operation)
 

@@ -49,9 +49,10 @@ does not apply to automated workers, which keep their JSON-only contracts.
    both from its own lens first). The runner supplies source files, candidate, rules, inventory and
    any diagnostic; reviewer profiles must keep `tools: []` (the `-read` twins keep
    read/search tools only). They never receive
-   each other's findings. Findings both reviewers raise at the same source
-   path:line are agreed; an arbiter confirms or rejects the disputed rest with
-   evidence, defaulting to not confirmed. A failing in-loop typecheck is a
+   each other's findings. An arbiter confirms or rejects every finding with
+   evidence, defaulting to not confirmed. Findings both reviewers raise at the
+   same source path:line reach it as a pair: the same place is not agreement, and
+   it confirms both only if they ask for compatible changes. A failing in-loop typecheck is a
    confirmed finding for the fixer. Fix only confirmed findings and
    review the changed output again, unless the user chose `fixPolicy:
    single-pass` (upstream Step 3: one fix, then build/smoke/parity judge it).

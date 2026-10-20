@@ -13,7 +13,7 @@ import { install, kitRoot } from '../scripts/install.mjs';
 import { mini, prepare } from './helpers.mjs';
 import { loadConfig, safePath, atomicWrite, writeJSON } from '../lib/core.mjs';
 import { phaseCommand } from '../scripts/phase_cli.mjs';
-import { migrationStatus, statusTodo } from '../lib/status.mjs';
+import { migrationStatus, statusTodo, statusChecklist } from '../lib/status.mjs';
 import { failureGuidance, guidanceRuleIds, doctorGuidance } from '../lib/guidance.mjs';
 import { interactiveDecision, installGuardrails } from '../lib/guardrails.mjs';
 import { setPreferences } from '../lib/preferences.mjs';
@@ -73,6 +73,10 @@ function assertContract(g, where, language) {
   assert.equal(g.recommended, g.options[0].id, where);
   assert.ok(g.options.every(o => o.label && o.reason), `${where}: label and reason on every option`);
   assert.deepEqual(g.choices, g.options.map((o, i) => i ? o.label : `${o.label}${recommended[language]}`), `${where}: choices for the question tool`);
+  // A command runs as written: outside quotes no pipe, redirection or separator
+  // may turn a placeholder such as a|b into other commands (&& chains are explicit).
+  for (const o of g.options.filter(x => x.command))
+    assert.doesNotMatch(o.command.replace(/"[^"]*"|'[^']*'/g, '').replaceAll('&&', ''), /[|<>;]/, `${where}: ${o.id} command is one command line`);
 }
 function project(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'guidance-contract-'));
@@ -90,8 +94,16 @@ test('every failure rule offers two choices plus pause, the recommendation first
     assertContract(g, `${id} (${language})`, language);
   }
   // Phase-specific and preference-specific variants keep the contract too.
-  for (const message of ['Phase 00 is not reviewed for current inputs', 'Phase 03 is not reviewed for current inputs', 'Phase 05c is not reviewed for current inputs'])
+  for (const message of ['Phase 00 is not reviewed for current inputs', 'Phase 03 is not reviewed for current inputs', 'Phase 05c is not reviewed for current inputs',
+    '"npm test" is denied by migration/guardrails.json during the migration.'])
     assertContract(failureGuidance(message, { language: 'en' }), message, 'en');
+});
+
+test('a survey command names the kind the error reports, or none when it is unknown', () => {
+  const named = failureGuidance('Survey incomplete: 2 of 5 scopes have no current result (s1, s2); resume survey run --kind inventory', { language: 'en' });
+  assert.match(named.options.find(o => o.id === 'survey-status').command, /survey status --kind inventory$/);
+  const unnamed = failureGuidance(samples['survey-incomplete'], { language: 'en' });
+  assert.equal(unnamed.options.find(o => o.id === 'survey-status').command, undefined);
 });
 
 test('a refused confirmation or an automatic reply is never taken as the answer', () => {
@@ -113,12 +125,17 @@ test("the kit's own hook denials are explained as the design working, in the per
   installGuardrails(f.root, kitRoot, {});
   for (const language of ['en', 'ja']) {
     setPreferences(f.root, { language });
+    // Version control that rewrites history: keep it; builds and tests: the runner runs them.
     const denied = interactiveDecision({ toolName: 'bash', toolArgs: { command: 'git reset --hard' }, cwd: f.root }, f.root);
     assert.equal(denied?.decision, 'deny');
     const g = failureGuidance(denied.reason, { root: f.root, language });
     assert.equal(g.id, 'guardrail-denied', denied.reason);
-    assert.equal(g.recommended, 'use-runner');
+    assert.equal(g.recommended, 'keep-history');
+    assert.equal(g.options[0].command, 'git status --short');
+    assert.ok(!g.options.some(o => o.id === 'use-runner'), 'a git denial is not a build to run');
     assert.match(g.options.find(o => o.id === 'revise-guardrails').command, /guardrails show$/, 'the list is shown before any change');
+    const build = interactiveDecision({ toolName: 'bash', toolArgs: { command: 'npm test' }, cwd: f.root }, f.root);
+    assert.equal(failureGuidance(build.reason, { root: f.root, language }).recommended, 'use-runner', build.reason);
     const write = interactiveDecision({ toolName: 'bash', toolArgs: { command: 'cp migration-kit/templates/guardrails.json migration/guardrails.json' }, cwd: f.root }, f.root);
     assert.equal(failureGuidance(write.reason, { root: f.root, language }).id, 'guardrails-write', write.reason);
   }
@@ -158,6 +175,14 @@ test('TODO descriptions follow the report language while JSON keeps the recorded
   assert.equal(statusTodo(report, 'ja').todoList[0].description, '確認・記録待ち');
   assert.equal(statusTodo(report, 'ja').todoList[5].description, '未完了');
   assert.equal(statusTodo(report, 'en').todoList[0].description, 'pending review');
+  // Waiting for the person's review is not work in progress: not-started, state
+  // in the title, and still the current phase in TODO and chat.
+  atomicWrite(safePath(root, 'migration/feasibility.md'), 'Three Python files; structural port.\n');
+  const waiting = migrationStatus(root), todo = statusTodo(waiting, 'ja');
+  assert.equal(waiting.currentState, 'awaiting-review');
+  assert.deepEqual([todo.todoList[0].status, todo.todoList[0].title], ['not-started', '00 事前調査【確認待ち】']);
+  assert.equal(todo.current.state, 'awaiting-review');
+  assert.match(statusChecklist(waiting, 'ja'), /▶ 00 事前調査【確認待ち】　← いまここ/);
 });
 
 test('doctor shows the review dependency map as pending until phase 01 is recorded', async t => {

@@ -131,7 +131,8 @@ test('fixPolicy single-pass: one fix of the confirmed findings completes on the 
     return fake(args);
   });
   assert.equal(report.done, 1);
-  assert.deepEqual(calls.sort(), ['fixer', 'implementer', 'reviewer-rules', 'reviewer-semantics']);
+  // Two findings at one source line are still arbitrated: the same place is not agreement.
+  assert.deepEqual(calls.sort(), ['arbiter', 'fixer', 'implementer', 'reviewer-rules', 'reviewer-semantics']);
   assert.equal(fs.readFileSync(safePath(f.root, unit.target), 'utf8'), fixed);
   const context = contextHash(f.root, f.config), state = unitState(f.root, unit);
   assert.equal(done(f.root, unit, context), true);

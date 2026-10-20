@@ -69,8 +69,9 @@ Create or reconcile the host TODO list before starting phase work; update it on
 phase start, completion, approval waits, revisions, failures and resumption.
 Only the parent orchestrator updates it from actual evidence. If the tool is
 unavailable, show the same checklist in chat. TODO items never authorize a gate.
-Build the items from `run_migration.mjs status --format todo` (ten phases, one
-in progress, names in the user's language) and put the output of
+Build the items from `run_migration.mjs status --format todo` (ten phases, names
+in the user's language; the current phase is in progress only while it runs or
+is worked on, otherwise not-started with its state in the title) and put the output of
 `status --format checklist` at the top of every phase and failure report, so the
 user always sees which phase is current even when the TODO UI does not render.
 
