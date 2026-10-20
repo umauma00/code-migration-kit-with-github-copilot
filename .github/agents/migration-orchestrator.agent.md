@@ -5,6 +5,7 @@ tools: ["read", "search", "edit", "execute", "agent", "ask_user", "vscode/askQue
 ---
 
 <!-- grep, glob and update_todo: Copilot CLI 1.0.98 does not map the search and todo aliases for custom agents (fixed in 1.0.99). -->
+<!-- ask_user is the Copilot CLI question tool and vscode/askQuestions the VS Code one; a host ignores tool names it does not provide. -->
 
 Use the phase prompts. Draft artifacts outside worker loops. Use the runner for translation and validation. Never claim a gate was approved from your own recommendation.
 
@@ -28,6 +29,8 @@ Follow [phase reports and user decisions](../../docs/PHASE-HANDOFF.md) after eve
 Use the host's available question tool for missing decisions; report concrete
 artifacts before asking and include a next-instruction example. Reuse explicit
 answers already given. If no question tool is available, ask in chat and wait.
+An automatic reply that the user is not available (Copilot CLI autopilot) is not
+an answer: choose nothing and ask the person to continue interactively.
 
 At start/resumption and phase transitions, maintain the host's ten-phase TODO
 list following the [progress contract](../../docs/PHASE-HANDOFF.md#track-the-ten-phases-in-the-host-todo-list).

@@ -1,5 +1,48 @@
 # Unreleased (0.3.0)
 
+- 2026-10-19 follow-up (questions, failure reports and progress):
+  - Failure guidance: every rule offers at least two choices plus pause, with
+    the recommendation first; a contract test holds each rule to it.
+    `guidance --format json` adds `choices`, the option labels for the host
+    question tool. New rules: `cannot-ask` (a refused confirmation, or the
+    Copilot CLI autopilot answering `ask_user` itself, is not an answer),
+    `guardrail-denied` and `guardrails-write` (the kit's own hook denials).
+  - Phase order: an error names only the immediate predecessor, and its
+    guidance recommended recording that phase, which failed the same way while
+    an earlier phase was incomplete. The guidance now leads with the phase
+    `phase next` reports. Source-only 05c recommends the unverified
+    acknowledgment (`phase complete 05c`) instead of a runner stage.
+  - `doctor` shows the review dependency map as pending until phase 01 is
+    recorded, so a new project's phase 00 check no longer fails with a command
+    that cannot run yet; the guidance points at phase 01 until a map exists.
+  - Questions: Copilot CLI `ask_user` takes one question per call with optional
+    string choices (CLI 1.0.98), so setup questions are asked one at a time
+    there and grouped only with VS Code `vscode/askQuestions`. A free-text reply
+    that picks no choice is not consent. The plugin orchestrator also lists
+    `vscode/askQuestions`.
+  - Progress: `status --format todo` descriptions follow the report language.
+    PHASE-HANDOFF notes that Copilot CLI `update_todo` takes one markdown
+    checklist (`status --format checklist`), and that TODO and question tool
+    failures use their chat fallbacks rather than a failure report.
+  - Review follow-ups (PR #4):
+    - Arbitration: two findings citing the same source path:line were confirmed
+      without the arbiter, even when they asked for opposite changes (for
+      example rounding toward negative infinity and toward zero). Every
+      finding now goes to the arbiter; same-location pairs reach it as
+      `samePlace` candidates, and it confirms both only if they ask for
+      compatible changes (upstream rule 4). A unit whose findings were all
+      paired makes one more arbiter call.
+    - TODO status: the current phase is `in-progress` only while it runs or is
+      worked on; waiting, blocked or not yet started it is `not-started` with
+      its state in the title, as PHASE-HANDOFF's three-state rule says.
+      `status --format todo` adds `current`, and the checklist arrow follows it.
+      The state is computed for the final current phase, so a running pilot
+      shows 04 as running instead of the parent flow's phase state.
+    - Guidance commands run as written: `survey status` takes the kind the
+      error names (none when unknown), and the original-runtime question has
+      no `a|b` placeholder command. A git denial recommends keeping history
+      (`git status --short`) instead of running a runner stage.
+
 - 2026-10-19 review (Copilot CLI 1.0.98 and 1.0.100-1, current VS Code docs):
   - Resumption: the receipt context hashes only what reaches workers. Run limits
     (`concurrency`, `maxAgentCalls`, `maxFixRounds`, timeouts, retries,

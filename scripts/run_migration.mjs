@@ -3,7 +3,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { lockRun, loadConfig, readManifest, contextHash, unitState, done, safePath, readJSON, parseArgs, verificationFiles, loadReviewDependencies, reviewSources } from '../lib/core.mjs';
+import { lockRun, loadConfig, readManifest, contextHash, unitState, done, safePath, readJSON, parseArgs, verificationFiles, loadReviewDependencies, reviewSources, reviewDependencyPath } from '../lib/core.mjs';
+import { strictPhases, phaseRecorded } from '../lib/phases.mjs';
 import { validateWorkerProfile, assistedReviewerRoles } from '../lib/review.mjs';
 import { runProcess } from '../lib/process.mjs';
 import { approve, runStage, translate, runPilot, runJudgePreparation } from '../lib/pipeline.mjs';
@@ -77,7 +78,14 @@ export async function doctor(root, config, { checkCLI = false, command = 'copilo
     const graph = loadReviewDependencies(root, config);
     const units = fs.existsSync(safePath(root, 'migration/manifest.tsv')) ? readManifest(root, config) : [];
     checks.push({ check: 'review dependency map', ok: true, units: units.map(u => ({ source: u.source, files: reviewSources(root, config, u.source, graph) })), note: 'Declared evidence scope; audit parser coverage and semantic dependencies in phase 01.' });
-  } catch (e) { checks.push({ check: 'review dependency map', ok: false, detail: e.message }); }
+  } catch (e) {
+    // Phase 01 creates and audits the declaration. Until phase 01 is recorded a
+    // missing file is the normal state of a new project, not a failed check.
+    let pending = false;
+    try { pending = !fs.existsSync(safePath(root, reviewDependencyPath(config))) && strictPhases(root, config) && !phaseRecorded(root, '01'); } catch {}
+    checks.push(pending ? { check: 'review dependency map', ok: true, status: 'pending', note: 'Created and audited in phase 01; not needed before then.' }
+      : { check: 'review dependency map', ok: false, detail: e.message });
+  }
   checks.push({ check: 'build artifact roots', ok: true, roots: config.buildArtifactRoots ?? [], note: 'Declare generated binaries, objects and reports here. Their file contents are excluded from command-input fingerprints; actual inputs must stay outside these roots.' });
   checks.push({ check: 'worker hook installed', ok: fs.existsSync(safePath(layout.root, layout.hookPath)) });
   // Copilot hooks fail open on timeout: a slow start silently disables the

@@ -91,7 +91,7 @@ Run everything below from the target repository root.
 node migration-kit/scripts/run_migration.mjs doctor --check-cli
 ```
 
-`doctor` checks the configuration, profiles, CLI version and required options. It also starts the CLI with the same arguments and environment as the workers and proves that every worker agent resolves (no AI calls). Right after installation it reports the dependency declaration created in phase 01 as missing; re-run it after that file is created and audited. It then runs the real CLI against a local loopback model (no account, network or AI usage) and proves that the hook keeps a tool-assisted reviewer out of `migration/runs`. Loading that hook relies on the undocumented `GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS` variable, so this check fails if a CLI update stops honoring it (verified on CLI 1.0.98 and 1.0.100-1). It does not guarantee model availability or that hooks run in interactive sessions.
+`doctor` checks the configuration, profiles, CLI version and required options. It also starts the CLI with the same arguments and environment as the workers and proves that every worker agent resolves (no AI calls). The dependency declaration created in phase 01 shows as `pending`, not failed, until phase 01 is recorded; after that a missing declaration fails. It then runs the real CLI against a local loopback model (no account, network or AI usage) and proves that the hook keeps a tool-assisted reviewer out of `migration/runs`. Loading that hook relies on the undocumented `GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS` variable, so this check fails if a CLI update stops honoring it (verified on CLI 1.0.98 and 1.0.100-1). It does not guarantee model availability or that hooks run in interactive sessions.
 
 ## Configuration
 
