@@ -36,6 +36,8 @@
       worked on; waiting, blocked or not yet started it is `not-started` with
       its state in the title, as PHASE-HANDOFF's three-state rule says.
       `status --format todo` adds `current`, and the checklist arrow follows it.
+      The state is computed for the final current phase, so a running pilot
+      shows 04 as running instead of the parent flow's phase state.
     - Guidance commands run as written: `survey status` takes the kind the
       error names (none when unknown), and the original-runtime question has
       no `a|b` placeholder command. A git denial recommends keeping history

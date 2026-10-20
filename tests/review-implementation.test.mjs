@@ -14,7 +14,7 @@ import { mergeInventory, dependencySamples, compareDependencyAudit, packageCycle
 import { makeRepairQueue } from '../scripts/diagnostic_queue.mjs';
 import { freezeAudit, submitAudit } from '../scripts/audit_inputs.mjs';
 import { preparationCommand } from '../scripts/preparation_cli.mjs';
-import { migrationStatus } from '../lib/status.mjs';
+import { migrationStatus, statusTodo, statusChecklist } from '../lib/status.mjs';
 import { runProcess } from '../lib/process.mjs';
 
 const write = (f, name, text) => atomicWrite(safePath(f.root, name), text);
@@ -39,6 +39,22 @@ test('plugin worker manuals resolve in plugin and installed copy layouts', t => 
       for (const link of links) assert.equal(fs.statSync(path.resolve(path.dirname(file), link[1])).isFile(), true);
     }
   }
+});
+
+test('a running pilot shows its own current phase as in progress in TODO and chat', async t => {
+  const f = await reviewedPreparation(t), child = childPath(t, f);
+  preparePilot(f.root, f.config, { target: child, sources: ['src/math_ops.py'], note: 'Disposable trial of one file' });
+  let during = null;
+  await runPilot(child, loadConfig(child), call => {
+    // Mid-run, while the runner holds the translation lock.
+    if (!during && call.role === 'implementer') { const report = migrationStatus(child); during = { report, todo: statusTodo(report, 'en'), checklist: statusChecklist(report, 'en') }; }
+    return fake(call);
+  });
+  assert.deepEqual([during.report.running, during.report.lock?.task, during.report.workflow.next, during.report.currentState], [true, 'translation', '04', 'running']);
+  const item = during.todo.todoList.find(i => i.title.startsWith('04 '));
+  assert.deepEqual([item.status, item.title], ['in-progress', '04 Translation and review [running]']);
+  assert.deepEqual([during.todo.current.phase, during.todo.current.state], ['04', 'running']);
+  assert.match(during.checklist, /▶ 04 Translation and review \[running\] {2}← you are here/);
 });
 
 test('strict phase-03 pilot uses the shared pipeline before production approval and cannot become production done', async t => {
