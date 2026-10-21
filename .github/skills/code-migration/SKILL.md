@@ -51,9 +51,27 @@ never revokes approvals). Write every user-facing report, question, TODO label
 and next-instruction example in that language, and link the matching documents:
 `X.md` for Japanese, `X.en.md` for English (for example [README](../../../README.md) /
 [README.en](../../../README.en.md)). Worker prompts and JSON stay in English. Before
-initialization, ask the language, the model IDs and the migration languages
+initialization, ask the language and the migration languages
 (one question per call with Copilot CLI `ask_user`; VS Code `vscode/askQuestions`
 takes them together) and pass `--language ja|en` to the installer.
+
+**Models and reasoning effort are the person's choice.** After initialization,
+and whenever they ask to change models, run
+`run_migration.mjs models list --format markdown`: it lists the models and
+reasoning efforts their own Copilot account offers (read live from the CLI) and
+the current assignment. Show it, then ask one question per worker role
+(implementer, reviewer-semantics, reviewer-rules, arbiter, fixer; surveyor
+follows the implementer unless they pick one), offering the listed model IDs as
+choices, then that model's listed efforts plus `default`. The person may answer
+"same for all" or "same for both reviewers". You may explain the upstream model
+plan — tier by blast radius: reviewers on the largest or a mid model,
+high-volume implementers on a mid or small model, fixers and the arbiter on a
+mid model; higher effort costs more tokens — as information, never as a
+preselected answer, and never choose for them. Record each answer with
+`run_migration.mjs models set --role ROLE --model ID --effort LEVEL|default`
+(`--role reviewers` or `all` for shared answers); the host asks them to confirm.
+If `models list` reports that the CLI is not signed in, start `copilot login`
+first. A changed model or effort makes reviewed units be reviewed again.
 
 Follow [phase reports and user decisions](../../../docs/PHASE-HANDOFF.md) at every
 phase boundary. Show the actual artifacts, review points and a copyable next
