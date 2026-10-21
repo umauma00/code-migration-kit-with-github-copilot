@@ -14,9 +14,9 @@ import { failureGuidance } from '../lib/guidance.mjs';
 // A stand-in for `copilot --headless --stdio`: framed JSON-RPC with connect and models.list.
 const catalog = [
   { id: 'big-model', name: 'Big Model', capabilities: { supports: { reasoningEffort: true } }, policy: { state: 'enabled', terms: '' },
-    billing: { multiplier: 1, tokenPrices: { input: '$2.00', output: '$10.00' } }, supportedReasoningEfforts: ['low', 'medium', 'high', 'xhigh'], defaultReasoningEffort: 'medium' },
-  { id: 'small-model', name: 'Small Model', capabilities: {}, supportedReasoningEfforts: ['low', 'medium', 'high', 'max'], defaultReasoningEffort: 'high' },
-  { id: 'plain-model', name: 'Plain Model', capabilities: {} },
+    billing: { multiplier: 1, tokenPrices: { inputPrice: 200, outputPrice: 1000, cacheReadPrice: 10, batchSize: 1000000, maxPromptTokens: 272000, longContext: { inputPrice: 400, outputPrice: 1500 } } }, supportedReasoningEfforts: ['low', 'medium', 'high', 'xhigh'], defaultReasoningEffort: 'medium' },
+  { id: 'small-model', name: 'Small Model', capabilities: {}, billing: { tokenPrices: { inputPrice: 10000000, outputPrice: 50000000, batchSize: 1000 } }, supportedReasoningEfforts: ['low', 'medium', 'high', 'max'], defaultReasoningEffort: 'high' },
+  { id: 'plain-model', name: 'Plain Model', capabilities: {}, billing: { tokenPrices: { inputPrice: 3, outputPrice: 9, batchSize: 1000 } } },
   { id: 'blocked-model', name: 'Blocked Model', capabilities: {}, policy: { state: 'disabled', terms: '' } },
 ];
 function fakeCli(t, { auth = true } = {}) {
@@ -37,6 +37,7 @@ process.stdin.on('data', d => {
     const msg = JSON.parse(buf.subarray(h + 4, h + 4 + len)); buf = buf.subarray(h + 4 + len);
     send({ jsonrpc: '2.0', method: 'session.log', params: {} });
     if (msg.method === 'connect') send({ jsonrpc: '2.0', id: msg.id, result: { ok: true, protocolVersion: 3 } });
+    else if (msg.method === 'models.listTokenPriceUnits') send({ jsonrpc: '2.0', id: msg.id, result: { units: [{ modelId: 'big-model', unit: 'ai_credits' }, { modelId: 'small-model', unit: 'nano_aiu' }] } });
     else if (msg.method === 'models.list') send(${auth} ? { jsonrpc: '2.0', id: msg.id, result: { models: ${JSON.stringify(catalog)} } }
       : { jsonrpc: '2.0', id: msg.id, error: { code: -32603, message: 'Request models.list failed with message: Not authenticated. Please authenticate first.' } });
   }
@@ -53,7 +54,10 @@ test('models list reads the account catalog from the CLI headless server', async
     ['plain-model', 'enabled', ''], ['blocked-model', 'disabled', '']]);
   assert.equal(models[0].defaultEffort, 'medium');
   const ja = modelsMarkdown(models, null, 'ja');
-  assert.match(ja, /\| `big-model` \| Big Model \| low, medium, high, xhigh \(medium\) \| \$2\.00 \/ \$10\.00 \|/);
+  // Official ModelBillingTokenPrices: inputPrice/outputPrice per batchSize tokens, unit from models.listTokenPriceUnits.
+  assert.match(ja, /\| `big-model` \| Big Model \| low, medium, high, xhigh \(medium\) \| 200 \/ 1000 AIC\/100万トークン、長文脈（入力 272000 トークン超） 400 \/ 1500 \|/);
+  assert.match(ja, /\| `small-model` \| Small Model \| .* \| 10 \/ 50 AIC\/100万トークン \|/, 'nano-AIU per 1000 tokens becomes AI Credits per million');
+  assert.match(modelsMarkdown(models, null, 'en'), /\| `plain-model` \| Plain Model \| — \| 3 \/ 9 per 1000 tokens \(unit unknown\) \|/);
   assert.match(ja, /利用できないモデル.*`blocked-model` \(disabled\)/);
   await assert.rejects(listAvailableModels({ command: process.execPath, prefixArgs: [fakeCli(t, { auth: false })] }), /not signed in to Copilot.*copilot login/);
   await assert.rejects(listAvailableModels({ command: path.join(os.tmpdir(), 'no-such-copilot') }), /Cannot start the Copilot CLI.*ENOENT/);
@@ -85,7 +89,7 @@ test('models set records the person\'s choice and revokes reviews made under the
   assert.deepEqual(written.models, { implementer: 'small-model', 'reviewer-semantics': 'big-model', 'reviewer-rules': 'big-model', arbiter: 'big-model', fixer: 'small-model' });
   assert.deepEqual(written.reasoningEfforts, { implementer: 'high', fixer: 'high', 'reviewer-semantics': 'xhigh', 'reviewer-rules': 'xhigh' });
   assert.equal(written.phaseModels.survey, 'plain-model');
-  assert.equal(result.assignments.find(a => a.role === 'surveyor').effort, 'high', 'surveyor effort follows the implementer unless chosen');
+  assert.equal(result.assignments.find(a => a.role === 'surveyor').effort, null, 'a surveyor with its own model never inherits the implementer\'s effort');
   const config = loadConfig(f.root);
   assert.equal(workerEffort(config, 'arbiter'), undefined);
   assert.equal(done(f.root, f.units[0], contextHash(f.root, config)), false, 'a new model or effort means a new review');
@@ -117,4 +121,35 @@ test('recording a model choice asks the person; listing does not', () => {
     assert.equal(decision.decision, 'ask');
     assert.match(decision.reason, /person's choice/);
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test('a surveyor set to its model default does not run with the implementer\'s effort', async t => {
+  const f = await ready(t);
+  const models = await listAvailableModels({ command: process.execPath, prefixArgs: [fakeCli(t)] });
+  setRoleModels(f.root, models, { role: 'implementer', model: 'big-model', effort: 'high' });
+  assert.equal(workerEffort(loadConfig(f.root), 'surveyor'), 'high', 'without a model of its own the surveyor runs the implementer\'s model and effort');
+  setRoleModels(f.root, models, { role: 'surveyor', model: 'plain-model', effort: 'default' });
+  const config = loadConfig(f.root);
+  assert.equal(workerEffort(config, 'surveyor'), undefined);
+  const args = copilotArgs('surveyor', 'plain-model', undefined, null, null, { effort: workerEffort(config, 'surveyor') });
+  assert.equal(args.includes('--reasoning-effort'), false);
+  // The effective combination is checked too, inheritance included.
+  const file = safePath(f.root, 'migration/config.json'), raw = readJSON(file);
+  delete raw.phaseModels.survey; raw.models.implementer = 'plain-model';
+  fs.writeFileSync(file, JSON.stringify(raw));
+  assert.throws(() => setRoleModels(f.root, models, { role: 'fixer', model: 'big-model' }), /implementer would run plain-model with reasoning effort high/);
+});
+
+test('--role all also covers a surveyor that had its own model and effort', async t => {
+  const f = await ready(t);
+  const models = await listAvailableModels({ command: process.execPath, prefixArgs: [fakeCli(t)] });
+  setRoleModels(f.root, models, { role: 'surveyor', model: 'small-model', effort: 'max' });
+  setRoleModels(f.root, models, { role: 'all', model: 'big-model', effort: 'low' });
+  const config = loadConfig(f.root);
+  assert.equal(config.phaseModels?.survey, undefined);
+  assert.equal(config.reasoningEfforts.surveyor, undefined);
+  for (const a of currentAssignments(config)) assert.deepEqual([a.role, a.model, a.effort], [a.role, 'big-model', 'low']);
+  setRoleModels(f.root, models, { role: 'all', model: 'plain-model', effort: 'default' });
+  assert.equal(loadConfig(f.root).reasoningEfforts, undefined);
+  assert.deepEqual(currentAssignments(loadConfig(f.root)).map(a => [a.model, a.effort]), Array(6).fill(['plain-model', null]));
 });
