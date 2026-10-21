@@ -4,12 +4,17 @@
   - `run_migration.mjs models list [--format json|markdown]` reads the
     signed-in account's models from the Copilot CLI headless server
     (`models.list`, the call behind the SDK's `listModels()`): ids, policy
-    state, supported reasoning efforts with the default, and prices.
+    state, supported reasoning efforts with the default, and token prices
+    (`inputPrice`/`outputPrice` per `batchSize`, scaled by the unit from
+    `models.listTokenPriceUnits` to AI Credits per million tokens).
   - `models set --role ROLE|reviewers|all --model ID [--effort LEVEL|default]`
     records the choice after checking the model is listed and enabled and the
     effort is one it supports. The hook asks the person to confirm it.
   - New optional `reasoningEfforts` per worker role (surveyor follows the
-    implementer). Workers get `--reasoning-effort`; receipts record
+    implementer only while it has no model of its own, so an explicit
+    "default" is honored; `--role all` returns it to the implementer's
+    choice; the effective model/effort pairs, inheritance included, are
+    checked against the list). Workers get `--reasoning-effort`; receipts record
     `requestedEffort`. Like `models`, it is reviewed configuration, so a change
     makes reviewed units be reviewed again. Worker profiles may not set model
     or effort fields of their own.
