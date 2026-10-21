@@ -53,7 +53,7 @@ Anthropicの[Code Migration Kit](https://github.com/anthropics/code-migration-ki
 - Node.js 22以上。ランナー本体は外部npm依存なし。
 - Copilot CLI（未導入ならAIが同意を得てインストールし、サインインを始めます）。指定モデルを利用できる契約・組織設定。
 - 対象言語の実行環境・ビルドツール。付属デモとPython/C依存解析にはPython 3が必要です。
-- Linuxの既存検証とmacOSでの自動テスト・CLI通信検証があります。Windowsでの実行は未検証です。WindowsではNodeから直接起動できるCopilot実行ファイルを使ってください。
+- Linuxの既存検証とmacOSでの自動テスト・CLI通信検証があります。Windowsでの実行は未検証です。`npm install -g @github/copilot` で入れたCopilot CLI（PATH上の `copilot.cmd`）は、同梱のWindows用実行ファイル（なければ `node` と同梱ローダー）に読み替えて起動します。WinGet版などの `copilot.exe` はそのまま使います。キットはシェルを使わないため、`migration/config.json` の検証コマンドに `npm` や `gradlew.bat` などの `.cmd`/`.bat` を直接書くことはできません。`node` から始まるコマンドか `.exe` で指定してください。
 
 ## プラグインとして導入する
 
