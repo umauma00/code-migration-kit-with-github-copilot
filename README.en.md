@@ -67,7 +67,7 @@ This needs a checkout that includes the 0.2.0 changes. VS Code detects plugins i
 
 ## Copying the kit into the target repository
 
-Run from the kit root. Replace `MODEL_ID` with an actual ID that `/model` shows for your Copilot account; no model names or prices are hard-coded.
+Run from the kit root. `--model MODEL_ID` is optional: without it, choose per role after installation with `models list` / `models set` below. If you pass it, use an actual ID that `/model` shows for your Copilot account; no model names or prices are hard-coded.
 
 ```bash
 # Preview the changes first
@@ -77,7 +77,16 @@ node scripts/install.mjs --target /path/to/your-project --model MODEL_ID --langu
 node scripts/install.mjs --target /path/to/your-project --model MODEL_ID --language en --apply
 ```
 
-`--models implementer=ID,reviewers=ID,arbiter=ID,fixer=ID` sets per-role models (unlisted roles use `--model`). As in the upstream model plan, choose by blast radius: reviewers on the largest or a mid model, high-volume implementers on a mid or small model, fixers and the arbiter on a mid model.
+**The person chooses models and reasoning effort.** Install without `--model`, then in the target repository run the commands below: the first reads the models your account can use, each model's selectable efforts (and default) and prices from the CLI. The AI asks per role from that list and records each answer with `models set` (the host asks the person to confirm).
+
+```bash
+node migration-kit/scripts/run_migration.mjs models list --format markdown
+node migration-kit/scripts/run_migration.mjs models set --role reviewers --model MODEL_ID --effort high
+```
+
+`--role` takes a role name, `reviewers` (both reviewers) or `all` (the surveyor drops its own setting and follows the implementer). The surveyor inherits the implementer's model and effort only while it has no model of its own. Prices are the CLI's published token prices, shown as AI Credits per million tokens. `--effort default` returns to the model's default. A model that is not listed or is disabled by policy, or an effort the model does not support, is refused. Listing needs a signed-in Copilot CLI.
+
+`--models implementer=ID,reviewers=ID,arbiter=ID,fixer=ID` still sets per-role models (unlisted roles use `--model`). As in the upstream model plan, choose by blast radius: reviewers on the largest or a mid model, high-volume implementers on a mid or small model, fixers and the arbiter on a mid model.
 
 `--language ja|en` sets the language of phase reports, questions and `status --format markdown`. It is stored in `migration/preferences.json` and never affects approvals or completion. If omitted, the skill asks Japanese or English at the start. Change it later with `run_migration.mjs preferences --language ja`.
 
@@ -112,7 +121,8 @@ The minimum settings in `migration/config.json`:
 | `verificationMode` | `runtime` (default): runs the original environment and old-versus-new comparison. `source-only`: validates source-derived preparation and the translated build/smoke, and hands off with behavioral equivalence unverified. Existing settings are never changed automatically |
 | `mode` | `preserve` for automatic file translation. `redesign` is supported up to the design and trial prompts |
 | `phasePolicy` | `strict` for new installs. Unset in existing ones keeps legacy behavior; `phase init` from the skill enables ordered phases without changing the config |
-| `models` | IDs for implementer, reviewer-semantics, reviewer-rules, arbiter and fixer |
+| `models` | IDs for implementer, reviewer-semantics, reviewer-rules, arbiter and fixer, chosen by the person from `models list` and recorded with `models set` |
+| `reasoningEfforts` | Optional per-role reasoning effort (`low` to `max`, as the model supports); unset means the model's default. Passed to workers as `--reasoning-effort`. Like models, a change makes reviewed units be reviewed again |
 | `phaseModels` | Explicit host models for rulebook, judgeAudit, dependencyAudit, inventoryAudit, stressA/B, stressInspector and designAudit. Preparation audits run in the parent and are never inherited by the automatic runner |
 | `designInputs` | Design documents included in full in the frozen input and protected. A link alone does not count as the body. This does not enable a redesign module runner |
 | `packageMap` | Optional source→target package declaration JSON. When set, phase 01 records a separate package-cycle audit |
