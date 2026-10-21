@@ -1,5 +1,11 @@
 # Unreleased (0.3.0)
 
+- 2026-10-21 Windows: a Copilot CLI installed with `npm install -g
+  @github/copilot` now starts. Node cannot run the `copilot.cmd` shim without a
+  shell, so workers, doctor and `models list` run the bundled
+  `copilot-win32-<arch>/copilot.exe`, or `node npm-loader.js` when it is
+  missing. Only shims that reference the package's `npm-loader.js` are
+  rewritten. Not yet run on a Windows machine.
 - 2026-10-21 model choice by the person running the kit:
   - `run_migration.mjs models list [--format json|markdown]` reads the
     signed-in account's models from the Copilot CLI headless server
