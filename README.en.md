@@ -51,7 +51,7 @@ Workers are always Copilot CLI processes: `--model` fixes each role's model, and
 - Node.js 22 or later. The runner has no external npm dependencies.
 - The Copilot CLI (if it is missing, the AI installs it and starts sign-in after you agree) and a plan or organization setting that allows the configured models.
 - The runtime and build tools of the languages involved. The bundled demo and the Python/C dependency mappers need Python 3.
-- Previously verified on Linux; automated tests and CLI transport verified on macOS. Windows is untested; on Windows use a Copilot executable that Node can start directly.
+- Previously verified on Linux; automated tests and CLI transport verified on macOS. Windows is untested. A Copilot CLI installed with `npm install -g @github/copilot` (the `copilot.cmd` shim on PATH) is started through the bundled Windows binary, or through `node` and the bundled loader when the binary is missing; a `copilot.exe` (for example from WinGet) is used as is. The kit never uses a shell, so verification commands in `migration/config.json` cannot name `.cmd`/`.bat` files such as `npm` or `gradlew.bat` directly; start them with `node` or an `.exe`.
 
 ## Installing as a plugin
 
