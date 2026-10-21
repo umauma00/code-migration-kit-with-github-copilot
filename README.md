@@ -69,7 +69,7 @@ copilot plugin install code-migration-kit@code-migration-kit-marketplace
 
 ## キットを対象リポジトリへコピーして導入する
 
-キットのルートで実行します。`MODEL_ID` は、利用するアカウントのCopilotで `/model` に表示される実際のIDへ置き換えてください。モデル名や料金は固定していません。
+キットのルートで実行します。`--model MODEL_ID` は省略でき、その場合は導入後に下記の `models list` / `models set` で担当ごとに選びます。指定する場合は、利用するアカウントのCopilotで `/model` に表示される実際のIDにしてください。モデル名や料金は固定していません。
 
 ```bash
 # まず変更対象を確認
@@ -79,7 +79,16 @@ node scripts/install.mjs --target /path/to/your-project --model MODEL_ID --langu
 node scripts/install.mjs --target /path/to/your-project --model MODEL_ID --language ja --apply
 ```
 
-`--models implementer=ID,reviewers=ID,arbiter=ID,fixer=ID` で担当ごとのモデルを指定できます（未指定の担当は `--model`）。上流キットのモデル計画と同じく、影響範囲で選びます：レビュー担当は最大または中規模、大量に動く実装担当は中または小規模、修正・裁定担当は中規模。
+**モデルとエフォートは利用者が選びます。** `--model` を省略して導入し、対象リポジトリで次を実行すると、利用するアカウントで使えるモデルと、モデルごとに選べるエフォート（既定値）・料金をCLIから取得して表示します。AIはこの一覧から担当ごとに質問し、回答を `models set` で記録します（ホストが利用者に確認を求めます）。
+
+```bash
+node migration-kit/scripts/run_migration.mjs models list --format markdown
+node migration-kit/scripts/run_migration.mjs models set --role reviewers --model MODEL_ID --effort high
+```
+
+`--role` は担当名、`reviewers`（2人のレビュー担当）、`all`（全担当）。`--effort default` でモデルの既定に戻します。一覧にない・組織の設定で無効なモデルや、そのモデルが対応しないエフォートは記録しません。一覧の取得にはCopilot CLIのサインインが必要です。
+
+従来どおり `--models implementer=ID,reviewers=ID,arbiter=ID,fixer=ID` で担当ごとのモデルを指定することもできます（未指定の担当は `--model`）。上流キットのモデル計画と同じく、影響範囲で選びます：レビュー担当は最大または中規模、大量に動く実装担当は中または小規模、修正・裁定担当は中規模。
 
 `--language ja|en` は、工程報告・質問・`status --format markdown` の言語です。`migration/preferences.json` に保存され、承認・完了判定には影響しません。省略した場合は、スキルが開始時に日本語・英語のどちらにするかを質問します。後から `run_migration.mjs preferences --language en` で変更できます。
 
@@ -114,7 +123,8 @@ node migration-kit/scripts/run_migration.mjs doctor --check-cli
 | `verificationMode` | `runtime`（省略時）：元環境と新旧比較を実行。`source-only`：ソース由来の準備と変換後build/smokeを検証し、動作同等性未検証として引き継ぐ。既存設定は自動変更しない |
 | `mode` | 自動ファイル変換は `preserve`。`redesign` は設計・試行プロンプトまで対応 |
 | `phasePolicy` | 新規は`strict`。既存の未設定は従来互換。スキル入口で`phase init`すると既存設定を保って工程順序を有効化 |
-| `models` | implementer、reviewer-semantics、reviewer-rules、arbiter、fixerの各ID |
+| `models` | implementer、reviewer-semantics、reviewer-rules、arbiter、fixerの各ID。利用者が `models list` の一覧から選び、`models set` で記録する |
+| `reasoningEfforts` | 任意。担当ごとのエフォート（`low`〜`max` のうちモデルが対応するもの）。未指定はモデルの既定。ワーカーに `--reasoning-effort` として渡す。モデルと同じく、変更するとレビュー済みの単位は再レビュー |
 | `phaseModels` | rulebook、judgeAudit、dependencyAudit、inventoryAudit、stressA/B、stressInspector、designAuditの明示的なhost model指定。準備監査は親が実行し、自動runnerへの暗黙継承はしない |
 | `designInputs` | 全文を固定入力へ含め、保護する設計文書のパス配列。リンクだけでは本文を渡した扱いにしない。redesignのmodule runnerを有効化する設定ではない |
 | `packageMap` | 任意のsource→target package宣言JSON。指定時は01で別のpackage cycle監査を記録 |

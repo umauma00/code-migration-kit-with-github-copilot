@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import http from 'node:http';
 import { runProcess } from '../lib/process.mjs';
-import { roles, workerModel } from '../lib/core.mjs';
+import { roles, workerModel, workerEffort } from '../lib/core.mjs';
 import { parseResult, validateResult } from '../lib/results.mjs';
 import { isReviewer, isToolFree, toolAssistedRole, assistedReviewerRoles, validateWorkerProfile } from '../lib/review.mjs';
 import { runtimeLayout } from '../lib/runtime.mjs';
@@ -17,19 +17,19 @@ import { sessionIdPattern } from '../lib/sessions.mjs';
 // `run_migration.mjs sessions` can report or prune exactly the kit's sessions.
 // --usage-output-file is the CLI's own usage record (tokens, cache, AI units);
 // --max-ai-credits is an optional per-call cap the CLI enforces.
-export function copilotArgs(role, model, prompt, layout, session, { usageFile, maxAiCredits } = {}) {
+export function copilotArgs(role, model, prompt, layout, session, { usageFile, maxAiCredits, effort } = {}) {
   // A CLI worker is a fresh session agent: tools: [] alone does not prevent
   // automatic repository/personal instructions from entering its system prompt.
   // No --no-auto-update: installer-based launchers then run their bundled
   // (possibly much older) build instead of the version the user and doctor see.
-  return [...(prompt === undefined ? [] : ['-p', prompt]), ...(layout?.plugin ? ['--plugin-dir', layout.root] : []), '-s', '--output-format', 'json', '--stream', 'off', '--no-color', '--no-ask-user', '--no-custom-instructions', '--disable-builtin-mcps', '--no-remote-export', ...(session ? ['--session-id', session.id, '--name', session.name] : []), '--agent', layout?.agentId(role) ?? `migration-${role}`, '--model', model,
+  return [...(prompt === undefined ? [] : ['-p', prompt]), ...(layout?.plugin ? ['--plugin-dir', layout.root] : []), '-s', '--output-format', 'json', '--stream', 'off', '--no-color', '--no-ask-user', '--no-custom-instructions', '--disable-builtin-mcps', '--no-remote-export', ...(session ? ['--session-id', session.id, '--name', session.name] : []), '--agent', layout?.agentId(role) ?? `migration-${role}`, '--model', model, ...(effort ? ['--reasoning-effort', effort] : []),
     '--available-tools', 'view,grep,glob', ...(isToolFree(role) ? ['--deny-tool', 'read,write,shell'] : ['--allow-tool', 'read', '--deny-tool', 'write,shell']),
     ...(usageFile ? ['--usage-output-file', usageFile] : []), ...(maxAiCredits ? ['--max-ai-credits', String(maxAiCredits)] : [])];
 }
 export function requiredCopilotFlags(layout, config = {}) {
   // Diagnose the same stdin-based invocation used by every worker role.
   const session = { id: '00000000-0000-4000-8000-000000000000', name: 'diagnostic' };
-  const options = { usageFile: 'diagnostic-usage.json', maxAiCredits: config.maxAiCreditsPerCall };
+  const options = { usageFile: 'diagnostic-usage.json', maxAiCredits: config.maxAiCreditsPerCall, effort: Object.keys(config.reasoningEfforts ?? {}).length ? 'medium' : undefined };
   return [...new Set(roles.flatMap(role => copilotArgs(role, 'diagnostic-model', undefined, layout, session, options).filter(arg => arg.startsWith('-'))))];
 }
 // The CLI's final usage statistics. aiCredits stays null: the CLI reports AI
@@ -265,6 +265,8 @@ export function createCopilotAdapter({ command = 'copilot', prefixArgs = [], ver
     validateWorkerProfile(root, worker, config);
     const layout = runtimeLayout(root, config);
     const model = modelOverride ?? workerModel(config, role);
+    // An override (a preparation audit's host-chosen model) keeps that model's own default effort.
+    const effort = modelOverride ? undefined : workerEffort(config, role);
     let cliVersion = null, cliVersionWarning;
     const checked = await currentVersion(root);
     if (signal?.aborted) throw new Error('Interrupted');
@@ -292,7 +294,7 @@ export function createCopilotAdapter({ command = 'copilot', prefixArgs = [], ver
     const usageDir = fs.mkdtempSync(path.join(os.tmpdir(), 'migration-kit-usage-')), usageFile = path.join(usageDir, 'usage.json');
     let usage = null;
     try {
-      result = await runProcess(command, [...prefixArgs, ...copilotArgs(worker, model, undefined, layout, session, { usageFile, maxAiCredits: config.maxAiCreditsPerCall })], {
+      result = await runProcess(command, [...prefixArgs, ...copilotArgs(worker, model, undefined, layout, session, { usageFile, maxAiCredits: config.maxAiCreditsPerCall, effort })], {
         cwd: root, signal, input: prompt, timeoutMs: config.timeoutSeconds * 1000,
         env: copilotEnv(worker)
       });
@@ -310,7 +312,7 @@ export function createCopilotAdapter({ command = 'copilot', prefixArgs = [], ver
       // A different reported model is a fallback or alias, never a silent pass.
       const modelWarning = observedModels.length && !observedModels.includes(model)
         ? `Copilot CLI reported model ${observedModels.join(', ')} for requested ${model}` : undefined;
-      return { result: value, requestedModel: model, promptBytes, responseBytes: Buffer.byteLength(JSON.stringify(value)),
+      return { result: value, requestedModel: model, ...(effort ? { requestedEffort: effort } : {}), promptBytes, responseBytes: Buffer.byteLength(JSON.stringify(value)),
         observedModel, tokens: usage ? usage.inputTokens + usage.outputTokens : null, aiCredits: null,
         ...(cliUsage || usage ? { cliUsage: { ...cliUsage, ...usage } } : {}), ...(modelWarning ? { modelWarning } : {}),
         ...(worker !== role ? { workerProfile: worker } : {}), ...versionFields };

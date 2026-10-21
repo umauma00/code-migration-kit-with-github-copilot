@@ -21,6 +21,7 @@ import { sessionsStatus, pruneSessions } from '../lib/sessions.mjs';
 import { buildLoop } from '../lib/build-loop.mjs';
 import { readPreferences, setPreferences, preferencesReport } from '../lib/preferences.mjs';
 import { readGuardrails, cliFolderTrust, guardrailsProposal, installGuardrails } from '../lib/guardrails.mjs';
+import { listAvailableModels, modelsMarkdown, setRoleModels, readConfigIfPresent, currentAssignments } from '../lib/models.mjs';
 
 export const usage = `Usage: node migration-kit/scripts/run_migration.mjs COMMAND [options]
   doctor [--check-cli] [--copilot /path/to/copilot]
@@ -29,6 +30,10 @@ export const usage = `Usage: node migration-kit/scripts/run_migration.mjs COMMAN
                               --wait (1-1800) returns once a running runner makes progress, stops or the time is up
   guidance --message TEXT [--format json|markdown]
                               Explain a failure: cause, impact and choices with a recommendation
+  models list [--format json|markdown]
+                              The models and reasoning efforts your Copilot account offers, and the current choice
+  models set --role ROLE[,ROLE]|reviewers|all --model ID [--effort LEVEL|default]
+                              Record the person's choice after checking it against that list
   preferences [--language ja|en] [--original-runtime available|unavailable]
                               Report language; whether the original can still run (guides recommendations)
   sessions status | prune [--run RUN_ID]
@@ -153,7 +158,7 @@ export async function doctor(root, config, { checkCLI = false, command = 'copilo
   const staticValid = checks.every(x => x.ok !== false);
   // Passing checks can still carry a warning the person should hear.
   const warnings = checks.filter(x => typeof x.warning === 'string').map(x => `${x.check}: ${x.warning}`);
-  return { ok: staticValid, staticValid, executionReady: 'not-verified', checks, ...(warnings.length ? { warnings } : {}), workerBackend: 'copilot-cli', requestedModels: config.models, requestedPhaseModels: config.phaseModels ?? {},
+  return { ok: staticValid, staticValid, executionReady: 'not-verified', checks, ...(warnings.length ? { warnings } : {}), workerBackend: 'copilot-cli', requestedModels: config.models, requestedEfforts: config.reasoningEfforts ?? {}, requestedPhaseModels: config.phaseModels ?? {},
     note: 'Help checks do not authenticate, verify model availability, exercise hooks, or make AI calls. Run the live smoke procedure before production use.' };
 }
 // A long translate or build-loop runs in a background terminal. Each status
@@ -191,6 +196,22 @@ export async function main(argv = process.argv.slice(2)) {
   }
   let language = 'en';
   try { language = readPreferences(root).userLanguage ?? 'en'; } catch {}
+  if (cmd === 'models') {
+    // The person picks; the list is their account's, read live from the CLI.
+    if (!['list', 'set'].includes(args._[1])) throw new Error('Use models list [--format json|markdown] | models set --role ROLE --model ID [--effort LEVEL|default]');
+    if (args.format !== undefined && !['json', 'markdown'].includes(args.format)) throw new Error('models list format must be json or markdown');
+    const models = await listAvailableModels({ command: args.copilot ?? 'copilot', cwd: root });
+    if (args._[1] === 'set') {
+      if (!readConfigIfPresent(root)) throw new Error('migration/config.json is missing: initialize the project (install.mjs) before recording model choices');
+      const release = lockRun(root, 'models-set');
+      try { console.log(JSON.stringify(setRoleModels(root, models, { role: args.role, model: args.model, effort: args.effort }), null, 2)); } finally { release(); }
+      return;
+    }
+    const config = readConfigIfPresent(root);
+    console.log(args.format === 'markdown' ? modelsMarkdown(models, config, language)
+      : JSON.stringify({ models, ...(config ? { assignments: currentAssignments(config) } : {}) }, null, 2));
+    return;
+  }
   if (cmd === 'status') {
     if (args.format && !['json', 'markdown', 'todo', 'checklist'].includes(args.format)) throw new Error('status format must be json, markdown, todo or checklist');
     const report = args.wait === undefined ? migrationStatus(root) : await waitForProgress(root, Number(args.wait));

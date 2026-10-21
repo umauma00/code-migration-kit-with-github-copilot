@@ -1,5 +1,21 @@
 # Unreleased (0.3.0)
 
+- 2026-10-21 model choice by the person running the kit:
+  - `run_migration.mjs models list [--format json|markdown]` reads the
+    signed-in account's models from the Copilot CLI headless server
+    (`models.list`, the call behind the SDK's `listModels()`): ids, policy
+    state, supported reasoning efforts with the default, and prices.
+  - `models set --role ROLE|reviewers|all --model ID [--effort LEVEL|default]`
+    records the choice after checking the model is listed and enabled and the
+    effort is one it supports. The hook asks the person to confirm it.
+  - New optional `reasoningEfforts` per worker role (surveyor follows the
+    implementer). Workers get `--reasoning-effort`; receipts record
+    `requestedEffort`. Like `models`, it is reviewed configuration, so a change
+    makes reviewed units be reviewed again. Worker profiles may not set model
+    or effort fields of their own.
+  - The skills ask for model and effort per role from the live list instead of
+    asking the person to type model IDs.
+
 - 2026-10-19 follow-up (questions, failure reports and progress):
   - Failure guidance: every rule offers at least two choices plus pause, with
     the recommendation first; a contract test holds each rule to it.
