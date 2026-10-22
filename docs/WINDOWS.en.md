@@ -30,4 +30,5 @@ On Windows `python3` is often missing or only opens the Microsoft Store. Command
 - **Folder trust**: the Copilot CLI ignores `.github/hooks` in untrusted folders. Start `copilot` interactively in the target repository once and trust it (`doctor` checks this).
 - **Long paths**: deep folders can hit the 260-character limit. Keep the repository short (`C:\work\proj`) or enable Windows long paths.
 - **Line-ending conversion**: Git `core.autocrlf=true` works, but changing it mid-migration changes file hashes and revokes approvals.
+- **Python judges**: on Windows, Python uses the console code page, not UTF-8, for piped input and output. A judge or original that prints non-ASCII text should pass `PYTHONUTF8=1` to its children and use `subprocess.run(..., encoding="utf-8")` (see `fixtures/mini/tests/judge.py`).
 - **WSL**: inside WSL the kit runs as on Linux; do not mix the Windows Copilot CLI with WSL-side files.

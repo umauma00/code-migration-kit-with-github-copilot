@@ -30,4 +30,5 @@
 - **フォルダの信頼**：Copilot CLI は、信頼していないフォルダの `.github/hooks` を読み込みません。最初に対象リポジトリで `copilot` を対話起動し、フォルダを信頼してください（`doctor` が確認します）。
 - **長いパス**：深いフォルダでは 260 文字の制限に当たることがあります。対象リポジトリは `C:\work\proj` のような短い場所に置くか、Windows の長いパスを有効にしてください。
 - **改行の自動変換**：Git の `core.autocrlf=true` でも動きます。ただし、変換後のファイルの内容（ハッシュ）が変わると承認が失効するため、移行中に autocrlf の設定を変えないでください。
+- **Python の判定スクリプト**：Windows の Python は、パイプの入出力に UTF-8 ではなくコンソールのコードページを使います。日本語などを出力する旧コードや判定スクリプトは、子プロセスに `PYTHONUTF8=1` を渡し、`subprocess.run(..., encoding="utf-8")` で読み書きしてください（`fixtures/mini/tests/judge.py` が例です）。
 - **WSL**：WSL の中で動かす場合は Linux として動きます。Windows 側の Copilot CLI と WSL 側のファイルを混ぜないでください。

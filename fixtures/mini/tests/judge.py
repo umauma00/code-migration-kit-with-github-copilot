@@ -1,5 +1,6 @@
 """Real process/JSON comparison. No dependencies and no model calls."""
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -14,9 +15,14 @@ CASES = [
 ]
 
 
+# UTF-8 pipes on every platform: on Windows, Python otherwise uses the console
+# code page and the original fails to print non-ASCII names.
+UTF8 = {**os.environ, "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"}
+
+
 def run(command, data):
-    result = subprocess.run(command, input=json.dumps(data), text=True,
-                            capture_output=True, timeout=10, check=True)
+    result = subprocess.run(command, input=json.dumps(data), encoding="utf-8",
+                            capture_output=True, timeout=10, check=True, env=UTF8)
     return json.loads(result.stdout)
 
 
@@ -31,6 +37,7 @@ def expected(case):
 
 
 def main():
+    sys.stdout.reconfigure(encoding="utf-8")
     mode = sys.argv[1]
     if mode == "build":
         files = sorted(Path("ported").glob("*.mjs"))
