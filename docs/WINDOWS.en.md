@@ -21,7 +21,7 @@ On Windows `python3` is often missing or only opens the Microsoft Store. Command
 - **`.cmd` / `.bat` commands**: `commands` in `migration/config.json` may name `npm`, `npx`, `mvn`, `gradlew.bat` and the like. The kit runs them through `cmd.exe /d /s /c` with each argument quoted and escaped, so spaces, `"`, `%` and `&` arrive unchanged.
 - **Guardrails**: `npm.cmd test`, `& "C:\...\npm.cmd" test`, `cmd /c git push`, `Start-Process git -ArgumentList push` and `py -3 -m pytest` match the same rules as `npm test`, `git push` and `python -m pytest`. PowerShell writes to `migration/guardrails.json` (`Set-Content`, `Out-File`, `Remove-Item`) are denied.
 - **File replacement**: when another process (status polling, an editor, antivirus) briefly holds a record open, the replacement is retried for about two seconds.
-- **Line endings and encoding**: the dependency parsers and the manifest generator write UTF-8 with LF; TSV and Markdown checked out with CRLF are read correctly.
+- **Line endings and encoding**: the dependency parsers and the manifest generator write UTF-8 with LF; TSV and Markdown checked out with CRLF are read correctly. The kit pins its own files to LF in `.gitattributes`, so its templates and agent profiles stay LF on a `core.autocrlf=true` clone.
 - **Diagnostics**: absolute paths with spaces (`C:\Users\Taro Yamada\...`) and backslash relative paths (`ported\a.mjs`) map to manifest targets.
 
 ## Things to watch

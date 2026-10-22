@@ -21,7 +21,7 @@
 - **`.cmd` / `.bat` のコマンド**：`migration/config.json` の `commands` に `npm`、`npx`、`mvn`、`gradlew.bat` などをそのまま書けます。キットは `cmd.exe /d /s /c` を通し、引数を引用・エスケープして渡します（空白、`"`、`%`、`&` などを含んでも、そのまま届きます）。
 - **ガードレール**：`npm.cmd test`、`& "C:\...\npm.cmd" test`、`cmd /c git push`、`Start-Process git -ArgumentList push`、`py -3 -m pytest` も、`npm test`・`git push`・`python -m pytest` と同じ禁止ルールで止めます。PowerShell の `Set-Content`、`Out-File`、`Remove-Item` による `migration/guardrails.json` の書き換えも拒否します。
 - **ファイルの置き換え**：記録ファイルをほかのプロセス（status の確認、エディター、ウイルス対策）が開いていて一時的に置き換えられないときは、約2秒まで再試行します。
-- **改行と文字コード**：依存解析と manifest の生成は UTF-8・LF で書きます。CRLF でチェックアウトされた TSV や Markdown も読めます。
+- **改行と文字コード**：依存解析と manifest の生成は UTF-8・LF で書きます。CRLF でチェックアウトされた TSV や Markdown も読めます。キット自体は `.gitattributes` で LF に固定しているため、`core.autocrlf=true` の端末で clone してもテンプレートやエージェント定義は LF のままです。
 - **エラー解析**：`C:\Users\Taro Yamada\...` のような空白を含む絶対パスや、`ported\a.mjs` のようなバックスラッシュの相対パスも、manifest の変換先に対応付けます。
 
 ## 気をつけること

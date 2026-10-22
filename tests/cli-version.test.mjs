@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { prepare, ready, cliDouble } from './helpers.mjs';
+import { prepare, ready, cliDouble, nodeCli, importable } from './helpers.mjs';
 import { safePath, atomicWrite, readJSON, roles } from '../lib/core.mjs';
 import { translate } from '../lib/pipeline.mjs';
 import { runtimeLayout } from '../lib/runtime.mjs';
@@ -21,17 +21,13 @@ test('workers follow the user CLI: no auto-update pinning in arguments or enviro
 
 // A CLI double that reports a configurable agent list for an unknown --agent.
 function agentCli(f, available) {
-  const file = safePath(f.root, 'agent-cli.mjs');
-  write(f, 'agent-cli.mjs', `#!/usr/bin/env node
-const argv = process.argv.slice(2);
+  return nodeCli(safePath(f.root, 'agent-cli.mjs'), `const argv = process.argv.slice(2);
 if (argv.includes('--version')) { console.log('GitHub Copilot CLI 9.9.9.'); process.exit(0); }
 if (argv.includes('--help')) { console.log(${JSON.stringify(requiredCopilotFlags(runtimeLayout(f.root, f.config)).join(' '))}); process.exit(0); }
 const agent = argv[argv.indexOf('--agent') + 1];
 console.error('No such agent: ' + agent + ', available: ' + ${JSON.stringify(available.join(', '))});
 process.exit(1);
 `);
-  fs.chmodSync(file, 0o755);
-  return file;
 }
 
 test('doctor proves every worker agent resolves and names the missing ones', async t => {
@@ -46,10 +42,7 @@ test('doctor proves every worker agent resolves and names the missing ones', asy
 });
 
 test('doctor fails the agent check when the CLI does not report an agent list', async t => {
-  const f = prepare(t), file = safePath(f.root, 'silent-cli.mjs');
-  write(f, 'silent-cli.mjs', `#!/usr/bin/env node
-console.log(${JSON.stringify(requiredCopilotFlags().join(' '))});\n`);
-  fs.chmodSync(file, 0o755);
+  const f = prepare(t), file = nodeCli(safePath(f.root, 'silent-cli.mjs'), `console.log(${JSON.stringify(requiredCopilotFlags().join(' '))});\n`);
   const check = (await doctor(f.root, f.config, { checkCLI: true, command: file })).checks.find(c => c.check === 'worker agents resolve');
   assert.equal(check.ok, false); assert.match(check.detail, /did not report its agent list/);
   assert.ok(!probeAgentName.startsWith('migration-'));
@@ -64,7 +57,7 @@ if (process.argv.includes('--version')) {
   console.log('GitHub Copilot CLI ' + (n === 1 ? '1.0.0' : '1.0.1') + '.');
   process.exit(0);
 }
-await import(${JSON.stringify(transport.prefixArgs[0])});
+await import(${JSON.stringify(importable(transport.prefixArgs[0]))});
 `);
   // Recheck before every call here; by default a run rechecks every 10 minutes.
   const adapter = createCopilotAdapter({ command: process.execPath, prefixArgs: [safePath(f.root, 'versioned-cli.mjs')], versionRecheckMs: 0 });
@@ -81,7 +74,7 @@ await import(${JSON.stringify(transport.prefixArgs[0])});
 
 test('an unreadable CLI version is recorded as unknown without blocking workers', async t => {
   const f = await ready(t), transport = cliDouble(f);
-  write(f, 'no-version-cli.mjs', `if (process.argv.includes('--version')) process.exit(3);\nawait import(${JSON.stringify(transport.prefixArgs[0])});\n`);
+  write(f, 'no-version-cli.mjs', `if (process.argv.includes('--version')) process.exit(3);\nawait import(${JSON.stringify(importable(transport.prefixArgs[0]))});\n`);
   const report = await translate(f.root, f.config, createCopilotAdapter({ command: process.execPath, prefixArgs: [safePath(f.root, 'no-version-cli.mjs')] }));
   assert.equal(report.done, 1);
   assert.equal(report.cliVersions, undefined);

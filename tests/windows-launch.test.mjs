@@ -142,8 +142,8 @@ test('Windows runs other batch files (npx.cmd, gradlew.bat) through cmd.exe with
   assert.deepEqual(windowsLaunch(path.join(dir, 'gradlew.bat'), { platform: 'win32', env }), { command: env.ComSpec, prefixArgs: [], batch: path.join(dir, 'gradlew.bat') });
   assert.deepEqual(windowsLaunch('missing', { platform: 'win32', env }), { command: 'missing', prefixArgs: [] });
   assert.deepEqual(batchCommandLine('C:\\Program Files\\nodejs\\npx.cmd', ['tsc', 'a b', 'x"y', '100%']),
-    ['/d', '/s', '/c', '"C:\\Program^ Files\\nodejs\\npx.cmd ^"tsc^" ^"a^ b^" ^"x\\^"y^" ^"100^%^""']);
-  // npm's node_modules/.bin shims reparse %*, so their metacharacters are escaped twice.
+    ['/d', '/s', '/c', '"C:\\Program^ Files\\nodejs\\npx.cmd ^^^"tsc^^^" ^^^"a^^^ b^^^" ^^^"x\\^^^"y^^^" ^^^"100^^^%^^^""']);
+  // A batch file reparses the %* it forwards, so metacharacters are escaped twice.
   assert.equal(batchCommandLine('C:\\p\\node_modules\\.bin\\tsc.cmd', ['a&b'])[3], '"C:\\p\\node_modules\\.bin\\tsc.cmd ^^^"a^^^&b^^^""');
 });
 

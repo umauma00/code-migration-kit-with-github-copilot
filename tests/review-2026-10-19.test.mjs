@@ -5,7 +5,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { prepare, ready, fake, cliDouble, result } from './helpers.mjs';
+import { prepare, ready, fake, cliDouble, result, importable } from './helpers.mjs';
 import { approve, runStage, translate } from '../lib/pipeline.mjs';
 import { contextHash, safePath, writeJSON, readJSON, atomicWrite, done, loadConfig, operationalConfigKeys } from '../lib/core.mjs';
 import { createCopilotAdapter, copilotArgs, readUsageFile, sessionName, sessionNameLimit } from '../scripts/copilot_adapter.mjs';
@@ -69,7 +69,7 @@ test('workers report the CLI\'s own token and AI-unit usage and pass the per-cal
 const argv = process.argv, at = argv.indexOf('--usage-output-file');
 if (!argv.includes('--version') && at > 0) fs.writeFileSync(argv[at + 1], JSON.stringify({ totalNanoAiu: 1200, aiCreditsStatus: 'unavailable', totalPremiumRequestCost: 0,
   modelMetrics: { 'test-double': { usage: { inputTokens: 2400, outputTokens: 30, cacheReadTokens: 2000, cacheWriteTokens: 0 } } } }));
-await import(${JSON.stringify(transport.prefixArgs[0])});
+await import(${JSON.stringify(importable(transport.prefixArgs[0]))});
 `);
   f.config.maxAiCreditsPerCall = 30; persist(f);
   const adapter = createCopilotAdapter({ command: process.execPath, prefixArgs: [safePath(f.root, 'usage-cli.mjs')] });

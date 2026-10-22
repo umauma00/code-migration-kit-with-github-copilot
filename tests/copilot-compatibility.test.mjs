@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { prepare, ready, result, fake, finding } from './helpers.mjs';
+import { prepare, ready, result, fake, finding, nodeCli } from './helpers.mjs';
 import { safePath, atomicWrite, writeJSON, readJSON, contextHash, done, loadConfig, loadReviewDependencies, reviewSources, unitState } from '../lib/core.mjs';
 import { reviewInput, validateWorkerProfile } from '../lib/review.mjs';
 import { translate, runStage, approve } from '../lib/pipeline.mjs';
@@ -198,9 +198,7 @@ test('C3: workers require concrete CLI read tools; aliases or added write tools 
 });
 
 test('C1: doctor requires the machine-output flag', async t => {
-  const f = prepare(t), command = safePath(f.root, 'cli-help');
-  write(f, 'cli-help', '#!/bin/sh\nprintf "%s\\n" "--agent --model --available-tools --deny-tool"\n');
-  fs.chmodSync(command, 0o755);
+  const f = prepare(t), command = nodeCli(safePath(f.root, 'cli-help.mjs'), 'console.log("--agent --model --available-tools --deny-tool");\n');
   const report = await doctor(f.root, f.config, { checkCLI: true, command });
   assert.equal(report.checks.find(c => c.check === 'required flags').ok, false);
 });

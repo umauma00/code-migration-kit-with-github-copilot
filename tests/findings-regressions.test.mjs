@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { prepare, ready, fake, result, finding, cliOutput } from './helpers.mjs';
+import { prepare, ready, fake, result, finding, cliOutput, nodeCli } from './helpers.mjs';
 import { safePath, atomicWrite, writeJSON, readJSON, loadConfig, readManifest, contextHash, done, roles } from '../lib/core.mjs';
 import { approve, runStage, translate } from '../lib/pipeline.mjs';
 import { runProcess } from '../lib/process.mjs';
@@ -110,9 +110,7 @@ test('normal CLI resume fails if a previously completed output changes while ano
   const context = contextHash(f.root, f.config);
   assert.equal(done(f.root, f.units[0], context), true);
   assert.equal(done(f.root, f.units[1], context), false);
-  const command = safePath(f.root, 'resume-cli.mjs');
-  write(f, 'resume-cli.mjs', `#!/usr/bin/env node
-import fs from 'node:fs';
+  const command = nodeCli(safePath(f.root, 'resume-cli.mjs'), `import fs from 'node:fs';
 for await (const chunk of process.stdin) {}
 fs.writeFileSync('review-started', 'ready');
 const deadline = Date.now() + 10000;
@@ -121,7 +119,6 @@ if (!fs.existsSync('editor-saved')) process.exit(2);
 const responses = ${JSON.stringify(Object.fromEntries(['reviewer-semantics', 'reviewer-rules'].map(role => [role, cliOutput(result(role, f.units[1]))])))};
 console.log(responses[process.env.MIGRATION_KIT_ROLE]);
 `);
-  fs.chmodSync(command, 0o755);
   const controller = new AbortController();
   const running = runProcess(process.execPath, [safePath(f.root, 'migration-kit/scripts/run_migration.mjs'), 'translate', '--root', f.root, '--copilot', command],
     { cwd: f.root, signal: controller.signal, timeoutMs: 15000 });
@@ -156,12 +153,11 @@ test('repair may complete its selected target while other translation units rema
 });
 
 test('doctor rejects every required worker flag missing from help, including short flags', async t => {
-  const f = prepare(t), command = safePath(f.root, 'help-cli');
+  const f = prepare(t);
   const flags = requiredCopilotFlags();
   for (const missing of [null, ...flags]) {
     const help = flags.filter(flag => flag !== missing).join(' ') + (missing ? ` ${missing}-unsupported` : '');
-    write(f, 'help-cli', `#!/bin/sh\nprintf '%s\\n' '${help}'\n`);
-    fs.chmodSync(command, 0o755);
+    const command = nodeCli(safePath(f.root, 'help-cli.mjs'), `console.log(${JSON.stringify(help)});\n`);
     const report = await doctor(f.root, f.config, { checkCLI: true, command });
     const check = report.checks.find(item => item.check === 'required flags');
     assert.equal(check.ok, missing === null, String(missing));

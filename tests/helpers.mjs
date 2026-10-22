@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { install, kitRoot } from '../scripts/install.mjs';
 import { loadConfig, roles, writeJSON, safePath, atomicWrite, readManifest } from '../lib/core.mjs';
 import { approve, runStage } from '../lib/pipeline.mjs';
@@ -8,6 +9,18 @@ import { approve, runStage } from '../lib/pipeline.mjs';
 export const mini = path.join(kitRoot, 'fixtures/mini');
 // Python on PATH: Windows installs (python.org, setup-python) name it python.
 export const python = process.platform === 'win32' ? 'python' : 'python3';
+// A Node script the kit launches by path as a CLI double: executable with a
+// shebang on POSIX; on Windows, where only executables and batch files spawn,
+// a .cmd wrapper next to it (run through cmd.exe like an npm shim).
+export function nodeCli(file, body) {
+  fs.writeFileSync(file, `#!/usr/bin/env node\n${body}`, { mode: 0o755 });
+  fs.chmodSync(file, 0o755);
+  if (process.platform !== 'win32') return file;
+  fs.writeFileSync(`${file}.cmd`, `@"${process.execPath}" "${file}" %*\r\n`);
+  return `${file}.cmd`;
+}
+// import() of an absolute path inside a generated script needs a file URL on Windows.
+export const importable = file => pathToFileURL(file).href;
 export function prepare(t, { realCommands = false, count = 1, model = 'test-double', root, workflow = false, layout = 'repository' } = {}) {
   root ??= fs.mkdtempSync(path.join(os.tmpdir(), 'copilot-migration-test-'));
   t?.after(() => fs.rmSync(root, { recursive: true, force: true }));
