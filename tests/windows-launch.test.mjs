@@ -54,7 +54,8 @@ test('Windows finds the npm shim through a quoted PATH entry or npm\'s global pr
   const installed = npmGlobal();
   fs.renameSync(installed.dir, path.join(profile, '.npm-packages'));
   const moved = installed.exe.replace(installed.dir, path.join(profile, '.npm-packages'));
-  for (const prefix of ['${USERPROFILE}/.npm-packages', '${userprofile?}/.npm-packages', '"${USERPROFILE}/.npm-packages"', '~/.npm-packages']) {
+  for (const prefix of ['${USERPROFILE}/.npm-packages', '${userprofile?}/.npm-packages', '"${USERPROFILE}/.npm-packages"', "'~/.npm-packages'",
+    '~/.npm-packages ; moved here', `${empty}\nprefix = \${USERPROFILE}/.npm-packages`]) {
     fs.writeFileSync(path.join(profile, '.npmrc'), `prefix=${prefix}\n`);
     assert.deepEqual(windowsLaunch('copilot', { ...win(dir), env: { Path: empty, USERPROFILE: profile } }), { command: moved, prefixArgs: [] }, prefix);
   }
@@ -62,6 +63,11 @@ test('Windows finds the npm shim through a quoted PATH entry or npm\'s global pr
   fs.renameSync(dir, path.join(appData, 'npm'));
   assert.deepEqual(windowsLaunch('copilot', { ...win(dir), env: { Path: empty, APPDATA: appData } }),
     { command: exe.replace(dir, path.join(appData, 'npm')), prefixArgs: [] });
+  // An empty prefix line does not take the next line, and a relative prefix never resolves against cwd.
+  for (const rc of ['prefix=\r\nregistry=https://registry.npmjs.org/\r\n', 'prefix=.\n']) {
+    fs.writeFileSync(path.join(profile, '.npmrc'), rc);
+    assert.deepEqual(windowsLaunch('copilot', { ...win(dir), cwd: path.join(profile, '.npm-packages'), env: { Path: empty, USERPROFILE: profile } }), { command: 'copilot', prefixArgs: [] }, rc);
+  }
   // Still nothing found: the bare name is left for spawn to report.
   assert.deepEqual(windowsLaunch('copilot', { ...win(dir), env: { Path: empty } }), { command: 'copilot', prefixArgs: [] });
 });
