@@ -1,5 +1,19 @@
 # Unreleased (0.3.0)
 
+- 2026-10-22 Windows as a primary platform (see docs/WINDOWS.md):
+  - `commands` may name `.cmd`/`.bat` tools (`npm`, `npx`, `mvn`,
+    `gradlew.bat`): they run through `cmd.exe /d /s /c` with every argument
+    quoted and escaped as cross-spawn does. Before, Node refused to start them
+    without a shell.
+  - Guardrails match `npm.cmd`/`git.exe`, the PowerShell call operator,
+    `cmd /c`, `Start-Process` and `py -3 -m pytest`.
+  - The dependency parsers and `make_manifest.py` write UTF-8 with LF (the
+    Windows default was the console code page and CRLF) and never crash
+    printing a path the console cannot encode.
+  - Atomic replacements retry briefly on Windows sharing violations.
+  - Node diagnostics keep absolute paths with spaces; printed commands quote
+    a kit path with spaces and use `py -3` or `python` instead of `python3`.
+  - CI runs `npm test` and `npm run demo` on windows-latest and ubuntu-latest.
 - 2026-10-22 fewer repeated confirmations, compared with upstream step by step
   (guardrails and every confirmation's hook ask stay):
   - `build-loop --through smoke|parity` extends the one host-confirmed grant to

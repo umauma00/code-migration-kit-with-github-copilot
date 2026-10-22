@@ -51,7 +51,7 @@ Workers are always Copilot CLI processes: `--model` fixes each role's model, and
 - Node.js 22 or later. The runner has no external npm dependencies.
 - The Copilot CLI (if it is missing, the AI installs it and starts sign-in after you agree) and a plan or organization setting that allows the configured models.
 - The runtime and build tools of the languages involved. The bundled demo and the Python/C dependency mappers need Python 3.
-- Previously verified on Linux; automated tests and CLI transport verified on macOS. Windows is untested. A Copilot CLI installed with `npm install -g @github/copilot` (the `copilot.cmd` shim on PATH) is started through the bundled Windows binary, or through `node` and the bundled loader when the binary is missing; a `copilot.exe` (for example from WinGet) is used as is. The kit never uses a shell, so verification commands in `migration/config.json` cannot name `.cmd`/`.bat` files such as `npm` or `gradlew.bat` directly; start them with `node` or an `.exe`.
+- Windows is a primary platform: GitHub Actions runs `npm test` and `npm run demo` on `windows-latest` and `ubuntu-latest` (a live Copilot CLI and VS Code run is still pending). `.cmd`/`.bat` build commands (`npm`, `npx`, `mvn`, `gradlew.bat`) may be used in `commands`. See [Using the kit on Windows](docs/WINDOWS.en.md) for requirements and caveats. Automated tests and CLI transport are also verified on macOS.
 
 ## Installing as a plugin
 
@@ -185,7 +185,7 @@ The commands below are for the default **runtime mode**. Projects without a usab
 }
 ```
 
-This is the bundled fixture's example; replace it with your project's commands. `mutation` exits 0 when the comparator detects a deliberately broken implementation. Keep `typecheck` to a cheap check that is valid before the whole tree is translated, or set it to `null`.
+This is the bundled fixture's example; replace it with your project's commands. On Windows use `py` (with `"-3"` as the first argument) or `python` instead of `python3`. `mutation` exits 0 when the comparator detects a deliberately broken implementation. Keep `typecheck` to a cheap check that is valid before the whole tree is translated, or set it to `null`.
 
 ## No runnable original or no specification
 

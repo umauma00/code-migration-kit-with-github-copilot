@@ -53,7 +53,7 @@ Anthropicの[Code Migration Kit](https://github.com/anthropics/code-migration-ki
 - Node.js 22以上。ランナー本体は外部npm依存なし。
 - Copilot CLI（未導入ならAIが同意を得てインストールし、サインインを始めます）。指定モデルを利用できる契約・組織設定。
 - 対象言語の実行環境・ビルドツール。付属デモとPython/C依存解析にはPython 3が必要です。
-- Linuxの既存検証とmacOSでの自動テスト・CLI通信検証があります。Windowsでの実行は未検証です。`npm install -g @github/copilot` で入れたCopilot CLI（PATH上の `copilot.cmd`）は、同梱のWindows用実行ファイル（なければ `node` と同梱ローダー）に読み替えて起動します。WinGet版などの `copilot.exe` はそのまま使います。キットはシェルを使わないため、`migration/config.json` の検証コマンドに `npm` や `gradlew.bat` などの `.cmd`/`.bat` を直接書くことはできません。`node` から始まるコマンドか `.exe` で指定してください。
+- Windowsを主な実行環境として扱い、GitHub Actionsの `windows-latest` と `ubuntu-latest` で `npm test`・`npm run demo` を実行しています（Copilot CLIとVS Codeの実機確認は未実施）。`.cmd`/`.bat` のビルドコマンド（`npm`、`npx`、`mvn`、`gradlew.bat`）も `commands` に書けます。用意するものと注意点は [Windowsで使う](docs/WINDOWS.md) を参照してください。macOSでは自動テストとCLI通信を確認しています。
 
 ## プラグインとして導入する
 
@@ -187,7 +187,7 @@ JSON形式は `{"schemaVersion":1,"dependencies":{"src/a.py":["src/b.py"],"src/b
 }
 ```
 
-これは付属題材の例です。実案件のコマンドに置き換えてください。`mutation` は「意図的に壊した実装を比較器が検出できたとき」に終了0を返します。`typecheck` は全体の変換前でも有効な軽量検査だけにし、それが難しければ `null` にします。
+これは付属題材の例です。実案件のコマンドに置き換えてください。Windowsでは `python3` の代わりに `py`（引数の先頭に `"-3"`）か `python` を使います。`mutation` は「意図的に壊した実装を比較器が検出できたとき」に終了0を返します。`typecheck` は全体の変換前でも有効な軽量検査だけにし、それが難しければ `null` にします。
 
 ## 現行の実行環境・仕様書がない場合
 
