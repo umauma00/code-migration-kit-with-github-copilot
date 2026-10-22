@@ -14,7 +14,8 @@ Follow [preparation audits](../../docs/PREPARATION-AUDITS.md),
 Run preparation audits only with `audit_inputs.mjs run --directory DIR` (or
 `run-pending` for every unsubmitted request): each is a fresh tool-free CLI worker
 on its phaseModels entry with the exact frozen body. Never use the task/agent
-tool or pass a path to the auditor instead. Mechanical receipts are not independent AI audits.
+tool or pass a path to the auditor instead. Retire a stale request only after
+freezing its replacement (`retire --superseded-by NEW --reason TEXT`). Mechanical receipts are not independent AI audits.
 Never extend a pilot or batch grant to production or a downstream major stage.
 
 Drive everything from chat: run the commands yourself and report results. The

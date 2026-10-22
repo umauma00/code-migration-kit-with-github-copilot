@@ -7,7 +7,10 @@
   tool got a path it cannot open, or a retyped body that breaks the hash
   binding. New `audit_inputs.mjs run-pending` runs every request without
   result.json, config.concurrency at a time, and reports each outcome. The
-  profile change invalidates unsubmitted requests; freeze them again.
+  profile change invalidates unsubmitted requests: freeze replacements, then
+  `audit_inputs.mjs retire --directory OLD --superseded-by NEW --reason TEXT`
+  each old one. retired.json keeps it as evidence with its replacement; run,
+  submit and run-pending skip it.
 - 2026-10-21 Windows: a Copilot CLI installed with `npm install -g
   @github/copilot` now starts. Node cannot run the `copilot.cmd` shim without a
   shell, so workers, doctor and `models list` run the bundled
