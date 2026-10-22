@@ -102,9 +102,12 @@ function printing(label, { native = false } = {}) {
   if (native) {
     const exe = path.join(g.pkg, 'node_modules', '@github', `copilot-win32-${process.arch}`, 'copilot.exe');
     fs.mkdirSync(path.dirname(exe), { recursive: true });
-    fs.writeFileSync(exe, `#!${process.execPath}\nconsole.log(${JSON.stringify(`native ${label}`)})\n`, { mode: 0o755 });
+    // On real Windows only a real executable spawns: a copy of node runs the -e
+    // program that printing() returns; elsewhere a script stands in for it.
+    if (process.platform === 'win32') fs.copyFileSync(process.execPath, exe);
+    else fs.writeFileSync(exe, `#!${process.execPath}\nconsole.log(${JSON.stringify(`native ${label}`)})\n`, { mode: 0o755 });
   }
-  return g;
+  return { ...g, args: ['-e', `console.log(${JSON.stringify(`native ${label}`)})`] };
 }
 
 test('Windows lookup uses the PATH given to the child, not the parent PATH', async () => {
@@ -123,7 +126,7 @@ test('Windows resolves a relative shim against the child cwd and runs it from th
     const g = printing(native ? 'tools-native' : 'tools', { native });
     fs.renameSync(g.dir, path.join(root, 'tools'));
     // The parent cwd has no tools/ folder; only the child's cwd does.
-    const r = await asWindows(() => runProcess(path.join('.', 'tools', 'copilot.cmd'), [], { cwd: root }));
+    const r = await asWindows(() => runProcess(path.join('.', 'tools', 'copilot.cmd'), g.args, { cwd: root }));
     assert.equal(r.stdout.trim(), native ? 'native tools-native' : 'loader tools');
     const launch = windowsLaunch(path.join('.', 'tools', 'copilot.cmd'), { cwd: root, platform: 'win32' });
     assert.ok(launch.prefixArgs.concat(launch.command).every(p => !p.includes('copilot') || path.isAbsolute(p)));
