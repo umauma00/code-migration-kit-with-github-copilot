@@ -6,6 +6,7 @@
 大きなリポジトリでは文脈が足りなくなります。`survey` はソースを**範囲（scope）**に分け、
 範囲ごとに新しい調査担当（surveyor）へ任せ、**結果をファイルで受け取ります**。
 親が読むのは、まとめた下書き（数件〜数十件の要約）だけです。
+00 は移行するかの判断なので、既定では親が一部を抜き出して読み、読まなかった範囲を報告します（上流と同じ）。survey は全ファイルを扱う 00b・02 で使い、00 では任意です。
 
 - 範囲ごとに新しい `copilot` プロセスを起動します（`--agent migration-surveyor`、ツールなし、`--no-custom-instructions`）。VS Code から進める場合も同じです。
 - 範囲内のソース本文を固定入力として渡します。担当は他のファイルや他の範囲の結果を読みません。
@@ -17,7 +18,7 @@
 
 | 種類 | 工程 | 担当が返すもの | まとめ先 |
 |---|---|---|---|
-| `facts` | 00 事前調査 | 公開入口・データ形式・外部依存・環境依存・生成コード・移行理由になる問題・危険な構文・テスト（すべて PATH:LINE 付き） | `migration/surveys/facts.md`（feasibility.md を書く材料） |
+| `facts` | 00 事前調査（任意。既定は親が一部を抜き出して読む） | 公開入口・データ形式・外部依存・環境依存・生成コード・移行理由になる問題・危険な構文・テスト（すべて PATH:LINE 付き） | `migration/surveys/facts.md`（feasibility.md を書く材料） |
 | `contracts` | 00b（source-as-spec） | ファイルごとの公開インターフェース・入出力とエラー・境界条件・根拠・不明点 | `migration/source-spec/contracts.md`（未編集の雛形の場合だけ。編集済みなら `migration/surveys/contracts.draft.md`） |
 | `inventory` | 02 意味の差 | 機械的に作った箇所一覧（census）の各箇所の分類・訳し方・根拠・confirmed/unknown | 範囲ごとのシャード → 既存の inventory マージで `migration/inventory.tsv` |
 

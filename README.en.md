@@ -207,7 +207,7 @@ When a runner command fails it prints, after the `ERROR:` line, **the cause, the
 
 ## Delegating preparation reading by scope
 
-In 00, 00b and 02, instead of the parent reading every file itself, `survey run --kind facts|contracts|inventory` splits the source into scopes and hands each to a fresh surveyor (a new `copilot` process). Results are saved as files under `migration/surveys/`; `survey merge` builds the draft. Interrupted runs resume with the remaining scopes. See [preparation surveys](docs/SURVEYS.en.md).
+Phase 00 reads a sample of the source directly, as upstream does, and reports what it skipped (survey is optional there). In 00b (source-as-spec) and 02, which must cover every file, instead of the parent reading every file itself, `survey run --kind facts|contracts|inventory` splits the source into scopes and hands each to a fresh surveyor (a new `copilot` process). Results are saved as files under `migration/surveys/`; `survey merge` builds the draft. Interrupted runs resume with the remaining scopes. See [preparation surveys](docs/SURVEYS.en.md).
 
 ## Working through the phases
 

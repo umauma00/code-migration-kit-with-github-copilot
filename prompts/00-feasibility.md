@@ -84,10 +84,11 @@ implementation. Identify checks that can be deferred. Perform authorized AI fixe
 and group only necessary user decisions. 00 assesses suitability/scope; 00b
 prepares comparison evidence; 03 prototypes; 04 begins production implementation.
 
-## Delegate the reading
+## Reading the source
 
-Do not read the whole codebase into this conversation. Run
-`run_migration.mjs survey run --kind facts` (fresh tool-free surveyors per scope,
-results as files), then `survey merge --kind facts`, and build the report from
-`migration/surveys/facts.md`, checking the cited lines you rely on. Small
-repositories may be read directly. See [surveys](../docs/SURVEYS.md).
+As upstream: read the source yourself with read-only commands (counts, grep, git
+log) and sample what is too big to read fully. Name what you sampled and what you
+skipped; a verdict does not need every file. `survey run --kind facts` is optional
+here: use it only when the person asks for it or sampling cannot support a
+committed call (see [surveys](../docs/SURVEYS.md)). It starts one Copilot CLI
+process per scope, so a failure to start it never blocks this report.

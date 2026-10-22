@@ -1,5 +1,14 @@
 # Unreleased (0.3.0)
 
+- 2026-10-22 phase 00 reads the source the way upstream does: the parent
+  samples it and names what it skipped. `survey --kind facts` is optional
+  there, so a Copilot CLI launch failure no longer stops the feasibility
+  report; 00b (source-as-spec) and 02 keep the survey. On Windows, a bare
+  `copilot` that PATH does not resolve is also looked up in npm's global
+  prefix (`npm_config_prefix`, the user `.npmrc` prefix with `${VAR}` and `~`
+  expanded, `%APPDATA%\npm`), and quoted PATH entries are read. A v0.3.0
+  survey stopped with `spawn copilot ENOENT` while `doctor --copilot PATH`
+  passed. Not yet run on a real Windows machine.
 - 2026-10-22 the report language holds for the whole session. The interactive
   hook denies a question-tool call (Copilot CLI `ask_user`, VS Code
   askQuestions) that does not ask 日本語 / English while

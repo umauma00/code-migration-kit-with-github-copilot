@@ -97,9 +97,11 @@ independent review of the package, show one report and record
 
 ## Keep the parent's context small
 
-In 00, 00b (source-as-spec) and 02, do not read the whole codebase yourself on
+In 00, read and sample the source yourself, as upstream does, and say what you
+skipped; `survey --kind facts` is optional there. In 00b (source-as-spec) and 02,
+which must cover every file, do not read the whole codebase yourself on
 anything but a small repository. Use [surveys](../docs/SURVEYS.md): `survey run --kind
-facts|contracts|inventory` sends each scope to a fresh tool-free surveyor (a new
+contracts|inventory` sends each scope to a fresh tool-free surveyor (a new
 Copilot CLI process) and saves its answer as a file; `survey merge` builds the draft you review. Check cited lines before relying
 on them; merged drafts still go through the phase's audits and the human gate.
 Run each independent preparation audit (00b/01/02) as `audit_inputs.mjs freeze`

@@ -40,6 +40,55 @@ test('Windows falls back to node and the loader, and leaves other commands alone
   assert.deepEqual(windowsLaunch('copilot', { ...win(dir), platform: 'linux' }), { command: 'copilot', prefixArgs: [] });
 });
 
+test('Windows finds the npm shim through a quoted PATH entry or npm\'s global prefix', () => {
+  const { dir, exe } = npmGlobal();
+  const empty = path.join(dir, 'empty');
+  assert.deepEqual(windowsLaunch('copilot', { ...win(dir), env: { Path: `${empty}; "${dir}" ` } }), { command: exe, prefixArgs: [] });
+  // PATH without npm's folder (a terminal opened before the install): npm's own prefix settings.
+  assert.deepEqual(windowsLaunch('copilot', { ...win(dir), env: { Path: empty, npm_config_prefix: dir } }), { command: exe, prefixArgs: [] });
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'kit-win-home-'));
+  fs.writeFileSync(path.join(home, '.npmrc'), `registry=https://registry.npmjs.org/\r\nprefix=${dir}\r\n`);
+  assert.deepEqual(windowsLaunch('copilot', { ...win(dir), env: { Path: empty, USERPROFILE: home } }), { command: exe, prefixArgs: [] });
+  // npm expands ${VAR} and a leading ~ in .npmrc; the prefix here lives under the user profile.
+  const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'kit-win-profile-'));
+  const installed = npmGlobal();
+  fs.renameSync(installed.dir, path.join(profile, '.npm-packages'));
+  const moved = installed.exe.replace(installed.dir, path.join(profile, '.npm-packages'));
+  for (const prefix of ['${USERPROFILE}/.npm-packages', '${userprofile?}/.npm-packages', '"${USERPROFILE}/.npm-packages"', "'~/.npm-packages'",
+    '~/.npm-packages ; moved here', `${empty}\nprefix = \${USERPROFILE}/.npm-packages`]) {
+    fs.writeFileSync(path.join(profile, '.npmrc'), `prefix=${prefix}\n`);
+    assert.deepEqual(windowsLaunch('copilot', { ...win(dir), env: { Path: empty, USERPROFILE: profile } }), { command: moved, prefixArgs: [] }, prefix);
+  }
+  const appData = fs.mkdtempSync(path.join(os.tmpdir(), 'kit-win-appdata-'));
+  fs.renameSync(dir, path.join(appData, 'npm'));
+  assert.deepEqual(windowsLaunch('copilot', { ...win(dir), env: { Path: empty, APPDATA: appData } }),
+    { command: exe.replace(dir, path.join(appData, 'npm')), prefixArgs: [] });
+  // ${VAR?} is '' when unset and a variable set to '' expands to '' (both unlike a missing one).
+  const run = (rc, extra = {}) => {
+    fs.writeFileSync(path.join(profile, '.npmrc'), `${rc}\n`);
+    return windowsLaunch('copilot', { ...win(dir), env: { Path: empty, USERPROFILE: profile, ...extra } }).command;
+  };
+  assert.equal(run('prefix=${USERPROFILE}/.npm-packages${UNSET_SUFFIX?}'), moved);
+  assert.equal(run('prefix=${USERPROFILE}/.npm-packages${EMPTY_SUFFIX}', { EMPTY_SUFFIX: '' }), moved);
+  assert.equal(run('prefix=${USERPROFILE}/.npm-packages${UNSET_SUFFIX}'), 'copilot');
+  assert.equal(run('prefix=\\${USERPROFILE}/.npm-packages'), 'copilot');
+  // Quoted values keep ; and #, unquoted ones end at them unless escaped; a [section] prefix is not global.
+  const tools = path.join(profile, 'npm #tools;x');
+  fs.renameSync(path.join(profile, '.npm-packages'), tools);
+  const inTools = moved.replace(path.join(profile, '.npm-packages'), tools);
+  for (const rc of ['prefix="${USERPROFILE}/npm #tools;x"', "prefix='${USERPROFILE}/npm #tools;x' ", 'prefix=${USERPROFILE}/npm \\#tools\\;x',
+    `prefix="${tools.replaceAll('\\', '\\\\')}"\n[other]\nprefix=${empty}`]) assert.equal(run(rc), inTools, rc);
+  assert.equal(run('prefix=${USERPROFILE}/npm #tools;x'), 'copilot');
+  fs.renameSync(tools, path.join(profile, '.npm-packages'));
+  // An empty prefix line does not take the next line, and a relative prefix never resolves against cwd.
+  for (const rc of ['prefix=\r\nregistry=https://registry.npmjs.org/\r\n', 'prefix=.\n']) {
+    fs.writeFileSync(path.join(profile, '.npmrc'), rc);
+    assert.deepEqual(windowsLaunch('copilot', { ...win(dir), cwd: path.join(profile, '.npm-packages'), env: { Path: empty, USERPROFILE: profile } }), { command: 'copilot', prefixArgs: [] }, rc);
+  }
+  // Still nothing found: the bare name is left for spawn to report.
+  assert.deepEqual(windowsLaunch('copilot', { ...win(dir), env: { Path: empty } }), { command: 'copilot', prefixArgs: [] });
+});
+
 // End to end through runProcess with the Windows branch on: the loader and the
 // "native binary" are scripts that print which copy ran.
 async function asWindows(fn) {

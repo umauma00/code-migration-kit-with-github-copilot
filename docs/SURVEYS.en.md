@@ -6,6 +6,7 @@ In phases 00, 00b and 02, a parent agent that reads the whole codebase into its
 own conversation runs out of context on large repositories. `survey` splits the
 source into **scopes**, hands each scope to a fresh surveyor worker and **gets
 the results back as files**. The parent reads only the merged draft.
+Phase 00 only decides whether to migrate, so by default the parent samples the source itself and reports what it skipped (as upstream). Surveys are for 00b and 02, which must cover every file; in 00 they are optional.
 
 - One new `copilot` process per scope (`--agent migration-surveyor`, no tools, `--no-custom-instructions`), also when driven from VS Code.
 - The scope's source text is the frozen input; a surveyor never reads other files or other scopes' results.
@@ -17,7 +18,7 @@ the results back as files**. The parent reads only the merged draft.
 
 | Kind | Phase | What a surveyor returns | Merged into |
 |---|---|---|---|
-| `facts` | 00 feasibility | Entry points, data formats, external dependencies, platform code, generated code, pain points, risky constructs and tests, each with PATH:LINE | `migration/surveys/facts.md` (material for feasibility.md) |
+| `facts` | 00 feasibility (optional; by default the parent samples the source itself) | Entry points, data formats, external dependencies, platform code, generated code, pain points, risky constructs and tests, each with PATH:LINE | `migration/surveys/facts.md` (material for feasibility.md) |
 | `contracts` | 00b (source-as-spec) | Per file: public interface, inputs/outputs/errors, edge cases, evidence, unknowns | `migration/source-spec/contracts.md` (only while it is the untouched skeleton; otherwise `migration/surveys/contracts.draft.md`) |
 | `inventory` | 02 gap inventory | For each site of a mechanical census: classification, target translation, evidence, confirmed/unknown | Per-scope shards, then the existing inventory merge into `migration/inventory.tsv` |
 
