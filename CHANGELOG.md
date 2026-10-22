@@ -1,5 +1,26 @@
 # Unreleased (0.3.0)
 
+- 2026-10-22 the report language holds for the whole session. The interactive
+  hook denies a question-tool call (Copilot CLI `ask_user`, VS Code
+  askQuestions) that does not ask 日本語 / English while
+  `migration/preferences.json` has no language, and, with `ja`, one whose
+  question text (each question separately, not its header or backticked
+  text) has no hiragana and, after setting aside whitespace-separated paths,
+  no Japanese or two or more English words, or with a choice of two or more English
+  words. Long sessions drifted back to English questions after
+  compaction and English tool output. The VS Code tool name is matched by
+  pattern and not yet checked in VS Code.
+- 2026-10-22 preparation audits no longer stall on a host subagent. The
+  auditor profiles now set `disable-model-invocation: true`, and the
+  orchestrator, prompts 00b/01/02, skills and docs name `audit_inputs.mjs run`
+  as the only way to start one: a tool-free auditor reached through the task
+  tool got a path it cannot open, or a retyped body that breaks the hash
+  binding. New `audit_inputs.mjs run-pending` runs every request without
+  result.json, config.concurrency at a time, and reports each outcome. The
+  profile change invalidates unsubmitted requests: freeze replacements, then
+  `audit_inputs.mjs retire --directory OLD --superseded-by NEW --reason TEXT`
+  each old one. retired.json keeps it as evidence with its replacement; run,
+  submit and run-pending skip it.
 - 2026-10-21 Windows: a Copilot CLI installed with `npm install -g
   @github/copilot` now starts. Node cannot run the `copilot.cmd` shim without a
   shell, so workers, doctor and `models list` run the bundled

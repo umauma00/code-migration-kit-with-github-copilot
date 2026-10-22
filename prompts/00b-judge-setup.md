@@ -38,6 +38,9 @@ build a language-neutral parity harness before any production translation.
   assertion batches against the old assertions and narrow normalization rules.
   Confirm weaknesses, repair and re-audit with fresh contexts. Mutation detection
   is an additional check, not a substitute for assertion comparison.
+  Run each audit request with `audit_inputs.mjs freeze` then `audit_inputs.mjs run
+  --directory DIR` (`run-pending` runs every unsubmitted request). Never pass a
+  request or its path to a task/agent subagent.
 
 Report scenario counts, mutation detection, inherited failures and environment
 failures separately. Resolve inherited failures before the final clean gate;

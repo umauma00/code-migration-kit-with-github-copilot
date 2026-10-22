@@ -122,10 +122,31 @@ Run the request with `node migration-kit/scripts/audit_inputs.mjs run --director
 migration/audits/REQUEST_ID`: a fresh Copilot CLI process on migration-preparation-auditor
 (or the plugin equivalent) with no tools and `--model` set to the requested
 phaseModels entry; the result records the model the CLI reported, the CLI
-version, session ID and usage. Host subagents cannot guarantee the model: the
-CLI task tool only overrides it on an explicit user request and VS Code Local
-refuses a model above the parent's cost tier. A response obtained another way
-can still be checked with `submit`. Two requests can share the same frozen input
+version, session ID and usage. `audit_inputs.mjs run-pending` does the same for
+every request directory without result.json, config.concurrency at a time, and
+exits non-zero if any request failed; rerun it to retry only the remaining ones.
+
+A request whose inputs, configuration or auditor profile changed fails with
+"inputs changed" and can never be submitted. Freeze a replacement, then retire
+the old one so it stops counting as pending:
+
+```bash
+node migration-kit/scripts/audit_inputs.mjs retire --directory migration/audits/OLD \
+  --superseded-by migration/audits/NEW --reason "auditor profile changed"
+```
+
+Retirement writes retired.json (reason, replacement directory and task) next to
+the untouched request; run, submit and run-pending skip it. A submitted request
+cannot be retired. Retire only requests you have replaced or deliberately
+dropped; a request that failed for a transient reason stays pending.
+
+Do not dispatch the auditor through the host's task/agent tool: the profile sets
+disable-model-invocation, a tool-free auditor cannot open a path, a model that
+retypes a large body breaks the task/input hash binding, and host subagents
+cannot guarantee the model (the CLI task tool overrides it only on an explicit
+user request; VS Code Local refuses a model above the parent's cost tier). If
+`run` fails, report its error as a failed step; do not substitute a subagent.
+A response obtained another way can still be checked with `submit`. Two requests can share the same frozen input
 but always have distinct task IDs. Do not forward prior findings, parent history
 or a link instead of file bodies. The JSON contract binds task/input hash and
 requires pass with no findings or changes with evidence-bearing findings.

@@ -11,8 +11,11 @@ Use the phase prompts. Draft artifacts outside worker loops. Use the runner for 
 
 Follow [preparation audits](../../docs/PREPARATION-AUDITS.md),
 [pilot grants](../../docs/PILOT.md) and [execution scopes](../../docs/EXECUTION-SCOPES.md).
-Dispatch preparation auditors independently with explicit phaseModels, fixed
-bodies and no prior findings. Mechanical receipts are not independent AI audits.
+Run preparation audits only with `audit_inputs.mjs run --directory DIR` (or
+`run-pending` for every unsubmitted request): each is a fresh tool-free CLI worker
+on its phaseModels entry with the exact frozen body. Never use the task/agent
+tool or pass a path to the auditor instead. Retire a stale request only after
+freezing its replacement (`retire --superseded-by NEW --reason TEXT`). Mechanical receipts are not independent AI audits.
 Never extend a pilot or batch grant to production or a downstream major stage.
 
 Drive everything from chat: run the commands yourself and report results. The
@@ -25,6 +28,9 @@ or start `copilot login` only after the person agrees, as the skill describes.
 First read the report language with `run_migration.mjs preferences`; if unset, ask
 日本語 / English with the question tool and record it with `preferences --language`.
 Write all user-facing text in that language; worker prompts and JSON stay English.
+Re-read it after every compaction; English docs and tool output never switch it.
+The hook rejects a question before the language is recorded, and a Japanese
+report's question with no Japanese text.
 Follow [phase reports and user decisions](../../docs/PHASE-HANDOFF.md) after every phase.
 Use the host's available question tool for missing decisions; report concrete
 artifacts before asking and include a next-instruction example. Reuse explicit

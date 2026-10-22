@@ -47,7 +47,9 @@ Before anything else at start or resumption, run `run_migration.mjs preferences`
 (skip only before initialization, see below). If it returns an `action`, ask the
 user with the available question tool: 日本語 (ja) or English (en). Record the
 answer with `preferences --language ja|en` (it lives outside config.json and
-never revokes approvals). Write every user-facing report, question, TODO label
+never revokes approvals). The hook denies any other question until the language
+is recorded, and with ja denies a question that has no Japanese text. Re-read
+the preference after a compaction. Write every user-facing report, question, TODO label
 and next-instruction example in that language, and link the matching documents:
 `X.md` for Japanese, `X.en.md` for English (for example [README](../../../README.md) /
 [README.en](../../../README.en.md)). Worker prompts and JSON stay in English. Before
@@ -121,7 +123,9 @@ on them; merged drafts still go through the phase's audits and the human gate.
 Run each independent preparation audit (00b/01/02) as `audit_inputs.mjs freeze`
 then `audit_inputs.mjs run --directory DIR`: a fresh tool-free Copilot CLI
 worker with `--model` set to the planned phaseModels entry, recording the model
-the CLI reports. Two requests on disjoint batches can run in parallel.
+the CLI reports. Two requests on disjoint batches can run in parallel;
+`audit_inputs.mjs run-pending` runs every unsubmitted request. Never hand a
+request or its path to a task/agent subagent: the auditor has no tools.
 
 ## When a step fails
 

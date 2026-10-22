@@ -13,6 +13,9 @@ failed rounds. Use the sample/diff CLI for mechanical evidence, not invented
 source findings. Review scanner exclusions and unsupported syntax separately.
 When target packages are known, declare config.packageMap and generate the
 separate target-package cycle report before phase 01 completion.
+Run each audit request with `audit_inputs.mjs freeze` then `audit_inputs.mjs run
+--directory DIR` (`run-pending` runs every unsubmitted request). Never pass a
+request or its path to a task/agent subagent.
 
 For plugin installations, replace `migration-kit/` in script paths with the
 absolute plugin root resolved from the loaded skill/agent. Keep the target

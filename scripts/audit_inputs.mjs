@@ -4,11 +4,13 @@
 // tool-free auditor as a fresh Copilot CLI process with --model set to the
 // request's phaseModels entry, so the plan is enforced and the CLI-reported
 // model is recorded. A response obtained elsewhere is still accepted by submit.
+// Never hand a request to a host subagent (task/agent tool): a tool-free auditor
+// cannot open a path, and a model retyping the body breaks the hash binding.
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { loadConfig, parseArgs, safePath, hash, fileHash, treeHash, readJSON, writeJSON, lockRun, semanticConfig } from '../lib/core.mjs';
+import { loadConfig, parseArgs, safePath, hash, fileHash, treeHash, readJSON, writeJSON, lockRun, semanticConfig, stamp } from '../lib/core.mjs';
 import { recordSession } from '../lib/sessions.mjs';
 import { createCopilotAdapter } from './copilot_adapter.mjs';
 import { readReviewText, validatePreparationProfile } from '../lib/review.mjs';
@@ -42,12 +44,16 @@ export function freezeAudit(root, config, { type, files, out } = {}) {
     return { directory, request, note: 'Delegate the exact frozen input to the tool-free preparation auditor in a fresh context. This is a request, not completed review.' };
   } finally { release(); }
 }
+const auditDirectory = /^migration\/audits\/[A-Za-z0-9_-]+$/;
+const retirement = (root, directory) => fs.existsSync(safePath(root, `${directory}/retired.json`)) ? readJSON(safePath(root, `${directory}/retired.json`)) : null;
 function currentRequest(root, config, directory) {
-  if (!/^migration\/audits\/[A-Za-z0-9_-]+$/.test(directory ?? '')) throw new Error('Invalid audit directory');
+  if (!auditDirectory.test(directory ?? '')) throw new Error('Invalid audit directory');
+  const retired = retirement(root, directory);
+  if (retired) throw new Error(`Audit request ${directory} is retired${retired.supersededBy ? `, superseded by ${retired.supersededBy}` : ''}; run its replacement instead`);
   const request = readJSON(safePath(root, `${directory}/request.json`));
   if (request.schemaVersion !== 1 || request.kind !== 'preparation-audit-request' || !Object.hasOwn(models, request.type) || request.requestedModel !== config.phaseModels?.[models[request.type]] ||
         !request.input || !Array.isArray(request.input.files) || request.snapshot !== snapshot(root, config) || hash(JSON.stringify(request.input)) !== request.inputHash ||
-        request.input.files.some(f => typeof f.content !== 'string' || hash(f.content) !== f.hash || fileHash(safePath(root, f.path)) !== f.hash)) throw new Error('Preparation audit inputs changed; use fresh contexts and requests');
+        request.input.files.some(f => typeof f.content !== 'string' || hash(f.content) !== f.hash || fileHash(safePath(root, f.path)) !== f.hash)) throw new Error(`Preparation audit inputs changed; use fresh contexts and requests: freeze a replacement, then retire --directory ${directory} --superseded-by NEW --reason TEXT`);
   return request;
 }
 export async function runAudit(root, config, adapter, { directory, signal } = {}) {
@@ -63,6 +69,48 @@ export async function runAudit(root, config, adapter, { directory, signal } = {}
   return submitAudit(root, config, { directory, response: `${directory}/response.json`, execution: {
     worker: 'copilot-cli', observedModel: response.observedModel ?? null, cliVersion: response.cliVersion ?? null, cliSessionId: response.cliSessionId ?? sessionId,
     ...(response.cliUsage ? { cliUsage: response.cliUsage } : {}), ...(response.modelWarning ? { modelWarning: response.modelWarning } : {}) } });
+}
+// A request that will never be submitted (stale after an input or profile
+// change, or dropped) is retired, not deleted: retired.json keeps it as
+// evidence, names its replacement, and run, submit and run-pending skip it.
+export function retireAudit(root, config, { directory, supersededBy, reason } = {}) {
+  if (!auditDirectory.test(directory ?? '') || !fs.existsSync(safePath(root, `${directory}/request.json`))) throw new Error('Name an existing audit request directory');
+  if (typeof reason !== 'string' || !reason.trim()) throw new Error('Give the reason for retiring the request');
+  const release = lockRun(root, 'audit-retire');
+  try {
+    if (fileHash(safePath(root, `${directory}/result.json`))) throw new Error('Audit result already submitted; a submitted audit stays as evidence');
+    if (retirement(root, directory)) throw new Error('Audit request already retired');
+    let replacement = null;
+    if (supersededBy !== undefined) {
+      if (supersededBy === directory || !auditDirectory.test(supersededBy) || !fs.existsSync(safePath(root, `${supersededBy}/request.json`)) || retirement(root, supersededBy)) throw new Error('The replacement must be another, unretired audit request directory');
+      replacement = readJSON(safePath(root, `${supersededBy}/request.json`));
+    }
+    const old = readJSON(safePath(root, `${directory}/request.json`));
+    const record = { schemaVersion: 1, kind: 'preparation-audit-retirement', task: old.task ?? null, reason: reason.trim(),
+      supersededBy: supersededBy ?? null, supersededByTask: replacement?.task ?? null, retiredAt: stamp() };
+    writeJSON(safePath(root, `${directory}/retired.json`), record); return record;
+  } finally { release(); }
+}
+// Every frozen request without a result or retirement, config.concurrency at a
+// time. One failure does not stop the others; the disk shows what is pending.
+export async function runPendingAudits(root, config, adapter, { signal } = {}) {
+  const base = safePath(root, 'migration/audits');
+  const pending = (fs.existsSync(base) ? fs.readdirSync(base, { withFileTypes: true }) : [])
+    .filter(d => d.isDirectory() && /^[A-Za-z0-9_-]+$/.test(d.name)).map(d => `migration/audits/${d.name}`)
+    .filter(dir => fs.existsSync(safePath(root, `${dir}/request.json`)) && !fs.existsSync(safePath(root, `${dir}/result.json`)) && !retirement(root, dir)).sort();
+  const outcomes = [], running = new Set();
+  for (const directory of pending) {
+    if (signal?.aborted) break;
+    const job = runAudit(root, config, adapter, { directory, signal })
+      .then(record => outcomes.push({ directory, verdict: record.result.verdict, observedModel: record.observedModel }),
+        error => outcomes.push({ directory, error: error.message }))
+      .finally(() => running.delete(job));
+    running.add(job);
+    while (running.size >= Math.max(1, config.concurrency ?? 1)) await Promise.race(running);
+  }
+  await Promise.all(running);
+  outcomes.sort((a, b) => a.directory.localeCompare(b.directory));
+  return { pending: pending.length, completed: outcomes.filter(o => !o.error).length, failed: outcomes.filter(o => o.error).length, outcomes };
 }
 export function submitAudit(root, config, { directory, response, execution } = {}) {
   const release = lockRun(root, 'audit-submit');
@@ -85,7 +133,10 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     const args = parseArgs(process.argv.slice(2)), root = fs.realpathSync(path.resolve(args.root ?? '.')), config = loadConfig(root);
     const result = args._[0] === 'freeze' ? freezeAudit(root, config, { type: args.type, files: args.files?.split(','), out: args.out })
       : args._[0] === 'run' ? await runAudit(root, config, createCopilotAdapter({ command: args.copilot }), { directory: args.directory })
-      : args._[0] === 'submit' ? submitAudit(root, config, { directory: args.directory, response: args.response }) : (() => { throw new Error('Use freeze --type TYPE --files LIST | run --directory PATH [--copilot PATH] | submit --directory PATH --response PATH'); })();
+      : args._[0] === 'run-pending' ? await runPendingAudits(root, config, createCopilotAdapter({ command: args.copilot }))
+      : args._[0] === 'retire' ? retireAudit(root, config, { directory: args.directory, supersededBy: args['superseded-by'], reason: args.reason })
+      : args._[0] === 'submit' ? submitAudit(root, config, { directory: args.directory, response: args.response }) : (() => { throw new Error('Use freeze --type TYPE --files LIST | run --directory PATH [--copilot PATH] | run-pending [--copilot PATH] | retire --directory PATH [--superseded-by PATH] --reason TEXT | submit --directory PATH --response PATH'); })();
     console.log(JSON.stringify(result, null, 2));
+    if (result.failed) process.exitCode = 1;
   } catch (e) { console.error(`ERROR: ${e.message}`); process.exitCode = 1; }
 }

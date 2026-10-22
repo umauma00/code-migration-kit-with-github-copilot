@@ -7,6 +7,9 @@ shards. Only the coordinator merges against a complete site census using the
 file/symbol/source_construct key. Confirm findings, fix and independently
 re-audit. Finish with a joint RULEBOOK/inventory audit citing rule, row and a
 concrete wrong translation example. Do not silently authorize rule amendments.
+Run each audit request with `audit_inputs.mjs freeze` then `audit_inputs.mjs run
+--directory DIR` (`run-pending` runs every unsubmitted request). Never pass a
+request or its path to a task/agent subagent.
 
 Read [phase reports and user decisions](../docs/PHASE-HANDOFF.md).
 End with its report; ask for the next decision only when needed.

@@ -123,6 +123,42 @@ test('recording a model choice asks the person; listing does not', () => {
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
 
+test('questions ask the report language first, then stay in Japanese when ja is recorded', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'language-gate-'));
+  const ask = toolArgs => interactiveDecision({ toolName: 'ask_user', toolArgs, cwd: root });
+  try {
+    fs.mkdirSync(path.join(root, 'migration'));
+    fs.writeFileSync(path.join(root, 'migration/config.json'), '{}');
+    assert.equal(ask({ question: 'Which target language?', choices: ['Java', 'Go'] }).decision, 'deny');
+    assert.match(ask({ question: 'Which target language?' }).reason, /preferences --language/);
+    assert.equal(ask({ question: 'Report language / 報告言語', choices: ['日本語 (ja)', 'English (en)'] }), null);
+    fs.writeFileSync(path.join(root, 'migration/preferences.json'), JSON.stringify({ schemaVersion: 1, userLanguage: 'ja' }));
+    const english = ask({ question: 'How should Phase 01 proceed?', choices: ['Keep blocked', 'Specify another path'] });
+    assert.equal(english.decision, 'deny'); assert.match(english.reason, /日本語/);
+    assert.equal(ask({ question: 'Phase 01 をどう進めますか？', choices: ['blocked を維持', '`audit_inputs.mjs run` で実行'] }), null);
+    const vscode = toolArgs => interactiveDecision({ toolName: 'vscode/askQuestions', toolArgs, cwd: root });
+    assert.equal(vscode({ questions: [{ question: 'Proceed?' }] }).decision, 'deny');
+    // A Japanese header, another question or a file name does not pass an English question.
+    const headed = vscode({ questions: [{ header: '確認', question: 'How should Phase 01 proceed?', options: [{ label: 'Keep blocked' }, { label: 'Specify another path' }] }] });
+    assert.equal(headed.decision, 'deny'); assert.match(headed.reason, /How should Phase 01 proceed\?/);
+    const mixed = vscode({ questions: [{ question: '続けますか？', options: [{ label: 'はい' }] }, { question: 'Which module next?' }] });
+    assert.equal(mixed.decision, 'deny'); assert.match(mixed.reason, /Which module next/); assert.doesNotMatch(mixed.reason, /続けますか/);
+    assert.equal(ask({ question: 'Should we migrate src/売上集計.java next?' }).decision, 'deny');
+    assert.equal(ask({ question: '売上集計.java を次に移行しますか？' }), null);
+    // Paths and slashes joined to Japanese prose without spaces keep the prose.
+    for (const question of ['Java/Goのどちらに移行しますか？', 'src/売上集計.javaを次に移行しますか？', '次にsrc/main.pyを移行しますか？',
+      'JavaとGoのどちらに移行しますか？', '`src/売上集計.java`を次に移行しますか？', '続行？', 'src/a.py 移行？']) assert.equal(ask({ question }), null, question);
+    for (const question of ['Should we migrate 売上集計.java next?', 'Migrate src\\売上\\集計.java now?', 'Proceed with 移行?'])
+      assert.equal(ask({ question }).decision, 'deny', question);
+    // Choices are checked separately; single names and `quoted` text pass.
+    assert.match(ask({ question: '次に何をしますか？', choices: ['blocked を維持', 'Keep everything blocked'] }).reason, /Keep everything blocked/);
+    assert.equal(ask({ question: '移行先の言語は？', choices: ['Java', 'Go', '`Spring Boot` を使う'] }), null);
+    assert.match(vscode({ questions: [{ question: '進めますか？', options: [{ label: 'はい', description: 'Runs every pending audit now' }] }] }).reason, /Runs every pending audit/);
+    fs.writeFileSync(path.join(root, 'migration/preferences.json'), JSON.stringify({ schemaVersion: 1, userLanguage: 'en' }));
+    assert.equal(ask({ question: 'How should Phase 01 proceed?' }), null);
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
 test('a surveyor set to its model default does not run with the implementer\'s effort', async t => {
   const f = await ready(t);
   const models = await listAvailableModels({ command: process.execPath, prefixArgs: [fakeCli(t)] });
