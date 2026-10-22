@@ -40,6 +40,23 @@ test('Windows falls back to node and the loader, and leaves other commands alone
   assert.deepEqual(windowsLaunch('copilot', { ...win(dir), platform: 'linux' }), { command: 'copilot', prefixArgs: [] });
 });
 
+test('Windows finds the npm shim through a quoted PATH entry or npm\'s global prefix', () => {
+  const { dir, exe } = npmGlobal();
+  const empty = path.join(dir, 'empty');
+  assert.deepEqual(windowsLaunch('copilot', { ...win(dir), env: { Path: `${empty}; "${dir}" ` } }), { command: exe, prefixArgs: [] });
+  // PATH without npm's folder (a terminal opened before the install): npm's own prefix settings.
+  assert.deepEqual(windowsLaunch('copilot', { ...win(dir), env: { Path: empty, npm_config_prefix: dir } }), { command: exe, prefixArgs: [] });
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'kit-win-home-'));
+  fs.writeFileSync(path.join(home, '.npmrc'), `registry=https://registry.npmjs.org/\r\nprefix=${dir}\r\n`);
+  assert.deepEqual(windowsLaunch('copilot', { ...win(dir), env: { Path: empty, USERPROFILE: home } }), { command: exe, prefixArgs: [] });
+  const appData = fs.mkdtempSync(path.join(os.tmpdir(), 'kit-win-appdata-'));
+  fs.renameSync(dir, path.join(appData, 'npm'));
+  assert.deepEqual(windowsLaunch('copilot', { ...win(dir), env: { Path: empty, APPDATA: appData } }),
+    { command: exe.replace(dir, path.join(appData, 'npm')), prefixArgs: [] });
+  // Still nothing found: the bare name is left for spawn to report.
+  assert.deepEqual(windowsLaunch('copilot', { ...win(dir), env: { Path: empty } }), { command: 'copilot', prefixArgs: [] });
+});
+
 // End to end through runProcess with the Windows branch on: the loader and the
 // "native binary" are scripts that print which copy ran.
 async function asWindows(fn) {
