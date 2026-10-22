@@ -4,9 +4,11 @@
   - `commands` may name `.cmd`/`.bat` tools (`npm`, `npx`, `mvn`,
     `gradlew.bat`): they run through `cmd.exe /d /s /c` with every argument
     quoted and escaped as cross-spawn does. Before, Node refused to start them
-    without a shell.
+    without a shell. A batch file named with its extension (`gradlew.bat`) is
+    also found in the project folder; a bare name is looked up on PATH only.
   - Guardrails match `npm.cmd`/`git.exe`, the PowerShell call operator,
-    `cmd /c`, `Start-Process` and `py -3 -m pytest`.
+    `cmd /c`, `Start-Process` (switches such as `-Wait` take no value;
+    abbreviated and `-Name:value` parameters are read) and `py -3 -m pytest`.
   - The dependency parsers and `make_manifest.py` write UTF-8 with LF (the
     Windows default was the console code page and CRLF) and never crash
     printing a path the console cannot encode.

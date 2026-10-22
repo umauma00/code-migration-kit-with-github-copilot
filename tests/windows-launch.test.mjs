@@ -141,6 +141,18 @@ test('Windows runs other batch files (npx.cmd, gradlew.bat) through cmd.exe with
   assert.deepEqual(windowsLaunch('npx', { platform: 'win32', env }), { command: env.ComSpec, prefixArgs: [], batch: path.join(dir, 'npx.cmd') });
   assert.deepEqual(windowsLaunch(path.join(dir, 'gradlew.bat'), { platform: 'win32', env }), { command: env.ComSpec, prefixArgs: [], batch: path.join(dir, 'gradlew.bat') });
   assert.deepEqual(windowsLaunch('missing', { platform: 'win32', env }), { command: 'missing', prefixArgs: [] });
+  // gradlew.bat in the project folder, named with its extension, is found in the child's cwd
+  // (as cmd.exe finds it); a bare name is not, so the repository cannot shadow a PATH tool.
+  const project = fs.mkdtempSync(path.join(os.tmpdir(), 'kit-win-project-'));
+  fs.writeFileSync(path.join(project, 'gradlew.bat'), '@echo off\r\n');
+  fs.writeFileSync(path.join(project, 'npm.cmd'), '@echo off\r\n');
+  const tools = fs.mkdtempSync(path.join(os.tmpdir(), 'kit-win-tools-'));
+  fs.writeFileSync(path.join(tools, 'npx.cmd'), '@echo off\r\n');
+  const bare = { platform: 'win32', env: { Path: tools, ComSpec: env.ComSpec }, cwd: project };
+  assert.deepEqual(windowsLaunch('gradlew.bat', bare), { command: env.ComSpec, prefixArgs: [], batch: path.join(project, 'gradlew.bat') });
+  assert.deepEqual(windowsLaunch('gradlew', bare), { command: 'gradlew', prefixArgs: [] });
+  assert.deepEqual(windowsLaunch('npx', bare), { command: env.ComSpec, prefixArgs: [], batch: path.join(tools, 'npx.cmd') });
+  assert.deepEqual(windowsLaunch('npm', bare), { command: 'npm', prefixArgs: [] });
   assert.deepEqual(batchCommandLine('C:\\Program Files\\nodejs\\npx.cmd', ['tsc', 'a b', 'x"y', '100%']),
     ['/d', '/s', '/c', '"C:\\Program^ Files\\nodejs\\npx.cmd ^^^"tsc^^^" ^^^"a^^^ b^^^" ^^^"x\\^^^"y^^^" ^^^"100^^^%^^^""']);
   // A batch file reparses the %* it forwards, so metacharacters are escaped twice.
@@ -158,4 +170,8 @@ test('a batch file receives its arguments unchanged on Windows', { skip: process
     assert.equal(r.code, 0, r.stderr);
     assert.deepEqual(JSON.parse(r.stdout), args);
   }
+  // Named with its extension from the project folder, off PATH (like "build": ["gradlew.bat", "build"]).
+  const local = await runProcess('echoargs.cmd', args, { cwd: dir });
+  assert.equal(local.code, 0, local.stderr);
+  assert.deepEqual(JSON.parse(local.stdout), args);
 });

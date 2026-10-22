@@ -24,9 +24,13 @@ test('guardrail matching follows upstream deny prefixes across pipelines, wrappe
 test('guardrails see the Windows forms of a denied command (PowerShell, cmd.exe, extensions, py launcher)', () => {
   for (const command of ['npm.cmd test', '& "C:\\Program Files\\nodejs\\npm.cmd" test', 'npx.cmd tsc --noEmit', 'git.exe push',
     'cmd /c "git push"', 'cmd /c git push', 'cmd.exe /d /s /c "npm test"', 'Start-Process git -ArgumentList push',
-    'Start-Process -FilePath git.exe -ArgumentList "push","origin"', '.\\gradlew.bat build', 'py -3 -m pytest', 'py -3.12 -m pytest -q'])
+    'Start-Process -FilePath git.exe -ArgumentList "push","origin"', '.\\gradlew.bat build', 'py -3 -m pytest', 'py -3.12 -m pytest -q',
+    // Switches take no value, wherever they stand; values may be attached or abbreviated.
+    'Start-Process -Wait git -ArgumentList push', 'Start-Process -NoNewWindow git -ArgumentList push', 'Start-Process git -Wait -ArgumentList push',
+    'Start-Process -Wait -NoNewWindow -PassThru -FilePath git -ArgumentList push', 'Start-Process -Wait:$true git push',
+    'Start-Process -FilePath:git -ArgumentList:push', 'saps -File git -Arg push', 'Start-Process -WindowStyle Hidden -WorkingDirectory C:\\w git push'])
     assert.ok(deniedRule(command, rules), command);
-  for (const command of ['git.exe status', 'npm.cmd run lint', 'cmd /c dir', 'py script.py', 'start notepad', 'Start-Process git -ArgumentList status'])
+  for (const command of ['git.exe status', 'npm.cmd run lint', 'cmd /c dir', 'py script.py', 'start notepad', 'Start-Process git -ArgumentList status', 'Start-Process -Wait git -ArgumentList status'])
     assert.equal(deniedRule(command, rules), null, command);
 });
 

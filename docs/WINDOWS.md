@@ -18,7 +18,7 @@
 ## キットが Windows で自動的に扱うこと
 
 - **Copilot CLI の起動**：npm 版の `copilot.cmd` は、同梱の `copilot.exe`（なければ `node` とローダー）に読み替えます。PATH に npm のフォルダがない端末でも、npm の global prefix を探します。
-- **`.cmd` / `.bat` のコマンド**：`migration/config.json` の `commands` に `npm`、`npx`、`mvn`、`gradlew.bat` などをそのまま書けます。キットは `cmd.exe /d /s /c` を通し、引数を引用・エスケープして渡します（空白、`"`、`%`、`&` などを含んでも、そのまま届きます）。
+- **`.cmd` / `.bat` のコマンド**：`migration/config.json` の `commands` に `npm`、`npx`、`mvn`、`gradlew.bat` などをそのまま書けます。プロジェクト直下のバッチは `gradlew.bat` のように拡張子付きで書けば見つかります（拡張子なしの `gradlew` は PATH だけを探します。リポジトリ内のファイルが PATH のツールにすり替わらないようにするためです）。キットは `cmd.exe /d /s /c` を通し、引数を引用・エスケープして渡します（空白、`"`、`%`、`&` などを含んでも、そのまま届きます）。
 - **ガードレール**：`npm.cmd test`、`& "C:\...\npm.cmd" test`、`cmd /c git push`、`Start-Process git -ArgumentList push`、`py -3 -m pytest` も、`npm test`・`git push`・`python -m pytest` と同じ禁止ルールで止めます。PowerShell の `Set-Content`、`Out-File`、`Remove-Item` による `migration/guardrails.json` の書き換えも拒否します。
 - **ファイルの置き換え**：記録ファイルをほかのプロセス（status の確認、エディター、ウイルス対策）が開いていて一時的に置き換えられないときは、約2秒まで再試行します。
 - **改行と文字コード**：依存解析と manifest の生成は UTF-8・LF で書きます。CRLF でチェックアウトされた TSV や Markdown も読めます。キット自体は `.gitattributes` で LF に固定しているため、`core.autocrlf=true` の端末で clone してもテンプレートやエージェント定義は LF のままです。
