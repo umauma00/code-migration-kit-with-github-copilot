@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { prepare, fake, ready } from './helpers.mjs';
+import { prepare, fake, ready, python, nodeCli } from './helpers.mjs';
 import { safePath, atomicWrite, writeJSON, readJSON, loadReviewDependencies, reviewSources, roles } from '../lib/core.mjs';
 import { inventorySlice } from '../lib/review.mjs';
 import { runStage, approve, translate } from '../lib/pipeline.mjs';
@@ -18,10 +18,9 @@ const edges = 'migration/depmap/edges.tsv';
 
 test('rereview 1: every CLI role disables ambient instructions; doctor rejects an unsupported CLI', async t => {
   for (const role of roles) assert.ok(copilotArgs(role, 'chosen-model').includes('--no-custom-instructions'));
-  const f = prepare(t), command = safePath(f.root, 'help-double');
+  const f = prepare(t);
   const advertised = requiredCopilotFlags().filter(flag => flag !== '--no-custom-instructions').join(' ');
-  write(f, 'help-double', `#!/bin/sh\nprintf '%s\\n' '${advertised}'\n`);
-  fs.chmodSync(command, 0o755);
+  const command = nodeCli(safePath(f.root, 'help-double.mjs'), `console.log(${JSON.stringify(advertised)});\n`);
   const check = (await doctor(f.root, f.config, { checkCLI: true, command })).checks.find(c => c.check === 'required flags');
   assert.equal(check.ok, false); assert.deepEqual(check.missing, ['--no-custom-instructions']);
 });
@@ -67,7 +66,7 @@ test('rereview 3: stock Python repo-root edges convert without doubled package p
   fs.cpSync(path.join(kitRoot, 'fixtures/python/pkg'), safePath(f.root, 'pkg'), { recursive: true });
   write(f, 'pkg/isolated.py', 'VALUE = "孤立"\n');
   write(f, 'tests/import_pkg.py', 'from pkg import a\n');
-  const parser = await runProcess('python3', [path.join(kitRoot, 'scripts/depmap_python.py'), '--root', f.root, '--out', safePath(f.root, 'migration/depmap')]);
+  const parser = await runProcess(python, [path.join(kitRoot, 'scripts/depmap_python.py'), '--root', f.root, '--out', safePath(f.root, 'migration/depmap')]);
   assert.equal(parser.code, 0, parser.stderr);
   assert.match(fs.readFileSync(safePath(f.root, edges), 'utf8'), /pkg\/a\.py\tpkg\/b\.py/);
   // Exercise the installed CLI entrypoint and its --depmap-root option.

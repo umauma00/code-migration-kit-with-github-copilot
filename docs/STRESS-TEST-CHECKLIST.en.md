@@ -22,7 +22,7 @@ replace `migration-kit/` with the plugin's absolute path.
 | 8 | Pilot: `pilot prepare --target /new/outside/dir --sources … --note …`, then `pilot run --root …` | AI runs it, the **human** approves (the host asks) | Same workers/reviews/fixes as production; were the rules obeyed? |
 | 9 | Report: amendment queue (never edit RULEBOOK), adherence findings, timing and usage (`usageEstimate` in the run summary), workspace deletion confirmed, estimated duration for 04 (`status`) | AI | `migration/stress-test/report.md` |
 | 10 | Decide which amendments to apply to RULEBOOK | **Human** | If applied, rerun `judge` and repeat 5–9 on fresh files weighted to the changed sections |
-| 11 | Review the report, then `phase complete 03 --note "what you reviewed"` | AI records, the **human** confirms (the host asks) | `status` shows "Current: 04 [awaiting approval]" |
+| 11 | Review the report; to start translation, `approve translation --complete-phase 03 --note "what you reviewed"` (records phase 03 and the translation approval under one confirmation; `phase complete 03 --note …` records only the phase) | AI records, the **human** confirms (the host asks once) | `status` shows "Current: 04" (only the phase: "04 [awaiting approval]") |
 
 For redesign, replace the bakeoff (5–7) with adversarial review of the design
 document plus small disposable trials. If the same section is re-amended twice,

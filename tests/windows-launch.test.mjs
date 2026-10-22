@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { windowsLaunch, runProcess } from '../lib/process.mjs';
+import { windowsLaunch, runProcess, batchCommandLine } from '../lib/process.mjs';
 
 // A global npm install on Windows: copilot.cmd on PATH, the loader in the
 // package and the platform binary as its dependency (nested or hoisted).
@@ -31,9 +31,9 @@ test('Windows runs the npm copilot shim through the platform binary, nested or h
 test('Windows falls back to node and the loader, and leaves other commands alone', () => {
   const { dir, pkg } = npmGlobal({ native: false });
   assert.deepEqual(windowsLaunch('copilot', win(dir)), { command: process.execPath, prefixArgs: [path.join(pkg, 'npm-loader.js')] });
-  // A shim that is not npm's copilot loader (npm itself, a project script) is not rewritten.
+  // A shim that is not npm's copilot loader (npm itself, a project script) runs through cmd.exe.
   const other = npmGlobal({ shim: '@"%~dp0\\node.exe" "%~dp0\\node_modules\\npm\\bin\\npm-cli.js" %*' });
-  assert.deepEqual(windowsLaunch('copilot', win(other.dir)), { command: 'copilot', prefixArgs: [] });
+  assert.deepEqual(windowsLaunch('copilot', win(other.dir)), { command: 'cmd.exe', prefixArgs: [], batch: path.join(other.dir, 'copilot.cmd') });
   // An .exe on PATH (WinGet, standalone) wins, and non-Windows never changes.
   fs.writeFileSync(path.join(dir, 'copilot.exe'), '');
   assert.deepEqual(windowsLaunch('copilot', win(dir)), { command: path.join(dir, 'copilot.exe'), prefixArgs: [] });
@@ -102,9 +102,12 @@ function printing(label, { native = false } = {}) {
   if (native) {
     const exe = path.join(g.pkg, 'node_modules', '@github', `copilot-win32-${process.arch}`, 'copilot.exe');
     fs.mkdirSync(path.dirname(exe), { recursive: true });
-    fs.writeFileSync(exe, `#!${process.execPath}\nconsole.log(${JSON.stringify(`native ${label}`)})\n`, { mode: 0o755 });
+    // On real Windows only a real executable spawns: a copy of node runs the -e
+    // program that printing() returns; elsewhere a script stands in for it.
+    if (process.platform === 'win32') fs.copyFileSync(process.execPath, exe);
+    else fs.writeFileSync(exe, `#!${process.execPath}\nconsole.log(${JSON.stringify(`native ${label}`)})\n`, { mode: 0o755 });
   }
-  return g;
+  return { ...g, args: ['-e', `console.log(${JSON.stringify(`native ${label}`)})`] };
 }
 
 test('Windows lookup uses the PATH given to the child, not the parent PATH', async () => {
@@ -123,9 +126,52 @@ test('Windows resolves a relative shim against the child cwd and runs it from th
     const g = printing(native ? 'tools-native' : 'tools', { native });
     fs.renameSync(g.dir, path.join(root, 'tools'));
     // The parent cwd has no tools/ folder; only the child's cwd does.
-    const r = await asWindows(() => runProcess(path.join('.', 'tools', 'copilot.cmd'), [], { cwd: root }));
+    const r = await asWindows(() => runProcess(path.join('.', 'tools', 'copilot.cmd'), g.args, { cwd: root }));
     assert.equal(r.stdout.trim(), native ? 'native tools-native' : 'loader tools');
     const launch = windowsLaunch(path.join('.', 'tools', 'copilot.cmd'), { cwd: root, platform: 'win32' });
     assert.ok(launch.prefixArgs.concat(launch.command).every(p => !p.includes('copilot') || path.isAbsolute(p)));
   }
+});
+
+test('Windows runs other batch files (npx.cmd, gradlew.bat) through cmd.exe with quoted arguments', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kit-win-batch-'));
+  fs.writeFileSync(path.join(dir, 'npx.cmd'), '@echo off\r\n');
+  fs.writeFileSync(path.join(dir, 'gradlew.bat'), '@echo off\r\n');
+  const env = { Path: dir, ComSpec: 'C:\\Windows\\system32\\cmd.exe' };
+  assert.deepEqual(windowsLaunch('npx', { platform: 'win32', env }), { command: env.ComSpec, prefixArgs: [], batch: path.join(dir, 'npx.cmd') });
+  assert.deepEqual(windowsLaunch(path.join(dir, 'gradlew.bat'), { platform: 'win32', env }), { command: env.ComSpec, prefixArgs: [], batch: path.join(dir, 'gradlew.bat') });
+  assert.deepEqual(windowsLaunch('missing', { platform: 'win32', env }), { command: 'missing', prefixArgs: [] });
+  // gradlew.bat in the project folder, named with its extension, is found in the child's cwd
+  // (as cmd.exe finds it); a bare name is not, so the repository cannot shadow a PATH tool.
+  const project = fs.mkdtempSync(path.join(os.tmpdir(), 'kit-win-project-'));
+  fs.writeFileSync(path.join(project, 'gradlew.bat'), '@echo off\r\n');
+  fs.writeFileSync(path.join(project, 'npm.cmd'), '@echo off\r\n');
+  const tools = fs.mkdtempSync(path.join(os.tmpdir(), 'kit-win-tools-'));
+  fs.writeFileSync(path.join(tools, 'npx.cmd'), '@echo off\r\n');
+  const bare = { platform: 'win32', env: { Path: tools, ComSpec: env.ComSpec }, cwd: project };
+  assert.deepEqual(windowsLaunch('gradlew.bat', bare), { command: env.ComSpec, prefixArgs: [], batch: path.join(project, 'gradlew.bat') });
+  assert.deepEqual(windowsLaunch('gradlew', bare), { command: 'gradlew', prefixArgs: [] });
+  assert.deepEqual(windowsLaunch('npx', bare), { command: env.ComSpec, prefixArgs: [], batch: path.join(tools, 'npx.cmd') });
+  assert.deepEqual(windowsLaunch('npm', bare), { command: 'npm', prefixArgs: [] });
+  assert.deepEqual(batchCommandLine('C:\\Program Files\\nodejs\\npx.cmd', ['tsc', 'a b', 'x"y', '100%']),
+    ['/d', '/s', '/c', '"C:\\Program^ Files\\nodejs\\npx.cmd ^^^"tsc^^^" ^^^"a^^^ b^^^" ^^^"x\\^^^"y^^^" ^^^"100^^^%^^^""']);
+  // A batch file reparses the %* it forwards, so metacharacters are escaped twice.
+  assert.equal(batchCommandLine('C:\\p\\node_modules\\.bin\\tsc.cmd', ['a&b'])[3], '"C:\\p\\node_modules\\.bin\\tsc.cmd ^^^"a^^^&b^^^""');
+});
+
+test('a batch file receives its arguments unchanged on Windows', { skip: process.platform !== 'win32' && 'needs cmd.exe' }, async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kit win batch 日本 '));
+  fs.writeFileSync(path.join(dir, 'echo.js'), 'console.log(JSON.stringify(process.argv.slice(2)))');
+  fs.writeFileSync(path.join(dir, 'echoargs.cmd'), `@"${process.execPath}" "%~dp0echo.js" %*\r\n`);
+  const key = Object.keys(process.env).find(k => k.toUpperCase() === 'PATH') ?? 'PATH';
+  const args = ['plain', 'a b', 'x"y', '100%', '&|<>^()', 'trailing\\', '日本語'];
+  for (const command of [path.join(dir, 'echoargs.cmd'), 'echoargs']) {
+    const r = await runProcess(command, args, { cwd: dir, env: { ...process.env, [key]: `${dir};${process.env[key]}` } });
+    assert.equal(r.code, 0, r.stderr);
+    assert.deepEqual(JSON.parse(r.stdout), args);
+  }
+  // Named with its extension from the project folder, off PATH (like "build": ["gradlew.bat", "build"]).
+  const local = await runProcess('echoargs.cmd', args, { cwd: dir });
+  assert.equal(local.code, 0, local.stderr);
+  assert.deepEqual(JSON.parse(local.stdout), args);
 });

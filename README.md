@@ -53,7 +53,7 @@ Anthropicの[Code Migration Kit](https://github.com/anthropics/code-migration-ki
 - Node.js 22以上。ランナー本体は外部npm依存なし。
 - Copilot CLI（未導入ならAIが同意を得てインストールし、サインインを始めます）。指定モデルを利用できる契約・組織設定。
 - 対象言語の実行環境・ビルドツール。付属デモとPython/C依存解析にはPython 3が必要です。
-- Linuxの既存検証とmacOSでの自動テスト・CLI通信検証があります。Windowsでの実行は未検証です。`npm install -g @github/copilot` で入れたCopilot CLI（PATH上の `copilot.cmd`）は、同梱のWindows用実行ファイル（なければ `node` と同梱ローダー）に読み替えて起動します。WinGet版などの `copilot.exe` はそのまま使います。キットはシェルを使わないため、`migration/config.json` の検証コマンドに `npm` や `gradlew.bat` などの `.cmd`/`.bat` を直接書くことはできません。`node` から始まるコマンドか `.exe` で指定してください。
+- Windowsを主な実行環境として扱い、GitHub Actionsの `windows-latest` と `ubuntu-latest` で `npm test`・`npm run demo` を実行しています（Copilot CLIとVS Codeの実機確認は未実施）。`.cmd`/`.bat` のビルドコマンド（`npm`、`npx`、`mvn`、`gradlew.bat`）も `commands` に書けます。用意するものと注意点は [Windowsで使う](docs/WINDOWS.md) を参照してください。macOSでは自動テストとCLI通信を確認しています。
 
 ## プラグインとして導入する
 
@@ -132,7 +132,7 @@ node migration-kit/scripts/run_migration.mjs doctor --check-cli
 | `workerBackend` | `copilot-cli` のみ（省略可）。0.3.0でnative方式を削除 |
 | `concurrency` | 同時AI呼び出し数。新規導入の初期値4、上限64。2つのレビューも含めてこの数以下。CLI方式では各呼び出しが別プロセスなので、Copilotのsubagent同時実行数ではなく、アカウントのレート制限が実質の上限 |
 | `dependencyOrder` | `auto`（新規導入）: 単位型チェックがあるときだけ、依存先のレビュー完了まで依存元を待たせる。型チェックがなければ上流と同じく承認範囲を一斉に展開する。`reviewed`（省略時・既存設定）: 常に待つ。`none`: 待たない（型チェックとは併用不可） |
-| `fixPolicy` | `rereview`（省略時）: 修正後に再レビューし、確定した指摘がなくなるまで繰り返す。`single-pass`: 上流Step 3と同じく、確定指摘の修正は1回で完了とし、build/smoke/parityが判定する。呼び出し数と停止する単位が減る |
+| `fixPolicy` | `single-pass`（新規導入の既定）: 上流Step 3と同じく、確定指摘の修正は1回で完了とし、build/smoke/parityが判定する。呼び出し数と停止する単位が減る。`rereview`（キーのない既存設定）: 修正後に再レビューし、確定した指摘がなくなるまで繰り返す |
 | `reviewFocus` | `shared`（新規導入）: 2人のレビュアーがそれぞれ自分の観点を先に、両方の観点（元の動作・ルール順守）を確認し、見つけた欠陥をすべて報告する。互いの結果は見ない。`specialized`（省略時・既存設定）: 上流と同じく1人1観点 |
 | `maxFixRounds`, `maxAgentCalls` | 1単位の修正回数、1回の実行（translate・repair 1回ごと）のAI呼び出し数の上限。`maxAgentCalls` は同時実行数ではなく呼び出しの総数（同時実行数は `concurrency`）。1単位はレビューに問題がなければ3回、上流と同じ修正1回なら4〜5回の呼び出し。実行上限なので、変更してもレビュー済みの単位と承認は失効しない。1回だけ変える場合は `translate --max-calls N` |
 | `maxRunInputBytes` | 任意。1回の実行でワーカーへ送る入力の合計バイト数の上限。AI Creditsはトークン量で消費され、使い切ると利用が止まるため、区切って使用量を確認するための予算。runの要約の `usageEstimate` に実測バイト数と推定トークン数（バイト÷4、課金データではない）を残す。判定は完了した呼び出しの合計で行うため、実行中の呼び出し（最大 `concurrency` 件）の分だけ上限を超えることがある |
@@ -187,7 +187,7 @@ JSON形式は `{"schemaVersion":1,"dependencies":{"src/a.py":["src/b.py"],"src/b
 }
 ```
 
-これは付属題材の例です。実案件のコマンドに置き換えてください。`mutation` は「意図的に壊した実装を比較器が検出できたとき」に終了0を返します。`typecheck` は全体の変換前でも有効な軽量検査だけにし、それが難しければ `null` にします。
+これは付属題材の例です。実案件のコマンドに置き換えてください。Windowsでは `python3` の代わりに `py`（引数の先頭に `"-3"`）か `python` を使います。`mutation` は「意図的に壊した実装を比較器が検出できたとき」に終了0を返します。`typecheck` は全体の変換前でも有効な軽量検査だけにし、それが難しければ `null` にします。
 
 ## 現行の実行環境・仕様書がない場合
 
@@ -262,10 +262,12 @@ node migration-kit/scripts/run_migration.mjs approve parity --note "基本動作
 node migration-kit/scripts/run_migration.mjs parity
 ```
 
-ビルドが失敗したら、チャットで合意したうえでAIが `build-loop` を実行します（ホストが確認を求めます）。上流のビルドデーモンと同じく「build → エラー解析 → レビュー付き修正 → 再build」を、クリーンになるか、指定回数（`--max-rounds`、既定5）かループ全体のAI呼び出し数（`--max-calls`、既定は `maxAgentCalls`）に達するか、エラー件数が減らなくなる（`stalled`：ルール改訂を提案）まで繰り返します。AIは提案時に両方の数を伝えます。各回の承認は1つの許可（`migration/gates/build-loop-<id>.json`）の下に記録され、実行中は `status` に表示され、ほかのrunnerコマンドは拒否されます。1回ずつ進める場合は `repair-round` を使います。同梱のパーサー（Python・Java/Maven・JavaScript/Node/ESLint/tsc・シェル/ShellCheck・Rust・汎用の `file:line:col: error` 形式）が記録済みのビルド出力からエラーを読み取り、manifestの変換先ごとの修正キューを作って修正まで実行します。manifestに対応しない行は推測せず一覧で報告します。ラウンドごとのエラー件数は `migration/build-rounds.tsv` に残ります。修正後のbuildには、従来どおり承認が必要です。
+ビルドが失敗したら、チャットで合意したうえでAIが `build-loop` を実行します（ホストが確認を求めます）。上流のビルドデーモンと同じく「build → エラー解析 → レビュー付き修正 → 再build」を、クリーンになるか、指定回数（`--max-rounds`、既定5）かループ全体のAI呼び出し数（`--max-calls`、既定は `maxAgentCalls`）に達するか、エラー件数が減らなくなる（`stalled`：ルール改訂を提案）まで繰り返します。AIは提案時に両方の数を伝えます。各回の承認は1つの許可（`migration/gates/build-loop-<id>.json`）の下に記録され、実行中は `status` に表示され、ほかのrunnerコマンドは拒否されます。1回ずつ進める場合は `repair-round` を使います。同梱のパーサー（Python・Java/Maven・JavaScript/Node/ESLint/tsc・シェル/ShellCheck・Rust・汎用の `file:line:col: error` 形式）が記録済みのビルド出力からエラーを読み取り、manifestの変換先ごとの修正キューを作って修正まで実行します。manifestに対応しない行は推測せず一覧で報告します。ラウンドごとのエラー件数は `migration/build-rounds.tsv` に残ります。`--through smoke` または `--through parity` を付けると、同じ1つの許可で、buildがクリーンになった後のsmoke（とparity）も承認・実行し、その失敗もレビュー付き修正に回して次の回をbuildからやり直します（上流のStep 5・6）。元テストの失敗や、変換先に対応しない失敗は推測せずに止まります。ループを使わない場合、修正後のbuildには従来どおり承認が必要です。
 
 ```bash
 node migration-kit/scripts/run_migration.mjs build-loop --note "ビルド修正を最大5回・AI呼び出し100回まで許可" --max-rounds 5 --max-calls 100
+# smoke・parityまで同じ許可で繰り返す場合
+node migration-kit/scripts/run_migration.mjs build-loop --through parity --note "parityが通るまで最大5回・AI呼び出し100回まで許可" --max-rounds 5 --max-calls 100
 # 1回ずつ進める場合
 node migration-kit/scripts/run_migration.mjs repair-round
 node migration-kit/scripts/run_migration.mjs approve build --note "修正結果を確認"

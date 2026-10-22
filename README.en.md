@@ -51,7 +51,7 @@ Workers are always Copilot CLI processes: `--model` fixes each role's model, and
 - Node.js 22 or later. The runner has no external npm dependencies.
 - The Copilot CLI (if it is missing, the AI installs it and starts sign-in after you agree) and a plan or organization setting that allows the configured models.
 - The runtime and build tools of the languages involved. The bundled demo and the Python/C dependency mappers need Python 3.
-- Previously verified on Linux; automated tests and CLI transport verified on macOS. Windows is untested. A Copilot CLI installed with `npm install -g @github/copilot` (the `copilot.cmd` shim on PATH) is started through the bundled Windows binary, or through `node` and the bundled loader when the binary is missing; a `copilot.exe` (for example from WinGet) is used as is. The kit never uses a shell, so verification commands in `migration/config.json` cannot name `.cmd`/`.bat` files such as `npm` or `gradlew.bat` directly; start them with `node` or an `.exe`.
+- Windows is a primary platform: GitHub Actions runs `npm test` and `npm run demo` on `windows-latest` and `ubuntu-latest` (a live Copilot CLI and VS Code run is still pending). `.cmd`/`.bat` build commands (`npm`, `npx`, `mvn`, `gradlew.bat`) may be used in `commands`. See [Using the kit on Windows](docs/WINDOWS.en.md) for requirements and caveats. Automated tests and CLI transport are also verified on macOS.
 
 ## Installing as a plugin
 
@@ -130,7 +130,7 @@ The minimum settings in `migration/config.json`:
 | `workerBackend` | `copilot-cli` only (may be omitted). The native backend was removed in 0.3.0 |
 | `concurrency` | Concurrent AI calls, 4 for new installs, at most 64, both reviews included. CLI workers are separate processes, so the account's rate limits, not Copilot's subagent concurrency, are the practical limit |
 | `dependencyOrder` | `auto` (new installs): hold a dependent until its dependencies have reviewed receipts only when a per-unit typecheck needs them; without one the approved scope fans out as upstream does. `reviewed` (unset, existing configs): always wait. `none`: never wait (not combinable with a typecheck) |
-| `fixPolicy` | `rereview` (unset): review a fixed output again until no confirmed finding remains. `single-pass`: as in upstream Step 3, one fix of the confirmed findings completes the unit and build/smoke/parity judge it; fewer calls and fewer blocked units |
+| `fixPolicy` | `single-pass` (new installs): as in upstream Step 3, one fix of the confirmed findings completes the unit and build/smoke/parity judge it; fewer calls and fewer blocked units. `rereview` (an existing configuration without the key): review a fixed output again until no confirmed finding remains |
 | `reviewFocus` | `shared` (new installs): both reviewers check source behavior and rule adherence, each from its own lens first, and report every defect either check finds; they never see each other's output. `specialized` (unset, existing configs): one check each, as upstream |
 | `maxFixRounds`, `maxAgentCalls` | Fix rounds per unit and AI calls per run (each translate or repair). `maxAgentCalls` is a total, not a concurrency (that is `concurrency`). A unit takes 3 calls when the reviews pass and 4–5 with one upstream-style fix. These are run limits: changing them keeps reviewed units and approvals. For one run only, use `translate --max-calls N` |
 | `maxRunInputBytes` | Optional cap on the prompt bytes a run sends to workers. AI Credits are metered on tokens and usage stops when they run out, so this budgets runs between usage checks. The run summary's `usageEstimate` records measured bytes and estimated tokens (bytes ÷ 4, not billing data). The check uses completed calls, so calls already in flight (up to `concurrency`) can overshoot it |
@@ -185,7 +185,7 @@ The commands below are for the default **runtime mode**. Projects without a usab
 }
 ```
 
-This is the bundled fixture's example; replace it with your project's commands. `mutation` exits 0 when the comparator detects a deliberately broken implementation. Keep `typecheck` to a cheap check that is valid before the whole tree is translated, or set it to `null`.
+This is the bundled fixture's example; replace it with your project's commands. On Windows use `py` (with `"-3"` as the first argument) or `python` instead of `python3`. `mutation` exits 0 when the comparator detects a deliberately broken implementation. Keep `typecheck` to a cheap check that is valid before the whole tree is translated, or set it to `null`.
 
 ## No runnable original or no specification
 
@@ -260,10 +260,12 @@ node migration-kit/scripts/run_migration.mjs approve parity --note "Confirmed ba
 node migration-kit/scripts/run_migration.mjs parity
 ```
 
-When the build fails and the person agrees in chat, the AI runs `build-loop` (the host asks them to confirm). Like upstream's build daemon it repeats build → parse errors → reviewed repairs → rebuild until clean, the round limit (`--max-rounds`, default 5) or the whole loop's AI call budget (`--max-calls`, default `maxAgentCalls`) is reached, or the error count stops falling (`stalled`: propose a rule amendment). The AI states both numbers when proposing it. Every round's approval is recorded under one grant in `migration/gates/build-loop-<id>.json`; while it runs, `status` shows it and other runner commands are refused. To go one round at a time, run `repair-round`. The bundled parsers (Python, Java/Maven, JavaScript/Node/ESLint/tsc, shell/ShellCheck, Rust and the generic `file:line:col: error` form) read the recorded build output, build a repair queue per manifest target and run the repairs. Lines that map to no manifest target are listed, never guessed. Error counts per round are kept in `migration/build-rounds.tsv`. A fresh build after repairs still needs approval.
+When the build fails and the person agrees in chat, the AI runs `build-loop` (the host asks them to confirm). Like upstream's build daemon it repeats build → parse errors → reviewed repairs → rebuild until clean, the round limit (`--max-rounds`, default 5) or the whole loop's AI call budget (`--max-calls`, default `maxAgentCalls`) is reached, or the error count stops falling (`stalled`: propose a rule amendment). The AI states both numbers when proposing it. Every round's approval is recorded under one grant in `migration/gates/build-loop-<id>.json`; while it runs, `status` shows it and other runner commands are refused. To go one round at a time, run `repair-round`. The bundled parsers (Python, Java/Maven, JavaScript/Node/ESLint/tsc, shell/ShellCheck, Rust and the generic `file:line:col: error` form) read the recorded build output, build a repair queue per manifest target and run the repairs. Lines that map to no manifest target are listed, never guessed. Error counts per round are kept in `migration/build-rounds.tsv`. With `--through smoke` or `--through parity` the same grant also approves and runs smoke (and parity) once the build is clean, sends their failures to reviewed repairs and starts the next round from build (upstream Steps 5-6). A failing original suite, or a failure that maps to no target, stops it instead of being guessed. Without the loop, a fresh build after repairs still needs approval.
 
 ```bash
 node migration-kit/scripts/run_migration.mjs build-loop --note "Up to five repair rounds and 100 AI calls agreed" --max-rounds 5 --max-calls 100
+# Through smoke and parity under the same grant
+node migration-kit/scripts/run_migration.mjs build-loop --through parity --note "Up to five rounds until parity passes, 100 AI calls" --max-rounds 5 --max-calls 100
 # One round at a time
 node migration-kit/scripts/run_migration.mjs repair-round
 node migration-kit/scripts/run_migration.mjs approve build --note "Reviewed the repairs"

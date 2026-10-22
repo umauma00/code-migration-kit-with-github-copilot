@@ -49,7 +49,8 @@ export const usage = `Usage: node migration-kit/scripts/run_migration.mjs COMMAN
   judge                       Runtime: original/mutation; source-only: validate preparation
   judge-prepare               Validate/reuse the judge at 00b before map/rules exist
   approve STAGE --note TEXT   Review/approve translation, build, smoke, parity, post-parity, handoff
-                              translation may use --batch N or --targets PATH,PATH
+                              translation may use --batch N or --targets PATH,PATH, and --complete-phase 03
+                              to record the reviewed phase 03 in the same confirmation
   translate [--max-calls N]  Run/resume translation with Copilot CLI workers; --max-calls is this run's
                               AI call budget (default maxAgentCalls), agreed with the person
   pilot prepare --target NEW_DIR --sources src/a,src/b --note TEXT [--through translation|build|smoke|parity]
@@ -59,9 +60,10 @@ export const usage = `Usage: node migration-kit/scripts/run_migration.mjs COMMAN
                              Parse the current failed run into a TSV and repair queue (default build)
   repair-round [--stage build|smoke|parity]
                              diagnose, then repair the queue; fresh build (and smoke/parity) runs still need approval
-  build-loop --note TEXT [--max-rounds N] [--max-calls N]
-                             One host-confirmed grant: build, diagnose, repair with reviews and rebuild until clean,
-                             N rounds (default 5), N AI calls in total (default maxAgentCalls) or a stalled error count
+  build-loop --note TEXT [--through build|smoke|parity] [--max-rounds N] [--max-calls N]
+                             One host-confirmed grant: build (then smoke, then parity with --through), diagnose,
+                             repair with reviews and start again from build until clean, N rounds (default 5),
+                             N AI calls in total (default maxAgentCalls) or a stalled error count
   build | smoke | parity | handoff     Run one approved validation stage and stop
   unlock --pid PID           Remove a lock only after its owning process has stopped
 Options: --root PATH (default cwd), --copilot PATH (default copilot)
@@ -272,10 +274,10 @@ export async function main(argv = process.argv.slice(2)) {
     else if (cmd === 'judge-prepare') result = await runJudgePreparation(root, config, { signal: controller.signal });
     else if (cmd === 'phase') result = phaseCommand(root,config,args._[1],args._[2],args);
     else if (cmd === 'build-loop') {
-      // One host-confirmed grant for build → diagnose → reviewed repairs → rebuild rounds.
+      // One host-confirmed grant for build (→ smoke → parity) → diagnose → reviewed repairs → rebuild rounds.
       const maxRounds = args['max-rounds'] === undefined ? 5 : Number(args['max-rounds']);
       const maxCalls = args['max-calls'] === undefined ? config.maxAgentCalls : Number(args['max-calls']);
-      result = await buildLoop(root, config, createCopilotAdapter({ command: args.copilot }), { maxRounds, maxCalls, note: args.note, signal: controller.signal,
+      result = await buildLoop(root, config, createCopilotAdapter({ command: args.copilot }), { maxRounds, maxCalls, through: args.through ?? 'build', note: args.note, signal: controller.signal,
         onProgress: event => console.error(`${event.unit}: ${event.stage}${event.calls === undefined ? '' : ` (agent calls ${event.calls})`}`) });
     }
     else if (cmd === 'sessions') {
@@ -300,7 +302,16 @@ export async function main(argv = process.argv.slice(2)) {
         if (list.length) console.error(guidanceListMarkdown(list, language));
       }
     }
-    else if (cmd === 'approve') result = approve(root, config, args._[1], args.note, { batch: args.batch, targets: args.targets?.split(',') });
+    else if (cmd === 'approve') {
+      const scope = { batch: args.batch, targets: args.targets?.split(',') };
+      if (args['complete-phase'] === undefined) result = approve(root, config, args._[1], args.note, scope);
+      else {
+        // The 03 review and the translation approval are one human decision: record both under one confirmation.
+        if (args._[1] !== 'translation' || args['complete-phase'] !== '03') throw new Error('--complete-phase applies only as approve translation --complete-phase 03');
+        const phase = phaseCommand(root, config, 'complete', '03', { note: args.note });
+        result = { phase, approval: approve(root, config, 'translation', args.note, scope) };
+      }
+    }
     else if (['judge', 'build', 'smoke', 'parity', 'handoff'].includes(cmd)) result = await runStage(root, config, cmd, { signal: controller.signal });
     else if (['translate', 'repair'].includes(cmd)) {
       if (cmd === 'repair' && !args.target && !args.queue) throw new Error('repair requires --target or --queue');

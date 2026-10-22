@@ -57,7 +57,10 @@ Collect proposed rule amendments; only apply them with the user's authorization
 at the gate. Rerun against fresh risk-weighted files, not only the original ones.
 Repeated changes to the same rule need a design decision, not another wording.
 Report timings, known usage, rule adherence and unresolved questions. Never start
-production fan-out based on your own favorable report.
+production fan-out based on your own favorable report. When the person has reviewed
+the report and wants translation to start, record both with one confirmation:
+`approve translation --complete-phase 03 --note TEXT` (add `--batch N` or
+`--targets` for a bounded first scope). `phase complete 03` alone stays available.
 
 <!-- Copilot adaptation: migration control and instructions updated on 2026-10-08; see NOTICE. -->
 

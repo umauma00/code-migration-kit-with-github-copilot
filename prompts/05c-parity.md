@@ -25,7 +25,8 @@ lines, write each confirmed regression as a `file<TAB>module<TAB>code<TAB>messag
 row naming its owning target, run `diagnostic_queue.mjs --stage parity --diagnostics
 migration/PATH.tsv`, then `repair --queue migration/repair-queue.json`. A failing
 original suite is inherited or environmental: the runner refuses to queue it.
-Repaired outputs need fresh build, smoke and parity approvals. The same error class
+Repaired outputs need fresh build, smoke and parity approvals, unless the person
+granted `build-loop --through parity`, which reruns all three under that one grant. The same error class
 three times is a rule bug: propose the amendment instead of another round.
 
 Report both suite counts, scenario coverage and all unresolved differences.

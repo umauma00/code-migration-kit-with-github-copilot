@@ -1,0 +1,3 @@
+# Keep LF in every checkout: fixtures are compared byte for byte, and the kit
+# copies its templates and agent profiles into the migration repository.
+* text=auto eol=lf

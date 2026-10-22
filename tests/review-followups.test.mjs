@@ -67,7 +67,7 @@ test('build-loop stops when the error count stops falling and at the round limit
   await assert.rejects(buildLoop(f.root, f.config, fake, { note: 'x', maxRounds: 0 }), /--max-rounds/);
 });
 
-test('build-loop is a host-confirmed human gate and loop metadata is build-only', async t => {
+test('build-loop is a host-confirmed human gate and loop metadata stays on validation stages', async t => {
   const loop = 'node migration-kit/scripts/run_migration.mjs build-loop --note "agreed" --max-rounds 3';
   assert.equal(humanGate(loop), 'build-loop');
   assert.equal(humanGate('node migration-kit/scripts/run_migration.mjs sessions prune --run 1-abcdef01'), 'sessions prune');
@@ -75,7 +75,7 @@ test('build-loop is a host-confirmed human gate and loop metadata is build-only'
   const f = await ready(t);
   const decision = interactiveDecision({ toolName: 'bash', toolArgs: { command: loop }, cwd: f.root }, f.root);
   assert.equal(decision.decision, 'ask'); assert.match(decision.reason, /round limit/);
-  assert.throws(() => approve(f.root, f.config, 'smoke', 'x', { loop: { grantId: 'g', round: 1 } }), /loop/);
+  assert.throws(() => approve(f.root, f.config, 'post-parity', 'x', { loop: { grantId: 'g', round: 1 } }), /loop/);
 });
 
 test('shared review focus asks each reviewer for both checks; specialized keeps one lens', t => {

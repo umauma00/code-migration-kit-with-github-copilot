@@ -1,0 +1,27 @@
+name: test
+on:
+  push:
+    branches: [main, feat/github-copilot-migration-kit]
+  pull_request:
+  workflow_dispatch:
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      # A hanging test fails with its name instead of holding the job. The limit
+      # also covers each whole test file, and Windows runners start processes
+      # slowly (one pilot test takes about two minutes there).
+      - run: npm test -- --test-timeout=600000 --test-reporter=spec
+      - run: npm run demo

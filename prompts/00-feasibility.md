@@ -78,12 +78,6 @@ Do not install policies, start translation, or approve the next phase yourself.
 
 <!-- Copilot adaptation: migration control and instructions updated on 2026-10-08; see NOTICE. -->
 
-Report every issue with ID, severity, source/target evidence, impact, proposed
-fix, owner (AI/user/environment), completion criterion, and whether it blocks
-implementation. Identify checks that can be deferred. Perform authorized AI fixes
-and group only necessary user decisions. 00 assesses suitability/scope; 00b
-prepares comparison evidence; 03 prototypes; 04 begins production implementation.
-
 ## Reading the source
 
 As upstream: read the source yourself with read-only commands (counts, grep, git

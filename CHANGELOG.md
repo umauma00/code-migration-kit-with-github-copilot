@@ -1,5 +1,36 @@
 # Unreleased (0.3.0)
 
+- 2026-10-22 Windows as a primary platform (see docs/WINDOWS.md):
+  - `commands` may name `.cmd`/`.bat` tools (`npm`, `npx`, `mvn`,
+    `gradlew.bat`): they run through `cmd.exe /d /s /c` with every argument
+    quoted and escaped as cross-spawn does. Before, Node refused to start them
+    without a shell. A batch file named with its extension (`gradlew.bat`) is
+    also found in the project folder; a bare name is looked up on PATH only.
+  - Guardrails match `npm.cmd`/`git.exe`, the PowerShell call operator,
+    `cmd /c`, `Start-Process` (switches such as `-Wait` take no value;
+    abbreviated and `-Name:value` parameters are read) and `py -3 -m pytest`.
+  - The dependency parsers and `make_manifest.py` write UTF-8 with LF (the
+    Windows default was the console code page and CRLF) and never crash
+    printing a path the console cannot encode.
+  - Atomic replacements retry briefly on Windows sharing violations.
+  - Node diagnostics keep absolute paths with spaces; printed commands quote
+    a kit path with spaces and use `py -3` or `python` instead of `python3`.
+  - CI runs `npm test` and `npm run demo` on windows-latest and ubuntu-latest.
+- 2026-10-22 fewer repeated confirmations, compared with upstream step by step
+  (guardrails and every confirmation's hook ask stay):
+  - `build-loop --through smoke|parity` extends the one host-confirmed grant to
+    upstream Steps 5-6: after a clean build it approves and runs smoke (then
+    parity), sends their mapped failures to reviewed repairs and starts the next
+    round from build. Before, every repair made the person approve build, smoke
+    and parity again. A failing original suite or an unmapped failure still
+    stops the loop; source-only refuses `--through parity`. Rounds record their
+    `stage`; `stalled` compares rounds that failed at the same stage.
+  - `approve translation --complete-phase 03 --note TEXT` records the reviewed
+    phase 03 and the translation approval under one confirmation (the hook
+    names both). `phase complete 03` alone still works.
+  - New installs set `fixPolicy: single-pass` (upstream Step 3). Existing
+    configurations keep their value; one without the key keeps `rereview`.
+  - Prompts 00/00b no longer repeat the findings format PHASE-HANDOFF defines.
 - 2026-10-22 phase 00 reads the source the way upstream does: the parent
   samples it and names what it skipped. `survey --kind facts` is optional
   there, so a Copilot CLI launch failure no longer stops the feasibility
