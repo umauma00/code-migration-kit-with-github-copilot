@@ -126,13 +126,13 @@ def main():
     cycles = [s for s in sccs if len(s) > 1]
 
     args.out.mkdir(parents=True, exist_ok=True)
-    (args.out / "edges.tsv").write_text("from\tto\n" + "".join(f"{a}\t{b}\n" for a, b in edges))
+    (args.out / "edges.tsv").write_text("from\tto\n" + "".join(f"{a}\t{b}\n" for a, b in edges), encoding="utf-8", newline="\n")
     (args.out / "order.txt").write_text(
         "# migration order: one batch per line, dependencies first\n"
-        + "".join("\t".join(s) + "\n" for s in sccs))
+        + "".join("\t".join(s) + "\n" for s in sccs), encoding="utf-8", newline="\n")
     (args.out / "cycles.txt").write_text(
         f"# strongly connected components > 1 file: {len(cycles)}\n"
-        + "".join("\t".join(s) + "\n" for s in cycles))
+        + "".join("\t".join(s) + "\n" for s in cycles), encoding="utf-8", newline="\n")
     print(f"files={len(files)} edges={len(edges)} batches={len(sccs)} cycles={len(cycles)}")
     if len(files) > 1 and not edges:
         print(
@@ -146,4 +146,7 @@ def main():
 
 
 if __name__ == "__main__":
+    # A Windows console encoding (cp932, cp1252...) cannot print every path.
+    for stream in (sys.stdout, sys.stderr):
+        stream.reconfigure(errors="backslashreplace")
     main()

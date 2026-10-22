@@ -188,15 +188,15 @@ def main():
     order, cycles = migration_order(nodes, edges)
 
     args.out.mkdir(parents=True, exist_ok=True)
-    with open(args.out / "edges.tsv", "w") as f:
+    with open(args.out / "edges.tsv", "w", encoding="utf-8", newline="\n") as f:
         f.write("from\tto\n")
         for a, b in edges:
             f.write(f"{a}\t{b}\n")
-    with open(args.out / "order.txt", "w") as f:
+    with open(args.out / "order.txt", "w", encoding="utf-8", newline="\n") as f:
         f.write("# migration order: one batch per line, dependencies first\n")
         for scc in order:
             f.write("\t".join(scc) + "\n")
-    with open(args.out / "cycles.txt", "w") as f:
+    with open(args.out / "cycles.txt", "w", encoding="utf-8", newline="\n") as f:
         f.write(f"# strongly connected components > 1 file: {len(cycles)}\n")
         for scc in cycles:
             f.write("\t".join(scc) + "\n")
@@ -214,4 +214,7 @@ def main():
 
 
 if __name__ == "__main__":
+    # A Windows console encoding (cp932, cp1252...) cannot print every path.
+    for stream in (sys.stdout, sys.stderr):
+        stream.reconfigure(errors="backslashreplace")
     main()

@@ -91,7 +91,7 @@ def main():
     if any(target.casefold() in seen_sources for _, target in rows):
         raise SystemExit("ERROR: a target overlaps a source file")
     args.out.parent.mkdir(parents=True, exist_ok=True)
-    with open(args.out, "w", encoding="utf-8") as f:
+    with open(args.out, "w", encoding="utf-8", newline="\n") as f:
         f.write("source\ttarget\n")
         for source, target in rows:
             f.write(f"{source}\t{target}\n")
@@ -99,4 +99,7 @@ def main():
 
 
 if __name__ == "__main__":
+    # A Windows console encoding (cp932, cp1252...) cannot print every path.
+    for stream in (sys.stdout, sys.stderr):
+        stream.reconfigure(errors="backslashreplace")
     main()
