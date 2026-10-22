@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { prepare, ready, result, fake, finding, cliOutput, cliDouble } from './helpers.mjs';
+import { prepare, ready, result, fake, finding, cliOutput, cliDouble, python } from './helpers.mjs';
 import { approve, requireGate, runStage, translate } from '../lib/pipeline.mjs';
 import { safePath, atomicWrite, readJSON, writeJSON, fileHash, loadConfig, contextHash,
   readManifest, done, unitState, statePath, lockRun, roles } from '../lib/core.mjs';
@@ -331,12 +331,12 @@ test('original Python, C and TS dependency fixtures retain byte-for-byte outputs
   for (const lang of ['python', 'c', 'ts']) {
     const script = path.join(kitRoot, `scripts/depmap_${lang}.${lang === 'ts' ? 'mjs' : 'py'}`);
     const out = path.join(root, lang), fixture = path.join(kitRoot, 'fixtures', lang);
-    const r = await runProcess(lang === 'ts' ? process.execPath : 'python3', [script, '--root', fixture, '--out', out]);
+    const r = await runProcess(lang === 'ts' ? process.execPath : python, [script, '--root', fixture, '--out', out]);
     assert.equal(r.code, 0, r.stderr);
     for (const file of ['edges.tsv', 'order.txt', 'cycles.txt']) assert.equal(fs.readFileSync(path.join(out, file), 'utf8'), fs.readFileSync(path.join(fixture, `expected_${file}`), 'utf8'));
   }
   const manifest = path.join(root, 'manifest.tsv');
-  const generated = await runProcess('python3', [path.join(kitRoot, 'scripts/make_manifest.py'), '--order', path.join(kitRoot, 'fixtures/python/expected_order.txt'), '--out', manifest, '--sub', 'pkg/=ts/', '--sub', '.py=.ts']);
+  const generated = await runProcess(python, [path.join(kitRoot, 'scripts/make_manifest.py'), '--order', path.join(kitRoot, 'fixtures/python/expected_order.txt'), '--out', manifest, '--sub', 'pkg/=ts/', '--sub', '.py=.ts']);
   assert.equal(generated.code, 0, generated.stderr);
   assert.equal(fs.readFileSync(manifest, 'utf8'), fs.readFileSync(path.join(kitRoot, 'fixtures/python/expected_manifest.tsv'), 'utf8'));
 });

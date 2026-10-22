@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { prepare, fake, ready } from './helpers.mjs';
+import { prepare, fake, ready, python } from './helpers.mjs';
 import { safePath, atomicWrite, writeJSON, readJSON, loadReviewDependencies, reviewSources, roles } from '../lib/core.mjs';
 import { inventorySlice } from '../lib/review.mjs';
 import { runStage, approve, translate } from '../lib/pipeline.mjs';
@@ -67,7 +67,7 @@ test('rereview 3: stock Python repo-root edges convert without doubled package p
   fs.cpSync(path.join(kitRoot, 'fixtures/python/pkg'), safePath(f.root, 'pkg'), { recursive: true });
   write(f, 'pkg/isolated.py', 'VALUE = "孤立"\n');
   write(f, 'tests/import_pkg.py', 'from pkg import a\n');
-  const parser = await runProcess('python3', [path.join(kitRoot, 'scripts/depmap_python.py'), '--root', f.root, '--out', safePath(f.root, 'migration/depmap')]);
+  const parser = await runProcess(python, [path.join(kitRoot, 'scripts/depmap_python.py'), '--root', f.root, '--out', safePath(f.root, 'migration/depmap')]);
   assert.equal(parser.code, 0, parser.stderr);
   assert.match(fs.readFileSync(safePath(f.root, edges), 'utf8'), /pkg\/a\.py\tpkg\/b\.py/);
   // Exercise the installed CLI entrypoint and its --depmap-root option.

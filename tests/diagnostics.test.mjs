@@ -104,3 +104,12 @@ const f = prepare(t);
   await assert.rejects(runStage(f.root, f.config, 'build'), /build failed/);
   assert.throws(() => diagnoseBuild(f.root, f.config), /no diagnostic maps to a manifest target/);
 });
+
+test('Node diagnostics keep Windows paths that contain spaces', () => {
+  const text = ['C:\\Users\\Taro Yamada\\proj\\ported\\a.mjs:3', '  bad(', '  ^', 'SyntaxError: Unexpected token', '',
+    'TypeError: x is not a function', '    at main (C:\\Users\\Taro Yamada\\proj\\ported\\b.mjs:7:3)', '    at node:internal/x:1:1', '',
+    'Error: boom', '    at file:///C:/Users/Taro%20Yamada/proj/ported/c.mjs:2:9', '', 'RangeError: r', '    at Object.<anonymous> (ported\\d.cjs:4:1)'].join('\r\n');
+  assert.deepEqual(parseBuildOutput(text).map(d => [d.file, d.line, d.code]), [
+    ['C:\\Users\\Taro Yamada\\proj\\ported\\a.mjs', '3', 'SyntaxError'], ['C:\\Users\\Taro Yamada\\proj\\ported\\b.mjs', '7', 'TypeError'],
+    ['file:///C:/Users/Taro%20Yamada/proj/ported/c.mjs', '2', 'Error'], ['ported\\d.cjs', '4', 'RangeError']]);
+});

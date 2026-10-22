@@ -6,6 +6,8 @@ import { loadConfig, roles, writeJSON, safePath, atomicWrite, readManifest } fro
 import { approve, runStage } from '../lib/pipeline.mjs';
 
 export const mini = path.join(kitRoot, 'fixtures/mini');
+// Python on PATH: Windows installs (python.org, setup-python) name it python.
+export const python = process.platform === 'win32' ? 'python' : 'python3';
 export function prepare(t, { realCommands = false, count = 1, model = 'test-double', root, workflow = false, layout = 'repository' } = {}) {
   root ??= fs.mkdtempSync(path.join(os.tmpdir(), 'copilot-migration-test-'));
   t?.after(() => fs.rmSync(root, { recursive: true, force: true }));
@@ -23,7 +25,7 @@ export function prepare(t, { realCommands = false, count = 1, model = 'test-doub
   delete config.dependencyOrder; delete config.fixPolicy; delete config.reviewFocus;
   config.concurrency = 2;
   for (const name of ['original', 'mutation', 'build', 'smoke', 'parity']) {
-    config.commands[name] = realCommands ? ['python3', '-B', 'tests/judge.py', name] : [process.execPath, '-e', 'console.log("test command OK")'];
+    config.commands[name] = realCommands ? [python, '-B', 'tests/judge.py', name] : [process.execPath, '-e', 'console.log("test command OK")'];
   }
   config.commands.typecheck = ['node', '--check', '{target}'];
   writeJSON(safePath(root, 'migration/config.json'), config);

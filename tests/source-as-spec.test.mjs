@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { install, kitRoot } from '../scripts/install.mjs';
-import { mini } from './helpers.mjs';
+import { mini, python } from './helpers.mjs';
 import { loadConfig, safePath, readJSON, atomicWrite } from '../lib/core.mjs';
 import { runStage } from '../lib/pipeline.mjs';
 import { phaseCommand } from '../scripts/phase_cli.mjs';
@@ -242,12 +242,12 @@ test('review fixes: python depmap keeps a real migration package; manifest --inc
     ['tests/test_app.py', 'import app\n'], ['migration/config.json', '{}'], ['migration/x.py', '']]) {
     fs.mkdirSync(path.dirname(path.join(dir, p)), { recursive: true }); fs.writeFileSync(path.join(dir, p), text);
   }
-  const map = await runProcess('python3', ['-I', path.join(kitRoot, 'scripts/depmap_python.py'), '--root', '.', '--out', 'migration/depmap'], { cwd: dir });
+  const map = await runProcess(python, ['-I', path.join(kitRoot, 'scripts/depmap_python.py'), '--root', '.', '--out', 'migration/depmap'], { cwd: dir });
   assert.equal(map.code, 0, map.stderr);
   const order = fs.readFileSync(path.join(dir, 'migration/depmap/order.txt'), 'utf8');
   assert.match(order, /src\/app\/migration\/step\.py/);
   assert.doesNotMatch(order, /migration\/x\.py$/m);
-  const manifest = await runProcess('python3', ['-I', path.join(kitRoot, 'scripts/make_manifest.py'), '--order', 'migration/depmap/order.txt', '--out', 'migration/manifest.tsv',
+  const manifest = await runProcess(python, ['-I', path.join(kitRoot, 'scripts/make_manifest.py'), '--order', 'migration/depmap/order.txt', '--out', 'migration/manifest.tsv',
     '--include', 'src/', '--sub', 'src/=ported/', '--sub', '.py=.mjs'], { cwd: dir });
   assert.equal(manifest.code, 0, manifest.stderr);
   const rows = fs.readFileSync(path.join(dir, 'migration/manifest.tsv'), 'utf8');
