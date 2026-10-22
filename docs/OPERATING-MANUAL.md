@@ -34,8 +34,9 @@ does not apply to automated workers, which keep their JSON-only contracts.
    The hook asks the person to confirm approval, phase-completion,
    `guardrails install`, `build-loop` and `sessions prune` commands and denies any other agent write of
    `migration/guardrails.json`.
-4. Delegate preparation reading by scope with `survey` (fresh tool-free
-   surveyors, results as files under `migration/surveys/`); see [surveys](SURVEYS.md).
+4. 00 reads and samples the source directly, as upstream does. 00b (source-as-spec)
+   and 02 must cover every file: delegate that reading by scope with `survey` (fresh
+   tool-free surveyors, results as files under `migration/surveys/`); see [surveys](SURVEYS.md).
    Translate through the runner. Implementers, fixers and arbiters use read/search
    tools. Reviewers have no tools and receive the same frozen input; when it exceeds
    maxReviewInputBytes both receive the same hash-bound file list and

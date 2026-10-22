@@ -49,6 +49,15 @@ test('Windows finds the npm shim through a quoted PATH entry or npm\'s global pr
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'kit-win-home-'));
   fs.writeFileSync(path.join(home, '.npmrc'), `registry=https://registry.npmjs.org/\r\nprefix=${dir}\r\n`);
   assert.deepEqual(windowsLaunch('copilot', { ...win(dir), env: { Path: empty, USERPROFILE: home } }), { command: exe, prefixArgs: [] });
+  // npm expands ${VAR} and a leading ~ in .npmrc; the prefix here lives under the user profile.
+  const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'kit-win-profile-'));
+  const installed = npmGlobal();
+  fs.renameSync(installed.dir, path.join(profile, '.npm-packages'));
+  const moved = installed.exe.replace(installed.dir, path.join(profile, '.npm-packages'));
+  for (const prefix of ['${USERPROFILE}/.npm-packages', '${userprofile?}/.npm-packages', '"${USERPROFILE}/.npm-packages"', '~/.npm-packages']) {
+    fs.writeFileSync(path.join(profile, '.npmrc'), `prefix=${prefix}\n`);
+    assert.deepEqual(windowsLaunch('copilot', { ...win(dir), env: { Path: empty, USERPROFILE: profile } }), { command: moved, prefixArgs: [] }, prefix);
+  }
   const appData = fs.mkdtempSync(path.join(os.tmpdir(), 'kit-win-appdata-'));
   fs.renameSync(dir, path.join(appData, 'npm'));
   assert.deepEqual(windowsLaunch('copilot', { ...win(dir), env: { Path: empty, APPDATA: appData } }),
