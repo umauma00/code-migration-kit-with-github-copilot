@@ -15,4 +15,5 @@ review, arbitration and fix path as build errors, rounds in `migration/smoke-rou
 When no line names a target, triage the failure, write the confirmed defects as
 `file<TAB>module<TAB>code<TAB>message` rows and run `diagnostic_queue.mjs --stage smoke
 --diagnostics migration/PATH.tsv`, then `repair --queue migration/repair-queue.json`.
-The repaired outputs need fresh build and smoke approvals.
+The repaired outputs need fresh build and smoke approvals, unless the person granted
+`build-loop --through smoke` (or `parity`), which reruns them under that one grant.

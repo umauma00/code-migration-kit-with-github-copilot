@@ -53,6 +53,11 @@ repairs resume with translate). An unmapped failure, a build that times out or a
 stale approval stops it with an error. While it runs, `status` shows it and other
 runner commands are refused. Report every round's counts and the calls used.
 
+With `--through smoke` or `--through parity` (state it in the proposal) the same
+grant also approves and runs smoke, then parity, after a clean build, repairs their
+mapped failures and starts the next round from build. A failure that maps to no
+target, or a failing original suite, stops the loop for triage (05b/05c).
+
 If several rounds repeat the same error class, stop and propose a rule amendment.
 Do not have every worker independently build the whole tree. Report counts by
 round and stop at the clean-build gate. If a cheap typecheck ran in-loop, still

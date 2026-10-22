@@ -1,5 +1,20 @@
 # Unreleased (0.3.0)
 
+- 2026-10-22 fewer repeated confirmations, compared with upstream step by step
+  (guardrails and every confirmation's hook ask stay):
+  - `build-loop --through smoke|parity` extends the one host-confirmed grant to
+    upstream Steps 5-6: after a clean build it approves and runs smoke (then
+    parity), sends their mapped failures to reviewed repairs and starts the next
+    round from build. Before, every repair made the person approve build, smoke
+    and parity again. A failing original suite or an unmapped failure still
+    stops the loop; source-only refuses `--through parity`. Rounds record their
+    `stage`; `stalled` compares rounds that failed at the same stage.
+  - `approve translation --complete-phase 03 --note TEXT` records the reviewed
+    phase 03 and the translation approval under one confirmation (the hook
+    names both). `phase complete 03` alone still works.
+  - New installs set `fixPolicy: single-pass` (upstream Step 3). Existing
+    configurations keep their value; one without the key keeps `rereview`.
+  - Prompts 00/00b no longer repeat the findings format PHASE-HANDOFF defines.
 - 2026-10-22 phase 00 reads the source the way upstream does: the parent
   samples it and names what it skipped. `survey --kind facts` is optional
   there, so a Copilot CLI launch failure no longer stops the feasibility

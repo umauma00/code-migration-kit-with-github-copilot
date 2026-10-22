@@ -23,7 +23,7 @@
   },
   "concurrency": 4,
   "dependencyOrder": "auto",
-  "fixPolicy": "rereview",
+  "fixPolicy": "single-pass",
   "reviewFocus": "shared",
   "maxFixRounds": 2,
   "maxAgentCalls": 100,

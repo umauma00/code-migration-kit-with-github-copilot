@@ -84,7 +84,8 @@ does not apply to automated workers, which keep their JSON-only contracts.
    Repeated failures signal an upstream rule/design problem. Stop at the repair
    limit and propose a rule amendment rather than endlessly patching instances.
    After the human agrees, `build-loop` runs upstream's build-until-clean rounds
-   under one host-confirmed grant and stops by itself when the error count stalls.
+   under one host-confirmed grant and stops by itself when the error count stalls;
+   `--through smoke|parity` extends the same grant to upstream Steps 5-6.
    When status reports a worker retrying (rate limit, service error), tell the user.
    Smoke and parity regressions follow the same path (`repair-round --stage smoke|parity`);
    a failing original suite is never repaired in translated outputs.

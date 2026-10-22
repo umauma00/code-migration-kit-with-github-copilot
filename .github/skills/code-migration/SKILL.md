@@ -172,9 +172,10 @@ stops with migration instructions: show them, and after the person's OK set
 translation approval.
 
 At initialization also offer these settings as the user's choice. `fixPolicy`:
-`rereview` (default; a fixed output is reviewed again until no confirmed finding
-remains) or `single-pass` (upstream Step 3: one fix of the confirmed findings,
-then build/smoke/parity judge it; fewer calls and fewer blocked units).
+`single-pass` (new installs, as upstream Step 3: one fix of the confirmed
+findings, then build/smoke/parity judge it; fewer calls and fewer blocked units)
+or `rereview` (a fixed output is reviewed again until no confirmed finding
+remains; also what an older configuration without the key gets).
 `dependencyOrder: auto` (new installs) lets the approved scope fan out like
 upstream and holds dependents for reviewed dependencies only when a per-unit
 typecheck needs them. `concurrency` (up to 64, both reviewers included) should
@@ -195,12 +196,14 @@ by itself; if it persists, offer a lower `concurrency` after the run (it keeps
 reviewed work). A run that stops at its AI call budget is a budget stop: rerun
 `translate`, or propose `translate --max-calls N` with the number the person agrees.
 
-After a failed build, propose `build-loop --note TEXT [--max-rounds N]
-[--max-calls N]` (defaults 5 rounds and `maxAgentCalls` AI calls for the whole
-loop; say both numbers): one host-confirmed grant that rebuilds, parses errors
+After a failed build, propose `build-loop --note TEXT [--through build|smoke|parity]
+[--max-rounds N] [--max-calls N]` (defaults: build only, 5 rounds and
+`maxAgentCalls` AI calls for the whole loop; say all three): one host-confirmed
+grant that rebuilds (then runs smoke and parity with `--through`), parses errors
 into the repair queue, runs reviewed repairs and stops when clean, at the round
 or call limit, or when the error count stops falling (then propose a rule
-amendment). While it runs, other runner commands are refused; check `status --wait`.
+amendment). Offer `--through parity` when the person wants upstream's
+run-until-parity loop instead of approving every rerun. While it runs, other runner commands are refused; check `status --wait`.
 Show the round counts and calls used.
 
 After a failed smoke or parity (upstream Step 6), triage every divergence against

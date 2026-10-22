@@ -164,19 +164,22 @@ select the affected manifest targets for `repair`; then approve a fresh build.
 
 ## Validation commands
 
-`build-loop --note TEXT [--max-rounds N] [--max-calls N]` is one host-confirmed
+`build-loop --note TEXT [--through build|smoke|parity] [--max-rounds N] [--max-calls N]` is one host-confirmed
 grant (default 5, at most 50 rounds; `--max-calls` defaults to `maxAgentCalls` and
 caps the AI calls of all its repair rounds together, as does `maxRunInputBytes`
 for prompt bytes) stored as `migration/gates/build-loop-<id>.json` with its note,
-owner `pid`, current `stage`, `agentCalls`, `promptBytes` and per-round
-`{round, buildExecutionId, success, errors, targets, unmapped}`.
+owner `pid`, `through` (default `build`), current `stage`, `agentCalls`, `promptBytes` and per-round
+`{round, stage, buildExecutionId, success, errors, targets, unmapped}` (`stage` is the
+last stage the round ran; `buildExecutionId` names that stage's run).
 Each round records an ordinary build approval whose gate carries
-`loop: {grantId, round}`, runs build, diagnoses the recorded output and, unless
-clean, repairs the queue through `translate` with the normal reviews. It stops
-`clean`, `stalled` (three rounds without a falling error count), `budget` or
+`loop: {grantId, round}`, runs build and diagnoses the recorded output. When it is
+clean and `through` is `smoke` or `parity`, it records and runs those stages the
+same way, in order. The first failing stage's queue is repaired through `translate`
+with the normal reviews, and the next round starts again from build. It stops
+`clean`, `stalled` (three rounds failing at the same stage without a falling error count), `budget` or
 `round-limit`. Once the loop's prompt bytes reach `maxRunInputBytes` it starts no
 further repair round. A build that could not run, a stale approval or an unmapped failure
-is an error, not a round. Only build approvals may carry `loop`. A loop takes
+is an error, not a round; so is a parity run whose original suite failed. Only build, smoke and parity approvals may carry `loop`; source-only refuses `--through parity`. A loop takes
 `migration/build-loop.lock` before it saves its grant and holds it to the end, so a
 second loop stops at start; a lock whose pid is gone is retaken. Until the grant
 has `finishedAt`, and while its pid lives, every other process's runner lock is
