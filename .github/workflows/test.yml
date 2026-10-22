@@ -11,7 +11,7 @@ jobs:
       matrix:
         os: [windows-latest, ubuntu-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -20,6 +20,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      # A hanging test fails with its name instead of holding the job.
-      - run: npm test -- --test-timeout=180000 --test-reporter=spec
+      # A hanging test fails with its name instead of holding the job. The limit
+      # also covers each whole test file, and Windows runners start processes
+      # slowly (one pilot test takes about two minutes there).
+      - run: npm test -- --test-timeout=600000 --test-reporter=spec
       - run: npm run demo
