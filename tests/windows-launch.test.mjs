@@ -63,6 +63,23 @@ test('Windows finds the npm shim through a quoted PATH entry or npm\'s global pr
   fs.renameSync(dir, path.join(appData, 'npm'));
   assert.deepEqual(windowsLaunch('copilot', { ...win(dir), env: { Path: empty, APPDATA: appData } }),
     { command: exe.replace(dir, path.join(appData, 'npm')), prefixArgs: [] });
+  // ${VAR?} is '' when unset and a variable set to '' expands to '' (both unlike a missing one).
+  const run = (rc, extra = {}) => {
+    fs.writeFileSync(path.join(profile, '.npmrc'), `${rc}\n`);
+    return windowsLaunch('copilot', { ...win(dir), env: { Path: empty, USERPROFILE: profile, ...extra } }).command;
+  };
+  assert.equal(run('prefix=${USERPROFILE}/.npm-packages${UNSET_SUFFIX?}'), moved);
+  assert.equal(run('prefix=${USERPROFILE}/.npm-packages${EMPTY_SUFFIX}', { EMPTY_SUFFIX: '' }), moved);
+  assert.equal(run('prefix=${USERPROFILE}/.npm-packages${UNSET_SUFFIX}'), 'copilot');
+  assert.equal(run('prefix=\\${USERPROFILE}/.npm-packages'), 'copilot');
+  // Quoted values keep ; and #, unquoted ones end at them unless escaped; a [section] prefix is not global.
+  const tools = path.join(profile, 'npm #tools;x');
+  fs.renameSync(path.join(profile, '.npm-packages'), tools);
+  const inTools = moved.replace(path.join(profile, '.npm-packages'), tools);
+  for (const rc of ['prefix="${USERPROFILE}/npm #tools;x"', "prefix='${USERPROFILE}/npm #tools;x' ", 'prefix=${USERPROFILE}/npm \\#tools\\;x',
+    `prefix="${tools.replaceAll('\\', '\\\\')}"\n[other]\nprefix=${empty}`]) assert.equal(run(rc), inTools, rc);
+  assert.equal(run('prefix=${USERPROFILE}/npm #tools;x'), 'copilot');
+  fs.renameSync(tools, path.join(profile, '.npm-packages'));
   // An empty prefix line does not take the next line, and a relative prefix never resolves against cwd.
   for (const rc of ['prefix=\r\nregistry=https://registry.npmjs.org/\r\n', 'prefix=.\n']) {
     fs.writeFileSync(path.join(profile, '.npmrc'), rc);
