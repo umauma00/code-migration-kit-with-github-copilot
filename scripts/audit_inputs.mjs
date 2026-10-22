@@ -4,6 +4,8 @@
 // tool-free auditor as a fresh Copilot CLI process with --model set to the
 // request's phaseModels entry, so the plan is enforced and the CLI-reported
 // model is recorded. A response obtained elsewhere is still accepted by submit.
+// Never hand a request to a host subagent (task/agent tool): a tool-free auditor
+// cannot open a path, and a model retyping the body breaks the hash binding.
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -64,6 +66,27 @@ export async function runAudit(root, config, adapter, { directory, signal } = {}
     worker: 'copilot-cli', observedModel: response.observedModel ?? null, cliVersion: response.cliVersion ?? null, cliSessionId: response.cliSessionId ?? sessionId,
     ...(response.cliUsage ? { cliUsage: response.cliUsage } : {}), ...(response.modelWarning ? { modelWarning: response.modelWarning } : {}) } });
 }
+// Every frozen request without a result, config.concurrency at a time. One
+// failure does not stop the others; the disk shows what is still pending.
+export async function runPendingAudits(root, config, adapter, { signal } = {}) {
+  const base = safePath(root, 'migration/audits');
+  const pending = (fs.existsSync(base) ? fs.readdirSync(base, { withFileTypes: true }) : [])
+    .filter(d => d.isDirectory() && /^[A-Za-z0-9_-]+$/.test(d.name)).map(d => `migration/audits/${d.name}`)
+    .filter(dir => fs.existsSync(safePath(root, `${dir}/request.json`)) && !fs.existsSync(safePath(root, `${dir}/result.json`))).sort();
+  const outcomes = [], running = new Set();
+  for (const directory of pending) {
+    if (signal?.aborted) break;
+    const job = runAudit(root, config, adapter, { directory, signal })
+      .then(record => outcomes.push({ directory, verdict: record.result.verdict, observedModel: record.observedModel }),
+        error => outcomes.push({ directory, error: error.message }))
+      .finally(() => running.delete(job));
+    running.add(job);
+    while (running.size >= Math.max(1, config.concurrency ?? 1)) await Promise.race(running);
+  }
+  await Promise.all(running);
+  outcomes.sort((a, b) => a.directory.localeCompare(b.directory));
+  return { pending: pending.length, completed: outcomes.filter(o => !o.error).length, failed: outcomes.filter(o => o.error).length, outcomes };
+}
 export function submitAudit(root, config, { directory, response, execution } = {}) {
   const release = lockRun(root, 'audit-submit');
   try {
@@ -85,7 +108,9 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     const args = parseArgs(process.argv.slice(2)), root = fs.realpathSync(path.resolve(args.root ?? '.')), config = loadConfig(root);
     const result = args._[0] === 'freeze' ? freezeAudit(root, config, { type: args.type, files: args.files?.split(','), out: args.out })
       : args._[0] === 'run' ? await runAudit(root, config, createCopilotAdapter({ command: args.copilot }), { directory: args.directory })
-      : args._[0] === 'submit' ? submitAudit(root, config, { directory: args.directory, response: args.response }) : (() => { throw new Error('Use freeze --type TYPE --files LIST | run --directory PATH [--copilot PATH] | submit --directory PATH --response PATH'); })();
+      : args._[0] === 'run-pending' ? await runPendingAudits(root, config, createCopilotAdapter({ command: args.copilot }))
+      : args._[0] === 'submit' ? submitAudit(root, config, { directory: args.directory, response: args.response }) : (() => { throw new Error('Use freeze --type TYPE --files LIST | run --directory PATH [--copilot PATH] | run-pending [--copilot PATH] | submit --directory PATH --response PATH'); })();
     console.log(JSON.stringify(result, null, 2));
+    if (result.failed) process.exitCode = 1;
   } catch (e) { console.error(`ERROR: ${e.message}`); process.exitCode = 1; }
 }

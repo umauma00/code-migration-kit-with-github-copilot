@@ -13,14 +13,15 @@ import { agentMetadata } from '../lib/runtime.mjs';
 import { doctor } from '../scripts/run_migration.mjs';
 import { failureGuidance } from '../lib/guidance.mjs';
 
-test('worker profiles stay out of the picker; only the parent-dispatched auditor remains model-invocable', () => {
+test('worker profiles, the preparation auditor included, stay out of the picker and the task tool', () => {
   for (const dir of ['.github/agents', 'com.github.copilot/agents']) for (const name of fs.readdirSync(path.join(kitRoot, dir))) {
     const front = agentMetadata(fs.readFileSync(path.join(kitRoot, dir, name), 'utf8'), name);
     if (name.includes('orchestrator')) { assert.equal(front['user-invocable'], undefined, name); continue; }
     assert.equal(front['user-invocable'], false, name);
     assert.ok(!name.includes('-native-'), `removed native profile still shipped: ${name}`);
-    const dispatched = name.includes('preparation-auditor');
-    assert.equal(front['disable-model-invocation'], dispatched ? undefined : true, name);
+    // A tool-free auditor reached through a task tool gets a path or a retyped
+    // body, never the exact frozen request; only audit_inputs.mjs run starts it.
+    assert.equal(front['disable-model-invocation'], true, name);
   }
 });
 

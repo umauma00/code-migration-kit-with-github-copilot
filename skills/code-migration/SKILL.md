@@ -140,7 +140,9 @@ on them; merged drafts still go through the phase's audits and the human gate.
 Run each independent preparation audit (00b/01/02) as `audit_inputs.mjs freeze`
 then `audit_inputs.mjs run --directory DIR`: a fresh tool-free Copilot CLI
 worker with `--model` set to the planned phaseModels entry, recording the model
-the CLI reports. Two requests on disjoint batches can run in parallel.
+the CLI reports. Two requests on disjoint batches can run in parallel;
+`audit_inputs.mjs run-pending` runs every unsubmitted request. Never hand a
+request or its path to a task/agent subagent: the auditor has no tools.
 
 ## When a step fails
 

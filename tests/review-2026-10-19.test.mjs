@@ -10,7 +10,7 @@ import { approve, runStage, translate } from '../lib/pipeline.mjs';
 import { contextHash, safePath, writeJSON, readJSON, atomicWrite, done, loadConfig, operationalConfigKeys } from '../lib/core.mjs';
 import { createCopilotAdapter, copilotArgs, readUsageFile, sessionName, sessionNameLimit } from '../scripts/copilot_adapter.mjs';
 import { waitForProgress } from '../scripts/run_migration.mjs';
-import { freezeAudit, runAudit } from '../scripts/audit_inputs.mjs';
+import { freezeAudit, runAudit, runPendingAudits } from '../scripts/audit_inputs.mjs';
 import { diagnoseBuild, makeRepairQueue } from '../scripts/diagnostic_queue.mjs';
 import { decide } from '../scripts/migration_hook.mjs';
 
@@ -102,6 +102,30 @@ test('preparation audits run as tool-free CLI workers on the planned model and r
   await assert.rejects(runAudit(f.root, f.config, adapter, { directory: frozen.directory }), /already submitted/);
   assert.ok(copilotArgs('preparation-auditor', 'm').join(' ').includes('--deny-tool read,write,shell'));
   assert.match(decide({ toolName: 'view', toolArgs: { path: 'src/a.py' } }, 'preparation-auditor'), /no tools/);
+});
+
+test('run-pending audits every unsubmitted request, keeps going past a failure and skips submitted ones', async t => {
+  const f = prepare(t);
+  f.config.phaseModels = { inventoryAudit: 'audit-model' }; persist(f);
+  const files = ['migration/RULEBOOK.md', 'migration/inventory.tsv'];
+  const [a, b, c] = [1, 2, 3].map(() => freezeAudit(f.root, f.config, { type: 'inventory', files }).directory);
+  const answer = args => {
+    const request = JSON.parse(args.reviewInput);
+    return { result: { schemaVersion: 1, kind: 'preparation-audit', task: request.task, inputHash: request.inputHash, target: args.unit.target, verdict: 'pass', findings: [] }, observedModel: 'audit-model' };
+  };
+  await runAudit(f.root, f.config, async args => answer(args), { directory: a });
+  const seen = [];
+  const first = await runPendingAudits(f.root, f.config, async args => {
+    seen.push(args.unit.target);
+    if (args.unit.target.startsWith(b)) throw new Error('worker failed');
+    return answer(args);
+  });
+  assert.deepEqual(seen.sort(), [`${b}/request.json`, `${c}/request.json`].sort());
+  assert.equal(first.pending, 2); assert.equal(first.completed, 1); assert.equal(first.failed, 1);
+  assert.match(first.outcomes.find(o => o.directory === b).error, /worker failed/);
+  const second = await runPendingAudits(f.root, f.config, async args => answer(args));
+  assert.equal(second.pending, 1); assert.equal(second.outcomes[0].directory, b); assert.equal(second.outcomes[0].verdict, 'pass');
+  assert.equal((await runPendingAudits(f.root, f.config, async args => answer(args))).pending, 0);
 });
 
 test('a failed parity run becomes a reviewed repair queue; an original-suite failure never does', async t => {

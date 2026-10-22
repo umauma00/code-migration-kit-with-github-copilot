@@ -1,5 +1,13 @@
 # Unreleased (0.3.0)
 
+- 2026-10-22 preparation audits no longer stall on a host subagent. The
+  auditor profiles now set `disable-model-invocation: true`, and the
+  orchestrator, prompts 00b/01/02, skills and docs name `audit_inputs.mjs run`
+  as the only way to start one: a tool-free auditor reached through the task
+  tool got a path it cannot open, or a retyped body that breaks the hash
+  binding. New `audit_inputs.mjs run-pending` runs every request without
+  result.json, config.concurrency at a time, and reports each outcome. The
+  profile change invalidates unsubmitted requests; freeze them again.
 - 2026-10-21 Windows: a Copilot CLI installed with `npm install -g
   @github/copilot` now starts. Node cannot run the `copilot.cmd` shim without a
   shell, so workers, doctor and `models list` run the bundled

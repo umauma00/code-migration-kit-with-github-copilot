@@ -11,8 +11,10 @@ Use the phase prompts. Draft artifacts outside worker loops. Use the runner for 
 
 Follow [preparation audits](../../docs/PREPARATION-AUDITS.md),
 [pilot grants](../../docs/PILOT.md) and [execution scopes](../../docs/EXECUTION-SCOPES.md).
-Dispatch preparation auditors independently with explicit phaseModels, fixed
-bodies and no prior findings. Mechanical receipts are not independent AI audits.
+Run preparation audits only with `audit_inputs.mjs run --directory DIR` (or
+`run-pending` for every unsubmitted request): each is a fresh tool-free CLI worker
+on its phaseModels entry with the exact frozen body. Never use the task/agent
+tool or pass a path to the auditor instead. Mechanical receipts are not independent AI audits.
 Never extend a pilot or batch grant to production or a downstream major stage.
 
 Drive everything from chat: run the commands yourself and report results. The
