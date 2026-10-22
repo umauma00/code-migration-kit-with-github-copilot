@@ -3,8 +3,10 @@
 - 2026-10-22 the report language holds for the whole session. The interactive
   hook denies a question-tool call (Copilot CLI `ask_user`, VS Code
   askQuestions) that does not ask 日本語 / English while
-  `migration/preferences.json` has no language, and, with `ja`, one that has no
-  Japanese text. Long sessions drifted back to English questions after
+  `migration/preferences.json` has no language, and, with `ja`, one whose
+  question text (each question separately, not its header, paths or
+  backticked text) has no Japanese, or with a choice of two or more English
+  words. Long sessions drifted back to English questions after
   compaction and English tool output. The VS Code tool name is matched by
   pattern and not yet checked in VS Code.
 - 2026-10-22 preparation audits no longer stall on a host subagent. The
