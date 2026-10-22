@@ -145,6 +145,11 @@ test('questions ask the report language first, then stay in Japanese when ja is 
     assert.equal(mixed.decision, 'deny'); assert.match(mixed.reason, /Which module next/); assert.doesNotMatch(mixed.reason, /続けますか/);
     assert.equal(ask({ question: 'Should we migrate src/売上集計.java next?' }).decision, 'deny');
     assert.equal(ask({ question: '売上集計.java を次に移行しますか？' }), null);
+    // Paths and slashes joined to Japanese prose without spaces keep the prose.
+    for (const question of ['Java/Goのどちらに移行しますか？', 'src/売上集計.javaを次に移行しますか？', '次にsrc/main.pyを移行しますか？',
+      'JavaとGoのどちらに移行しますか？', '`src/売上集計.java`を次に移行しますか？', '続行？', 'src/a.py 移行？']) assert.equal(ask({ question }), null, question);
+    for (const question of ['Should we migrate 売上集計.java next?', 'Migrate src\\売上\\集計.java now?', 'Proceed with 移行?'])
+      assert.equal(ask({ question }).decision, 'deny', question);
     // Choices are checked separately; single names and `quoted` text pass.
     assert.match(ask({ question: '次に何をしますか？', choices: ['blocked を維持', 'Keep everything blocked'] }).reason, /Keep everything blocked/);
     assert.equal(ask({ question: '移行先の言語は？', choices: ['Java', 'Go', '`Spring Boot` を使う'] }), null);

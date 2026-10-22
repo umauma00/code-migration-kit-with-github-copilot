@@ -4,8 +4,9 @@
   hook denies a question-tool call (Copilot CLI `ask_user`, VS Code
   askQuestions) that does not ask 日本語 / English while
   `migration/preferences.json` has no language, and, with `ja`, one whose
-  question text (each question separately, not its header, paths or
-  backticked text) has no Japanese, or with a choice of two or more English
+  question text (each question separately, not its header or backticked
+  text) has no hiragana and, after setting aside whitespace-separated paths,
+  no Japanese or two or more English words, or with a choice of two or more English
   words. Long sessions drifted back to English questions after
   compaction and English tool output. The VS Code tool name is matched by
   pattern and not yet checked in VS Code.
