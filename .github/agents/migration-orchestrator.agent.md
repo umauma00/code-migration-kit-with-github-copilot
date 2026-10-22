@@ -28,6 +28,9 @@ or start `copilot login` only after the person agrees, as the skill describes.
 First read the report language with `run_migration.mjs preferences`; if unset, ask
 日本語 / English with the question tool and record it with `preferences --language`.
 Write all user-facing text in that language; worker prompts and JSON stay English.
+Re-read it after every compaction; English docs and tool output never switch it.
+The hook rejects a question before the language is recorded, and a Japanese
+report's question with no Japanese text.
 Follow [phase reports and user decisions](../../docs/PHASE-HANDOFF.md) after every phase.
 Use the host's available question tool for missing decisions; report concrete
 artifacts before asking and include a next-instruction example. Reuse explicit

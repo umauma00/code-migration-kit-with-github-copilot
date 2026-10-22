@@ -123,6 +123,25 @@ test('recording a model choice asks the person; listing does not', () => {
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
 
+test('questions ask the report language first, then stay in Japanese when ja is recorded', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'language-gate-'));
+  const ask = toolArgs => interactiveDecision({ toolName: 'ask_user', toolArgs, cwd: root });
+  try {
+    fs.mkdirSync(path.join(root, 'migration'));
+    fs.writeFileSync(path.join(root, 'migration/config.json'), '{}');
+    assert.equal(ask({ question: 'Which target language?', choices: ['Java', 'Go'] }).decision, 'deny');
+    assert.match(ask({ question: 'Which target language?' }).reason, /preferences --language/);
+    assert.equal(ask({ question: 'Report language / 報告言語', choices: ['日本語 (ja)', 'English (en)'] }), null);
+    fs.writeFileSync(path.join(root, 'migration/preferences.json'), JSON.stringify({ schemaVersion: 1, userLanguage: 'ja' }));
+    const english = ask({ question: 'How should Phase 01 proceed?', choices: ['Keep blocked', 'Specify another path'] });
+    assert.equal(english.decision, 'deny'); assert.match(english.reason, /日本語/);
+    assert.equal(ask({ question: 'Phase 01 をどう進めますか？', choices: ['blocked を維持', '`audit_inputs.mjs run` で実行'] }), null);
+    assert.equal(interactiveDecision({ toolName: 'vscode/askQuestions', toolArgs: { questions: [{ question: 'Proceed?' }] }, cwd: root }).decision, 'deny');
+    fs.writeFileSync(path.join(root, 'migration/preferences.json'), JSON.stringify({ schemaVersion: 1, userLanguage: 'en' }));
+    assert.equal(ask({ question: 'How should Phase 01 proceed?' }), null);
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
 test('a surveyor set to its model default does not run with the implementer\'s effort', async t => {
   const f = await ready(t);
   const models = await listAvailableModels({ command: process.execPath, prefixArgs: [fakeCli(t)] });

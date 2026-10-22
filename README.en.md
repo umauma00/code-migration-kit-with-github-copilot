@@ -88,7 +88,7 @@ node migration-kit/scripts/run_migration.mjs models set --role reviewers --model
 
 `--models implementer=ID,reviewers=ID,arbiter=ID,fixer=ID` still sets per-role models (unlisted roles use `--model`). As in the upstream model plan, choose by blast radius: reviewers on the largest or a mid model, high-volume implementers on a mid or small model, fixers and the arbiter on a mid model.
 
-`--language ja|en` sets the language of phase reports, questions and `status --format markdown`. It is stored in `migration/preferences.json` and never affects approvals or completion. If omitted, the skill asks Japanese or English at the start. Change it later with `run_migration.mjs preferences --language ja`.
+`--language ja|en` sets the language of phase reports, questions and `status --format markdown`. It is stored in `migration/preferences.json` and never affects approvals or completion. If omitted, the skill asks Japanese or English at the start. Change it later with `run_migration.mjs preferences --language ja`. Until it is set, the hook denies any other question; with `ja` it denies a question (`ask_user` and the like) that has no Japanese text, so long sessions do not drift back to English questions.
 
 Scripts and documents go to `migration-kit/` in the target, and the Copilot entry points to `.github/`. A managed block is appended to existing Copilot instructions. Existing files with different content are never overwritten (the installer stops), and an existing `migration/config.json` is kept. Re-running with the same content changes nothing.
 
