@@ -184,7 +184,8 @@ export async function waitForProgress(root, seconds, { intervalMs = 5000 } = {})
 }
 export async function main(argv = process.argv.slice(2)) {
   const args = parseArgs(argv), cmd = args._[0];
-  if (!cmd || cmd === 'help') { console.log(usage); return; }
+  // Agents probe `COMMAND --help` before acting; answer with the usage, never run the command.
+  if (!cmd || cmd === 'help' || args.help) { console.log(usage); return; }
   const root = fs.realpathSync(path.resolve(args.root ?? '.'));
   if (cmd === 'unlock') {
     const file = safePath(root, 'migration/run.lock'), lock = readJSON(file), pid = Number(args.pid);

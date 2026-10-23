@@ -155,3 +155,14 @@ test('Astra F3: published translate and queue commands reach the real phase gate
     assert.doesNotMatch(response.stderr, /Missing value/);
   }
 });
+
+test('COMMAND --help prints the usage instead of failing with Missing value for --help', async t => {
+  const f = prepare(t);
+  const runner = path.join(kitRoot, 'scripts/run_migration.mjs');
+  for (const argv of [['phase', '--help'], ['--help'], ['status', '-h']]) {
+    const response = await runProcess(process.execPath, [runner, ...argv], { cwd: f.root, timeoutMs: 20000 });
+    assert.equal(response.code, 0, response.stderr);
+    assert.match(response.stdout, /^Usage: /);
+    assert.doesNotMatch(response.stderr, /Missing value/);
+  }
+});
