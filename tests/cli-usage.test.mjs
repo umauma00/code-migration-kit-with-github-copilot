@@ -9,6 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { kitRoot } from '../scripts/install.mjs';
 import { usage } from '../scripts/run_migration.mjs';
+import { humanGate } from '../lib/guardrails.mjs';
 import { specs, parseCommandLine, allOptions, resolve } from '../lib/cli.mjs';
 
 // Records of past runs and reviews quote commands as they were then.
@@ -212,4 +213,20 @@ test('the runner rejects unknown options, stray words and missing actions with t
   assert.deepEqual(parseCommandLine(['phase', 'complete', '01', '--confirm-no-dependencies', '--note', 'ok'], runner),
     { _: ['phase', 'complete', '01'], 'confirm-no-dependencies': true, note: 'ok' });
   assert.equal(parseCommandLine(['phase', '--help'], runner).help, true);
+});
+
+test('a help request is never a human gate, and a value option still takes -h as its value', () => {
+  const r = 'node migration-kit/scripts/run_migration.mjs';
+  for (const command of [`${r} models set --help`, `${r} phase complete -h`, `${r} build-loop --help`, `${r} approve translation --note x --help`])
+    assert.equal(humanGate(command), null, command);
+  // Only the help segment is exempt; the next command of the line is still a gate.
+  assert.equal(humanGate(`${r} models set --help && ${r} models set --role all --model m`), 'models set');
+  assert.equal(humanGate(`${r} phase complete 03 --note -h`), 'phase complete 03');
+  assert.deepEqual(parseCommandLine(['phase', 'complete', '03', '--note', '-h'], specs.run_migration), { _: ['phase', 'complete', '03'], note: '-h' });
+});
+
+test('a phase list may have spaces after its commas, as phase complete reads it', () => {
+  assert.deepEqual(parseCommandLine(['phase', 'complete', '00, 00b', '--note', 'ok'], specs.run_migration)._, ['phase', 'complete', '00, 00b']);
+  assert.doesNotThrow(() => parseCommandLine(['phase', 'complete', '00,00b,01', '--note', 'ok'], specs.run_migration));
+  assert.throws(() => parseCommandLine(['phase', 'complete', '00, 0x', '--note', 'ok'], specs.run_migration), /must be one of .*not 0x/);
 });
