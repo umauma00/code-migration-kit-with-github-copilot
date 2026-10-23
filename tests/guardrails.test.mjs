@@ -46,6 +46,30 @@ test('guardrails apply to interactive sessions only when the human installed the
   assert.match(guardrailDecision(event), /invalid/);
 });
 
+test('guardrails replay keystrokes typed into a running shell (write_bash, and write_powershell on Windows)', t => {
+  const f = prepare(t);
+  writeJSON(safePath(f.root, 'migration/guardrails.json'), template);
+  const typed = (toolName, input) => guardrailDecision({ toolName, toolArgs: { shellId: '1', input }, cwd: f.root });
+  for (const tool of ['write_bash', 'write_powershell']) {
+    assert.match(typed(tool, 'git push{enter}'), /"git push" is denied/, tool);
+    assert.match(typed(tool, 'echo ok{enter}npm test{enter}'), /"npm test" is denied/, tool);
+    assert.match(typed(tool, 'git pux{backspace}sh{enter}'), /"git push" is denied/, tool);
+    assert.match(typed(tool, 'git ush{left}{left}{left}p{enter}'), /"git push" is denied/, tool);
+    // A raw newline runs the line too; later edits cannot take it back.
+    assert.match(typed(tool, `git push\n${'{backspace}'.repeat(9)}git status{enter}`), /"git push" is denied/, tool);
+    assert.match(typed(tool, 'git push\r\n'), /"git push" is denied/, tool);
+    assert.equal(typed(tool, 'git status{enter}'), null, tool);
+    // What the shell runs is unknown: history, menus, Tab completion, line-editing controls,
+    // edits into earlier text, and text left for a later {enter}.
+    for (const input of [`git status{enter}{up}${'{backspace}'.repeat(6)}push{enter}`, '{down}{down}{enter}', 'git pu\t{enter}', 'git\tstatus\n', '\x15git status{enter}',
+      '\x1b[A{enter}', '{backspace}h{enter}', '{left}x{enter}', 'git pu'])
+      assert.match(typed(tool, input), /cannot be checked/, `${tool} ${JSON.stringify(input)}`);
+  }
+  // Without installed guardrails, keystrokes are not checked.
+  fs.rmSync(safePath(f.root, 'migration/guardrails.json'));
+  assert.equal(typed('write_powershell', '{up}{enter}'), null);
+});
+
 test('the installed hook denies guarded commands in Copilot CLI and VS Code Local payloads', t => {
   const f = prepare(t), hook = safePath(f.root, 'migration-kit/scripts/migration_hook.mjs');
   writeJSON(safePath(f.root, 'migration/guardrails.json'), template);
