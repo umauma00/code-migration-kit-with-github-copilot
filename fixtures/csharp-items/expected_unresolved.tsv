@@ -1,0 +1,8 @@
+file	reference	reason
+DebugOnly.cs	(whole file)	compiled by Items.csproj only under a Condition that is not evaluated; its declarations are kept
+Excluded.cs	(whole file)	not compiled by Items.csproj; its declarations are ignored
+Sdk/Gone.cs	(whole file)	not compiled by Sdk/Sdk.csproj; its declarations are ignored
+Sdk/Maybe.cs	(whole file)	compiled by Sdk/Sdk.csproj only under a Condition that is not evaluated; its declarations are kept
+Sdk/Maybe2.cs	(whole file)	compiled by Sdk/Sdk.csproj only under a Condition that is not evaluated; its declarations are kept
+Sdk/Maybe3.cs	(whole file)	compiled by Sdk/Sdk.csproj only under a Condition that is not evaluated; its declarations are kept
+Sdk/Old/Older.cs	(whole file)	not compiled by Sdk/Sdk.csproj; its declarations are ignored

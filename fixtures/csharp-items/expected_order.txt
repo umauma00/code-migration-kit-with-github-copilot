@@ -1,0 +1,12 @@
+# migration order: one batch per line, dependencies first
+DebugOnly.cs
+Excluded.cs
+Target.cs
+Main.cs
+Sdk/Gone.cs
+Sdk/Keep.cs
+Sdk/Maybe.cs
+Sdk/Maybe2.cs
+Sdk/Maybe3.cs
+Sdk/Old/Older.cs
+Sdk/Use.cs

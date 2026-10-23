@@ -89,8 +89,8 @@ def scan(rel, text):
                 if t == "record" and (i + 2 >= len(toks) or toks[i + 2] not in {"(", "<"}):
                     continue  # "record" used as an identifier
                 info.decls.append((package, name))
-    info.names = chains(body, KEYWORDS)
-    info.type_members, info.type_bases, info.flow = flow_c_like(toks, KEYWORDS, "java", package)
+    info.names = [(package, name) for name in chains(body, KEYWORDS)]
+    info.type_members, info.type_bases, info.flow, info.type_ns = flow_c_like(toks, KEYWORDS, "java", package)
     for m in REFLECTION_RE.finditer(body):
         arg = (m.group(1) or "").strip()
         if not arg.startswith('""'):

@@ -28,6 +28,10 @@ several files maps to the one its PSR-4/PSR-0 path or classmap names, and a
 class no file is seen declaring maps to the file at its PSR-4/PSR-0 path.
 --include-path DIR,DIR gives PHP's include_path: a relative include is
 looked up there first, then next to the including file, then at --root.
+An explicit ./x or ../x path is relative to the working directory, which
+the source does not show: it is looked up next to the including file and at
+--root only (never in include_path); when those give two different files,
+both become edges and the include is listed in unresolved.tsv.
 
 Known limits, listed in unresolved.tsv where the source shows them:
   - include/require of a computed path ($dir . $name) and `new $class`,
@@ -294,6 +298,17 @@ def resolve_include(src, parts, info, by_rel, by_tail, include_path=()):
     if not pieces:
         return None, "include path computed at run time"
     path = "".join(pieces)
+    if base is None and not unknown_prefix and path.replace("\\", "/").startswith(("./", "../")):
+        # PHP resolves ./x and ../x against the working directory only, never
+        # include_path. The working directory is not in the source: the
+        # including file's directory and --root are the usual ones.
+        cand = sorted({c for c in (posixpath.normpath(posixpath.join(posixpath.dirname(src), path)),
+                                   posixpath.normpath(path)) if c in by_rel})
+        if len(cand) == 1:
+            return cand, None
+        if cand:
+            return cand, "explicit relative include depends on the working directory; edges to every candidate"
+        return None, "explicit relative include depends on the working directory; no candidate found"
     if base is not None:
         cand = [posixpath.normpath(posixpath.join(base, path.lstrip("/") if path.startswith("/") else path))]
     elif unknown_prefix:
@@ -370,7 +385,7 @@ def mapper(root, warnings, args):
             hit, why = resolve_include(src, parts, info, by_rel, by_tail, include_path)
             if hit:
                 add(hit)
-            else:
+            if why:     # unresolved, or resolved to several candidates
                 expr = " ".join("'" + info.strings[int(p[1:-1])] + "'" if p.startswith(STR) else p for p in parts)
                 unresolved.add((src, f"include {expr}", why))
         for ns, name, is_call, uses in info.refs:

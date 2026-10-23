@@ -1,0 +1,16 @@
+# migration order: one batch per line, dependencies first
+DebugOnly.vb
+Excluded.vb
+Target.vb
+Main.vb
+Scopes/A.vb
+Scopes/B.vb
+Scopes/Main.vb
+Scopes/Real.vb
+Scopes/Rooted.vb
+Scopes/Shadow.vb
+Sdk/Gone.vb
+Sdk/Keep.vb
+Sdk/Maybe.vb
+Sdk/Old/Older.vb
+Sdk/Use.vb

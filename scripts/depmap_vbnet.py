@@ -24,9 +24,14 @@ types (scripts/depmap_typed.py, type flow): `Dim x = F()` then `x.M().N()`
 reaches F's return type, M's and N's, through Inherits/Implements too;
 parameters, Dim ... As, For Each variables and List(Of T) elements count.
 
+Each name is resolved from the Namespace block it is written in; Global.X
+names from the root namespace only.
+
 .vbproj files are read like .csproj ones: ProjectReference narrows names
 declared in several projects; files a project does not compile declare
-nothing and are listed in unresolved.tsv.
+nothing and are listed in unresolved.tsv (a file left out only under a
+Condition keeps its declarations and is listed too). <Import Include>
+applies to the files of its own project.
 
 Known limits, listed in unresolved.tsv where the source shows them:
   - With blocks, lambdas, late binding on Object and overload resolution
@@ -54,7 +59,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # -I drops the script dir
 from depmap_common import find_files, read_source, run  # noqa: E402
 from depmap_projects import dotnet_projects, drop_not_compiled  # noqa: E402
-from depmap_typed import PREDEFINED, TOKEN_RE, FileInfo, chains, is_ident, join, members, parse_expr, resolve  # noqa: E402
+from depmap_typed import GLOBAL, PREDEFINED, TOKEN_RE, FileInfo, chains, is_ident, join, members, parse_expr, resolve  # noqa: E402
 
 EXTS = {".vb"}
 SKIP_DIRS = {"bin", "obj", "packages", "my project"}
@@ -143,6 +148,8 @@ def vb_type(text):
     if not m:
         return []
     head = m.group(1).replace("[", "").replace("]", "")
+    if head.startswith("global."):      # Global.Ns.Foo: from the root namespace
+        head = GLOBAL + head[len("global."):]
     chains = [] if head in PREDEFINED or head in KEYWORDS else [(head, False)]
     for arg in re.findall(r"[a-z_][\w.]*", m.group(2) or ""):
         if arg not in KEYWORDS and arg not in PREDEFINED and arg != "of":
@@ -181,7 +188,7 @@ def scan(rel, text, root_ns=""):
         for name, typ in PARAM_RE.findall(low[low.find("("):] if "(" in low else ""):
             chains = vb_type(typ)
             if chains:
-                info.flow.append(("bind", name, enclosing(), [], chains, False))
+                info.flow.append(("bind", name, enclosing(), [], chains, False, ns()))
 
     def body_line(low):
         m = DIM_RE.match(low)
@@ -190,12 +197,12 @@ def scan(rel, text, root_ns=""):
             chains = vb_type(typ) if typ else []
             expr = vb_expr(value) if value else None
             if chains or expr:
-                info.flow.append(("bind", name, enclosing(), [expr] if expr else [], chains, False))
+                info.flow.append(("bind", name, enclosing(), [expr] if expr else [], chains, False, ns()))
         m = FOREACH_RE.match(low)
         if m:
             name, typ, value = m.group(1), m.group(2), m.group(3)
             expr = vb_expr(value)
-            info.flow.append(("bind", name, enclosing(), [expr] if expr else [], vb_type(typ) if typ else [], True))
+            info.flow.append(("bind", name, enclosing(), [expr] if expr else [], vb_type(typ) if typ else [], True, ns()))
         toks = TOKEN_RE.findall(low)
         for i, t in enumerate(toks):
             if i and toks[i - 1] == ".":
@@ -203,7 +210,7 @@ def scan(rel, text, root_ns=""):
             if t in {"new", "me", "mybase"} or (is_ident(t) and t not in KEYWORDS):
                 parsed = parse_expr(toks, i, KEYWORDS)
                 if parsed and (parsed[0][2] or parsed[0][0] == "new"):
-                    info.flow.append(("use", enclosing(), parsed[0]))
+                    info.flow.append(("use", enclosing(), parsed[0], ns()))
 
     for idx, line in enumerate(lines):
         low = line.lower()
@@ -212,7 +219,7 @@ def scan(rel, text, root_ns=""):
                 member = None
             else:
                 body_line(low)
-            body.append(line)
+            body.append((ns(), line))
             continue
         m = IMPORTS_RE.match(low)
         if m:
@@ -228,7 +235,7 @@ def scan(rel, text, root_ns=""):
             while stack:
                 if stack.pop()[0] == kind:
                     break
-            body.append(line)
+            body.append((ns(), line))
             continue
         m = BLOCK_RE.match(low)
         if m:
@@ -243,13 +250,14 @@ def scan(rel, text, root_ns=""):
                 info.partial.add(f"{ns()}.{name}" if ns() else name)
             stack.append((kind, name))
             info.type_members.setdefault(join(ns(), name), {})
-            body.append(line[m.end(2):])
+            info.type_ns.setdefault(join(ns(), name), ns())
+            body.append((ns(), line[m.end(2):]))
             continue
         m = DELEGATE_RE.match(low)
         if m:
             info.namespaces.add(ns())
             info.decls.append((ns(), m.group(1).replace("[", "").replace("]", "")))
-            body.append(line[m.end(1):])
+            body.append((ns(), line[m.end(1):]))
             continue
         in_type = stack and stack[-1][0] in {"class", "module", "structure", "interface"}
         if in_type:
@@ -258,7 +266,7 @@ def scan(rel, text, root_ns=""):
             if m:
                 for base in m.group(2).split(","):
                     info.type_bases.setdefault(owner, []).extend(c for c, elem in vb_type(base) if not elem)
-                body.append(line)
+                body.append((ns(), line))
                 continue
             m = MEMBER_RE.match(low)
             declared = m and (m.group(1) or re.match(r"^\s*(?:<[^>]*>\s*)?(?:public|friend|private|protected|const|dim|shared|readonly)\b", low))
@@ -286,11 +294,12 @@ def scan(rel, text, root_ns=""):
                 elif not kind:
                     # A field initializer: Private _x As New Foo(), Dim y = Bar.Create()
                     body_line(low)
-        body.append(line)
+        body.append((ns(), line))
     if not info.namespaces:
         info.namespaces.add(root_ns)
-    code = "\n".join(body).lower()
-    info.names = chains(code, KEYWORDS)
+    code = "\n".join(line for _, line in body).lower()
+    # Each name is resolved from the namespace block it is written in.
+    info.names = [(ctx, name) for ctx, line in body for name in chains(line.lower(), KEYWORDS, fold=True)]
     info.members = members(code)
     for m in REFLECTION_RE.finditer(code):
         arg = (m.group(2) or "").strip()
@@ -301,20 +310,22 @@ def scan(rel, text, root_ns=""):
 
 def mapper(root, warnings, args):
     files = find_files(root, EXTS, SKIP_DIRS)
-    rels, infos, global_imports, root_ns = [], [], set(), {}
+    rels, infos, root_ns = [], [], {}
     for proj in find_files(root, {".vbproj"}, SKIP_DIRS):
-        text = read_source(proj, warnings)
-        global_imports.update(VBPROJ_IMPORT_RE.findall(text))
-        m = ROOT_NS_RE.search(text)
+        m = ROOT_NS_RE.search(read_source(proj, warnings))
         root_ns.setdefault(proj.parent, (m.group(1).strip() if m else proj.stem).lower())
     for path in files:
         rel = path.relative_to(root).as_posix()
         project = next((root_ns[d] for d in path.parents if d in root_ns), "")
         infos.append(scan(rel, read_source(path, warnings), project))
         rels.append(rel)
-    visible_files, not_compiled = dotnet_projects(root, rels, ".vbproj", warnings)
+    visible_files, not_compiled, owner, texts = dotnet_projects(root, rels, ".vbproj", warnings)
+    # Project-level <Import Include> applies to the files of its project only.
+    for info in infos:
+        text = texts.get(owner[info.rel], "")
+        info.usings.update(name.lower() for name in VBPROJ_IMPORT_RE.findall(text))
     skipped = drop_not_compiled(infos, not_compiled)
-    edges, unresolved = resolve(infos, fold=True, global_usings=global_imports, visible_files=visible_files)
+    edges, unresolved = resolve(infos, fold=True, visible_files=visible_files)
     return rels, edges, unresolved | skipped
 
 

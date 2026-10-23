@@ -1,0 +1,6 @@
+file	reference	reason
+DebugOnly.vb	(whole file)	compiled by Items.vbproj only under a Condition that is not evaluated; its declarations are kept
+Excluded.vb	(whole file)	not compiled by Items.vbproj; its declarations are ignored
+Sdk/Gone.vb	(whole file)	not compiled by Sdk/Sdk.vbproj; its declarations are ignored
+Sdk/Maybe.vb	(whole file)	compiled by Sdk/Sdk.vbproj only under a Condition that is not evaluated; its declarations are kept
+Sdk/Old/Older.vb	(whole file)	not compiled by Sdk/Sdk.vbproj; its declarations are ignored

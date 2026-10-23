@@ -331,7 +331,11 @@ test('C#, Java, PHP, VB.NET and COBOL dependency fixtures produce their expected
   // [mapper, fixture, prefix of the expected files, extra options]
   const cases = [['csharp', 'csharp'], ['java', 'java'], ['php', 'php'], ['vbnet', 'vbnet'], ['cobol', 'cobol'],
     ['csharp', 'csharp-projects'], ['java', 'java-modules'], ['php', 'php-composer', 'expected_', ['--include-path', 'lib/inc']],
-    ['cobol', 'cobol', 'expected_copy_path_', ['--copy-path', 'SHARED,copy']]];
+    ['cobol', 'cobol', 'expected_copy_path_', ['--copy-path', 'SHARED,copy']],
+    // Review regressions: per-namespace scope, global::, global using aliases,
+    // MSBuild item lists and conditions, ./ includes versus include_path.
+    ['csharp', 'csharp-scopes'], ['csharp', 'csharp-items'], ['vbnet', 'vbnet-items'],
+    ['php', 'php-relative', 'expected_', ['--include-path', 'lib']]];
   for (const [lang, name, prefix = 'expected_', options = []] of cases) {
     const out = path.join(root, `${name}-${prefix}`), fixture = path.join(kitRoot, 'fixtures', name);
     // -I: the mapper must find its shared modules without the script directory on sys.path.
@@ -339,6 +343,24 @@ test('C#, Java, PHP, VB.NET and COBOL dependency fixtures produce their expected
     assert.equal(r.code, 0, r.stderr);
     for (const file of ['edges.tsv', 'order.txt', 'cycles.txt', 'unresolved.tsv'])
       assert.equal(fs.readFileSync(path.join(out, file), 'utf8'), fs.readFileSync(path.join(fixture, `${prefix}${file}`), 'utf8'), `${name} ${prefix}${file}`);
+  }
+});
+
+test('typed-language mappers give the same output under every hash seed', async t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'copilot-depmap-seed-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  // Set iteration order follows PYTHONHASHSEED; the output must not. (No -I:
+  // it would ignore PYTHONHASHSEED.)
+  for (const [lang, name] of [['csharp', 'csharp-scopes'], ['vbnet', 'vbnet-items'], ['csharp', 'csharp']]) {
+    const fixture = path.join(kitRoot, 'fixtures', name);
+    for (const seed of ['0', '1', '2', '3']) {
+      const out = path.join(root, `${name}-${seed}`);
+      const r = await runProcess(python, [path.join(kitRoot, `scripts/depmap_${lang}.py`), '--root', fixture, '--out', out],
+        { env: { ...process.env, PYTHONHASHSEED: seed } });
+      assert.equal(r.code, 0, r.stderr);
+      for (const file of ['edges.tsv', 'order.txt', 'unresolved.tsv'])
+        assert.equal(fs.readFileSync(path.join(out, file), 'utf8'), fs.readFileSync(path.join(fixture, `expected_${file}`), 'utf8'), `${name} seed ${seed} ${file}`);
+    }
   }
 });
 

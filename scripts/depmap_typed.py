@@ -30,26 +30,49 @@ class FileInfo:
         self.extensions = []        # (namespace, name) of members called as x.Name (C# extension methods, VB module members)
         self.partial = set()        # FQNs declared partial in this file
         self.usings = set()         # imported namespaces (or types: Java on-demand of a type)
+        self.scoped_usings = set()  # (namespace, imported namespace): C# using inside a namespace block
         self.aliases = {}           # alias -> dotted target
         self.direct = set()         # dotted targets imported one by one (Java import a.B, C# using static)
-        self.names = []             # dotted name chains mentioned in code
+        self.names = []             # (namespace written in, dotted name chain) mentioned in code
         self.members = set()        # names written after "." (x.Name)
         self.strings = []           # string literal contents (reflection lookups)
         self.dynamic = []           # (reference, reason) the mapper could not resolve statically
         self.type_members = {}      # type fqn -> {member: [(type chain, is_element)]}
         self.type_bases = {}        # type fqn -> [base type chain]
+        self.type_ns = {}           # type fqn -> namespace its declaration is written in
         self.flow = []              # bindings and member chains (see flow_c_like)
 
 
+GLOBAL = "global::"     # a name qualified from the root namespace (C# global::, VB Global.)
+
+
 def dotted(name, fold):
+    """A written name as a dotted chain; a root-qualified name keeps the
+    GLOBAL prefix so that it is resolved from the root only."""
     name = name.replace(" ", "").replace("\t", "").replace("\n", "").replace("\r", "")
-    if name.startswith("global::"):
-        name = name[len("global::"):]
+    root = name.startswith(GLOBAL)
+    if root:
+        name = name[len(GLOBAL):]
     name = name.replace("::", ".")
     if name.startswith("@"):
         name = name[1:]
     name = ".".join(part.lstrip("@") for part in name.split("."))
-    return name.lower() if fold else name
+    name = name.lower() if fold else name
+    if not root and name.lower().startswith("global.") and fold:    # VB Global.X
+        root, name = True, name[len("global."):]
+    return GLOBAL + name if root else name
+
+
+def rooted(segs):
+    """(segments without the GLOBAL marker, whether the name was root-qualified)."""
+    if segs and segs[0].startswith(GLOBAL):
+        return [segs[0][len(GLOBAL):]] + list(segs[1:]), True
+    return list(segs), False
+
+
+def in_scope(ctx, ns):
+    """Whether a directive written inside namespace ns applies at ctx."""
+    return not ns or ctx == ns or ctx.startswith(ns + ".")
 
 
 def prefixes(ns):
@@ -66,6 +89,9 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
             nested_lookup=True, visible_files=None):
     """Return (edges, unresolved) for the FileInfo list.
 
+    Every reference carries the namespace it is written in, and is looked up
+    from there: a file with two namespace blocks resolves each block's names
+    from its own block.
     nested_lookup: C# and VB.NET see the types of every enclosing namespace
     (code in a.b.c sees a.b and a) and accept names qualified relative to
     them; Java sees only its own package and fully qualified names.
@@ -93,28 +119,34 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
     def lookup(fqn):
         return types.get(fqn, ())
 
-    class Scope:
-        """Name lookup as seen from one file."""
+    def longest(segs):
+        for i in range(len(segs), 0, -1):
+            fq = ".".join(segs[:i])
+            if fq in types:
+                return fq
+        return None
 
-        def __init__(self, info):
+    class Scope:
+        """Name lookup as seen from one namespace of one file."""
+
+        def __init__(self, info, ctx):
             self.info = info
-            own = set(info.namespaces) or {""}
-            self.enclosing = set()
-            for ns in own:
-                self.enclosing.update(prefixes(ns) if nested_lookup else [ns])
-            self.usings = set(info.usings) | global_usings
-            self.visible = self.enclosing | {u for u in self.usings if u in namespaces}
+            # Innermost first: prefixes() lists a namespace before its parents.
+            self.inner_first = prefixes(ctx) if nested_lookup else [ctx]
+            self.enclosing = set(self.inner_first)
+            self.usings = set(info.usings) | global_usings | {
+                u for ns, u in info.scoped_usings if in_scope(ctx, ns)}
             self.imported = sorted(u for u in self.usings if u in namespaces)
-            self.inner_first = sorted(self.enclosing, key=len, reverse=True)
+            self.visible = self.enclosing | set(self.imported)
             self.cache, self.mention_cache = {}, {}
             self.simple = {}    # simple name -> fqns from direct imports and aliases
             for target in sorted(info.direct):
                 segs = target.split(".")
-                fq = self.longest(segs)
+                fq = longest(segs)
                 if fq:
                     self.simple.setdefault(segs[-1], set()).add(fq)
             for alias, target in sorted(info.aliases.items()):
-                fq = self.longest(target.split("."))
+                fq = longest(rooted(target.split("."))[0])
                 if fq:
                     self.simple.setdefault(alias, set()).add(fq)
 
@@ -144,18 +176,18 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
             self.cache[name] = found
             return found
 
-        @staticmethod
-        def longest(segs):
-            for i in range(len(segs), 0, -1):
-                fq = ".".join(segs[:i])
-                if fq in types:
-                    return fq
-            return None
+        def unalias(self, segs):
+            if segs[0] in self.info.aliases:
+                return rooted(self.info.aliases[segs[0]].split(".") + segs[1:])[0]
+            return segs
 
         def exact(self, segs):
             """Types a dotted name denotes as a whole (no member suffix)."""
-            if segs[0] in self.info.aliases:
-                segs = self.info.aliases[segs[0]].split(".") + segs[1:]
+            segs, root = rooted(segs)
+            if root:            # global::A.B: from the root namespace only
+                fq = ".".join(segs)
+                return {fq} if fq in types else set()
+            segs = self.unalias(segs)
             if len(segs) == 1:
                 return self.simple_name(segs[0])
             # Qualified: from the innermost enclosing namespace outward
@@ -178,11 +210,13 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
             return self.mention_cache[chain]
 
         def _mentioned(self, chain):
-            segs = chain.split(".")
-            if segs[0] in self.info.aliases:
-                segs = self.info.aliases[segs[0]].split(".") + segs[1:]
+            segs, root = rooted(chain.split("."))
+            if root:
+                fq = longest(segs)
+                return {fq} if fq else set()
+            segs = self.unalias(segs)
             for ns in self.inner_first if nested_lookup else [""]:
-                fq = self.longest((ns.split(".") if ns else []) + segs)
+                fq = longest((ns.split(".") if ns else []) + segs)
                 if fq:
                     return {fq}
             found = self.exact(segs[:1])
@@ -190,7 +224,14 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
                 found = self.exact([segs[0] + attribute_suffix])
             return found
 
-    scopes = {info.rel: Scope(info) for info in infos}
+    scopes = {}
+
+    def scope_of(info, ctx):
+        key = (info.rel, ctx)
+        if key not in scopes:
+            scopes[key] = Scope(info, ctx)
+        return scopes[key]
+
     edges, unresolved = set(), set()
 
     def add(src, targets):
@@ -210,14 +251,14 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
             files.update(lookup(fq))
         add(src, files)
 
-    # Member tables, resolved lazily in the declaring file's scope.
+    # Member tables, resolved lazily in the scope of the type's declaration.
     member_cache, base_cache = {}, {}
 
     def members_of(fqn):
         if fqn not in member_cache:
             table = {}
             for info in declared_in.get(fqn, ()):
-                scope = scopes[info.rel]
+                scope = scope_of(info, info.type_ns.get(fqn, ""))
                 for name, chains in info.type_members.get(fqn, {}).items():
                     slot = table.setdefault(name, set())
                     for chain, elem in chains:
@@ -230,8 +271,9 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
             base_cache[fqn] = set()
             found = set()
             for info in declared_in.get(fqn, ()):
+                scope = scope_of(info, info.type_ns.get(fqn, ""))
                 for chain in info.type_bases.get(fqn, ()):
-                    found.update(scopes[info.rel].exact(chain.split(".")))
+                    found.update(scope.exact(chain.split(".")))
             base_cache[fqn] = found
         return base_cache[fqn]
 
@@ -293,25 +335,30 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
 
     for info in infos:
         src = info.rel
-        scope = scopes[src]
+        file_scope = scope_of(info, "")
         # Partial parts of one type depend on each other.
         for fqn in info.partial:
             add(src, lookup(fqn))
         for target in sorted(info.direct):
             segs = target.split(".")
-            fq = scope.longest(segs)
+            fq = longest(segs)
             if fq:
                 add(src, lookup(fq))
             elif ".".join(segs[:-1]) in namespaces:
                 unresolved.add((src, target, "import of a type the repository package does not declare"))
-        for u in sorted(scope.usings):
+        usings = set(info.usings) | global_usings | {u for _, u in info.scoped_usings}
+        for u in sorted(usings):
             if lookup(u):  # Java on-demand import of a type's members, C# using of a type
                 add(src, lookup(u))
-        for chain in info.names:
-            add_types(src, scope.mentioned(chain))
-        # x.Name() may call an extension method of any visible namespace.
+        for ctx, chain in info.names:
+            add_types(src, scope_of(info, ctx).mentioned(chain))
+        # x.Name() may call an extension method of any namespace visible
+        # somewhere in the file.
+        visible = set(file_scope.visible)
+        for ctx in info.namespaces:
+            visible |= scope_of(info, ctx).visible
         for name in sorted(info.members):
-            for ns in scope.visible:
+            for ns in sorted(visible):
                 add(src, extensions.get(join(ns, name), ()))
         for text in info.strings:
             name = text.split(",")[0].strip()
@@ -321,8 +368,9 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
         # Types reached through variables and member chains.
         env = {}
         for step in info.flow:
+            scope = scope_of(info, step[-1])
             if step[0] == "bind":
-                _, var, enclosing, exprs, chains, foreach = step
+                _, var, enclosing, exprs, chains, foreach, _ = step
                 bound = set()
                 for chain, elem in chains:
                     bound.update((fq, elem) for fq in scope.exact(chain.split(".")))
@@ -336,7 +384,7 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
                 if bound:
                     env.setdefault(var, set()).update((fq, elem) for fq, elem in bound)
             else:
-                _, enclosing, expr = step
+                _, enclosing, expr, _ = step
                 add_types(src, evaluate(scope, env, enclosing, expr)[1])
         for ref, why in info.dynamic:
             unresolved.add((src, ref, why))
@@ -458,6 +506,11 @@ CHAIN_RE = re.compile(r"(?:global::)?@?[^\W\d]\w*(?:\s*(?:\.|::)\s*@?[^\W\d]\w*)
 
 def chains(code, keywords, fold=False):
     """Dotted name chains in code, minus those headed by a language keyword."""
+    return [name for _, name in chains_at(code, keywords, fold)]
+
+
+def chains_at(code, keywords, fold=False):
+    """(offset, chain) of every dotted name chain chains() reports."""
     out = []
     for m in CHAIN_RE.finditer(code):
         start = m.start()
@@ -471,7 +524,7 @@ def chains(code, keywords, fold=False):
         name = dotted(m.group(0), fold)
         # this.X, base.X, string.Join...: a value or a built-in, not a type.
         if name.split(".")[0] not in keywords:
-            out.append(name)
+            out.append((start, name))
     return out
 
 
@@ -514,12 +567,16 @@ def parse_type(toks, i, keywords):
     if i >= n:
         return None
     t = toks[i]
-    if t in PREDEFINED:
+    root = global_at(toks, i)
+    if root:
+        i += 3
+        t = toks[i]
+    if t in PREDEFINED and not root:
         j, chains = i + 1, []
     else:
         if not is_ident(t) or t in keywords:
             return None
-        segs = [t.lstrip("@")]
+        segs = [(GLOBAL if root else "") + t.lstrip("@")]
         j = i + 1
         while j + 1 < n and toks[j] == "." and is_ident(toks[j + 1]) and toks[j + 1] not in keywords:
             segs.append(toks[j + 1].lstrip("@"))
@@ -557,6 +614,12 @@ def parse_type(toks, i, keywords):
     return chains, j
 
 
+def global_at(toks, i):
+    """Whether toks[i:] starts with C#'s global:: (followed by a name)."""
+    return toks[i] == "global" and i + 3 < len(toks) and toks[i + 1] == ":" and toks[i + 2] == ":" \
+        and is_ident(toks[i + 3])
+
+
 def skip_balanced(toks, i):
     """toks[i] opens ( [ or {; return the index after its closing token."""
     pairs = {"(": ")", "[": "]", "{": "}"}
@@ -588,6 +651,8 @@ def parse_expr(toks, i, keywords):
         if j < n and toks[j] in {"(", "{"}:
             j = skip_balanced(toks, j)
         kind = "new"
+    elif global_at(toks, i):
+        kind, head, j = "name", GLOBAL + toks[i + 3].lstrip("@"), i + 4
     elif t in {"this", "base", "super", "me", "mybase"}:
         kind, head, j = {"me": "this", "mybase": "base", "super": "base"}.get(t, t), "", i + 1
     elif is_ident(t) and t not in keywords:
@@ -632,14 +697,15 @@ def parse_expr(toks, i, keywords):
 def flow_c_like(toks, keywords, language, package=""):
     """Member table, base types and flow statements of one C# or Java file.
 
-    Returns (members, bases, flow):
+    Returns (members, bases, flow, type_ns):
       members: {type fqn: {member: [(chain, is_element)]}}
       bases:   {type fqn: [chain]}
-      flow:    [("bind", var, enclosing, exprs, chains, foreach)
-                | ("use", enclosing, expr)], in source order
+      flow:    [("bind", var, enclosing, exprs, chains, foreach, namespace)
+                | ("use", enclosing, expr, namespace)], in source order
+      type_ns: {type fqn: namespace the type is declared in}
     """
     n = len(toks)
-    members, bases, flow = {}, {}, []
+    members, bases, flow, type_ns = {}, {}, [], {}
     depth, paren = 0, 0
     ns_stack, file_ns = [], package
     type_stack = []         # (fqn, depth of its body)
@@ -700,6 +766,7 @@ def flow_c_like(toks, keywords, language, package=""):
                 fqn = join(namespace(), toks[j].lstrip("@"))
                 pending = fqn
                 members.setdefault(fqn, {})
+                type_ns.setdefault(fqn, namespace())
                 j += 1
                 if j < n and toks[j] == "<":
                     level = 0
@@ -734,11 +801,14 @@ def flow_c_like(toks, keywords, language, package=""):
                 k += 1
             parsed = parse_expr(toks, k, keywords) if k < n else None
             if parsed:
-                flow.append(("bind", name, enclosing(), [parsed[0]], [], toks[i + 2] != "="))
+                flow.append(("bind", name, enclosing(), [parsed[0]], [], toks[i + 2] != "=", namespace()))
             i += 2
             continue
+        # The name after global:: was read with the global (as a root-qualified name).
+        after_global = i >= 3 and prev == ":" and toks[i - 2] == ":" and toks[i - 3] == "global"
         # Declarations: Type name followed by = ; , ) ( { => : in
-        if (is_ident(t) and t not in keywords or t in PREDEFINED) and prev not in {".", "new"}:
+        if (is_ident(t) and t not in keywords or t in PREDEFINED or global_at(toks, i)) \
+                and prev not in {".", "new"} and not after_global:
             parsed = parse_type(toks, i, keywords)
             if parsed and parsed[1] < n - 1:
                 chains, j = parsed
@@ -755,12 +825,13 @@ def flow_c_like(toks, keywords, language, package=""):
                     if in_body:
                         members[type_stack[-1][0]].setdefault(name, []).extend(chains)
                     elif chains:
-                        flow.append(("bind", name, enclosing(), [], chains, False))
+                        flow.append(("bind", name, enclosing(), [], chains, False, namespace()))
                     i = j       # continue at the declared name
                     continue
-        if prev not in {".", "?"} and (t in {"new", "this", "base", "super"} or (is_ident(t) and t not in keywords)):
+        if prev not in {".", "?"} and not after_global and (
+                t in {"new", "this", "base", "super"} or (is_ident(t) and t not in keywords) or global_at(toks, i)):
             parsed = parse_expr(toks, i, keywords)
             if parsed and (parsed[0][2] or parsed[0][0] == "new"):
-                flow.append(("use", enclosing(), parsed[0]))
+                flow.append(("use", enclosing(), parsed[0], namespace()))
         i += 1
-    return members, bases, flow
+    return members, bases, flow, type_ns

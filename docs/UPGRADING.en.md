@@ -1,8 +1,8 @@
-# Upgrading (0.3.3 and earlier releases)
+# Upgrading (0.4.0 and earlier releases)
 
 [日本語](UPGRADING.md) | English
 
-## 0.3.3 (dependency mappers for C#, Java, VB.NET, PHP and COBOL)
+## 0.4.0 (dependency mappers for C#, Java, VB.NET, PHP and COBOL)
 
 Existing approvals and completion records are revoked once because the kit's files (lib, scripts) change. Re-validate from judge. Completed outputs are kept; the re-run only reviews them again.
 

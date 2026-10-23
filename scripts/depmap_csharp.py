@@ -22,11 +22,16 @@ F's return type, M's and N's, through members inherited from base types too;
 parameters, typed locals and foreach variables count, and an element type
 (List<Order>) passes through indexers and LINQ-style calls.
 
+Each name is resolved from the namespace block it is written in; global::
+names from the root namespace only. global using directives and aliases
+(and <Using Include> in .csproj) apply to every file of their project.
+
 .csproj files are read as text: a name declared in several projects only
 gives edges into the projects the file's project references
 (ProjectReference, transitively), and a file the project does not compile
 (<Compile Remove>, or left out of an old-style project's <Compile Include>
-list) declares nothing and is listed in unresolved.tsv.
+list) declares nothing and is listed in unresolved.tsv. A file left out
+only under a Condition keeps its declarations and is listed too.
 
 Known limits, listed in unresolved.tsv where the source shows them:
   - lambda parameters, generic method type inference, overload resolution,
@@ -49,6 +54,7 @@ and unresolved.tsv (file, reference, reason).
 Test: python3 scripts/depmap_csharp.py --root fixtures/csharp --out /tmp/depmap-cs && diff /tmp/depmap-cs/edges.tsv fixtures/csharp/expected_edges.tsv
 """
 
+import bisect
 import re
 import sys
 from pathlib import Path
@@ -56,7 +62,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # -I drops the script dir
 from depmap_common import find_files, read_source, run  # noqa: E402
 from depmap_projects import dotnet_projects, drop_not_compiled  # noqa: E402
-from depmap_typed import FileInfo, TOKEN_RE, chains, dotted, flow_c_like, members, resolve, strip_c_like  # noqa: E402
+from depmap_typed import FileInfo, TOKEN_RE, chains_at, dotted, flow_c_like, members, resolve, strip_c_like  # noqa: E402
 
 EXTS = {".cs"}
 SKIP_DIRS = {"bin", "obj", "packages"}
@@ -96,8 +102,9 @@ def scan(rel, text):
     code, info.strings = strip_c_like(text, csharp=True)
     toks = [(m.group(0), m.start(), m.end()) for m in TOKEN_RE.finditer(code)]
     blank = []          # spans of directives, not counted as mentions
-    globals_ = []
+    globals_, global_aliases = [], {}
     depth, file_ns, stack = 0, "", []  # stack: (namespace, depth before its "{")
+    contexts = [(0, "")]    # (offset, namespace from there on)
 
     def current():
         return ".".join(p for p in [file_ns] + [n for n, _ in stack] if p)
@@ -110,8 +117,12 @@ def scan(rel, text):
             depth += 1
         elif t == "}":
             depth -= 1
+            popped = False
             while stack and stack[-1][1] >= depth:
                 stack.pop()
+                popped = True
+            if popped:
+                contexts.append((start, current()))
         elif t == "namespace":
             name, j = read_dotted(toks, i + 1)
             if j < len(toks) and toks[j][0] == ";":
@@ -119,6 +130,7 @@ def scan(rel, text):
             else:
                 stack.append((name, depth))
             info.namespaces.add(current())
+            contexts.append((start, current()))
             blank.append((start, toks[j - 1][2] if j > i + 1 else toks[i][2]))
             i = j
             continue
@@ -130,12 +142,15 @@ def scan(rel, text):
             if name and k < len(toks) and toks[k][0] in {";", "="}:
                 if toks[k][0] == "=":
                     target, k2 = read_dotted(toks, k + 1)
-                    info.aliases[name] = target
+                    # global using A = N.T; applies to the whole project.
+                    (global_aliases if prev == "global" else info.aliases)[name] = target
                     k = k2
                 elif static:
                     info.direct.add(name)
                 elif prev == "global":
                     globals_.append(name)
+                elif current():
+                    info.scoped_usings.add((current(), name))
                 else:
                     info.usings.add(name)
                 while k < len(toks) and toks[k][0] != ";":
@@ -194,31 +209,45 @@ def scan(rel, text):
         info.namespaces.add("")
     for a, b in sorted(blank, reverse=True):
         code = code[:a] + " " * (b - a) + code[b:]
-    info.names = chains(code, KEYWORDS)
+    # Each name is resolved from the namespace it is written in.
+    offsets = [o for o, _ in contexts]
+    info.names = [(contexts[bisect.bisect_right(offsets, pos) - 1][1], name)
+                  for pos, name in chains_at(code, KEYWORDS)]
     info.members = members(code)
-    info.type_members, info.type_bases, info.flow = flow_c_like([t for t, _, _ in toks], KEYWORDS, "csharp")
+    info.type_members, info.type_bases, info.flow, info.type_ns = flow_c_like(
+        [t for t, _, _ in toks], KEYWORDS, "csharp")
     for m in REFLECTION_RE.finditer(code):
         arg = (m.group(2) or "").strip()
         if not arg.startswith('""'):
             info.dynamic.append((f"{dotted(m.group(1), False)}({arg})", "reflection with a computed type name"))
-    return info, globals_
+    return info, globals_, global_aliases
 
 
 def mapper(root, warnings, args):
     files = find_files(root, EXTS, SKIP_DIRS)
-    rels, infos, global_usings = [], [], set()
+    rels, infos, project_globals = [], [], []
     for path in files:
         rel = path.relative_to(root).as_posix()
-        info, globals_ = scan(rel, read_source(path, warnings))
+        info, globals_, global_aliases = scan(rel, read_source(path, warnings))
         rels.append(rel)
         infos.append(info)
-        global_usings.update(globals_)
-    for proj in find_files(root, {".csproj"}, SKIP_DIRS):
-        global_usings.update(CSPROJ_USING_RE.findall(read_source(proj, warnings)))
-    visible_files, not_compiled = dotnet_projects(root, rels, ".csproj", warnings)
+        project_globals.append((globals_, global_aliases))
+    visible_files, not_compiled, owner, texts = dotnet_projects(root, rels, ".csproj", warnings)
+    # global using (and <Using Include> in the .csproj) applies to every file
+    # of its project; files outside any project share one set.
+    usings, aliases = {}, {}
+    for info, (globals_, global_aliases) in zip(infos, project_globals):
+        usings.setdefault(owner[info.rel], set()).update(globals_)
+        for name, target in global_aliases.items():
+            aliases.setdefault(owner[info.rel], {}).setdefault(name, target)
+    for d, text in texts.items():
+        usings.setdefault(d, set()).update(CSPROJ_USING_RE.findall(text))
+    for info in infos:
+        info.usings.update(dotted(u, False) for u in usings.get(owner[info.rel], ()))
+        for name, target in aliases.get(owner[info.rel], {}).items():
+            info.aliases.setdefault(name, target)
     skipped = drop_not_compiled(infos, not_compiled)
-    edges, unresolved = resolve(infos, global_usings=global_usings, attribute_suffix="Attribute",
-                                visible_files=visible_files)
+    edges, unresolved = resolve(infos, attribute_suffix="Attribute", visible_files=visible_files)
     return rels, edges, unresolved | skipped
 
 

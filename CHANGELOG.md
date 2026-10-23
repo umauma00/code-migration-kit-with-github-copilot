@@ -1,4 +1,4 @@
-# 0.3.3 — 2026-10-23
+# 0.4.0 — 2026-10-23
 
 - 2026-10-23 dependency mappers for C#, Java, VB.NET, PHP and COBOL
   (`scripts/depmap_csharp.py`, `depmap_java.py`, `depmap_vbnet.py`,
@@ -18,11 +18,19 @@
   type on the way). `.csproj`/`.vbproj` ProjectReference and Maven/Gradle
   module dependencies narrow a name declared in several projects to the
   referenced ones, and files a .NET project does not compile declare
-  nothing. Lambda parameters, generic inference and overloads are not
-  followed. PHP follows computable
+  nothing. Every name is resolved from the namespace block it is written in
+  (a file with two blocks no longer merges them, and the output no longer
+  depends on the hash seed), `global::`/`Global.` names from the root only,
+  and global using aliases and project imports apply to their own project's
+  files. `<Compile Include/Remove>` values are item lists (`a.cs;b.cs`); a
+  file left out only under a Condition keeps its declarations and is listed
+  in `unresolved.tsv`. Lambda parameters, generic inference and overloads
+  are not followed. PHP follows computable
   include paths and case-insensitive class/function names with namespaces
   and `use`, narrowed by composer.json autoload (PSR-4, PSR-0, classmap),
-  with `--include-path`; COBOL follows COPY, EXEC SQL INCLUDE, CALL 'X' and
+  with `--include-path` (an explicit `./` or `../` include never uses it:
+  it is looked up next to the including file and at `--root`, and is listed
+  as unresolved when those differ); COBOL follows COPY, EXEC SQL INCLUDE, CALL 'X' and
   EXEC CICS LINK/XCTL in fixed or free format, with `--copy-path` as the
   copybook search order. Non-UTF-8 sources are read as cp932,
   then Latin-1, with a warning. `source-spec check` suggests the mapper for

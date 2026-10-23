@@ -1,0 +1,8 @@
+from	to
+Main.vb	DebugOnly.vb
+Main.vb	Target.vb
+Scopes/Main.vb	Scopes/A.vb
+Scopes/Main.vb	Scopes/B.vb
+Scopes/Rooted.vb	Scopes/Real.vb
+Sdk/Use.vb	Sdk/Keep.vb
+Sdk/Use.vb	Sdk/Maybe.vb

@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <Compile Remove="Gone.cs;Old\**" />
+    <Compile Remove="Maybe2.cs" Condition="'$(Configuration)' == 'Release'" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(TargetFramework)' == 'net48'">
+    <Compile Remove="Maybe.cs" />
+  </ItemGroup>
+  <Choose>
+    <When Condition="'$(Os)' == 'Windows'">
+      <ItemGroup>
+        <Compile Remove="Maybe3.cs" />
+      </ItemGroup>
+    </When>
+  </Choose>
+</Project>

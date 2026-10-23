@@ -23,7 +23,7 @@ Windows では `python3` の代わりに `py` または `python` を使います
 
 追加のオプション（どちらも `--root` からの相対パスをカンマ区切りで指定）：
 
-- PHP：`--include-path lib,inc` で PHP の include_path を指定します。相対パスの include はまずここを探し、次に include したファイルの場所、最後に `--root` を探します。`composer.json`（vendor 以外）の autoload（PSR-4・PSR-0・classmap）は自動で読みます。同じクラスが複数のファイルにあるときは autoload が指すファイルを選びます
+- PHP：`--include-path lib,inc` で PHP の include_path を指定します。相対パスの include はまずここを探し、次に include したファイルの場所、最後に `--root` を探します。`./x` や `../x` のように明示した相対パスは作業ディレクトリ基準なので include_path は使わず、include したファイルの場所と `--root` だけを探します。この2つで別のファイルになるときは両方を辺にし、`unresolved.tsv` にも載せます。`composer.json`（vendor 以外）の autoload（PSR-4・PSR-0・classmap）は自動で読みます。同じクラスが複数のファイルにあるときは autoload が指すファイルを選びます
 - COBOL：`--copy-path copy,shared` でコピーブックの検索順（SYSLIB や COBCPY に相当）を指定します。同じ名前のコピーブックが複数あるときは、先に書いたディレクトリのものを選びます。`COPY X OF LIB` は LIB という名前のディレクトリを先に探します
 
 出力は共通です。
@@ -40,8 +40,8 @@ Windows では `python3` の代わりに `py` または `python` を使います
 C#・Java・VB.NET では、`using` や `import` はファイルではなく名前空間を指し、同じ名前空間の型は import なしで使えます。そこで解析器は「各ファイルが宣言する型の表」を作り、各ファイルのコードに**書かれている名前**をその表で解決します。
 
 - **名前が書かれていない型もたどります。** 各型のメソッド・プロパティ・フィールドの宣言型と継承元を表にして、`var x = F(); x.M().N();` のように変数やメソッドチェーンを通る型（`F` の戻り値の型、`M` と `N` の戻り値の型）を辺にします。引数・型付きのローカル変数・foreach の変数も使います。`List<Order>` のような要素の型は、インデクサや LINQ 風の呼び出しを通しても引き継ぎます。
-- **名前の解決は言語の優先順に従います。** C#・VB.NET は内側の名前空間から外側へ、次に using/Imports。Java は単一型 import、自分のパッケージ、`pkg.*` の順。同じ順位に複数の候補があるときは全部を辺にします（多めに出る方向）。型と同名のローカル変数も辺になります。
-- **プロジェクトファイルで候補を絞ります。** C#・VB.NET は `.csproj`/`.vbproj` の ProjectReference、Java は Maven（`pom.xml`）と Gradle（`build.gradle`）のモジュール依存を読み、同じ名前の型が複数のプロジェクトにあるときは、参照しているプロジェクト側だけを辺にします。ビルド対象外のファイル（`<Compile Remove>`、古い形式のプロジェクトで `<Compile Include>` に無いもの）は型を提供せず、`unresolved.tsv` に載ります。ファイルはテキストとして読むだけで、MSBuild や Maven は実行しません。
+- **名前の解決は言語の優先順に従います。** 名前は書かれている名前空間ブロックから探します（1ファイルに複数のブロックがあっても、ブロックごとに解決します）。C#・VB.NET は内側の名前空間から外側へ、次に using/Imports。`global::X` / `Global.X` はルートの名前空間から探します。Java は単一型 import、自分のパッケージ、`pkg.*` の順。同じ順位に複数の候補があるときは全部を辺にします（多めに出る方向）。型と同名のローカル変数も辺になります。
+- **プロジェクトファイルで候補を絞ります。** C#・VB.NET は `.csproj`/`.vbproj` の ProjectReference、Java は Maven（`pom.xml`）と Gradle（`build.gradle`）のモジュール依存を読み、同じ名前の型が複数のプロジェクトにあるときは、参照しているプロジェクト側だけを辺にします。ビルド対象外のファイル（`<Compile Remove>`、古い形式のプロジェクトで `<Compile Include>` に無いもの）は型を提供せず、`unresolved.tsv` に載ります。Include/Remove の値はアイテムのリスト（`a.cs;b.cs`）として読みます。Condition は評価しません。条件付き（項目・ItemGroup・`<Choose>` の分岐）でだけ外れるファイルは型を残したまま `unresolved.tsv` に載せます。global using とその別名、`<Using Include>`・`<Import Include>` は同じプロジェクトのファイルにだけ効きます。ファイルはテキストとして読むだけで、MSBuild や Maven は実行しません。
 - **まだ見落とすもの：** ラムダ引数の型、ジェネリックメソッドの型推論、オーバーロードの選択、`dynamic`、VB の With ブロック。レビュー根拠（一緒に読むファイル）として不足していないかは、[準備監査](PREPARATION-AUDITS.md)の抜き取りと `dependency-diff` で確かめてください。
 - PHP はメソッド呼び出し先が実行時に決まる言語なので、本物の構文解析器を使っても `$obj->m()` の行き先は分かりません。COBOL の依存は COPY と CALL の名前だけで決まります。この2言語は、同梱版と本物の解析器の差がほとんどありません。
 
