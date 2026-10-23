@@ -5,7 +5,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { prepare } from './helpers.mjs';
 import { safePath, writeJSON } from '../lib/core.mjs';
-import { deniedRule, guardrailDecision, parseGuardrails, cliFolderTrust } from '../lib/guardrails.mjs';
+import { deniedRule, guardrailDecision, parseGuardrails, cliFolderTrust, interactiveDecision } from '../lib/guardrails.mjs';
 import { doctor } from '../scripts/run_migration.mjs';
 import { kitRoot } from '../scripts/install.mjs';
 
@@ -102,4 +102,26 @@ test('doctor fails when installed guardrails would be silently ignored in an unt
   trust([path.dirname(f.root)]);
   assert.deepEqual([(await check()).status, (await check()).ok], ['trusted', true]);
   assert.equal((await doctor(f.root, f.config)).checks.find(c => c.check === 'command guardrails').status, 'installed');
+});
+
+// Phase 01 on Windows: generating the review dependency map was refused as a
+// guardrails.json write because a read on the same line (Test-Path, a listing
+// of migration/*, Format-Table *) named the file or a pattern matching it.
+test('PowerShell reads beside a kit command are not guardrails writes; the refusal names the matched word', () => {
+  const f = prepare();
+  const decide = command => interactiveDecision({ toolName: 'run_in_terminal', toolArgs: { command }, cwd: f.root }, f.root);
+  const kit = 'C:\\Users\\me\\AppData\\Roaming\\Code\\agentPlugins\\code-migration-kit\\scripts';
+  const make = `node "${kit}\\make_review_dependencies.mjs" --source-root src --edges migration/depmap/edges.tsv`;
+  for (const command of [make, `${make}; Test-Path migration/guardrails.json`, `${make}; Get-Item migration/* | Select-Object Name`,
+    `Set-Location ${f.root}; ${make}; Get-ChildItem | Format-Table *`, `${make}; Get-ChildItem migration -Filter *.json | Select-Object Name, Length`,
+    `${make}; Select-String -Path migration/* -Pattern edges`, `${make}; findstr /S /N edges migration\\*`])
+    assert.equal(decide(command), null, command);
+  for (const command of ['Set-Content migration/guardrails.json "{}"', 'echo {} > migration/guardrails.json', 'Copy-Item x.json migration/guardrails.json',
+    'Remove-Item -Recurse migration', 'Get-ChildItem migration/* | Remove-Item', 'Get-ChildItem migration/* | ForEach-Object { $_.Delete() }',
+    'Test-Path migration/guardrails.json > migration/guardrails.json', 'sort -o migration/guardrails.json a.txt', 'cp a.json migration/*']) {
+    const d = decide(command);
+    assert.equal(d?.decision, 'deny', command);
+    assert.match(d.reason, /Matched: `[^`]+`/, command);
+  }
+  assert.match(decide('cp a.json migration/*').reason, /Matched: `migration\/\*`/);
 });

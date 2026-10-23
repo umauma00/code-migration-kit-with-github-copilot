@@ -1,5 +1,17 @@
 # 0.3.2 — 2026-10-23
 
+- 2026-10-23 phase 01 on Windows: generating the review dependency map was
+  refused as a write to `migration/guardrails.json`. The hook took any
+  non-read command naming the file, or a pattern matching it, as a write, and
+  knew only POSIX readers, so `Test-Path migration/guardrails.json`,
+  `Get-Item migration/*` or `Format-Table *` after `Set-Location` on the same
+  line refused the whole line. PowerShell and cmd.exe readers and formatters
+  (`Test-Path`, `Get-ChildItem`, `Select-String`, `findstr`, `Select-Object`,
+  `Format-Table`...) now count as reads, unless their output is piped into a
+  command that writes, moves or deletes. The refusal names the word that
+  matched, and the `guardrails-write` guidance offers dropping it or splitting
+  the line when no change was meant.
+
 - 2026-10-23 phase 00 on Windows stopped twice for no kit reason. The host's
   own source check took a `/P` switch for a literal credential, then read
   `guidance --message` as a second failure: an unknown message printed "This
