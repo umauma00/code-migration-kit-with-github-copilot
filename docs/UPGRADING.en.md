@@ -1,6 +1,13 @@
-# Upgrading (0.3.0 and earlier releases)
+# Upgrading (0.3.1 and earlier releases)
 
 [日本語](UPGRADING.md) | English
+
+## 0.3.1 (command lines checked; models chosen in one question)
+
+Existing approvals and completion records are revoked once because the kit's files (lib, scripts) change. Re-validate from judge. Completed outputs are kept; the re-run only reviews them again.
+
+1. The runner and the other scripts refuse an unknown option, a missing value, an extra word and a value outside its set (phase IDs, approval stages, `--format`...). If your own scripts relied on forms that used to be ignored silently, fix them to the accepted options the error lists. `--opt=value` is not accepted; write `--opt value`. `--help`/`-h` prints the usage on any command.
+2. Models and efforts are chosen in one question and recorded with `models set --assign "implementer=ID:EFFORT,reviewers=ID:EFFORT,arbiter=ID,fixer=ID"`; `--role/--model/--effort` still works.
 
 ## 2026-10-19 update (resumption scope, usage, audits, parity repairs)
 

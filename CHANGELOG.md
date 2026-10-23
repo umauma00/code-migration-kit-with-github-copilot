@@ -1,4 +1,4 @@
-# Unreleased (0.3.0)
+# 0.3.1 — 2026-10-23
 
 - 2026-10-23 every command line is checked against one spec per script
   (`lib/cli.mjs`). The scripts used to read any `--option` as taking the next
@@ -20,6 +20,8 @@
   `models set --assign "implementer=ID:EFFORT,reviewers=ID:EFFORT,..."` records
   the whole answer under one confirmation, checking every entry before it
   writes anything. `models list --format markdown` shows the form.
+
+# 0.3.0 — 2026-10-23
 
 - 2026-10-23 guardrails cover keystrokes typed into a running shell. On
   Windows, Copilot CLI's shell tools are `powershell` and `write_powershell`;
