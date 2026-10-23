@@ -5,8 +5,12 @@
   the hook knew only `write_bash`, so `git push{enter}` sent with
   `write_powershell` passed `migration/guardrails.json`. With either tool,
   `{enter}` also hid the command (`git push{enter}` matched no rule). The hook
-  now replays the input as the shell receives it: `{enter}` runs a line and
-  `{left}`/`{right}`/`{backspace}` edit it (keys as in CLI 1.0.60).
+  now replays the input as the shell receives it: `{enter}` or a raw CR/LF
+  runs a line, which later edits cannot take back, and `{left}`/`{right}`/
+  `{backspace}` edit the current line (keys as in CLI 1.0.60). Keystrokes whose
+  result it cannot see are denied while guardrails are installed: `{up}`/
+  `{down}` (history or a menu), other control characters, an edit reaching text
+  typed before the call, and text left for a later `{enter}`.
 
 - 2026-10-23 Copilot CLI 1.0.103 compatibility: workers no longer pass
   `--no-remote-export`. 1.0.103 renamed it to `--sync-session off` and stops
