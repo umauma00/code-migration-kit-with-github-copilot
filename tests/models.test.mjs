@@ -100,6 +100,24 @@ test('models set records the person\'s choice and revokes reviews made under the
   assert.deepEqual(currentAssignments({ models: {} }).find(a => a.role === 'surveyor'), { role: 'surveyor', model: null, effort: null, inherits: 'implementer' });
 });
 
+test('models set --assign records every role from one answer, all or nothing', async t => {
+  const f = await ready(t);
+  const models = await listAvailableModels({ command: process.execPath, prefixArgs: [fakeCli(t)] });
+  const before = readJSON(safePath(f.root, 'migration/config.json'));
+  // One refused entry (an effort the model lacks) writes nothing at all.
+  assert.throws(() => setRoleModels(f.root, models, { assign: 'all=small-model:high, arbiter=plain-model:low' }), /no selectable reasoning effort/);
+  assert.throws(() => setRoleModels(f.root, models, { assign: 'implementer' }), /ROLE=MODEL_ID\[:EFFORT\]/);
+  assert.throws(() => setRoleModels(f.root, models, { assign: 'all=small-model', role: 'fixer' }), /either/);
+  assert.deepEqual(readJSON(safePath(f.root, 'migration/config.json')), before);
+  const result = setRoleModels(f.root, models, { assign: 'all=small-model:high, reviewers=big-model:xhigh arbiter=big-model:default,fixer=small-model' });
+  const written = readJSON(safePath(f.root, 'migration/config.json'));
+  assert.deepEqual(written.models, { implementer: 'small-model', 'reviewer-semantics': 'big-model', 'reviewer-rules': 'big-model', arbiter: 'big-model', fixer: 'small-model' });
+  assert.deepEqual(written.reasoningEfforts, { implementer: 'high', 'reviewer-semantics': 'xhigh', 'reviewer-rules': 'xhigh' });
+  assert.equal(result.assignments.find(a => a.role === 'surveyor').inherits, 'implementer');
+  assert.match(modelsMarkdown(models, written, 'ja'), /まとめて選ぶ（1回の回答）[\s\S]*implementer=MODEL_ID:EFFORT, reviewers=MODEL_ID:EFFORT/);
+  assert.equal(humanGate('node migration-kit/scripts/run_migration.mjs models set --assign "all=small-model:high,reviewers=big-model"'), 'models set');
+});
+
 test('reasoning effort reaches the worker command line and is validated in config', () => {
   const args = copilotArgs('implementer', 'small-model', undefined, null, null, { effort: 'high' });
   assert.deepEqual(args.slice(args.indexOf('--model'), args.indexOf('--model') + 4), ['--model', 'small-model', '--reasoning-effort', 'high']);

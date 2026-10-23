@@ -33,8 +33,10 @@ export const usage = `Usage: node migration-kit/scripts/run_migration.mjs COMMAN
                               Explain a failure: cause, impact and choices with a recommendation
   models list [--format json|markdown]
                               The models and reasoning efforts your Copilot account offers, and the current choice
+  models set --assign ROLE=ID[:EFFORT],...
+                              Record every role's model and effort from one answer (all=ID first, then overrides)
   models set --role ROLE[,ROLE]|reviewers|all --model ID [--effort LEVEL|default]
-                              Record the person's choice after checking it against that list
+                              Record one choice; both forms are checked against that list before writing
   preferences [--language ja|en] [--original-runtime available|unavailable]
                               Report language; whether the original can still run (guides recommendations)
   sessions status | prune [--run RUN_ID]
@@ -204,13 +206,13 @@ export async function main(argv = process.argv.slice(2)) {
   try { language = readPreferences(root).userLanguage ?? 'en'; } catch {}
   if (cmd === 'models') {
     // The person picks; the list is their account's, read live from the CLI.
-    if (!['list', 'set'].includes(args._[1])) throw new Error('Use models list [--format json|markdown] | models set --role ROLE --model ID [--effort LEVEL|default]');
+    if (!['list', 'set'].includes(args._[1])) throw new Error('Use models list [--format json|markdown] | models set --assign ROLE=ID[:EFFORT],... | models set --role ROLE --model ID [--effort LEVEL|default]');
     if (args.format !== undefined && !['json', 'markdown'].includes(args.format)) throw new Error('models list format must be json or markdown');
     const models = await listAvailableModels({ command: args.copilot ?? 'copilot', cwd: root });
     if (args._[1] === 'set') {
       if (!readConfigIfPresent(root)) throw new Error('migration/config.json is missing: initialize the project (install.mjs) before recording model choices');
       const release = lockRun(root, 'models-set');
-      try { console.log(JSON.stringify(setRoleModels(root, models, { role: args.role, model: args.model, effort: args.effort }), null, 2)); } finally { release(); }
+      try { console.log(JSON.stringify(setRoleModels(root, models, { role: args.role, model: args.model, effort: args.effort, assign: args.assign }), null, 2)); } finally { release(); }
       return;
     }
     const config = readConfigIfPresent(root);

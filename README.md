@@ -79,14 +79,15 @@ node scripts/install.mjs --target /path/to/your-project --model MODEL_ID --langu
 node scripts/install.mjs --target /path/to/your-project --model MODEL_ID --language ja --apply
 ```
 
-**モデルとエフォートは利用者が選びます。** `--model` を省略して導入し、対象リポジトリで次を実行すると、利用するアカウントで使えるモデルと、モデルごとに選べるエフォート（既定値）・料金をCLIから取得して表示します。AIはこの一覧から担当ごとに質問し、回答を `models set` で記録します（ホストが利用者に確認を求めます）。
+**モデルとエフォートは利用者が選びます。** `--model` を省略して導入し、対象リポジトリで次を実行すると、利用するアカウントで使えるモデルと、モデルごとに選べるエフォート（既定値）・料金をCLIから取得して表示します。AIはこの一覧をもとに、全担当のモデルとエフォートを**1回の質問**でまとめて聞き、回答を1回の `models set --assign` で記録します（ホストが利用者に1回だけ確認を求めます）。
 
 ```bash
 node migration-kit/scripts/run_migration.mjs models list --format markdown
+node migration-kit/scripts/run_migration.mjs models set --assign "implementer=MODEL_ID:medium,reviewers=MODEL_ID:high,arbiter=MODEL_ID,fixer=MODEL_ID"
 node migration-kit/scripts/run_migration.mjs models set --role reviewers --model MODEL_ID --effort high
 ```
 
-`--role` は担当名、`reviewers`（2人のレビュー担当）、`all`（全担当。surveyor は個別設定を解除して implementer と同じ設定に戻す）。surveyor は自分のモデルを持たない間だけ implementer のモデルとエフォートを引き継ぎ、自分のモデルを選んだ後は引き継ぎません。料金はCLIが公開する単価を、AI Credits の100万トークンあたりに換算して表示します。`--effort default` でモデルの既定に戻します。一覧にない・組織の設定で無効なモデルや、そのモデルが対応しないエフォートは記録しません。一覧の取得にはCopilot CLIのサインインが必要です。
+`--assign` は `担当=モデルID:エフォート` をカンマで並べた1つの回答です（エフォートを省くと既定、`all=ID` を先に書くと全担当をまとめて指定し、後ろの担当で上書き）。全項目を確認してから書き込むので、1つでも不正なら何も変わりません。`--role` は担当名、`reviewers`（2人のレビュー担当）、`all`（全担当。surveyor は個別設定を解除して implementer と同じ設定に戻す）。surveyor は自分のモデルを持たない間だけ implementer のモデルとエフォートを引き継ぎ、自分のモデルを選んだ後は引き継ぎません。料金はCLIが公開する単価を、AI Credits の100万トークンあたりに換算して表示します。`--effort default` でモデルの既定に戻します。一覧にない・組織の設定で無効なモデルや、そのモデルが対応しないエフォートは記録しません。一覧の取得にはCopilot CLIのサインインが必要です。
 
 従来どおり `--models implementer=ID,reviewers=ID,arbiter=ID,fixer=ID` で担当ごとのモデルを指定することもできます（未指定の担当は `--model`）。上流キットのモデル計画と同じく、影響範囲で選びます：レビュー担当は最大または中規模、大量に動く実装担当は中または小規模、修正・裁定担当は中規模。
 
