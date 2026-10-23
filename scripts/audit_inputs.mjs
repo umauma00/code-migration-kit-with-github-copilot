@@ -10,7 +10,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { loadConfig, parseArgs, safePath, hash, fileHash, treeHash, readJSON, writeJSON, lockRun, semanticConfig, stamp } from '../lib/core.mjs';
+import { parseCommandLine, specs, usageText } from '../lib/cli.mjs';
+import { loadConfig, safePath, hash, fileHash, treeHash, readJSON, writeJSON, lockRun, semanticConfig, stamp } from '../lib/core.mjs';
 import { recordSession } from '../lib/sessions.mjs';
 import { createCopilotAdapter } from './copilot_adapter.mjs';
 import { readReviewText, validatePreparationProfile } from '../lib/review.mjs';
@@ -130,7 +131,9 @@ export function submitAudit(root, config, { directory, response, execution } = {
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
-    const args = parseArgs(process.argv.slice(2)), root = fs.realpathSync(path.resolve(args.root ?? '.')), config = loadConfig(root);
+    const args = parseCommandLine(process.argv.slice(2), specs.audit_inputs);
+    if (args.help) { console.log(usageText(specs.audit_inputs)); process.exit(0); }
+    const root = fs.realpathSync(path.resolve(args.root ?? '.')), config = loadConfig(root);
     const result = args._[0] === 'freeze' ? freezeAudit(root, config, { type: args.type, files: args.files?.split(','), out: args.out })
       : args._[0] === 'run' ? await runAudit(root, config, createCopilotAdapter({ command: args.copilot }), { directory: args.directory })
       : args._[0] === 'run-pending' ? await runPendingAudits(root, config, createCopilotAdapter({ command: args.copilot }))

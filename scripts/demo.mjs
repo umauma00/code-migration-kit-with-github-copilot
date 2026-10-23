@@ -5,8 +5,10 @@ import os from 'node:os';
 import path from 'node:path';
 import { prepare, fake } from '../tests/helpers.mjs';
 import { approve, runStage, translate } from '../lib/pipeline.mjs';
-import { parseArgs, safePath, writeJSON, atomicWrite } from '../lib/core.mjs';
-const args = parseArgs(process.argv.slice(2));
+import { safePath, writeJSON, atomicWrite } from '../lib/core.mjs';
+import { parseCommandLine, specs, usageText } from '../lib/cli.mjs';
+const args = parseCommandLine(process.argv.slice(2), specs.demo);
+if (args.help) { console.log(usageText(specs.demo)); process.exit(0); }
 const root = args.target ? path.resolve(args.target) : fs.mkdtempSync(path.join(os.tmpdir(), 'copilot-migration-demo-'));
 if (args.target) {
   if (fs.existsSync(root)) throw new Error('--target must be a new directory');

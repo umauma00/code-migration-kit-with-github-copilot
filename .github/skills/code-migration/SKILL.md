@@ -61,17 +61,25 @@ takes them together) and pass `--language ja|en` to the installer.
 and whenever they ask to change models, run
 `run_migration.mjs models list --format markdown`: it lists the models and
 reasoning efforts their own Copilot account offers (read live from the CLI) and
-the current assignment. Show it, then ask one question per worker role
-(implementer, reviewer-semantics, reviewer-rules, arbiter, fixer; surveyor
-follows the implementer unless they pick one), offering the listed model IDs as
-choices, then that model's listed efforts plus `default`. The person may answer
-"same for all" or "same for both reviewers". You may explain the upstream model
-plan — tier by blast radius: reviewers on the largest or a mid model,
-high-volume implementers on a mid or small model, fixers and the arbiter on a
-mid model; higher effort costs more tokens — as information, never as a
-preselected answer, and never choose for them. Record each answer with
-`run_migration.mjs models set --role ROLE --model ID --effort LEVEL|default`
-(`--role reviewers` or `all` for shared answers); the host asks them to confirm.
+the current assignment. Show it, then ask **one** question that covers every
+role and effort at once — never one question per role (one `ask_user` call in
+the Copilot CLI; one `vscode/askQuestions` question in VS Code). Offer as
+choices "every role on MODEL (default effort)" for each listed enabled model,
+and take any mix as the free-text answer in the form the list's "Choose
+everything in one answer" section shows:
+`implementer=ID:EFFORT, reviewers=ID:EFFORT, arbiter=ID:EFFORT, fixer=ID:EFFORT`
+(effort left out = default; `all=ID` first, then overrides; roles are
+implementer, reviewer-semantics, reviewer-rules, reviewers, arbiter, fixer,
+surveyor, all; surveyor follows the implementer unless named). You may explain
+the upstream model plan — tier by blast radius: reviewers on the largest or a
+mid model, high-volume implementers on a mid or small model, fixers and the
+arbiter on a mid model; higher effort costs more tokens — as information, never
+as a preselected answer, and never choose for them. Record the whole answer with
+one `run_migration.mjs models set --assign "ROLE=ID:EFFORT,..."` (a single
+choice for everyone may use `--role all --model ID --effort LEVEL|default`);
+the host asks them to confirm once. Every entry is checked before anything is
+written: if one is refused (unlisted model, unsupported effort), nothing
+changes, so ask again about that entry only and record the full answer again.
 If `models list` reports that the CLI is not signed in, start `copilot login`
 first. A changed model or effort makes reviewed units be reviewed again.
 
@@ -116,7 +124,7 @@ independent review of the package, show one report and record
 ## Keep the parent's context small
 
 In 00, read and sample the source yourself, as upstream does, and say what you
-skipped; `survey --kind facts` is optional there. In 00b (source-as-spec) and 02,
+skipped; `survey run --kind facts` is optional there. In 00b (source-as-spec) and 02,
 which must cover every file, do not read the whole codebase yourself on
 anything but a small repository. Use [surveys](../../../docs/SURVEYS.md): `survey run --kind
 contracts|inventory` sends each scope to a fresh tool-free surveyor (a new

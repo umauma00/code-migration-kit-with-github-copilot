@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { lockRun, loadConfig, unsetModels, readManifest, contextHash, unitState, done, safePath, readJSON, parseArgs, verificationFiles, loadReviewDependencies, reviewSources, reviewDependencyPath } from '../lib/core.mjs';
+import { lockRun, loadConfig, unsetModels, readManifest, contextHash, unitState, done, safePath, readJSON, verificationFiles, loadReviewDependencies, reviewSources, reviewDependencyPath } from '../lib/core.mjs';
 import { strictPhases, phaseRecorded } from '../lib/phases.mjs';
 import { validateWorkerProfile, assistedReviewerRoles } from '../lib/review.mjs';
 import { runProcess } from '../lib/process.mjs';
@@ -16,6 +16,7 @@ import { failureGuidance, guidanceMarkdown, failureGuidanceList, guidanceListMar
 import { initSourceSpec, sourceSpecReadiness } from '../lib/source-spec.mjs';
 import { runSurvey, mergeSurvey, surveyStatus, planSurvey } from '../lib/survey.mjs';
 import { phaseCommand } from './phase_cli.mjs';
+import { parseCommandLine, specs } from '../lib/cli.mjs';
 import { diagnoseBuild } from './diagnostic_queue.mjs';
 import { sessionsStatus, pruneSessions } from '../lib/sessions.mjs';
 import { buildLoop } from '../lib/build-loop.mjs';
@@ -32,8 +33,10 @@ export const usage = `Usage: node migration-kit/scripts/run_migration.mjs COMMAN
                               Explain a failure: cause, impact and choices with a recommendation
   models list [--format json|markdown]
                               The models and reasoning efforts your Copilot account offers, and the current choice
+  models set --assign ROLE=ID[:EFFORT],...
+                              Record every role's model and effort from one answer (all=ID first, then overrides)
   models set --role ROLE[,ROLE]|reviewers|all --model ID [--effort LEVEL|default]
-                              Record the person's choice after checking it against that list
+                              Record one choice; both forms are checked against that list before writing
   preferences [--language ja|en] [--original-runtime available|unavailable]
                               Report language; whether the original can still run (guides recommendations)
   sessions status | prune [--run RUN_ID]
@@ -183,8 +186,9 @@ export async function waitForProgress(root, seconds, { intervalMs = 5000 } = {})
   return report;
 }
 export async function main(argv = process.argv.slice(2)) {
-  const args = parseArgs(argv), cmd = args._[0];
-  if (!cmd || cmd === 'help') { console.log(usage); return; }
+  const args = parseCommandLine(argv, specs.run_migration), cmd = args._[0];
+  // Agents probe `COMMAND --help` before acting; answer with the usage, never run the command.
+  if (!cmd || cmd === 'help' || args.help) { console.log(usage); return; }
   const root = fs.realpathSync(path.resolve(args.root ?? '.'));
   if (cmd === 'unlock') {
     const file = safePath(root, 'migration/run.lock'), lock = readJSON(file), pid = Number(args.pid);
@@ -202,13 +206,13 @@ export async function main(argv = process.argv.slice(2)) {
   try { language = readPreferences(root).userLanguage ?? 'en'; } catch {}
   if (cmd === 'models') {
     // The person picks; the list is their account's, read live from the CLI.
-    if (!['list', 'set'].includes(args._[1])) throw new Error('Use models list [--format json|markdown] | models set --role ROLE --model ID [--effort LEVEL|default]');
+    if (!['list', 'set'].includes(args._[1])) throw new Error('Use models list [--format json|markdown] | models set --assign ROLE=ID[:EFFORT],... | models set --role ROLE --model ID [--effort LEVEL|default]');
     if (args.format !== undefined && !['json', 'markdown'].includes(args.format)) throw new Error('models list format must be json or markdown');
     const models = await listAvailableModels({ command: args.copilot ?? 'copilot', cwd: root });
     if (args._[1] === 'set') {
       if (!readConfigIfPresent(root)) throw new Error('migration/config.json is missing: initialize the project (install.mjs) before recording model choices');
       const release = lockRun(root, 'models-set');
-      try { console.log(JSON.stringify(setRoleModels(root, models, { role: args.role, model: args.model, effort: args.effort }), null, 2)); } finally { release(); }
+      try { console.log(JSON.stringify(setRoleModels(root, models, { role: args.role, model: args.model, effort: args.effort, assign: args.assign }), null, 2)); } finally { release(); }
       return;
     }
     const config = readConfigIfPresent(root);
@@ -330,7 +334,9 @@ if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.ar
     console.error(`ERROR: ${e.message}`);
     // Every failure ends with its cause and the user's choices (docs/PHASE-HANDOFF.md).
     try {
-      const root = fs.realpathSync(path.resolve(parseArgs(process.argv.slice(2)).root ?? '.'));
+      // Read --root alone: a command-line error must still get its guidance.
+      const argv = process.argv.slice(2), at = argv.indexOf('--root');
+      const root = fs.realpathSync(path.resolve(at >= 0 && argv[at + 1] ? argv[at + 1] : '.'));
       let language = 'en';
       try { language = readPreferences(root).userLanguage ?? 'en'; } catch {}
       console.error(`\n${guidanceListMarkdown(failureGuidanceList(e, { root, language }), language)}`);

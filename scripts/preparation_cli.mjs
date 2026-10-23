@@ -3,7 +3,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loadConfig, parseArgs, writeJSON, lockRun, assertReportPath } from '../lib/core.mjs';
+import { loadConfig, writeJSON, lockRun, assertReportPath } from '../lib/core.mjs';
+import { parseCommandLine, specs, usageText } from '../lib/cli.mjs';
 import { mergeInventory, packageCycles, dependencySamples, compareDependencyAudit } from '../lib/preparation.mjs';
 export function preparationCommand(root, config, action, options = {}) {
   if (action === 'inventory-merge') return mergeInventory(root, config, { shards: options.shards?.split(','), sites: options.sites });
@@ -19,6 +20,9 @@ export function preparationCommand(root, config, action, options = {}) {
   } finally { release(); }
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  try { const args = parseArgs(process.argv.slice(2)), root = fs.realpathSync(path.resolve(args.root ?? '.')); console.log(JSON.stringify(preparationCommand(root, loadConfig(root), args._[0], args), null, 2)); }
-  catch (e) { console.error(`ERROR: ${e.message}`); process.exitCode = 1; }
+  try {
+    const args = parseCommandLine(process.argv.slice(2), specs.preparation_cli);
+    if (args.help) console.log(usageText(specs.preparation_cli));
+    else { const root = fs.realpathSync(path.resolve(args.root ?? '.')); console.log(JSON.stringify(preparationCommand(root, loadConfig(root), args._[0], args), null, 2)); }
+  } catch (e) { console.error(`ERROR: ${e.message}`); process.exitCode = 1; }
 }
