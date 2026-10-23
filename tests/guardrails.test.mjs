@@ -59,10 +59,9 @@ test('guardrails replay keystrokes typed into a running shell (write_bash, and w
     assert.match(typed(tool, `git push\n${'{backspace}'.repeat(9)}git status{enter}`), /"git push" is denied/, tool);
     assert.match(typed(tool, 'git push\r\n'), /"git push" is denied/, tool);
     assert.equal(typed(tool, 'git status{enter}'), null, tool);
-    assert.equal(typed(tool, 'git\tstatus\n'), null, tool);
-    // What the shell runs is unknown: history, menus, line-editing controls,
+    // What the shell runs is unknown: history, menus, Tab completion, line-editing controls,
     // edits into earlier text, and text left for a later {enter}.
-    for (const input of [`git status{enter}{up}${'{backspace}'.repeat(6)}push{enter}`, '{down}{down}{enter}', '\x15git status{enter}',
+    for (const input of [`git status{enter}{up}${'{backspace}'.repeat(6)}push{enter}`, '{down}{down}{enter}', 'git pu\t{enter}', 'git\tstatus\n', '\x15git status{enter}',
       '\x1b[A{enter}', '{backspace}h{enter}', '{left}x{enter}', 'git pu'])
       assert.match(typed(tool, input), /cannot be checked/, `${tool} ${JSON.stringify(input)}`);
   }
