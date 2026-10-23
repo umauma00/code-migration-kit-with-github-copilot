@@ -36,6 +36,7 @@ const samples = {
   'no-dependencies': 'Review dependency map declares no dependencies between 3 manifest files',
   'template-rules': 'migration/RULEBOOK.md is still the installed template',
   'untrusted-folder': 'Repository hooks are not loaded: the Copilot CLI folder is untrusted',
+  'models-unset': 'Set an available model ID for models.implementer',
   'cli-options': 'Copilot CLI is missing required options: --session-id',
   'hook-check': 'Hook check failed: node hook.mjs took 9000 ms (timeout 5 s)',
   'profile-modified': "Worker profile is not the kit's: migration-implementer",

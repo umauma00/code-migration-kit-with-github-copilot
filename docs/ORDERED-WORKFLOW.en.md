@@ -12,7 +12,7 @@ node migration-kit/scripts/run_migration.mjs phase next
 node migration-kit/scripts/run_migration.mjs phase start 00
 ```
 
-The parent runs only the first incomplete phase. If the user names a later phase, it shows the incomplete prerequisites and returns to that phase. `phase check ID` is a read-only prerequisite check; `phase start ID` also checks prerequisites. Completion of 00–03 is recorded on the instruction of a user who reviewed the actual artifacts. Work already approved is not asked again, and the concrete reasoning is saved in the note.
+The parent runs only the first incomplete phase. If the user names a later phase, it shows the incomplete prerequisites and returns to that phase. `phase check ID` is a read-only prerequisite check; for 00–03 it also checks what `phase complete` would (artifacts, drafted rulebook, dependency map); `phase start ID` also checks prerequisites. Completion of 00–03 is recorded on the instruction of a user who reviewed the actual artifacts. Work already approved is not asked again, and the concrete reasoning is saved in the note.
 
 ```sh
 node migration-kit/scripts/run_migration.mjs phase complete 00 --note "Reviewed the scope and the migration decision"

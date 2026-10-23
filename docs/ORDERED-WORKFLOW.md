@@ -18,7 +18,7 @@ node migration-kit/scripts/run_migration.mjs phase start 00
 ```
 
 親は最初の未完了工程だけを実行する。利用者が後の工程を指定しても、未完了の前提を示して
-その工程へ戻る。`phase check ID`は読み取り専用の前提確認。`phase start ID`も前提を確認する。
+その工程へ戻る。`phase check ID`は読み取り専用の前提確認。00〜03では `phase complete` と同じ内容（成果物、RULEBOOKの下書き、依存マップ）も確認する。`phase start ID`も前提を確認する。
 00〜03の完了は、実際の成果物をレビューした利用者の指示に基づいて記録する。
 既に承認された作業は再質問せず、具体的な判断理由をnoteに保存する。
 
