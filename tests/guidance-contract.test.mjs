@@ -137,8 +137,9 @@ test('guidance --message explains a message, and a credential suspicion stops no
     assert.equal(result.id, 'credential-candidate', message);
     assert.doesNotMatch(JSON.stringify(result) + guidanceMarkdown(result, 'en'), /ExampleSecret123/, message);
   }
-  // Outside the credential rules, a value after a password switch is masked; -p is not one.
-  assert.equal(failureGuidance('sqlcmd -S db -U sa -P ExampleSecret123 failed', { explain: true }).message, 'sqlcmd -S db -U sa -P *** failed');
+  // Outside the credential rules, a message with a value after a password switch is withheld; -p is not one.
+  for (const value of ['ExampleSecret123', '仮の秘密値123', 'Example秘密123'])
+    assert.doesNotMatch(JSON.stringify(failureGuidance(`sqlcmd -S db -U sa -P ${value} failed`, { explain: true })), new RegExp(value));
   assert.equal(failureGuidance('mkdir -p migration/x failed', { explain: true }).message, 'mkdir -p migration/x failed');
   for (const message of ['token expired for user', 'Found 2 matches in src']) assert.equal(id(message), 'unknown', message);
   // A clean result only informs: no question, in either language.
@@ -289,10 +290,14 @@ test('no guidance field repeats a credential value, whichever rule the message g
   const secret = 'ExampleSecret123';
   const cases = {
     'credential-candidate': [`credential check returned ${secret} for b.py`, `No credentials detected in a.py; credential check returned ${secret} for b.py`,
+      `No credentials detected in a.py and credential check returned ${secret} for b.py`,
       `No credentials detected, credential check returned ${secret}`, `Copilot implementer failed (exit 1): possible hardcoded password value ${secret}`],
     'credential-incomplete': [`Secret scan failed: no access to credentials file ${secret}`, '資格情報の検査に必要な権限がありませんでした', `credential scan skipped for ${secret}.bat`],
+    // A failed build or worker that only names a password keeps its own rule.
+    'build-failed': ['Build failed (exit 1): missing PASSWORD environment variable'], 'worker-output': ['Copilot implementer failed (exit 1): cannot open src/password.py'],
     'hook-check': [`Hook check failed: token=${secret}`, `Hook check failed: sqlcmd -P ${secret} took 9000 ms (timeout 5 s)`],
-    'credential-clear': ['No credentials detected', 'Secret scan: none', 'secret scan complete, nothing found', '秘密情報の検査: 0件']
+    'credential-clear': ['No credentials detected', 'Secret scan: none', 'secret scan complete, nothing found', '秘密情報の検査: 0件',
+      'Secret scan complete: 0 matches, 0 errors', 'No credentials detected. No errors reported.', '秘密情報の検査: 0件、エラーなし']
   };
   for (const [expected, messages] of Object.entries(cases)) for (const message of messages) for (const language of ['en', 'ja']) {
     const g = failureGuidance(message, { language, explain: true });
