@@ -317,7 +317,7 @@ npm run demo
 - CLI応答は1つのJSONです。ワーカー応答の取り込み上限は16 MiB。モデル自体の出力上限にも制約されます。
 - ログには要求モデルと時間を保存します。CLI方式では、CLIがJSONLで報告する実行モデル（`model.call_final_result`）と `premiumRequests` などの使用量も記録し、要求と違うモデルはrunの警告にします。さらに各呼び出しで `--usage-output-file` を使い、CLI自身が報告する入力・出力・キャッシュのトークン数とAI unit（nano AIU）を `cliUsage` に、runの合計を `measuredUsage` に記録します。AI Creditsへの換算はCLIが報告しないため `null` のままです。呼び出し上限は料金上限ではありません。
 - CLIは `--output-format json` のとき、レート制限・5xx・認証エラーをstdoutの `session.error` だけに出します（stderrは空）。runnerはこれを読み、429/5xxは再試行、認証・クレジット切れは全体停止として扱い、エラーメッセージに原因を残します。
-- CLIワーカーは呼び出しごとに名前付き（`migration-kit 役割 対象 ID先頭8文字`）のセッション（GitHubアカウントへの同期は利用者のCopilot CLIの設定に従う。キットは同期用のフラグを渡さない）として `~/.copilot/session-state` に残り、IDはrunnerが呼び出し前に実行記録（`cli-sessions.jsonl`、再試行・中断した呼び出しも含む）へ残します。ソースコードを含むため、移行後にAIが `sessions status` で件数と容量を報告し、同意があれば `sessions prune` でキットのワーカー分だけを削除します（ホストが確認を求めます）。
+- CLIワーカーは呼び出しごとに1つのセッション（GitHubアカウントへの同期は利用者のCopilot CLIの設定に従う。キットは同期用のフラグを渡さない）として `~/.copilot/session-state` に残り、IDはrunnerが呼び出し前に実行記録（`cli-sessions.jsonl`、再試行・中断した呼び出しも含む）へ残します。ソースコードを含むため、移行後にAIが `sessions status` で件数と容量を報告し、同意があれば `sessions prune` でキットのワーカー分だけを削除します（ホストが確認を求めます）。
 - 並列ワーカーは多くのファイルを開きます。Copilot CLI（Node）は起動時に自分で開けるファイル数（soft limit）をhard limitまで引き上げるため（1.0.98で256→hard limitを確認）、キット側の引き上げは不要です。上げられないのはhard limitだけなので、`doctor --check-cli` がhard limitを確認し、4096未満なら引き上げ方を案内します。
 - レート制限（429）やサービス障害は自動で再試行します。再試行中は `status` に表示され、AIがその旨を伝えます。
 - 権限制限とhooksは作業上の制御であり、OSの隔離境界ではありません。SDK拡張と設定コマンドはローカルコードとして動作します。

@@ -91,12 +91,14 @@ test('shared review focus asks each reviewer for both checks; specialized keeps 
   assert.throws(() => loadConfig(f.root), /reviewFocus/);
 });
 
-test('workers run as named local-only sessions whose IDs the attempt records keep', async t => {
+test('workers run as sessions whose IDs the attempt records keep', async t => {
   const f = await ready(t);
-  const args = copilotArgs('implementer', 'm', undefined, undefined, { id: 'abc', name: 'migration-kit implementer x' });
+  const args = copilotArgs('implementer', 'm', undefined, undefined, { id: 'abc' });
   // CLI 1.0.103 rejects --no-remote-export; workers pass no session-sync flag.
   assert.ok(!args.some(arg => /remote-export|sync-session/.test(arg)));
-  assert.deepEqual(args.slice(args.indexOf('--session-id'), args.indexOf('--session-id') + 4), ['--session-id', 'abc', '--name', 'migration-kit implementer x']);
+  assert.deepEqual(args.slice(args.indexOf('--session-id'), args.indexOf('--session-id') + 2), ['--session-id', 'abc']);
+  // Flags that change nothing the runner reads are not passed (each is a compatibility risk).
+  for (const flag of ['-s', '--no-color', '--no-ask-user', '--name']) assert.ok(!args.includes(flag), flag);
   const file = safePath(f.root, 'argv-double.mjs');
   fs.writeFileSync(file, `import fs from 'node:fs';
 if (process.argv.includes('--version')) { console.log('GitHub Copilot CLI 0.0.0-test.'); process.exit(0); }
@@ -109,7 +111,6 @@ process.exit(1);
   assert.match(error.cliSessionId, /^[0-9a-f-]{36}$/);
   const argv = JSON.parse(fs.readFileSync(safePath(f.root, 'argv.jsonl'), 'utf8').trim().split('\n').at(-1));
   assert.equal(argv[argv.indexOf('--session-id') + 1], error.cliSessionId);
-  assert.equal(argv[argv.indexOf('--name') + 1], `migration-kit implementer ported/math_ops.mjs ${error.cliSessionId.slice(0, 8)}`);
 });
 
 test('sessions status and prune touch only recorded worker session directories', t => {

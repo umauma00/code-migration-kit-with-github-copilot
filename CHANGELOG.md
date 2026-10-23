@@ -5,7 +5,11 @@
   with "--no-remote-export was renamed", so `doctor --check-cli` reported a
   missing option and no worker could start. Worker session sync now follows
   the person's CLI setting; no replacement flag is passed, so older and newer
-  CLIs both run.
+  CLIs both run. Flags that change nothing the runner reads are no longer
+  passed either: `-s`, `--no-color`, `--no-ask-user` (with JSON output and
+  `--available-tools view,grep,glob` they made no difference on 1.0.103) and the
+  session `--name`, which needed its own length workaround (100 characters,
+  1.0.98). Sessions keep their runner-chosen `--session-id`.
 - 2026-10-23 steps 00-02 without avoidable stops:
   - `doctor` runs before the worker models are chosen: it reports them as the
     failed check `worker models chosen` (guidance: `models list`, then

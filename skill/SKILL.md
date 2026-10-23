@@ -197,7 +197,7 @@ confirmed regressions as `file<TAB>module<TAB>code<TAB>message` rows and run
 `repair --queue`. The person then approves build, smoke and parity again. A
 failing original suite is never repaired in translated outputs.
 
-Workers are named Copilot CLI sessions (account sync follows the user's CLI setting) whose
+Workers are Copilot CLI sessions (account sync follows the user's CLI setting) whose
 IDs the runner journals before each call (retries and interrupted calls included); their transcripts contain source code. After the
 migration, report `sessions status` and, only if the user agrees, run
 `sessions prune` (it deletes only the kit's own worker sessions).

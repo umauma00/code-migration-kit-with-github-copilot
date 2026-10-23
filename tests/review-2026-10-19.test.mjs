@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import { prepare, ready, fake, cliDouble, result, importable } from './helpers.mjs';
 import { approve, runStage, translate } from '../lib/pipeline.mjs';
 import { contextHash, safePath, writeJSON, readJSON, atomicWrite, done, loadConfig, operationalConfigKeys } from '../lib/core.mjs';
-import { createCopilotAdapter, copilotArgs, readUsageFile, sessionName, sessionNameLimit } from '../scripts/copilot_adapter.mjs';
+import { createCopilotAdapter, copilotArgs, readUsageFile } from '../scripts/copilot_adapter.mjs';
 import { waitForProgress } from '../scripts/run_migration.mjs';
 import { freezeAudit, runAudit, runPendingAudits, retireAudit, submitAudit } from '../scripts/audit_inputs.mjs';
 import { diagnoseBuild, makeRepairQueue } from '../scripts/diagnostic_queue.mjs';
@@ -197,18 +197,6 @@ test('a failed parity run becomes a reviewed repair queue; an original-suite fai
   assert.deepEqual(repaired.scopeTargets, ['ported/math_ops.mjs']); assert.equal(repaired.scopeComplete, true);
   // Changed outputs need fresh approved build, smoke and parity runs.
   assert.throws(() => diagnoseBuild(f.root, f.config, { stage: 'parity' }), /No current parity attempt/);
-});
-
-test('worker session names stay within the CLI limit and keep the role, file name and ID', () => {
-  const id = '0123abcd-0000-4000-8000-000000000000';
-  const deep = `ported/${'very-long-package-name/'.repeat(8)}module_with_a_long_name.mjs`;
-  for (const [worker, target] of [['implementer', 'ported/a.mjs'], ['reviewer-semantics-read', deep], ['preparation-auditor', `migration/audits/${id}/request.json`]]) {
-    const name = sessionName(worker, target, id);
-    assert.ok(name.length <= sessionNameLimit, name);
-    assert.ok(name.startsWith(`migration-kit ${worker} `)); assert.ok(name.endsWith(' 0123abcd'));
-  }
-  assert.match(sessionName('implementer', deep, id), /module_with_a_long_name\.mjs 0123abcd$/);
-  assert.equal(sessionName('implementer', 'ported/a.mjs', id), 'migration-kit implementer ported/a.mjs 0123abcd');
 });
 
 test('maxAiCreditsPerCall follows the CLI minimum of 30', t => {
