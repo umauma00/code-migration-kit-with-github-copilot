@@ -86,3 +86,16 @@ skipped; a verdict does not need every file. `survey run --kind facts` is option
 here: use it only when the person asks for it or sampling cannot support a
 committed call (see [surveys](../docs/SURVEYS.md)). It starts one Copilot CLI
 process per scope, so a failure to start it never blocks this report.
+
+## Credentials in the source
+
+The kit runs no secret scan, and neither 00 nor the survey adds one as a gate:
+do not invent a check that stops this phase. A command switch alone is not a
+credential: `set /P`, `xcopy /P`, `del /P`, `-p` with nothing after it are
+options. Only a value written right after a password switch (for example
+`schtasks /U user /P value` or `sqlcmd -P value`) or a key/token assigned in
+code is a candidate. For a real candidate, write its file and line in the
+report — never the value — keep that file out of `survey run` until the person
+decides, and finish the report; the person moves the value out of the source,
+not you. If a tool you ran flagged one, `run_migration.mjs guidance --message`
+with its text gives the choices.

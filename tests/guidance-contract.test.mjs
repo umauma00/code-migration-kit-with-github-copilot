@@ -64,6 +64,7 @@ const samples = {
   'build-failed': 'Build failed (exit 2)',
   timeout: 'Copilot reviewer timed out after 600 s',
   'worker-output': 'Invalid review result for src/login.py',
+  'credential-candidate': 'Local scan: the /P argument is still a literal credential candidate',
   unknown: 'something nobody anticipated'
 };
 const recommended = { ja: '（推奨）', en: ' (recommended)' };
@@ -99,6 +100,33 @@ test('every failure rule offers two choices plus pause, the recommendation first
   for (const message of ['Phase 00 is not reviewed for current inputs', 'Phase 03 is not reviewed for current inputs', 'Phase 05c is not reviewed for current inputs',
     '"npm test" is denied by migration/guardrails.json during the migration.'])
     assertContract(failureGuidance(message, { language: 'en' }), message, 'en');
+});
+
+// A Windows phase 00 run stopped twice: a host's own scan took a /P switch for a
+// password, then read the guidance it asked for as a second failure.
+test('guidance --message explains a message, and a credential suspicion stops no phase', async t => {
+  for (const message of [samples['credential-candidate'], '再開時の検査で /P 引数が資格情報候補と判定されました', 'Possible hardcoded password in deploy.bat', 'secret scan found 1 match'])
+    assert.equal(failureGuidance(message, { language: 'en' }).id, 'credential-candidate', message);
+  for (const message of ['Bad credentials', 'Copilot implementer failed (exit 1): To authenticate, you can use any of the following methods'])
+    assert.equal(failureGuidance(message, { language: 'en' }).id, 'copilot-auth', message);
+  const g = failureGuidance(samples['credential-candidate'], { language: 'en' });
+  assert.deepEqual(g.options.map(o => o.id), ['check-line', 'skip-survey', 'move-secret', 'pause']);
+  assert.ok(!g.options.some(o => o.command), 'no command runs on a suspected credential');
+  assert.match(g.cause, /no phase stops on one/);
+  const root = project(t), script = safePath(root, 'migration-kit/scripts/run_migration.mjs');
+  for (const [message, cause] of [[samples['credential-candidate'], /suspected a literal credential/], ['something nobody anticipated', /kit has no entry for this message/]]) {
+    const out = await runProcess(process.execPath, [script, 'guidance', '--message', message], { cwd: root });
+    assert.equal(out.code, 0, out.stderr);
+    assert.match(out.stdout, /^## What to do about this message\n- Note: the guidance command succeeded\./);
+    assert.doesNotMatch(out.stdout, /did not succeed|did not complete/);
+    assert.match(out.stdout, cause);
+    assert.match(out.stdout, /- Message: `/);
+  }
+  setPreferences(root, { language: 'ja' });
+  const ja = await runProcess(process.execPath, [script, 'guidance', '--message', 'something nobody anticipated', '--format', 'json'], { cwd: root });
+  assert.equal(JSON.parse(ja.stdout).explained, true);
+  // A runner error keeps its failure heading.
+  assert.match((await runProcess(process.execPath, [script, 'phase', 'start', '04'], { cwd: root })).stderr, /## うまくいきませんでした/);
 });
 
 test('a survey command names the kind the error reports, or none when it is unknown', () => {

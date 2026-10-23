@@ -1,3 +1,17 @@
+# Unreleased
+
+- 2026-10-23 phase 00 on Windows stopped twice for no kit reason. The host's
+  own source check took a `/P` switch for a literal credential, then read
+  `guidance --message` as a second failure: an unknown message printed "This
+  step did not succeed / Unexpected error". `guidance --message` now heads its
+  output "What to do about this message" with a note that guidance itself
+  succeeded (`explained: true` in JSON), and a message the kit has no entry
+  for no longer claims an operation failed. A new `credential-candidate` rule
+  says the kit runs no secret scan and no phase stops on one, that a switch
+  alone (`set /P`, `xcopy /P`, `-p`) is not a credential, and offers checking
+  the line, continuing 00 without the survey, or moving a real value out.
+  Prompt 00 says the same in "Credentials in the source".
+
 # 0.3.1 — 2026-10-23
 
 - 2026-10-23 every command line is checked against one spec per script
