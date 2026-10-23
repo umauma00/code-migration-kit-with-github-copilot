@@ -22,7 +22,7 @@ test('guardrail matching follows upstream deny prefixes across pipelines, wrappe
 });
 
 test('guardrails see the Windows forms of a denied command (PowerShell, cmd.exe, extensions, py launcher)', () => {
-  for (const command of ['npm.cmd test', '& "C:\\Program Files\\nodejs\\npm.cmd" test', 'npx.cmd tsc --noEmit', 'git.exe push',
+  for (const command of ['GIT push', 'Git.exe push', 'NPM test', 'POWERSHELL -c "git push"', 'npm.cmd test', '& "C:\\Program Files\\nodejs\\npm.cmd" test', 'npx.cmd tsc --noEmit', 'git.exe push',
     'cmd /c "git push"', 'cmd /c git push', 'cmd.exe /d /s /c "npm test"', 'Start-Process git -ArgumentList push',
     'Start-Process -FilePath git.exe -ArgumentList "push","origin"', '.\\gradlew.bat build', 'py -3 -m pytest', 'py -3.12 -m pytest -q',
     // Switches take no value, wherever they stand; values may be attached or abbreviated.
@@ -124,7 +124,10 @@ test('PowerShell reads beside a kit command are not guardrails writes; the refus
     'Test-Path migration/guardrails.json > migration/guardrails.json', 'sort -o migration/guardrails.json a.txt', 'cp a.json migration/*',
     // A script block or a pipe into a command that takes its path from the pipeline can change what the reader lists.
     'Get-ChildItem migration/* | Where-Object { Remove-Item -LiteralPath $_.FullName; $true }', 'Get-ChildItem migration/* | Set-Content -Value x',
-    'Get-ChildItem migration/* | iex', 'Get-ChildItem migration/* | Out-File migration/guardrails.json']) {
+    'Get-ChildItem migration/* | iex', 'Get-ChildItem migration/* | Out-File migration/guardrails.json',
+    // PowerShell names in any letter case, and its aliases.
+    'remove-item -Recurse migration', 'REMOVE-ITEM -Recurse migration', 'Move-Item migration backup', 'move-item migration backup', 'mi migration backup',
+    'Rename-Item migration old', 'set-location migration; remove-item guardrails.json', 'SET-LOCATION migration; REMOVE-ITEM guardrails.json']) {
     const d = decide(command);
     assert.equal(d?.decision, 'deny', command);
     assert.match(d.reason, /Matched: `[^`]+`/, command);

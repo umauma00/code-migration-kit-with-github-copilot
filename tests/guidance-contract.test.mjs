@@ -126,7 +126,12 @@ test('guidance --message explains a message, and a credential suspicion stops no
   // its value never reaches the output.
   for (const message of ['Secret scan: 0 matches\nPotential hardcoded password at src/config.bat:17',
     'No credentials detected, but possible hardcoded password: sqlcmd -P ExampleSecret123',
-    '資格情報は検出されませんでした。しかし、ハードコードされたパスワードを検知しました: schtasks /U admin /P ExampleSecret123']) {
+    '資格情報は検出されませんでした。しかし、ハードコードされたパスワードを検知しました: schtasks /U admin /P ExampleSecret123',
+    // In one clause, however they are joined.
+    'No credentials detected but possible hardcoded password value ExampleSecret123', 'Secret scan: 0 matches but potential leaked token value ExampleSecret123',
+    '資格情報は検出されませんでしたがハードコードされたパスワードを検知しました ExampleSecret123',
+    // Names a credential but is neither clean nor a known finding: unsure is never clean.
+    'credential check returned ExampleSecret123']) {
     const result = failureGuidance(message, { language: 'en', explain: true });
     assert.equal(result.id, 'credential-candidate', message);
     assert.doesNotMatch(JSON.stringify(result) + guidanceMarkdown(result, 'en'), /ExampleSecret123/, message);
@@ -134,6 +139,7 @@ test('guidance --message explains a message, and a credential suspicion stops no
   // Outside the credential rules, a value after a password switch is masked; -p is not one.
   assert.equal(failureGuidance('sqlcmd -S db -U sa -P ExampleSecret123 failed', { explain: true }).message, 'sqlcmd -S db -U sa -P *** failed');
   assert.equal(failureGuidance('mkdir -p migration/x failed', { explain: true }).message, 'mkdir -p migration/x failed');
+  for (const message of ['token expired for user', 'Found 2 matches in src']) assert.equal(id(message), 'unknown', message);
   // A clean result only informs: no question, in either language.
   for (const language of ['en', 'ja']) {
     const clear = failureGuidance('No credentials detected', { language, explain: true });

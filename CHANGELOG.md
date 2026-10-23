@@ -13,7 +13,11 @@
   target); a script block (`{ ... }`) or a pipe into `Remove-Item`,
   `Set-Content` or `iex` voids it. The refusal names the word that
   matched, and the `guardrails-write` guidance offers dropping it or splitting
-  the line when no change was meant.
+  the line when no change was meant. Command names compare in any letter case
+  everywhere in the hook, as Windows treats them: `remove-item -Recurse
+  migration`, `set-location migration; remove-item guardrails.json` and a deny
+  rule against `GIT push` or `NPM test` were missed before; `mi`, `Rename-Item`
+  and `ren` now count as moves.
 
 - 2026-10-23 phase 00 on Windows stopped twice for no kit reason. The host's
   own source check took a `/P` switch for a literal credential, then read
@@ -28,8 +32,10 @@
   out. Guidance never repeats a candidate message (Markdown or JSON), since it
   may hold the value, and masks an assigned `password=`/`token:` value in any
   other, as well as the value after a password switch (`-P`, `/P`, `/RP`).
-  Messages are read clause by clause, and a finding in any clause wins over a
-  clean one ("0 matches" then "possible hardcoded password"). A clean result
+  Clean phrases ("no credentials detected", "0 matches") are cut out first and
+  any finding left wins, however it is joined ("No credentials detected but
+  possible hardcoded password ..."); a message that names a credential but is
+  neither clean nor a known finding counts as a candidate. A clean result
   ("No credentials detected", "0 matches", 「検出されませんでした」) gets
   `credential-clear`, which is informational: `actionRequired: false` in JSON
   and a next step instead of choices in Markdown, so no question; Japanese
