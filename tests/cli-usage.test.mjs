@@ -222,6 +222,14 @@ test('a help request is never a human gate, and a value option still takes -h as
   // Only the help segment is exempt; the next command of the line is still a gate.
   assert.equal(humanGate(`${r} models set --help && ${r} models set --role all --model m`), 'models set');
   assert.equal(humanGate(`${r} phase complete 03 --note -h`), 'phase complete 03');
+  // A help flag the runner never receives keeps the gate: a comment, a
+  // redirection target, a substitution or a line continuation.
+  for (const command of [`${r} phase complete 00 --note "Reviewed fixture scope" # --help`, `${r} phase complete 00 --note "Reviewed fixture scope" > --help`,
+    `${r} phase complete 00 --note "Reviewed" 2> --help`, `${r} phase complete 00 --note "Reviewed" < --help`, `${r} phase complete 00 --note "$(echo ok)" --help`,
+    `${r} phase complete 00 --note ok \\\n # --help`])
+    assert.equal(humanGate(command), 'phase complete 00', command);
+  assert.equal(humanGate(`${r} models set --role all --model m # -h`), 'models set');
+  assert.equal(humanGate(`${r} build-loop --note ok > -h`), 'build-loop');
   assert.deepEqual(parseCommandLine(['phase', 'complete', '03', '--note', '-h'], specs.run_migration), { _: ['phase', 'complete', '03'], note: '-h' });
 });
 
