@@ -325,6 +325,19 @@ test('workflow invalid CLI result fails closed and never marks a unit complete',
   assert.equal(receipt(f).status, 'blocked');
 });
 
+test('C#, Java, PHP, VB.NET and COBOL dependency fixtures produce their expected outputs', async t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'copilot-depmap-legacy-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  for (const lang of ['csharp', 'java', 'php', 'vbnet', 'cobol']) {
+    const out = path.join(root, lang), fixture = path.join(kitRoot, 'fixtures', lang);
+    // -I: the mapper must find its shared modules without the script directory on sys.path.
+    const r = await runProcess(python, ['-I', path.join(kitRoot, `scripts/depmap_${lang}.py`), '--root', fixture, '--out', out]);
+    assert.equal(r.code, 0, r.stderr);
+    for (const file of ['edges.tsv', 'order.txt', 'cycles.txt', 'unresolved.tsv'])
+      assert.equal(fs.readFileSync(path.join(out, file), 'utf8'), fs.readFileSync(path.join(fixture, `expected_${file}`), 'utf8'), `${lang} ${file}`);
+  }
+});
+
 test('original Python, C and TS dependency fixtures retain byte-for-byte outputs', async t => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'copilot-depmap-test-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));

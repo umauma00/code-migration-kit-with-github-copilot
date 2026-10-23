@@ -1,0 +1,8 @@
+# migration order: one batch per line, dependencies first
+SHARED/CUSTREC.cpy
+copy/CUSTREC.cpy
+copy/DBTYPES.cpy
+copy/ORDREC.cpy
+src/printer.cbl
+src/taxcalc.cob
+src/ORDMAIN.cbl

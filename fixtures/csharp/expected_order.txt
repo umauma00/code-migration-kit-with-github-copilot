@@ -1,0 +1,9 @@
+# migration order: one batch per line, dependencies first
+Core/AuditedAttribute.cs
+Core/StringExtensions.cs
+Core/Order.Totals.cs	Core/Order.cs	Core/OrderLine.cs
+Util/Formatter.cs
+Data/Legacy.cs
+Data/Repos/OrderRepository.cs
+Util/MathHelpers.cs
+App/Program.cs

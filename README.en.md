@@ -171,6 +171,8 @@ node migration-kit/scripts/make_review_dependencies.mjs \
   --source-roots pkg,shared --depmap-root . --edges migration/depmap/edges.tsv
 ```
 
+Bundled mappers cover Python, JS/TS, C/C++, C#, Java, VB.NET, PHP and COBOL; all of them only read source (the original is never run). [Dependency mappers](docs/DEPENDENCY-MAPPERS.en.md) lists each command and how to write an adapter for another language.
+
 The JSON format is `{"schemaVersion":1,"dependencies":{"src/a.py":["src/b.py"],"src/b.py":[]}}`. Without `--depmap-root`, the single `--source-root` is the mapping root, so older commands still work. Enumeration is limited to the given source roots, and isolated files get `[]`. Edges that start outside the scope (for example tests → pkg) are dropped and listed under `ignoredEdges` on stdout. A dependency from a source in scope to one outside (for example pkg → shared) stops the command and asks for the missing root. Audit the mapper's supported syntax, exclusions, unresolved imports and dropped edges, and add semantic references needed for inventory evidence. With several mapping roots, generate separate `--out migration/PATH.json` files and merge them into one map. Missing keys or files in a required closure stop the run. Changing the map or explicit dependencies revokes approvals and completion records.
 
 The commands below are for the default **runtime mode**. Projects without a usable original environment use the explicit [source-only mode](docs/SOURCE-ONLY.md) preparation record and its build/smoke → handoff path.

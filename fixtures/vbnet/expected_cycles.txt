@@ -1,0 +1,2 @@
+# strongly connected components > 1 file: 1
+Core/Customer.vb	Core/Order.Designer.vb	Core/Order.vb

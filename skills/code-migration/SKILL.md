@@ -140,6 +140,16 @@ In source-as-spec, draft 00b, 01 and 02 together from the source, run one
 independent review of the package, show one report and record
 `phase complete 00b,01,02 --note TEXT` only after the user's OK.
 
+## Dependency map (01)
+
+Build the map with the bundled mapper for the source language (Python, JS/TS,
+C/C++, C#, Java, VB.NET, PHP, COBOL; see [dependency mappers](../../docs/DEPENDENCY-MAPPERS.md)).
+They read source text only: never build or run the original to map it. Show
+the five-file trial with its `unresolved.tsv`. For any other language, write an
+adapter under `migration/tools/depmap-<language>/` by that document's rules
+(static, deterministic, same output files, hand-written fixture first); never
+hand-write the graph.
+
 ## Keep the parent's context small
 
 In 00, read and sample the source yourself, as upstream does, and say what you

@@ -1,0 +1,11 @@
+from	to
+App/MainForm.vb	Common/Formatter.vb
+App/MainForm.vb	Core/Invoice.vb
+App/MainForm.vb	Core/Order.Designer.vb
+App/MainForm.vb	Core/Order.vb
+App/MainForm.vb	Core/TaxModule.vb
+Core/Customer.vb	Core/Order.Designer.vb
+Core/Customer.vb	Core/Order.vb
+Core/Order.Designer.vb	Core/Order.vb
+Core/Order.vb	Core/Customer.vb
+Core/Order.vb	Core/Order.Designer.vb

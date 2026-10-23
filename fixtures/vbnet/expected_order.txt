@@ -1,0 +1,6 @@
+# migration order: one batch per line, dependencies first
+Common/Formatter.vb
+Core/Invoice.vb
+Core/Customer.vb	Core/Order.Designer.vb	Core/Order.vb
+Core/TaxModule.vb
+App/MainForm.vb

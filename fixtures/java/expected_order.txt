@@ -1,0 +1,7 @@
+# migration order: one batch per line, dependencies first
+src/main/java/com/acme/app/Audited.java
+src/main/java/com/acme/app/Helper.java
+src/main/java/com/acme/model/Customer.java	src/main/java/com/acme/model/Order.java
+src/main/java/com/acme/model/Invoice.java
+src/main/java/com/acme/util/Strings.java
+src/main/java/com/acme/app/Main.java

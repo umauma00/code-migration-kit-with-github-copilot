@@ -1,3 +1,27 @@
+# 0.3.3 — 2026-10-23
+
+- 2026-10-23 dependency mappers for C#, Java, VB.NET, PHP and COBOL
+  (`scripts/depmap_csharp.py`, `depmap_java.py`, `depmap_vbnet.py`,
+  `depmap_php.py`, `depmap_cobol.py`). Only Python, JS/TS and C/C++ had one,
+  so for a C# source an agent wrote and ran its own .NET tool, which read as
+  if it ran the original. The new mappers use the Python standard library
+  only, read source text only and keep the edges/order/cycles contract; they
+  also write `unresolved.tsv` (dynamic includes and CALLs, reflection with a
+  computed name, imports of undeclared repository types). C#, Java and
+  VB.NET resolve type names through namespaces, imports, aliases, global
+  usings (.cs/.csproj/.vbproj), extension methods, VB module members and
+  partial types, leaning towards extra edges; a type whose name is never
+  written (`var x = f()`) gives no direct edge. PHP follows computable
+  include paths and case-insensitive class/function names with namespaces
+  and `use`; COBOL follows COPY, EXEC SQL INCLUDE, CALL 'X' and EXEC CICS
+  LINK/XCTL in fixed or free format. Non-UTF-8 sources are read as cp932,
+  then Latin-1, with a warning. `source-spec check` suggests the mapper for
+  these languages. [Dependency mappers](docs/DEPENDENCY-MAPPERS.md) lists
+  them and says how to write an adapter for any other language (static only,
+  under `migration/tools/`, same output files, hand-written fixture first);
+  the skills and prompt 01 point to it. Fixtures and expected outputs for
+  each language are tested with `python -I`.
+
 # 0.3.1 — 2026-10-23
 
 - 2026-10-23 every command line is checked against one spec per script

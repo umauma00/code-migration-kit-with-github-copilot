@@ -1,0 +1,3 @@
+file	reference	reason
+src/main/java/com/acme/app/Main.java	Class.forName(args[0])	reflection with a computed class name
+src/main/java/com/acme/app/Main.java	com.acme.model.Missing	import of a type the repository package does not declare
