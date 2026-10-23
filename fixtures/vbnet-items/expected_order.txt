@@ -13,4 +13,8 @@ Sdk/Gone.vb
 Sdk/Keep.vb
 Sdk/Maybe.vb
 Sdk/Old/Older.vb
+Sdk/Quoted.vb
+Sdk/Shallow/Deep/Deep.vb
+Sdk/Shallow/Unused.vb
+Sdk/Solo.vb
 Sdk/Use.vb

@@ -22,9 +22,13 @@
   (a file with two blocks no longer merges them, and the output no longer
   depends on the hash seed), `global::`/`Global.` names from the root only,
   and global using aliases and project imports apply to their own project's
-  files. `<Compile Include/Remove>` values are item lists (`a.cs;b.cs`); a
-  file left out only under a Condition keeps its declarations and is listed
-  in `unresolved.tsv`. Lambda parameters, generic inference and overloads
+  files. A using alias or using static inside a namespace block applies to
+  that block and the blocks nested in it only. `global using static` (and
+  `<Using Static="true">`) gives an edge from each file of the project that
+  names a member of the type. `<Compile Include/Remove>` values are item
+  lists (`a.cs;b.cs`); `*` and `?` stay within one directory and `**` spans
+  any depth; attributes may use either quote. A file left out only under a
+  Condition keeps its declarations and is listed in `unresolved.tsv`. Lambda parameters, generic inference and overloads
   are not followed. PHP follows computable
   include paths and case-insensitive class/function names with namespaces
   and `use`, narrowed by composer.json autoload (PSR-4, PSR-0, classmap),

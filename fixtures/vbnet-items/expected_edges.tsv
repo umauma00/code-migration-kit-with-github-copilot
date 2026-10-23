@@ -6,3 +6,5 @@ Scopes/Main.vb	Scopes/B.vb
 Scopes/Rooted.vb	Scopes/Real.vb
 Sdk/Use.vb	Sdk/Keep.vb
 Sdk/Use.vb	Sdk/Maybe.vb
+Sdk/Use.vb	Sdk/Quoted.vb
+Sdk/Use.vb	Sdk/Shallow/Deep/Deep.vb

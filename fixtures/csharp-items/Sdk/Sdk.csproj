@@ -2,6 +2,9 @@
   <ItemGroup>
     <Compile Remove="Gone.cs;Old\**" />
     <Compile Remove="Maybe2.cs" Condition="'$(Configuration)' == 'Release'" />
+    <Compile Remove="Quoted.cs" Condition='false' />
+    <Compile Remove='Solo.cs' />
+    <Compile Remove="Shallow/*.cs" />
   </ItemGroup>
   <ItemGroup Condition="'$(TargetFramework)' == 'net48'">
     <Compile Remove="Maybe.cs" />

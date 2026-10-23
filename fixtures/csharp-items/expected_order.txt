@@ -9,4 +9,8 @@ Sdk/Maybe.cs
 Sdk/Maybe2.cs
 Sdk/Maybe3.cs
 Sdk/Old/Older.cs
+Sdk/Quoted.cs
+Sdk/Shallow/Deep/Deep.cs
+Sdk/Shallow/Unused.cs
+Sdk/Solo.cs
 Sdk/Use.cs

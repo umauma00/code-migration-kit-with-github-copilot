@@ -12,7 +12,8 @@ not run. What they give:
     on a sibling module's artifactId, Gradle project(':a:b')), transitively;
   - .NET files a project does not compile (<Compile Remove>, or an old-style
     project that lists its <Compile Include> files and leaves the file out).
-    Include and Remove are item lists ("a.cs;b.cs"). An item under a
+    Include and Remove are item lists ("a.cs;b.cs"); * and ? stay within one
+    directory, ** spans any depth; attributes take either quote. An item under a
     Condition (on the item, its ItemGroup, or inside <Choose>) is not
     evaluated: a file only such an item leaves out keeps its declarations and
     is reported as depending on an unevaluated condition.
@@ -22,7 +23,6 @@ projects the file's own project can see. A project that sees none of the
 candidates keeps them all.
 """
 
-import fnmatch
 import posixpath
 import re
 import sys
@@ -31,9 +31,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # -I drops the script dir
 from depmap_common import find_files, nearest, reachable, read_source  # noqa: E402
 
-ATTR = r'\s+Include\s*=\s*"([^"]+)"'
+QUOTED = r"""(?:"([^"]*)"|'([^']*)')"""     # an XML attribute value, either quote
+ATTR = r"\s+Include\s*=\s*" + QUOTED
 COMPILE_RE = re.compile(r"<Compile\b([^>]*?)/?>", re.IGNORECASE)
-ITEM_ATTR_RE = re.compile(r'\b(Include|Remove|Condition)\s*=\s*"([^"]*)"', re.IGNORECASE)
+ITEM_ATTR_RE = re.compile(r"\b(Include|Remove|Condition)\s*=\s*" + QUOTED, re.IGNORECASE)
 CONDITIONAL_RE = re.compile(r"<(ItemGroup|When|Otherwise)\b([^>]*)>(.*?)</\1\s*>", re.IGNORECASE | re.DOTALL)
 COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
 PROJECT_REF_RE = re.compile(r"<ProjectReference" + ATTR, re.IGNORECASE)
@@ -65,7 +66,7 @@ def compile_items(text):
         guarded.append((m.start(), m.end()))
     items = []
     for m in COMPILE_RE.finditer(text):
-        attrs = {k.lower(): v for k, v in ITEM_ATTR_RE.findall(m.group(1))}
+        attrs = {k.lower(): a or b for k, a, b in ITEM_ATTR_RE.findall(m.group(1))}
         conditional = "condition" in attrs or any(a <= m.start() < b for a, b in guarded)
         for kind in ("include", "remove"):
             for value in attrs.get(kind, "").split(";"):
@@ -74,9 +75,37 @@ def compile_items(text):
     return items
 
 
+def attr_values(regex, text):
+    """Values of a regex built on QUOTED, whichever quote each one uses."""
+    return [a or b for a, b in regex.findall(text)]
+
+
+GLOB_CACHE = {}
+
+
 def glob_match(rel, pattern):
-    # MSBuild ** matches any depth; fnmatch's * already crosses "/".
-    return fnmatch.fnmatchcase(rel, pattern.replace("**/", "*").replace("**", "*"))
+    """MSBuild wildcards: * and ? stay within one directory, ** spans any
+    number of directories (none too)."""
+    if pattern not in GLOB_CACHE:
+        out, i = [], 0
+        while i < len(pattern):
+            if pattern.startswith("**/", i):
+                out.append("(?:[^/]*/)*")
+                i += 3
+            elif pattern.startswith("**", i):
+                out.append(".*")
+                i += 2
+            elif pattern[i] == "*":
+                out.append("[^/]*")
+                i += 1
+            elif pattern[i] == "?":
+                out.append("[^/]")
+                i += 1
+            else:
+                out.append(re.escape(pattern[i]))
+                i += 1
+        GLOB_CACHE[pattern] = re.compile("".join(out))
+    return GLOB_CACHE[pattern].fullmatch(rel) is not None
 
 
 def dotnet_projects(root, rels, project_ext, warnings):
@@ -101,7 +130,7 @@ def dotnet_projects(root, rels, project_ext, warnings):
     refs, not_compiled = {}, {}
     for d, (proj_rel, text) in projects.items():
         refs[d] = set()
-        for value in PROJECT_REF_RE.findall(text):
+        for value in attr_values(PROJECT_REF_RE, text):
             target = posixpath.dirname(msbuild_path(d, value))
             if target in projects:
                 refs[d].add(target)

@@ -1,0 +1,2 @@
+Class Solo
+End Class

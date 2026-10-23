@@ -4,3 +4,6 @@ Excluded.vb	(whole file)	not compiled by Items.vbproj; its declarations are igno
 Sdk/Gone.vb	(whole file)	not compiled by Sdk/Sdk.vbproj; its declarations are ignored
 Sdk/Maybe.vb	(whole file)	compiled by Sdk/Sdk.vbproj only under a Condition that is not evaluated; its declarations are kept
 Sdk/Old/Older.vb	(whole file)	not compiled by Sdk/Sdk.vbproj; its declarations are ignored
+Sdk/Quoted.vb	(whole file)	compiled by Sdk/Sdk.vbproj only under a Condition that is not evaluated; its declarations are kept
+Sdk/Shallow/Unused.vb	(whole file)	not compiled by Sdk/Sdk.vbproj; its declarations are ignored
+Sdk/Solo.vb	(whole file)	not compiled by Sdk/Sdk.vbproj; its declarations are ignored

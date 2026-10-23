@@ -30,9 +30,10 @@ class FileInfo:
         self.extensions = []        # (namespace, name) of members called as x.Name (C# extension methods, VB module members)
         self.partial = set()        # FQNs declared partial in this file
         self.usings = set()         # imported namespaces (or types: Java on-demand of a type)
-        self.scoped_usings = set()  # (namespace, imported namespace): C# using inside a namespace block
+        self.blocks = {}            # C# namespace block context -> Directives written in it
         self.aliases = {}           # alias -> dotted target
         self.direct = set()         # dotted targets imported one by one (Java import a.B, C# using static)
+        self.project_static = set() # C# global using static of another file: an edge only where a member is used
         self.names = []             # (namespace written in, dotted name chain) mentioned in code
         self.members = set()        # names written after "." (x.Name)
         self.strings = []           # string literal contents (reflection lookups)
@@ -41,6 +42,26 @@ class FileInfo:
         self.type_bases = {}        # type fqn -> [base type chain]
         self.type_ns = {}           # type fqn -> namespace its declaration is written in
         self.flow = []              # bindings and member chains (see flow_c_like)
+
+
+class Directives:
+    """using directives written inside one C# namespace block. They apply in
+    that block and in the blocks nested in it, not in another block of the
+    same namespace."""
+
+    def __init__(self, parent):
+        self.parent = parent        # context of the enclosing block, or None
+        self.usings = set()
+        self.aliases = {}
+        self.direct = set()
+
+
+BLOCK = "#"     # a context "ns#3" is the 3rd namespace block of a C# file, in namespace ns
+
+
+def context_ns(ctx):
+    """The namespace a context denotes (a C# block context names its block too)."""
+    return ctx.split(BLOCK, 1)[0]
 
 
 GLOBAL = "global::"     # a name qualified from the root namespace (C# global::, VB Global.)
@@ -68,11 +89,6 @@ def rooted(segs):
     if segs and segs[0].startswith(GLOBAL):
         return [segs[0][len(GLOBAL):]] + list(segs[1:]), True
     return list(segs), False
-
-
-def in_scope(ctx, ns):
-    """Whether a directive written inside namespace ns applies at ctx."""
-    return not ns or ctx == ns or ctx.startswith(ns + ".")
 
 
 def prefixes(ns):
@@ -131,21 +147,32 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
 
         def __init__(self, info, ctx):
             self.info = info
+            ns = context_ns(ctx)
             # Innermost first: prefixes() lists a namespace before its parents.
-            self.inner_first = prefixes(ctx) if nested_lookup else [ctx]
+            self.inner_first = prefixes(ns) if nested_lookup else [ns]
             self.enclosing = set(self.inner_first)
-            self.usings = set(info.usings) | global_usings | {
-                u for ns, u in info.scoped_usings if in_scope(ctx, ns)}
+            # Directives of the enclosing blocks, innermost first, then the file's.
+            self.aliases, direct = {}, info.direct | info.project_static
+            self.usings = set(info.usings) | global_usings
+            block = info.blocks.get(ctx)
+            while block:
+                self.usings |= block.usings
+                direct |= block.direct
+                for alias, target in block.aliases.items():
+                    self.aliases.setdefault(alias, target)
+                block = info.blocks.get(block.parent)
+            for alias, target in info.aliases.items():
+                self.aliases.setdefault(alias, target)
             self.imported = sorted(u for u in self.usings if u in namespaces)
             self.visible = self.enclosing | set(self.imported)
             self.cache, self.mention_cache = {}, {}
             self.simple = {}    # simple name -> fqns from direct imports and aliases
-            for target in sorted(info.direct):
+            for target in sorted(direct):
                 segs = target.split(".")
                 fq = longest(segs)
                 if fq:
                     self.simple.setdefault(segs[-1], set()).add(fq)
-            for alias, target in sorted(info.aliases.items()):
+            for alias, target in sorted(self.aliases.items()):
                 fq = longest(rooted(target.split("."))[0])
                 if fq:
                     self.simple.setdefault(alias, set()).add(fq)
@@ -177,8 +204,8 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
             return found
 
         def unalias(self, segs):
-            if segs[0] in self.info.aliases:
-                return rooted(self.info.aliases[segs[0]].split(".") + segs[1:])[0]
+            if segs[0] in self.aliases:
+                return rooted(self.aliases[segs[0]].split(".") + segs[1:])[0]
             return segs
 
         def exact(self, segs):
@@ -339,14 +366,22 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
         # Partial parts of one type depend on each other.
         for fqn in info.partial:
             add(src, lookup(fqn))
-        for target in sorted(info.direct):
+        for target in sorted(info.direct.union(*(b.direct for b in info.blocks.values()))):
             segs = target.split(".")
             fq = longest(segs)
             if fq:
                 add(src, lookup(fq))
             elif ".".join(segs[:-1]) in namespaces:
                 unresolved.add((src, target, "import of a type the repository package does not declare"))
-        usings = set(info.usings) | global_usings | {u for _, u in info.scoped_usings}
+        # A project-wide using static gives an edge where a member of its
+        # type is named, as Run() for global using static Util.
+        heads = {chain.split(".")[0] for _, chain in info.names} | info.members
+        for target in sorted(info.project_static - info.direct):
+            fq = longest(target.split("."))
+            if fq and any(has_member(fq, name) for name in sorted(heads)):
+                add(src, lookup(fq))
+        usings = set(info.usings) | global_usings
+        usings = usings.union(*(b.usings for b in info.blocks.values()))
         for u in sorted(usings):
             if lookup(u):  # Java on-demand import of a type's members, C# using of a type
                 add(src, lookup(u))
@@ -355,7 +390,7 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
         # x.Name() may call an extension method of any namespace visible
         # somewhere in the file.
         visible = set(file_scope.visible)
-        for ctx in info.namespaces:
+        for ctx in sorted(info.namespaces | set(info.blocks)):
             visible |= scope_of(info, ctx).visible
         for name in sorted(info.members):
             for ns in sorted(visible):
@@ -700,19 +735,25 @@ def flow_c_like(toks, keywords, language, package=""):
     Returns (members, bases, flow, type_ns):
       members: {type fqn: {member: [(chain, is_element)]}}
       bases:   {type fqn: [chain]}
-      flow:    [("bind", var, enclosing, exprs, chains, foreach, namespace)
-                | ("use", enclosing, expr, namespace)], in source order
-      type_ns: {type fqn: namespace the type is declared in}
+      flow:    [("bind", var, enclosing, exprs, chains, foreach, context)
+                | ("use", enclosing, expr, context)], in source order
+      type_ns: {type fqn: context the type is declared in}
+    A context is the namespace, or for C# code inside a namespace block,
+    the namespace and the block's number (BLOCK), counted as scan counts them.
     """
     n = len(toks)
     members, bases, flow, type_ns = {}, {}, [], {}
     depth, paren = 0, 0
-    ns_stack, file_ns = [], package
+    ns_stack, file_ns = [], package     # ns_stack: (name, depth, block number)
+    blocks = 0
     type_stack = []         # (fqn, depth of its body)
     pending = None
 
     def namespace():
-        return ".".join(p for p in [file_ns] + [x for x, _ in ns_stack] if p)
+        return ".".join(p for p in [file_ns] + [x for x, _, _ in ns_stack] if p)
+
+    def context():
+        return f"{namespace()}{BLOCK}{ns_stack[-1][2]}" if ns_stack else namespace()
 
     def enclosing():
         return [fqn for fqn, _ in reversed(type_stack)]
@@ -754,7 +795,8 @@ def flow_c_like(toks, keywords, language, package=""):
             if j < n and toks[j] == ";":
                 file_ns = ".".join(segs)
             else:
-                ns_stack.append((".".join(segs), depth))
+                blocks += 1
+                ns_stack.append((".".join(segs), depth, blocks))
             i = j
             continue
         if t in {"class", "struct", "interface", "enum", "record", "@interface"} and prev not in {".", ":", ",", "<", "(", "new", "where"} \
@@ -766,7 +808,7 @@ def flow_c_like(toks, keywords, language, package=""):
                 fqn = join(namespace(), toks[j].lstrip("@"))
                 pending = fqn
                 members.setdefault(fqn, {})
-                type_ns.setdefault(fqn, namespace())
+                type_ns.setdefault(fqn, context())
                 j += 1
                 if j < n and toks[j] == "<":
                     level = 0
@@ -801,7 +843,7 @@ def flow_c_like(toks, keywords, language, package=""):
                 k += 1
             parsed = parse_expr(toks, k, keywords) if k < n else None
             if parsed:
-                flow.append(("bind", name, enclosing(), [parsed[0]], [], toks[i + 2] != "=", namespace()))
+                flow.append(("bind", name, enclosing(), [parsed[0]], [], toks[i + 2] != "=", context()))
             i += 2
             continue
         # The name after global:: was read with the global (as a root-qualified name).
@@ -825,13 +867,13 @@ def flow_c_like(toks, keywords, language, package=""):
                     if in_body:
                         members[type_stack[-1][0]].setdefault(name, []).extend(chains)
                     elif chains:
-                        flow.append(("bind", name, enclosing(), [], chains, False, namespace()))
+                        flow.append(("bind", name, enclosing(), [], chains, False, context()))
                     i = j       # continue at the declared name
                     continue
         if prev not in {".", "?"} and not after_global and (
                 t in {"new", "this", "base", "super"} or (is_ident(t) and t not in keywords) or global_at(toks, i)):
             parsed = parse_expr(toks, i, keywords)
             if parsed and (parsed[0][2] or parsed[0][0] == "new"):
-                flow.append(("use", enclosing(), parsed[0], namespace()))
+                flow.append(("use", enclosing(), parsed[0], context()))
         i += 1
     return members, bases, flow, type_ns

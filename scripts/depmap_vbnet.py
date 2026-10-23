@@ -58,7 +58,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # -I drops the script dir
 from depmap_common import find_files, read_source, run  # noqa: E402
-from depmap_projects import dotnet_projects, drop_not_compiled  # noqa: E402
+from depmap_projects import QUOTED, attr_values, dotnet_projects, drop_not_compiled  # noqa: E402
 from depmap_typed import GLOBAL, PREDEFINED, TOKEN_RE, FileInfo, chains, is_ident, join, members, parse_expr, resolve  # noqa: E402
 
 EXTS = {".vb"}
@@ -78,7 +78,7 @@ DIM_RE = re.compile(r"^\s*(?:(?:dim|static|const|using|private|public|friend|pro
 FOREACH_RE = re.compile(r"^\s*for\s+each\s+([a-z_]\w*)(?:\s+as\s+([\w.]+(?:\s*\(\s*of\s+[^)]*\))?))?\s+in\s+(.+)$")
 IMPORTS_RE = re.compile(r"^\s*imports\s+(?:([\w\[\]]+)\s*=\s*)?([\w.\[\]]+)\s*$", re.IGNORECASE)
 ROOT_NS_RE = re.compile(r"<RootNamespace>\s*([^<]*?)\s*</RootNamespace>", re.IGNORECASE)
-VBPROJ_IMPORT_RE = re.compile(r'<Import\s+Include\s*=\s*"([^"]+)"', re.IGNORECASE)
+VBPROJ_IMPORT_RE = re.compile(r"<Import\s+Include\s*=\s*" + QUOTED, re.IGNORECASE)
 REFLECTION_RE = re.compile(r"\b(createobject|activator\s*\.\s*createinstance|type\s*\.\s*gettype|assembly\s*\.\s*load\w*)\s*\(\s*((?:[^()]|\([^()]*\))+?)?\s*\)", re.IGNORECASE)
 KEYWORDS = set("""addhandler addressof alias and andalso as boolean byref byte byval call case catch cbool
 cbyte cchar cdate cdbl cdec char cint class clng cobj const continue csbyte cshort csng cstr ctype
@@ -323,7 +323,7 @@ def mapper(root, warnings, args):
     # Project-level <Import Include> applies to the files of its project only.
     for info in infos:
         text = texts.get(owner[info.rel], "")
-        info.usings.update(name.lower() for name in VBPROJ_IMPORT_RE.findall(text))
+        info.usings.update(name.lower() for name in attr_values(VBPROJ_IMPORT_RE, text) if name.strip())
     skipped = drop_not_compiled(infos, not_compiled)
     edges, unresolved = resolve(infos, fold=True, visible_files=visible_files)
     return rels, edges, unresolved | skipped

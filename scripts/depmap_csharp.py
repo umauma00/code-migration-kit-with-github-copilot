@@ -23,8 +23,11 @@ parameters, typed locals and foreach variables count, and an element type
 (List<Order>) passes through indexers and LINQ-style calls.
 
 Each name is resolved from the namespace block it is written in; global::
-names from the root namespace only. global using directives and aliases
-(and <Using Include> in .csproj) apply to every file of their project.
+names from the root namespace only. A using, alias or using static inside
+a namespace block applies to that block and the blocks nested in it.
+global using directives and aliases (and <Using> items in .csproj) apply to
+every file of their project; global using static gives an edge from the
+files that name a member of its type.
 
 .csproj files are read as text: a name declared in several projects only
 gives edges into the projects the file's project references
@@ -61,8 +64,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # -I drops the script dir
 from depmap_common import find_files, read_source, run  # noqa: E402
-from depmap_projects import dotnet_projects, drop_not_compiled  # noqa: E402
-from depmap_typed import FileInfo, TOKEN_RE, chains_at, dotted, flow_c_like, members, resolve, strip_c_like  # noqa: E402
+from depmap_projects import QUOTED, dotnet_projects, drop_not_compiled  # noqa: E402
+from depmap_typed import BLOCK, Directives, FileInfo, TOKEN_RE, chains_at, dotted, flow_c_like, members, resolve, strip_c_like  # noqa: E402
 
 EXTS = {".cs"}
 SKIP_DIRS = {"bin", "obj", "packages"}
@@ -75,7 +78,8 @@ stackalloc static string struct switch this throw true try typeof uint ulong unc
 ushort using virtual void volatile while var dynamic nameof await async yield when where get set
 init value add remove partial global record nint nuint not and or with""".split())
 REFLECTION_RE = re.compile(r"\b(Type\s*\.\s*GetType|Activator\s*\.\s*CreateInstance|Assembly\s*\.\s*Load\w*)\s*\(\s*((?:[^()]|\([^()]*\))+?)?\s*\)")
-CSPROJ_USING_RE = re.compile(r'<Using\s+Include\s*=\s*"([^"]+)"(?![^>]*\bStatic\s*=\s*"true")', re.IGNORECASE)
+CSPROJ_USING_RE = re.compile(r"<Using\b([^>]*?)/?>", re.IGNORECASE)
+CSPROJ_ATTR_RE = re.compile(r"\b(Include|Alias|Static)\s*=\s*" + QUOTED, re.IGNORECASE)
 
 
 def read_dotted(toks, j):
@@ -102,12 +106,18 @@ def scan(rel, text):
     code, info.strings = strip_c_like(text, csharp=True)
     toks = [(m.group(0), m.start(), m.end()) for m in TOKEN_RE.finditer(code)]
     blank = []          # spans of directives, not counted as mentions
-    globals_, global_aliases = [], {}
-    depth, file_ns, stack = 0, "", []  # stack: (namespace, depth before its "{")
-    contexts = [(0, "")]    # (offset, namespace from there on)
+    globals_, global_aliases, global_static = [], {}, []
+    depth, file_ns, stack = 0, "", []  # stack: (namespace, depth before its "{", block context)
+    blocks = 0
+    contexts = [(0, "")]    # (offset, context from there on)
 
     def current():
-        return ".".join(p for p in [file_ns] + [n for n, _ in stack] if p)
+        return ".".join(p for p in [file_ns] + [n for n, _, _ in stack] if p)
+
+    def context():
+        """The namespace, tagged with the innermost namespace block (BLOCK):
+        using directives belong to the block they are written in."""
+        return stack[-1][2] if stack else current()
 
     i = 0
     while i < len(toks):
@@ -122,15 +132,20 @@ def scan(rel, text):
                 stack.pop()
                 popped = True
             if popped:
-                contexts.append((start, current()))
+                contexts.append((start, context()))
         elif t == "namespace":
             name, j = read_dotted(toks, i + 1)
             if j < len(toks) and toks[j][0] == ";":
                 file_ns = name
             else:
-                stack.append((name, depth))
+                blocks += 1
+                parent = stack[-1][2] if stack else None
+                stack.append((name, depth, None))
+                ctx = f"{current()}{BLOCK}{blocks}"
+                stack[-1] = (name, depth, ctx)
+                info.blocks[ctx] = Directives(parent)
             info.namespaces.add(current())
-            contexts.append((start, current()))
+            contexts.append((start, context()))
             blank.append((start, toks[j - 1][2] if j > i + 1 else toks[i][2]))
             i = j
             continue
@@ -140,19 +155,24 @@ def scan(rel, text):
             j += static
             name, k = read_dotted(toks, j)
             if name and k < len(toks) and toks[k][0] in {";", "="}:
+                # global using applies to the whole project; a using inside a
+                # namespace block to that block; any other to the file.
+                block = info.blocks.get(context())
+                where = block or info
                 if toks[k][0] == "=":
                     target, k2 = read_dotted(toks, k + 1)
-                    # global using A = N.T; applies to the whole project.
-                    (global_aliases if prev == "global" else info.aliases)[name] = target
+                    (global_aliases if prev == "global" else where.aliases)[name] = target
                     k = k2
                 elif static:
-                    info.direct.add(name)
+                    if prev == "global":
+                        global_static.append(name)
+                        info.direct.add(name)   # the declaring file names the type
+                    else:
+                        where.direct.add(name)
                 elif prev == "global":
                     globals_.append(name)
-                elif current():
-                    info.scoped_usings.add((current(), name))
                 else:
-                    info.usings.add(name)
+                    where.usings.add(name)
                 while k < len(toks) and toks[k][0] != ";":
                     k += 1
                 blank.append((toks[i - (prev == "global")][1], toks[min(k, len(toks) - 1)][2]))
@@ -220,7 +240,24 @@ def scan(rel, text):
         arg = (m.group(2) or "").strip()
         if not arg.startswith('""'):
             info.dynamic.append((f"{dotted(m.group(1), False)}({arg})", "reflection with a computed type name"))
-    return info, globals_, global_aliases
+    return info, (globals_, global_aliases, global_static)
+
+
+def csproj_usings(text):
+    """(usings, aliases, static usings) of the <Using> items of a .csproj."""
+    usings, aliases, static = [], {}, []
+    for m in CSPROJ_USING_RE.finditer(text):
+        attrs = {k.lower(): a or b for k, a, b in CSPROJ_ATTR_RE.findall(m.group(1))}
+        name = attrs.get("include", "").strip()
+        if not name:
+            continue
+        if attrs.get("alias", "").strip():
+            aliases[attrs["alias"].strip()] = name
+        elif attrs.get("static", "").strip().lower() == "true":
+            static.append(name)
+        else:
+            usings.append(name)
+    return usings, aliases, static
 
 
 def mapper(root, warnings, args):
@@ -228,23 +265,32 @@ def mapper(root, warnings, args):
     rels, infos, project_globals = [], [], []
     for path in files:
         rel = path.relative_to(root).as_posix()
-        info, globals_, global_aliases = scan(rel, read_source(path, warnings))
+        info, globals_ = scan(rel, read_source(path, warnings))
         rels.append(rel)
         infos.append(info)
-        project_globals.append((globals_, global_aliases))
+        project_globals.append(globals_)
     visible_files, not_compiled, owner, texts = dotnet_projects(root, rels, ".csproj", warnings)
-    # global using (and <Using Include> in the .csproj) applies to every file
-    # of its project; files outside any project share one set.
-    usings, aliases = {}, {}
-    for info, (globals_, global_aliases) in zip(infos, project_globals):
-        usings.setdefault(owner[info.rel], set()).update(globals_)
+    # global using, global using static, global aliases (and <Using> items in
+    # the .csproj) apply to every file of their project; files outside any
+    # project share one set.
+    usings, aliases, static = {}, {}, {}
+    for info, (globals_, global_aliases, global_static) in zip(infos, project_globals):
+        d = owner[info.rel]
+        usings.setdefault(d, set()).update(globals_)
+        static.setdefault(d, set()).update(global_static)
         for name, target in global_aliases.items():
-            aliases.setdefault(owner[info.rel], {}).setdefault(name, target)
-    for d, text in texts.items():
-        usings.setdefault(d, set()).update(CSPROJ_USING_RE.findall(text))
+            aliases.setdefault(d, {}).setdefault(name, target)
+    for d, text in sorted(texts.items()):
+        names, named, statics = csproj_usings(text)
+        usings.setdefault(d, set()).update(names)
+        static.setdefault(d, set()).update(statics)
+        for name, target in named.items():
+            aliases.setdefault(d, {}).setdefault(name, target)
     for info in infos:
-        info.usings.update(dotted(u, False) for u in usings.get(owner[info.rel], ()))
-        for name, target in aliases.get(owner[info.rel], {}).items():
+        d = owner[info.rel]
+        info.usings.update(dotted(u, False) for u in usings.get(d, ()))
+        info.project_static.update(dotted(u, False) for u in static.get(d, ()))
+        for name, target in aliases.get(d, {}).items():
             info.aliases.setdefault(name, target)
     skipped = drop_not_compiled(infos, not_compiled)
     edges, unresolved = resolve(infos, attribute_suffix="Attribute", visible_files=visible_files)

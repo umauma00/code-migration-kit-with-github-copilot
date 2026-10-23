@@ -5,3 +5,5 @@ Sdk/Use.cs	Sdk/Keep.cs
 Sdk/Use.cs	Sdk/Maybe.cs
 Sdk/Use.cs	Sdk/Maybe2.cs
 Sdk/Use.cs	Sdk/Maybe3.cs
+Sdk/Use.cs	Sdk/Quoted.cs
+Sdk/Use.cs	Sdk/Shallow/Deep/Deep.cs

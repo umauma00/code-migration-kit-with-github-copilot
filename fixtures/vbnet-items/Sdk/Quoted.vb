@@ -1,0 +1,2 @@
+Class Quoted
+End Class

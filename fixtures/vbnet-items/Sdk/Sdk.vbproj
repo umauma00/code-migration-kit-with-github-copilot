@@ -4,6 +4,9 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Remove="Gone.vb;Old\**" />
+    <Compile Remove="Quoted.vb" Condition='false' />
+    <Compile Remove='Solo.vb' />
+    <Compile Remove="Shallow\*.vb" />
   </ItemGroup>
   <ItemGroup Condition="'$(TargetFramework)' == 'net48'">
     <Compile Remove="Maybe.vb" />

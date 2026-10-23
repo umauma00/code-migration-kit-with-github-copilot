@@ -1,0 +1,12 @@
+# migration order: one batch per line, dependencies first
+A.cs
+B.cs
+Holder.cs
+Main.cs
+Nested.cs
+Same.cs
+Statics/Util.cs
+Statics/Global.cs
+Statics/Helpers.cs
+Statics/Runner.cs
+User.cs
