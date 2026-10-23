@@ -27,9 +27,14 @@ const EXTS = [".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"];
 const SKIP_DIRS = new Set(["node_modules", "dist", "build", ".git", "coverage"]);
 
 function args() {
-  const a = process.argv.slice(2), out = {};
-  for (let i = 0; i < a.length; i += 2) out[a[i].replace(/^--/, "")] = a[i + 1];
-  if (!out.root || !out.out) { console.error("usage: --root <dir> --out <dir>"); process.exit(1); }
+  const a = process.argv.slice(2), out = {}, usage = "usage: --root <dir> --out <dir>";
+  if (a.includes("--help") || a.includes("-h")) { console.log(usage); process.exit(0); }
+  for (let i = 0; i < a.length; i += 2) {
+    if (a[i] !== "--root" && a[i] !== "--out") { console.error(`unknown argument: ${a[i]} (${usage})`); process.exit(1); }
+    if (a[i + 1] === undefined || a[i + 1].startsWith("--")) { console.error(`missing value for ${a[i]} (${usage})`); process.exit(1); }
+    out[a[i].slice(2)] = a[i + 1];
+  }
+  if (!out.root || !out.out) { console.error(usage); process.exit(1); }
   return out;
 }
 

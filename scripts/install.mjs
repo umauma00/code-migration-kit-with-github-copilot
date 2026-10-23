@@ -3,7 +3,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { safePath, parseArgs, readJSON, filesUnder, atomicWrite } from '../lib/core.mjs';
+import { safePath, readJSON, filesUnder, atomicWrite } from '../lib/core.mjs';
+import { parseCommandLine, specs } from '../lib/cli.mjs';
 export const kitRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 function rewriteLinks(text, relativeFile) {
   return text.replace(/\]\(([^)#]+)(#[^)]*)?\)/g, (whole, link, fragment = '') => {
@@ -128,8 +129,10 @@ export function install(target, { apply = false, model, harness = 'copilot', wit
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
   try {
-    const args = parseArgs(process.argv.slice(2));
-    if (!args.target) throw new Error('Usage: node scripts/install.mjs --target PATH [--layout repository|plugin] [--model MODEL_ID] [--harness copilot|vscode-local] [--verification-mode runtime|source-only] [--preparation-profile standard|source-as-spec] [--models implementer=ID,reviewers=ID,arbiter=ID,fixer=ID] [--language ja|en] [--fix-policy rereview|single-pass] [--with-workflow] [--apply]');
+    const args = parseCommandLine(process.argv.slice(2), specs.install);
+    const usage = 'Usage: node scripts/install.mjs --target PATH [--layout repository|plugin] [--model MODEL_ID] [--harness copilot|vscode-local] [--verification-mode runtime|source-only] [--preparation-profile standard|source-as-spec] [--models implementer=ID,reviewers=ID,arbiter=ID,fixer=ID] [--language ja|en] [--fix-policy rereview|single-pass] [--with-workflow] [--apply]';
+    if (args.help) { console.log(usage); process.exit(0); }
+    if (!args.target) throw new Error(usage);
     console.log(JSON.stringify(install(args.target, { apply: args.apply, model: args.model, harness: args.harness, withWorkflow: args['with-workflow'], layout: args.layout, workerBackend: args['worker-backend'], verificationMode: args['verification-mode'], preparationProfile: args['preparation-profile'], models: args.models, language: args.language, fixPolicy: args['fix-policy'] }), null, 2));
   } catch (e) { console.error(`ERROR: ${e.message}`); process.exitCode = 1; }
 }

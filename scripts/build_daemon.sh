@@ -53,6 +53,7 @@ while [ $# -gt 0 ]; do
       esac
       shift 2 ;;
     --once)     ONCE=1; shift ;;
+    -h|--help)  echo "usage: build_daemon.sh $USAGE"; exit 0 ;;
     *) echo "unknown argument: $1 $USAGE" >&2; exit 1 ;;
   esac
 done

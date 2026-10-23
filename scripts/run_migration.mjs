@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { lockRun, loadConfig, unsetModels, readManifest, contextHash, unitState, done, safePath, readJSON, parseArgs, verificationFiles, loadReviewDependencies, reviewSources, reviewDependencyPath } from '../lib/core.mjs';
+import { lockRun, loadConfig, unsetModels, readManifest, contextHash, unitState, done, safePath, readJSON, verificationFiles, loadReviewDependencies, reviewSources, reviewDependencyPath } from '../lib/core.mjs';
 import { strictPhases, phaseRecorded } from '../lib/phases.mjs';
 import { validateWorkerProfile, assistedReviewerRoles } from '../lib/review.mjs';
 import { runProcess } from '../lib/process.mjs';
@@ -16,6 +16,7 @@ import { failureGuidance, guidanceMarkdown, failureGuidanceList, guidanceListMar
 import { initSourceSpec, sourceSpecReadiness } from '../lib/source-spec.mjs';
 import { runSurvey, mergeSurvey, surveyStatus, planSurvey } from '../lib/survey.mjs';
 import { phaseCommand } from './phase_cli.mjs';
+import { parseCommandLine, specs } from '../lib/cli.mjs';
 import { diagnoseBuild } from './diagnostic_queue.mjs';
 import { sessionsStatus, pruneSessions } from '../lib/sessions.mjs';
 import { buildLoop } from '../lib/build-loop.mjs';
@@ -183,7 +184,7 @@ export async function waitForProgress(root, seconds, { intervalMs = 5000 } = {})
   return report;
 }
 export async function main(argv = process.argv.slice(2)) {
-  const args = parseArgs(argv), cmd = args._[0];
+  const args = parseCommandLine(argv, specs.run_migration), cmd = args._[0];
   // Agents probe `COMMAND --help` before acting; answer with the usage, never run the command.
   if (!cmd || cmd === 'help' || args.help) { console.log(usage); return; }
   const root = fs.realpathSync(path.resolve(args.root ?? '.'));
@@ -331,7 +332,9 @@ if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.ar
     console.error(`ERROR: ${e.message}`);
     // Every failure ends with its cause and the user's choices (docs/PHASE-HANDOFF.md).
     try {
-      const root = fs.realpathSync(path.resolve(parseArgs(process.argv.slice(2)).root ?? '.'));
+      // Read --root alone: a command-line error must still get its guidance.
+      const argv = process.argv.slice(2), at = argv.indexOf('--root');
+      const root = fs.realpathSync(path.resolve(at >= 0 && argv[at + 1] ? argv[at + 1] : '.'));
       let language = 'en';
       try { language = readPreferences(root).userLanguage ?? 'en'; } catch {}
       console.error(`\n${guidanceListMarkdown(failureGuidanceList(e, { root, language }), language)}`);

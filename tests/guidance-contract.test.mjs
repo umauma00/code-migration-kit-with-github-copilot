@@ -24,6 +24,7 @@ import { doctor } from '../scripts/run_migration.mjs';
 // sample here, so it is held to the same contract.
 const samples = {
   'cannot-ask': 'Permission denied and could not request permission from user: unable to ask user for confirmation',
+  'command-line': 'Unknown option --formt. Options for status: --root PATH, --copilot PATH, --format json|markdown|todo|checklist. Add --help for usage.',
   guardrails: 'Phase 03 requires human-installed command guardrails. Ask the human to install them',
   'guardrail-denied': '"git reset --hard" is denied by migration/guardrails.json during the migration.',
   'guardrails-write': "migration/guardrails.json is the human's decision. Do not write it directly",

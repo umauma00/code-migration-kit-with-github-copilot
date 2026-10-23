@@ -3,7 +3,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { safePath, relativeName, inside, filesUnder, parseArgs, writeJSON } from '../lib/core.mjs';
+import { safePath, relativeName, inside, filesUnder, writeJSON } from '../lib/core.mjs';
+import { parseCommandLine, specs } from '../lib/cli.mjs';
 import { readUtf8 } from '../lib/text.mjs';
 
 // Parser paths are relative to depmapRoot; only sourceRoots are enumerated.
@@ -62,8 +63,10 @@ export function makeReviewDependencies(root, { sourceRoot, sourceRoots, depmapRo
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
   try {
-    const args = parseArgs(process.argv.slice(2));
-    if ((!args['source-root'] && !args['source-roots']) || !args.edges) throw new Error('Usage: node migration-kit/scripts/make_review_dependencies.mjs (--source-root src | --source-roots pkg,shared) --edges migration/depmap/edges.tsv [--depmap-root .] [--out migration/review-dependencies.json] [--root PATH]');
+    const args = parseCommandLine(process.argv.slice(2), specs.make_review_dependencies);
+    const usage = 'Usage: node migration-kit/scripts/make_review_dependencies.mjs (--source-root src | --source-roots pkg,shared) --edges migration/depmap/edges.tsv [--depmap-root .] [--out migration/review-dependencies.json] [--root PATH]';
+    if (args.help) { console.log(usage); process.exit(0); }
+    if ((!args['source-root'] && !args['source-roots']) || !args.edges) throw new Error(usage);
     console.log(JSON.stringify(makeReviewDependencies(fs.realpathSync(path.resolve(args.root ?? '.')), { sourceRoot: args['source-root'], sourceRoots: args['source-roots']?.split(','), depmapRoot: args['depmap-root'], edges: args.edges, out: args.out }), null, 2));
   } catch (e) { console.error(`ERROR: ${e.message}`); process.exitCode = 1; }
 }

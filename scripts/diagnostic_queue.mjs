@@ -7,7 +7,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loadConfig, parseArgs, safePath, readJSON, readManifest, fileHash, contextHash, atomicWrite, writeJSON, lockRun, assertReportPath } from '../lib/core.mjs';
+import { parseCommandLine, specs, usageText } from '../lib/cli.mjs';
+import { loadConfig, safePath, readJSON, readManifest, fileHash, contextHash, atomicWrite, writeJSON, lockRun, assertReportPath } from '../lib/core.mjs';
 import { outputFingerprint } from '../lib/pipeline.mjs';
 import { readReviewText } from '../lib/review.mjs';
 import { diagnosticsForUnits, diagnosticTsv } from '../lib/diagnostics.mjs';
@@ -97,6 +98,10 @@ export function diagnoseBuild(root, config, { out = 'migration/repair-queue.json
     errors: rows.length, targets: queue.jobs.map(j => j.target), formats, unmapped: unmapped.slice(0, 50), unmappedCount: unmapped.length };
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  try { const args = parseArgs(process.argv.slice(2)), root = fs.realpathSync(path.resolve(args.root ?? '.')); console.log(JSON.stringify(makeRepairQueue(root, loadConfig(root), args), null, 2)); }
+  try {
+    const args = parseCommandLine(process.argv.slice(2), specs.diagnostic_queue);
+    if (args.help) console.log(usageText(specs.diagnostic_queue));
+    else { const root = fs.realpathSync(path.resolve(args.root ?? '.')); console.log(JSON.stringify(makeRepairQueue(root, loadConfig(root), args), null, 2)); }
+  }
   catch (e) { console.error(`ERROR: ${e.message}`); process.exitCode = 1; }
 }
