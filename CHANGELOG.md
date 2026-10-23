@@ -16,8 +16,9 @@
     `models set`) and runs every other check. Before, it stopped with
     "Set an available model ID" explained as an unexpected error.
   - Japanese questions may offer model IDs (`gpt-5-mini`, `claude-sonnet-4`)
-    as choices: identifiers with `-`, `_` or digits are names, not English
-    words. Before, the hook denied the model question.
+    as choices: an ASCII identifier with a digit is a name, not English words
+    (adjacent Japanese such as `候補1` still counts; `read-only` stays English).
+    Before, the hook denied the model question.
   - Folder trust on Windows compares paths without regard to case, so a
     folder stored as `c:\work` is trusted for `C:\work`.
   - `phase check 00|00b|01|02|03` checks what `phase complete` checks, so a

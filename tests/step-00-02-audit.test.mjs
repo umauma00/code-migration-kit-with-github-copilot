@@ -36,8 +36,12 @@ test('a Japanese question may offer model IDs as choices', t => {
   setPreferences(f.root, { language: 'ja' });
   const ask = choices => interactiveDecision({ toolName: 'ask_user', cwd: f.root, toolArgs: { question: '実装担当のモデルを選んでください', choices } }, f.root);
   assert.equal(ask(['gpt-5-mini', 'claude-sonnet-4', 'o3', 'gpt-5.1-codex-max', '既定']), null);
-  // English prose is still sent back for rewriting.
+  // A digit beside Japanese is not an identifier that swallows the Japanese.
+  for (const question of ['並列数（1〜4）', 'モデル選択（候補1）'])
+    assert.equal(interactiveDecision({ toolName: 'ask_user', cwd: f.root, toolArgs: { question, choices: ['はい'] } }, f.root), null, question);
+  // English prose, hyphenated words included, is still sent back for rewriting.
   assert.equal(ask(['same for all'])?.decision, 'deny');
+  assert.equal(ask(['read-only', 'read-write'])?.decision, 'deny');
 });
 
 test('folder trust compares Windows paths without regard to case', { skip: process.platform !== 'win32' && 'Windows paths only' }, t => {
