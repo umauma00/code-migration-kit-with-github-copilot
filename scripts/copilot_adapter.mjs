@@ -11,18 +11,20 @@ import { isReviewer, isToolFree, toolAssistedRole, assistedReviewerRoles, valida
 import { runtimeLayout } from '../lib/runtime.mjs';
 import { sessionIdPattern } from '../lib/sessions.mjs';
 
-// Worker sessions hold source code and prompts. They stay local
-// (--no-remote-export: no sync to the GitHub account, no remote control) and
-// carry a runner-chosen ID and name, so receipts point at their transcript and
+// Worker sessions hold source code and prompts. They carry a runner-chosen
+// ID and name, so receipts point at their transcript and
 // `run_migration.mjs sessions` can report or prune exactly the kit's sessions.
 // --usage-output-file is the CLI's own usage record (tokens, cache, AI units);
 // --max-ai-credits is an optional per-call cap the CLI enforces.
 export function copilotArgs(role, model, prompt, layout, session, { usageFile, maxAiCredits, effort } = {}) {
   // A CLI worker is a fresh session agent: tools: [] alone does not prevent
   // automatic repository/personal instructions from entering its system prompt.
+  // No session-sync flag: CLI 1.0.103 renamed --no-remote-export to
+  // --sync-session off and rejects the old name, so sync follows the person's
+  // CLI setting. Only flags a worker cannot run without belong here.
   // No --no-auto-update: installer-based launchers then run their bundled
   // (possibly much older) build instead of the version the user and doctor see.
-  return [...(prompt === undefined ? [] : ['-p', prompt]), ...(layout?.plugin ? ['--plugin-dir', layout.root] : []), '-s', '--output-format', 'json', '--stream', 'off', '--no-color', '--no-ask-user', '--no-custom-instructions', '--disable-builtin-mcps', '--no-remote-export', ...(session ? ['--session-id', session.id, '--name', session.name] : []), '--agent', layout?.agentId(role) ?? `migration-${role}`, '--model', model, ...(effort ? ['--reasoning-effort', effort] : []),
+  return [...(prompt === undefined ? [] : ['-p', prompt]), ...(layout?.plugin ? ['--plugin-dir', layout.root] : []), '-s', '--output-format', 'json', '--stream', 'off', '--no-color', '--no-ask-user', '--no-custom-instructions', '--disable-builtin-mcps', ...(session ? ['--session-id', session.id, '--name', session.name] : []), '--agent', layout?.agentId(role) ?? `migration-${role}`, '--model', model, ...(effort ? ['--reasoning-effort', effort] : []),
     '--available-tools', 'view,grep,glob', ...(isToolFree(role) ? ['--deny-tool', 'read,write,shell'] : ['--allow-tool', 'read', '--deny-tool', 'write,shell']),
     ...(usageFile ? ['--usage-output-file', usageFile] : []), ...(maxAiCredits ? ['--max-ai-credits', String(maxAiCredits)] : [])];
 }

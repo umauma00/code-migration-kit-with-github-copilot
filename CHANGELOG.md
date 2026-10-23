@@ -1,5 +1,11 @@
 # Unreleased (0.3.0)
 
+- 2026-10-23 Copilot CLI 1.0.103 compatibility: workers no longer pass
+  `--no-remote-export`. 1.0.103 renamed it to `--sync-session off` and stops
+  with "--no-remote-export was renamed", so `doctor --check-cli` reported a
+  missing option and no worker could start. Worker session sync now follows
+  the person's CLI setting; no replacement flag is passed, so older and newer
+  CLIs both run.
 - 2026-10-22 Windows as a primary platform (see docs/WINDOWS.md):
   - `commands` may name `.cmd`/`.bat` tools (`npm`, `npx`, `mvn`,
     `gradlew.bat`): they run through `cmd.exe /d /s /c` with every argument

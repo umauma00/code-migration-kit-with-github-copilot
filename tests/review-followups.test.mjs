@@ -94,7 +94,8 @@ test('shared review focus asks each reviewer for both checks; specialized keeps 
 test('workers run as named local-only sessions whose IDs the attempt records keep', async t => {
   const f = await ready(t);
   const args = copilotArgs('implementer', 'm', undefined, undefined, { id: 'abc', name: 'migration-kit implementer x' });
-  assert.ok(args.includes('--no-remote-export'));
+  // CLI 1.0.103 rejects --no-remote-export; workers pass no session-sync flag.
+  assert.ok(!args.some(arg => /remote-export|sync-session/.test(arg)));
   assert.deepEqual(args.slice(args.indexOf('--session-id'), args.indexOf('--session-id') + 4), ['--session-id', 'abc', '--name', 'migration-kit implementer x']);
   const file = safePath(f.root, 'argv-double.mjs');
   fs.writeFileSync(file, `import fs from 'node:fs';

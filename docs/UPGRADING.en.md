@@ -21,7 +21,7 @@ Existing approvals and completion records are revoked once because the kit's fil
 4. The AI proposes `migration/guardrails.json` from `guardrails show` and installs the agreed list with `guardrails install`. The host asks you to confirm, and that confirmation is your act.
 5. Existing configurations do not get `fixPolicy`, `dependencyOrder` or `reviewFocus` added automatically; adopting them restarts approvals.
 6. The managed block in `.github/copilot-instructions.md` is much shorter (the skill holds the detail). Reinstalling a repository copy stops with "Existing managed instructions differ"; the AI replaces the text between `<!-- code-migration-kit:start -->` and `end` after you agree, leaving your own text outside the block unchanged.
-7. Workers run as named, local-only (`--no-remote-export`) sessions whose IDs the run records keep. Worker sessions from before 0.3.0 have no recorded ID, so `sessions prune` does not touch them; tidy any that were synced to your GitHub account from the Copilot CLI's `/session` commands.
+7. Workers run as named sessions (GitHub account sync follows the person's CLI setting) whose IDs the run records keep. Worker sessions from before 0.3.0 have no recorded ID, so `sessions prune` does not touch them; tidy any that were synced to your GitHub account from the Copilot CLI's `/session` commands.
 8. Repeated build repairs can be one agreed `build-loop` grant.
 
 ## 2026-10-17 update (CLI version tracking, guardrails, tool-assisted review, diagnostics, language)
