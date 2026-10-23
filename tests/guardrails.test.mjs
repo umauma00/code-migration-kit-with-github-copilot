@@ -46,6 +46,20 @@ test('guardrails apply to interactive sessions only when the human installed the
   assert.match(guardrailDecision(event), /invalid/);
 });
 
+test('guardrails replay keystrokes typed into a running shell (write_bash, and write_powershell on Windows)', t => {
+  const f = prepare(t);
+  writeJSON(safePath(f.root, 'migration/guardrails.json'), template);
+  const typed = (toolName, input) => guardrailDecision({ toolName, toolArgs: { shellId: '1', input }, cwd: f.root });
+  for (const tool of ['write_bash', 'write_powershell']) {
+    assert.match(typed(tool, 'git push{enter}'), /"git push" is denied/, tool);
+    assert.match(typed(tool, 'echo ok{enter}npm test{enter}'), /"npm test" is denied/, tool);
+    assert.match(typed(tool, 'git pux{backspace}sh{enter}'), /"git push" is denied/, tool);
+    assert.match(typed(tool, 'git ush{left}{left}{left}p{enter}'), /"git push" is denied/, tool);
+    assert.equal(typed(tool, 'git status{enter}'), null, tool);
+    assert.equal(typed(tool, '{down}{down}{enter}'), null, tool);
+  }
+});
+
 test('the installed hook denies guarded commands in Copilot CLI and VS Code Local payloads', t => {
   const f = prepare(t), hook = safePath(f.root, 'migration-kit/scripts/migration_hook.mjs');
   writeJSON(safePath(f.root, 'migration/guardrails.json'), template);

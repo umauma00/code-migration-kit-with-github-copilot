@@ -1,5 +1,13 @@
 # Unreleased (0.3.0)
 
+- 2026-10-23 guardrails cover keystrokes typed into a running shell. On
+  Windows, Copilot CLI's shell tools are `powershell` and `write_powershell`;
+  the hook knew only `write_bash`, so `git push{enter}` sent with
+  `write_powershell` passed `migration/guardrails.json`. With either tool,
+  `{enter}` also hid the command (`git push{enter}` matched no rule). The hook
+  now replays the input as the shell receives it: `{enter}` runs a line and
+  `{left}`/`{right}`/`{backspace}` edit it (keys as in CLI 1.0.60).
+
 - 2026-10-23 Copilot CLI 1.0.103 compatibility: workers no longer pass
   `--no-remote-export`. 1.0.103 renamed it to `--sync-session off` and stops
   with "--no-remote-export was renamed", so `doctor --check-cli` reported a
