@@ -36,7 +36,10 @@
   credential, assigns a password, secret or token value, or has a value
   after a password switch (any characters) is never repeated, and its words
   are removed from every field a rule built from it (cause, choices,
-  commands). Rules read the message as given. A finding left after clean
+  commands). Values are found by syntax, not by how they look: an
+  assignment key in any case (`TOKEN=`), a quoted value, a short or
+  lowercase one. Rules are chosen on the message as given, but build their
+  text from captures of the protected message. A finding left after clean
   phrases are cut out wins, however it is joined, and wins over another rule
   (a worker's output carrying one); anything else left that names a
   credential is unsure, never clean; a credential check that failed, lacked

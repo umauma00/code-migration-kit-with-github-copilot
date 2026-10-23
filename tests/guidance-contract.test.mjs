@@ -305,6 +305,16 @@ test('no guidance field repeats a credential value, whichever rule the message g
     assert.equal(g.actionRequired, expected !== 'credential-clear', message);
     assert.doesNotMatch(JSON.stringify(g) + guidanceMarkdown(g, language), new RegExp(secret), `${language}: ${message}`);
   }
+  // Review round 6: a value is protected by its syntax, not by how it looks:
+  // lowercase, short, quoted, an upper-case key, or not ASCII.
+  for (const [message, value] of [['Hook check failed: token=huntertwo', 'huntertwo'], ['Hook check failed: sqlcmd -P huntertwo took 9000 ms', 'huntertwo'],
+    ['Hook check failed: TOKEN=ExampleSecret123', 'ExampleSecret123'], ['Hook check failed: token=q1', 'q1'], ['Hook check failed: password="two words" took 1 ms', 'two words'],
+    ["Hook check failed: Password: 'hunter' took 1 ms", 'hunter'], ['Hook check failed: sqlcmd -P 仮の秘密値 took 9000 ms', '仮の秘密値']])
+    for (const language of ['en', 'ja']) {
+      const g = failureGuidance(message, { language, explain: true });
+      assert.equal(g.id, 'hook-check', message);
+      assert.ok(!(JSON.stringify(g) + guidanceMarkdown(g, language)).includes(value), `${language}: ${message}`);
+    }
   // Japanese prose after a switch is not a value, and stays readable for the rules.
   assert.equal(failureGuidance('再開時の検査で /P 引数が資格情報候補と判定されました').id, 'credential-candidate');
   // A message that only mentions a credential keeps its own rule, with the text withheld.
