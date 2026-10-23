@@ -8,9 +8,16 @@
   succeeded (`explained: true` in JSON), and a message the kit has no entry
   for no longer claims an operation failed. A new `credential-candidate` rule
   says the kit runs no secret scan and no phase stops on one, that a switch
-  alone (`set /P`, `xcopy /P`, `-p`) is not a credential, and offers checking
-  the line, continuing 00 without the survey, or moving a real value out.
-  Prompt 00 says the same in "Credentials in the source".
+  alone (`set /P`, `xcopy /P`, `-p`) is not a credential, and offers the person
+  checking the line, continuing 00 without reading it, or moving a real value
+  out. Guidance never repeats a candidate message (Markdown or JSON), since it
+  may hold the value, and masks an assigned `password=`/`token:` value in any
+  other. A clean result ("No credentials detected", "0 matches",
+  「検出されませんでした」) gets `credential-clear` and no question; Japanese
+  findings such as 「検知しました」「見つかりました」 are recognized. Prompt 00's
+  "Credentials in the source" says to stop reading a candidate line, keep
+  only its file and line number, and pass guidance a description, never the
+  tool's raw output: skipping the survey alone protects nothing.
 
 # 0.3.1 — 2026-10-23
 

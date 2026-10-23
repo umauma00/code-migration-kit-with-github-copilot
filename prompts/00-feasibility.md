@@ -94,8 +94,15 @@ do not invent a check that stops this phase. A command switch alone is not a
 credential: `set /P`, `xcopy /P`, `del /P`, `-p` with nothing after it are
 options. Only a value written right after a password switch (for example
 `schtasks /U user /P value` or `sqlcmd -P value`) or a key/token assigned in
-code is a candidate. For a real candidate, write its file and line in the
-report — never the value — keep that file out of `survey run` until the person
-decides, and finish the report; the person moves the value out of the source,
-not you. If a tool you ran flagged one, `run_migration.mjs guidance --message`
-with its text gives the choices.
+code is a candidate.
+
+Once a line looks like a real candidate, stop reading it: anything you read is
+in your context, so skipping the survey alone protects nothing. Keep only its
+file and line number; do not print, quote or survey the line, and record that
+part as unverified in the report — never the value. Finish the report; the
+person checks the line and moves a real value out of the source, not you. If a
+tool you ran flagged one, describe the finding without its text, for example
+`run_migration.mjs guidance --message "credential candidate at src/run.bat line 5"`;
+never paste the tool's raw output into a command line. Guidance withholds a
+candidate message and masks an assigned value, but it cannot unread what
+reached your context.

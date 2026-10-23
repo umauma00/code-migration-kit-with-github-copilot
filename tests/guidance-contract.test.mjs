@@ -65,6 +65,7 @@ const samples = {
   timeout: 'Copilot reviewer timed out after 600 s',
   'worker-output': 'Invalid review result for src/login.py',
   'credential-candidate': 'Local scan: the /P argument is still a literal credential candidate',
+  'credential-clear': 'Secret scan: 0 matches',
   unknown: 'something nobody anticipated'
 };
 const recommended = { ja: '（推奨）', en: ' (recommended)' };
@@ -105,14 +106,22 @@ test('every failure rule offers two choices plus pause, the recommendation first
 // A Windows phase 00 run stopped twice: a host's own scan took a /P switch for a
 // password, then read the guidance it asked for as a second failure.
 test('guidance --message explains a message, and a credential suspicion stops no phase', async t => {
-  for (const message of [samples['credential-candidate'], '再開時の検査で /P 引数が資格情報候補と判定されました', 'Possible hardcoded password in deploy.bat', 'secret scan found 1 match'])
-    assert.equal(failureGuidance(message, { language: 'en' }).id, 'credential-candidate', message);
+  const id = message => failureGuidance(message, { language: 'en' }).id;
+  for (const message of [samples['credential-candidate'], '再開時の検査で /P 引数が資格情報候補と判定されました', 'Possible hardcoded password in deploy.bat',
+    'secret scan found 1 match', 'Secret scan found 2 matches', '1 credential candidate found; no other matches', 'credential candidate at src/run.bat line 5',
+    'ハードコードされたパスワードを検知しました', '認証情報が見つかりました', 'シークレットが見つかりました'])
+    assert.equal(id(message), 'credential-candidate', message);
+  // A clean result needs no question, though it names a credential and "detected".
+  for (const message of ['No credentials detected', 'No secret candidates found', 'Secret scan: 0 matches', 'Secret scan: none', 'secret scan complete, nothing found',
+    '資格情報は検出されませんでした', 'シークレットは見つかりませんでした', '秘密情報の検査: 0件'])
+    assert.equal(id(message), 'credential-clear', message);
   for (const message of ['Bad credentials', 'Copilot implementer failed (exit 1): To authenticate, you can use any of the following methods'])
-    assert.equal(failureGuidance(message, { language: 'en' }).id, 'copilot-auth', message);
+    assert.equal(id(message), 'copilot-auth', message);
   const g = failureGuidance(samples['credential-candidate'], { language: 'en' });
-  assert.deepEqual(g.options.map(o => o.id), ['check-line', 'skip-survey', 'move-secret', 'pause']);
+  assert.deepEqual(g.options.map(o => o.id), ['check-line', 'skip-line', 'move-secret', 'pause']);
   assert.ok(!g.options.some(o => o.command), 'no command runs on a suspected credential');
   assert.match(g.cause, /no phase stops on one/);
+  assert.equal(failureGuidance('No credentials detected', { language: 'en' }).recommended, 'continue');
   const root = project(t), script = safePath(root, 'migration-kit/scripts/run_migration.mjs');
   for (const [message, cause] of [[samples['credential-candidate'], /suspected a literal credential/], ['something nobody anticipated', /kit has no entry for this message/]]) {
     const out = await runProcess(process.execPath, [script, 'guidance', '--message', message], { cwd: root });
@@ -121,6 +130,15 @@ test('guidance --message explains a message, and a credential suspicion stops no
     assert.doesNotMatch(out.stdout, /did not succeed|did not complete/);
     assert.match(out.stdout, cause);
     assert.match(out.stdout, /- Message: `/);
+  }
+  // A candidate's text may carry the value: neither output repeats it, and any
+  // other message has an assigned value masked.
+  const secret = 'ExampleSecret123';
+  for (const [message, format] of [[`Possible hardcoded password: sqlcmd -P ${secret}`, 'markdown'], [`Possible hardcoded password: sqlcmd -P ${secret}`, 'json'],
+    [`ハードコードされたパスワードを検知しました: schtasks /U admin /P ${secret}`, 'json'], [`deploy failed: password=${secret}`, 'markdown'], [`deploy failed: token: "${secret}"`, 'json']]) {
+    const out = await runProcess(process.execPath, [script, 'guidance', '--message', message, '--format', format], { cwd: root });
+    assert.equal(out.code, 0, out.stderr);
+    assert.doesNotMatch(out.stdout + out.stderr, new RegExp(secret), `${format}: ${message}`);
   }
   setPreferences(root, { language: 'ja' });
   const ja = await runProcess(process.execPath, [script, 'guidance', '--message', 'something nobody anticipated', '--format', 'json'], { cwd: root });

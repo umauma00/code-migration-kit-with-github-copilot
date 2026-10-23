@@ -7,7 +7,8 @@
 Existing approvals and completion records are revoked once because the kit's files (lib) change. Re-validate from judge. Completed outputs are kept; the re-run only reviews them again. A project still in phase 00 is not affected.
 
 1. `guidance --message` output starts with "What to do about this message" and says guidance itself succeeded; JSON carries `explained: true`.
-2. A message about a suspected credential gets its own guidance: the kit runs no secret scan and no phase stops on one, and a switch alone such as `set /P` is not a credential. Prompt 00 says the same.
+2. A message about a suspected credential gets its own guidance: the kit runs no secret scan and no phase stops on one, and a switch alone such as `set /P` is not a credential. Guidance does not repeat that message, Markdown or JSON, since it may hold the value. A clean result ("No credentials detected") gets guidance with no question.
+3. Prompt 00: stop reading a line that looks real, and report only its file and line number as unverified. Pass guidance a description without the value, never the tool's raw output.
 
 ## 0.3.1 (command lines checked; models chosen in one question)
 
