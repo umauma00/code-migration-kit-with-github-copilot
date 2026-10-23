@@ -17,7 +17,12 @@
   everywhere in the hook, as Windows treats them: `remove-item -Recurse
   migration`, `set-location migration; remove-item guardrails.json` and a deny
   rule against `GIT push` or `NPM test` were missed before; `mi`, `Rename-Item`
-  and `ren` now count as moves.
+  and `ren` now count as moves. A method call on what a reader returns
+  (`(Get-Item migration/guardrails.json).Delete()`, `[IO.File]::Delete(...)`)
+  voids the exemption, a listing of `migration/` piped into a command that
+  changes what it receives (`Get-ChildItem migration | Remove-Item`,
+  `ls migration | xargs rm`) is refused, and `-Path:value` counts like
+  `-Path value`.
 
 - 2026-10-23 phase 00 on Windows stopped twice for no kit reason. The host's
   own source check took a `/P` switch for a literal credential, then read
@@ -38,15 +43,20 @@
   are removed from every field a rule built from it (cause, choices,
   commands). Values are found by syntax, not by how they look: an
   assignment key in any case (`TOKEN=`), a quoted value, a short or
-  lowercase one. Rules are chosen on the message as given, but build their
+  lowercase one, a key inside a longer name (`DB_PASSWORD=`, `MYSQL_PWD=`),
+  or a value attached to a SQL client's switch (`sqlcmd -Pvalue`,
+  `mysql -pvalue`). Rules are chosen on the message as given, but build their
   text from captures of the protected message. A finding left after clean
   phrases are cut out wins, however it is joined, and wins over another rule
   (a worker's output carrying one); anything else left that names a
   credential is unsure, never clean; a credential check that failed, lacked
   access or was skipped gets `credential-incomplete` ("0 errors" and
   「エラーなし」 are not failures), while a build or worker failure that only
-  names a password keeps its own rule. A clean result
-  ("No credentials detected", "0 matches", 「検出されませんでした」) gets
+  names a password keeps its own rule. A clean phrase from a check that
+  crashed, ran in part, timed out, hit a limit or exited non-zero is
+  incomplete, not clean. A clean result
+  ("No credentials detected", "0 matches", "found no issues", "passed",
+  「検出されませんでした」「問題なし」) gets
   `credential-clear`, which is informational: `actionRequired: false` in JSON
   and a next step instead of choices in Markdown, so no question; Japanese
   findings such as 「検知しました」「見つかりました」 are recognized. Prompt 00's

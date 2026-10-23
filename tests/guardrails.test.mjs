@@ -127,7 +127,13 @@ test('PowerShell reads beside a kit command are not guardrails writes; the refus
     'Get-ChildItem migration/* | iex', 'Get-ChildItem migration/* | Out-File migration/guardrails.json',
     // PowerShell names in any letter case, and its aliases.
     'remove-item -Recurse migration', 'REMOVE-ITEM -Recurse migration', 'Move-Item migration backup', 'move-item migration backup', 'mi migration backup',
-    'Rename-Item migration old', 'set-location migration; remove-item guardrails.json', 'SET-LOCATION migration; REMOVE-ITEM guardrails.json']) {
+    'Rename-Item migration old', 'set-location migration; remove-item guardrails.json', 'SET-LOCATION migration; REMOVE-ITEM guardrails.json',
+    // A method call on what a reader returns, a listing of migration/ piped into a command that changes it, and -Param:value.
+    '(Get-Item migration/guardrails.json).Delete()', '(gi migration/guardrails.json).MoveTo(\'x\')', '(Get-ChildItem migration/*).Delete()',
+    'Write-Output (Get-Item migration/guardrails.json).Delete()', '[IO.File]::Delete(\'migration/guardrails.json\')',
+    'Get-ChildItem migration | Remove-Item', 'Get-ChildItem migration | del', 'Get-ChildItem -Path migration -Recurse | Remove-Item',
+    'gci migration | Where-Object Name -eq guardrails.json | Remove-Item', 'Get-ChildItem . -Recurse -Filter guardrails.json | ri', 'ls migration | xargs rm',
+    'Set-Content -Path:migration/guardrails.json x', 'x | Out-File -FilePath:migration/guardrails.json', 'Remove-Item -Path:migration/guardrails.json']) {
     const d = decide(command);
     assert.equal(d?.decision, 'deny', command);
     assert.match(d.reason, /Matched: `[^`]+`/, command);

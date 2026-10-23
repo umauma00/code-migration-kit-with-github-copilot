@@ -292,12 +292,17 @@ test('no guidance field repeats a credential value, whichever rule the message g
     'credential-candidate': [`credential check returned ${secret} for b.py`, `No credentials detected in a.py; credential check returned ${secret} for b.py`,
       `No credentials detected in a.py and credential check returned ${secret} for b.py`,
       `No credentials detected, credential check returned ${secret}`, `Copilot implementer failed (exit 1): possible hardcoded password value ${secret}`],
-    'credential-incomplete': [`Secret scan failed: no access to credentials file ${secret}`, '資格情報の検査に必要な権限がありませんでした', `credential scan skipped for ${secret}.bat`],
+    'credential-incomplete': [`Secret scan failed: no access to credentials file ${secret}`, '資格情報の検査に必要な権限がありませんでした', `credential scan skipped for ${secret}.bat`,
+      // A clean phrase from a scan that crashed, ran in part or exited non-zero is not clean (review round 7).
+      'Secret scan: no secrets found; scanner crashed', 'Secret scan: no secrets found; partial scan', 'Secret scan: no secrets found; only 3 of 10 files scanned',
+      'Secret scan: no secrets found; 2 files unreadable', 'Secret scan: no secrets found. Tool exited with code 2', 'Secret scan: no secrets found (scan limit reached)',
+      'Secret scan: nothing found. Token expired for GitHub', 'シークレットの検査: 検出なし（一部のファイルは読めませんでした）'],
     // A failed build or worker that only names a password keeps its own rule.
     'build-failed': ['Build failed (exit 1): missing PASSWORD environment variable'], 'worker-output': ['Copilot implementer failed (exit 1): cannot open src/password.py'],
     'hook-check': [`Hook check failed: token=${secret}`, `Hook check failed: sqlcmd -P ${secret} took 9000 ms (timeout 5 s)`],
     'credential-clear': ['No credentials detected', 'Secret scan: none', 'secret scan complete, nothing found', '秘密情報の検査: 0件',
-      'Secret scan complete: 0 matches, 0 errors', 'No credentials detected. No errors reported.', '秘密情報の検査: 0件、エラーなし']
+      'Secret scan complete: 0 matches, 0 errors', 'No credentials detected. No errors reported.', '秘密情報の検査: 0件、エラーなし',
+      'Secret scan found no issues', 'secret scan: passed', 'secret scan: ok', 'シークレットの検査: エラーなし、問題なし']
   };
   for (const [expected, messages] of Object.entries(cases)) for (const message of messages) for (const language of ['en', 'ja']) {
     const g = failureGuidance(message, { language, explain: true });
@@ -309,7 +314,11 @@ test('no guidance field repeats a credential value, whichever rule the message g
   // lowercase, short, quoted, an upper-case key, or not ASCII.
   for (const [message, value] of [['Hook check failed: token=huntertwo', 'huntertwo'], ['Hook check failed: sqlcmd -P huntertwo took 9000 ms', 'huntertwo'],
     ['Hook check failed: TOKEN=ExampleSecret123', 'ExampleSecret123'], ['Hook check failed: token=q1', 'q1'], ['Hook check failed: password="two words" took 1 ms', 'two words'],
-    ["Hook check failed: Password: 'hunter' took 1 ms", 'hunter'], ['Hook check failed: sqlcmd -P 仮の秘密値 took 9000 ms', '仮の秘密値']])
+    ["Hook check failed: Password: 'hunter' took 1 ms", 'hunter'], ['Hook check failed: sqlcmd -P 仮の秘密値 took 9000 ms', '仮の秘密値'],
+    // A key inside a longer name, and a value attached to a SQL client's switch (review round 7).
+    ['Hook check failed: DB_PASSWORD=huntertwo', 'huntertwo'], ['Hook check failed: MYSQL_PWD=huntertwo', 'huntertwo'],
+    ['Hook check failed: DB_PASSWORD_PROD=huntertwo', 'huntertwo'], ['Hook check failed: sqlcmd -Phuntertwo took 9000 ms', 'huntertwo'],
+    ['Hook check failed: mysql -u root -phuntertwo took 9000 ms', 'huntertwo']])
     for (const language of ['en', 'ja']) {
       const g = failureGuidance(message, { language, explain: true });
       assert.equal(g.id, 'hook-check', message);
