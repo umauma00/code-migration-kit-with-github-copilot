@@ -23,6 +23,12 @@ Two kinds of edges:
 
 Only code between <?php / <?= and ?> is read; inline HTML is not.
 
+composer.json files under --root (not vendor/) are read: a class declared in
+several files maps to the one its PSR-4/PSR-0 path or classmap names, and a
+class no file is seen declaring maps to the file at its PSR-4/PSR-0 path.
+--include-path DIR,DIR gives PHP's include_path: a relative include is
+looked up there first, then next to the including file, then at --root.
+
 Known limits, listed in unresolved.tsv where the source shows them:
   - include/require of a computed path ($dir . $name) and `new $class`,
     `$class::m()`, call_user_func($x) are dynamic.
@@ -34,20 +40,21 @@ Skipped directories: vendor, plus node_modules, __pycache__, generated and
 every directory starting with ".".
 
 Usage:
-  python3 depmap_php.py --root path/to/repo --out path/to/migration/depmap
+  python3 depmap_php.py --root path/to/repo --out path/to/migration/depmap [--include-path lib,inc]
 Output: edges.tsv, order.txt, cycles.txt (same contract as depmap_python.py)
 and unresolved.tsv (file, reference, reason).
 
 Test: python3 scripts/depmap_php.py --root fixtures/php --out /tmp/depmap-php && diff /tmp/depmap-php/edges.tsv fixtures/php/expected_edges.tsv
 """
 
+import json
 import posixpath
 import re
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # -I drops the script dir
-from depmap_common import find_files, read_source, run  # noqa: E402
+from depmap_common import find_files, path_list, read_source, run  # noqa: E402
 
 EXTS = {".php", ".inc", ".phtml", ".php3", ".php4", ".php5", ".module"}
 SKIP_DIRS = {"vendor"}
@@ -251,7 +258,7 @@ def scan(rel, text):
     return info
 
 
-def resolve_include(src, parts, info, by_rel, by_tail):
+def resolve_include(src, parts, info, by_rel, by_tail, include_path=()):
     """Edge targets for one include expression, or a reason it is dynamic."""
     base, pieces, unknown_prefix = None, [], False
     k = 0
@@ -292,8 +299,10 @@ def resolve_include(src, parts, info, by_rel, by_tail):
     elif unknown_prefix:
         cand = []
     else:
-        cand = [posixpath.normpath(posixpath.join(posixpath.dirname(src), path)),
-                posixpath.normpath(path.lstrip("/"))]
+        # PHP tries include_path first, then the including file's directory.
+        cand = [posixpath.normpath(posixpath.join(d, path)) for d in include_path] + [
+            posixpath.normpath(posixpath.join(posixpath.dirname(src), path)),
+            posixpath.normpath(path.lstrip("/"))]
     for c in cand:
         if c in by_rel:
             return [c], None
@@ -306,7 +315,7 @@ def resolve_include(src, parts, info, by_rel, by_tail):
     return None, "included file not found under --root"
 
 
-def mapper(root, warnings):
+def mapper(root, warnings, args):
     files = find_files(root, EXTS, SKIP_DIRS)
     rels, infos = [], []
     for path in files:
@@ -319,14 +328,34 @@ def mapper(root, warnings):
         parts = rel.split("/")
         for k in range(len(parts)):
             by_tail.setdefault("/".join(parts[k:]).lower(), []).append(rel)
-    classes, functions, constants = {}, {}, {}
+    include_path = [p for p in path_list(args.include_path) if p != "."]
+    autoload = composer_autoload(root, warnings)
+    declared, functions, constants = {}, {}, {}
     for info in infos:
         for c in info.classes:
-            classes.setdefault(c.lower(), set()).add(info.rel)
+            declared.setdefault(c.lower(), set()).add(info.rel)
         for f in info.functions:
             functions.setdefault(f.lower(), set()).add(info.rel)
         for c in info.constants:
             constants.setdefault(c, set()).add(info.rel)
+
+    by_lower = {rel.lower(): rel for rel in rels}
+    cache = {}
+
+    def classes(key):
+        """Files declaring a class (lower-cased name), narrowed by composer
+        autoload rules: a class declared in several files maps to the one its
+        PSR-4/PSR-0 path or classmap names; a class no scanned file declares
+        maps to the file at its PSR-4/PSR-0 path, if that file exists."""
+        if key not in cache:
+            files = declared.get(key, set())
+            by_path = {by_lower[p] for p in autoload.paths(key) if p in by_lower}
+            if len(files) > 1:
+                narrowed = (files & by_path) or {r for r in files if autoload.in_classmap(r)}
+                cache[key] = narrowed or files
+            else:
+                cache[key] = files or by_path
+        return cache[key]
 
     edges, unresolved = set(), set()
     for info in infos:
@@ -338,7 +367,7 @@ def mapper(root, warnings):
                     edges.add((src, t))
 
         for parts in info.includes:
-            hit, why = resolve_include(src, parts, info, by_rel, by_tail)
+            hit, why = resolve_include(src, parts, info, by_rel, by_tail, include_path)
             if hit:
                 add(hit)
             else:
@@ -347,7 +376,7 @@ def mapper(root, warnings):
         for ns, name, is_call, uses in info.refs:
             if name.startswith("\\"):
                 full = name[1:]
-                add(classes.get(full.lower(), ()))
+                add(classes(full.lower()))
                 add(functions.get(full.lower(), ()))
                 add(constants.get(full, ()))
                 continue
@@ -357,7 +386,7 @@ def mapper(root, warnings):
                 full = uses["class"][head.lower()] + ("\\" + rest if rest else "")
             else:
                 full = f"{ns}\\{name}".lstrip("\\")
-            add(classes.get(full.lower(), ()))
+            add(classes(full.lower()))
             if not rest:
                 fn = uses["function"].get(name.lower())
                 add(functions.get((fn or full).lower(), ()) or functions.get(name.lower(), ()))
@@ -368,12 +397,69 @@ def mapper(root, warnings):
                 add(constants.get(full, ()))
         for s in info.strings:
             name = s.strip().lstrip("\\").split("::")[0].replace("\\\\", "\\")
-            if ("\\" in name or "::" in s) and name.lower() in classes:
-                add(classes[name.lower()])
+            if "\\" in name or "::" in s:
+                add(classes(name.lower()))
         for ref, why in info.dynamic:
             unresolved.add((src, ref, why))
     return rels, edges, unresolved
 
 
+COMPOSER_SKIP = {"vendor", "node_modules"}
+
+
+class Autoload:
+    """PSR-4, PSR-0 and classmap entries of every composer.json under --root
+    (autoload and autoload-dev; vendor/ is not read)."""
+
+    def __init__(self):
+        self.psr4, self.psr0, self.classmap = [], [], []
+
+    def paths(self, key):
+        """Candidate files (root-relative, lower-cased class key) for a class."""
+        out = []
+        for prefix, base in self.psr4:
+            if key.startswith(prefix):
+                out.append(posixpath.normpath(posixpath.join(base, key[len(prefix):].replace("\\", "/") + ".php")))
+        for prefix, base in self.psr0:
+            if key.startswith(prefix):
+                ns, _, cls = key.rpartition("\\")
+                rel = (ns.replace("\\", "/") + "/" if ns else "") + cls.replace("_", "/") + ".php"
+                out.append(posixpath.normpath(posixpath.join(base, rel)))
+        return out
+
+    def in_classmap(self, rel):
+        return any(rel == p or rel.startswith(p.rstrip("/") + "/") for p in self.classmap)
+
+
+def composer_autoload(root, warnings):
+    """Autoload rules, matched case-insensitively against existing paths."""
+    auto = Autoload()
+    for path in sorted(root.rglob("composer.json")):
+        parts = path.relative_to(root).parts
+        if any(p.startswith(".") or p in COMPOSER_SKIP for p in parts[:-1]):
+            continue
+        base = path.parent.relative_to(root).as_posix()
+        base = "" if base == "." else base
+        try:
+            data = json.loads(read_source(path, warnings))
+        except ValueError as e:
+            warnings.append(f"composer.json not parsed, autoload ignored: {path} ({e})")
+            continue
+        for section in ("autoload", "autoload-dev"):
+            block = data.get(section) or {}
+            for kind, target in (("psr-4", auto.psr4), ("psr-0", auto.psr0)):
+                for prefix, dirs in (block.get(kind) or {}).items():
+                    for d in [dirs] if isinstance(dirs, str) else dirs:
+                        target.append((prefix.lower(), posixpath.normpath(posixpath.join(base, d)).lower()
+                                       if d not in ("", ".") else base.lower()))
+            for entry in block.get("classmap") or []:
+                auto.classmap.append(posixpath.normpath(posixpath.join(base, entry)))
+    # Longest prefix first, as composer does.
+    auto.psr4.sort(key=lambda p: -len(p[0]))
+    auto.psr0.sort(key=lambda p: -len(p[0]))
+    return auto
+
+
 if __name__ == "__main__":
-    run("Map file dependencies of a PHP codebase from its source text.", mapper)
+    run("Map file dependencies of a PHP codebase from its source text.", mapper,
+        [("--include-path", "comma-separated directories (relative to --root) PHP's include_path lists")])

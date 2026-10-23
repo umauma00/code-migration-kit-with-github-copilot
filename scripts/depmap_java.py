@@ -14,10 +14,19 @@ single-type imports, on-demand imports (pkg.*, Outer.*), static imports and
 fully qualified names. String literals equal to a declared type's full name
 (Class.forName("a.B")) count too.
 
+Types used without their name being written are followed through declared
+types (scripts/depmap_typed.py, type flow): `var x = f(); x.m().n()` reaches
+f's return type, m's and n's, through members inherited from superclasses
+and interfaces too; parameters, typed locals and for-each variables count,
+and an element type (List<Order>) passes through get() and stream calls.
+
+Maven (pom.xml) and Gradle (build.gradle[.kts]) modules are read as text: a
+type declared in several modules only gives edges into the modules the
+file's module depends on (a sibling artifactId, project(':a')), transitively.
+
 Known limits, listed in unresolved.tsv where the source shows them:
-  - a type used without its name being written (var x = f(); x.m(), chained
-    calls, lambda parameters) gives no direct edge; the edge to f's class
-    usually connects it indirectly. Audit these with the sample/diff CLI.
+  - lambda parameters, generic method type inference and overload
+    resolution are not followed. Audit these with the sample/diff CLI.
   - a local variable with a type's name gives an extra edge (conservative).
   - an import of a type the repository's own package does not declare, and
     reflection with a computed name (Class.forName(x)), are unresolved.
@@ -41,7 +50,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # -I drops the script dir
 from depmap_common import find_files, read_source, run  # noqa: E402
-from depmap_typed import FileInfo, TOKEN_RE, chains, resolve, strip_c_like  # noqa: E402
+from depmap_projects import java_modules  # noqa: E402
+from depmap_typed import FileInfo, TOKEN_RE, chains, flow_c_like, resolve, strip_c_like  # noqa: E402
 
 EXTS = {".java"}
 SKIP_DIRS = {"target", "build", "out"}
@@ -80,6 +90,7 @@ def scan(rel, text):
                     continue  # "record" used as an identifier
                 info.decls.append((package, name))
     info.names = chains(body, KEYWORDS)
+    info.type_members, info.type_bases, info.flow = flow_c_like(toks, KEYWORDS, "java", package)
     for m in REFLECTION_RE.finditer(body):
         arg = (m.group(1) or "").strip()
         if not arg.startswith('""'):
@@ -87,14 +98,14 @@ def scan(rel, text):
     return info
 
 
-def mapper(root, warnings):
+def mapper(root, warnings, args):
     files = find_files(root, EXTS, SKIP_DIRS)
     rels, infos = [], []
     for path in files:
         rel = path.relative_to(root).as_posix()
         infos.append(scan(rel, read_source(path, warnings)))
         rels.append(rel)
-    edges, unresolved = resolve(infos, nested_lookup=False)
+    edges, unresolved = resolve(infos, nested_lookup=False, visible_files=java_modules(root, rels, warnings))
     return rels, edges, unresolved
 
 

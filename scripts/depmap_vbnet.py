@@ -19,10 +19,18 @@ Every namespace is placed under the project's root namespace, as the VB
 compiler does: <RootNamespace> of the nearest .vbproj above the file, or the
 .vbproj's file name; Namespace Global.X opts out.
 
+Types used without their name being written are followed through declared
+types (scripts/depmap_typed.py, type flow): `Dim x = F()` then `x.M().N()`
+reaches F's return type, M's and N's, through Inherits/Implements too;
+parameters, Dim ... As, For Each variables and List(Of T) elements count.
+
+.vbproj files are read like .csproj ones: ProjectReference narrows names
+declared in several projects; files a project does not compile declare
+nothing and are listed in unresolved.tsv.
+
 Known limits, listed in unresolved.tsv where the source shows them:
-  - a type used without its name being written (Dim x = F(), With blocks,
-    late binding on Object) gives no direct edge; the edge to F's file
-    usually connects it indirectly. Audit these with the sample/diff CLI.
+  - With blocks, lambdas, late binding on Object and overload resolution
+    are not followed. Audit these with the sample/diff CLI.
   - a local name equal to a type or module member gives an extra edge.
   - CreateObject/Activator/Type.GetType with a computed name is unresolved.
   - every #If branch is mapped. VB6 (.bas/.cls/.frm) is a different
@@ -45,7 +53,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # -I drops the script dir
 from depmap_common import find_files, read_source, run  # noqa: E402
-from depmap_typed import FileInfo, chains, members, resolve  # noqa: E402
+from depmap_projects import dotnet_projects, drop_not_compiled  # noqa: E402
+from depmap_typed import PREDEFINED, TOKEN_RE, FileInfo, chains, is_ident, join, members, parse_expr, resolve  # noqa: E402
 
 EXTS = {".vb"}
 SKIP_DIRS = {"bin", "obj", "packages", "my project"}
@@ -55,7 +64,13 @@ MODIFIERS = (r"(?:(?:public|private|friend|protected|partial|mustinherit|notinhe
 BLOCK_RE = re.compile(r"^\s*(?:<[^>]*>\s*)?" + MODIFIERS + r"(class|module|structure|interface|enum|namespace)\s+([\w.\[\]]+)", re.IGNORECASE)
 END_RE = re.compile(r"^\s*end\s+(class|module|structure|interface|enum|namespace)\b", re.IGNORECASE)
 DELEGATE_RE = re.compile(r"^\s*(?:<[^>]*>\s*)?" + MODIFIERS + r"delegate\s+(?:sub|function)\s+([\w\[\]]+)", re.IGNORECASE)
-MEMBER_RE = re.compile(r"^\s*(?:<[^>]*>\s*)?" + MODIFIERS + r"(?:(sub|function|property|event|declare\s+(?:ansi\s+|unicode\s+|auto\s+)?(?:sub|function))\s+)?([\w\[\]]+)", re.IGNORECASE)
+MEMBER_RE = re.compile(r"^\s*(?:<[^>]*>\s*)?" + MODIFIERS + r"(?:(sub|function|property|event|operator|declare\s+(?:ansi\s+|unicode\s+|auto\s+)?(?:sub|function))\s+)?([\w\[\]]+)", re.IGNORECASE)
+# "As [New] Type" after a member's name (and parameter list, if any).
+MEMBER_TYPE_RE = re.compile(r"^(?:\s*\((?:[^()]|\([^()]*\))*\))?\s*as\s+(?:new\s+)?([\w.\[\]]+(?:\s*\(\s*of\s+[^)]*\))?)")
+INHERITS_RE = re.compile(r"^\s*(inherits|implements)\s+(.+)$")
+PARAM_RE = re.compile(r"(?:byval\s+|byref\s+|optional\s+|paramarray\s+)*([a-z_]\w*)(?:\(\))?\s+as\s+([\w.]+(?:\s*\(\s*of\s+[^)]*\))?)")
+DIM_RE = re.compile(r"^\s*(?:(?:dim|static|const|using|private|public|friend|protected|shared|readonly)\s+)+([a-z_]\w*)(?:\(\))?\s*(?:as\s+(?:new\s+)?([\w.]+(?:\s*\(\s*of\s+[^)]*\))?))?(?:\s*=\s*(.+))?")
+FOREACH_RE = re.compile(r"^\s*for\s+each\s+([a-z_]\w*)(?:\s+as\s+([\w.]+(?:\s*\(\s*of\s+[^)]*\))?))?\s+in\s+(.+)$")
 IMPORTS_RE = re.compile(r"^\s*imports\s+(?:([\w\[\]]+)\s*=\s*)?([\w.\[\]]+)\s*$", re.IGNORECASE)
 ROOT_NS_RE = re.compile(r"<RootNamespace>\s*([^<]*?)\s*</RootNamespace>", re.IGNORECASE)
 VBPROJ_IMPORT_RE = re.compile(r'<Import\s+Include\s*=\s*"([^"]+)"', re.IGNORECASE)
@@ -121,13 +136,36 @@ def strip_vb(text):
     return lines, strings
 
 
+def vb_type(text):
+    """Chains of a written VB type: Foo, Ns.Foo, List(Of Foo) -> element Foo."""
+    text = text.strip()
+    m = re.match(r"([\w.\[\]]+)(?:\s*\(\s*of\s+(.*)\))?", text)
+    if not m:
+        return []
+    head = m.group(1).replace("[", "").replace("]", "")
+    chains = [] if head in PREDEFINED or head in KEYWORDS else [(head, False)]
+    for arg in re.findall(r"[a-z_][\w.]*", m.group(2) or ""):
+        if arg not in KEYWORDS and arg not in PREDEFINED and arg != "of":
+            chains.append((arg, True))
+    return chains
+
+
+def vb_expr(text):
+    """First member-access chain of an expression (see parse_expr)."""
+    toks = TOKEN_RE.findall(text)
+    if toks and toks[0] == "await":
+        toks = toks[1:]
+    parsed = parse_expr(toks, 0, KEYWORDS) if toks else None
+    return parsed[0] if parsed else None
+
+
 def scan(rel, text, root_ns=""):
     info = FileInfo(rel)
     lines, strings = strip_vb(text)
     info.strings = strings
     stack = []      # (kind, name) of open Namespace/Class/Module... blocks
     body = []
-    member = None   # "sub"/"function"/"property" body open inside a Module
+    member = None   # "sub"/"function"/"property"/"operator" body being read
     lines = [line for line in lines if line.strip()]
 
     def ns():
@@ -136,11 +174,44 @@ def scan(rel, text, root_ns=""):
             return ".".join([parts[0][len("global."):]] + parts[1:])
         return ".".join([root_ns] + parts if root_ns else parts)
 
+    def enclosing():
+        return [join(ns(), name) for kind, name in reversed(stack) if kind != "namespace"]
+
+    def bind_params(low):
+        for name, typ in PARAM_RE.findall(low[low.find("("):] if "(" in low else ""):
+            chains = vb_type(typ)
+            if chains:
+                info.flow.append(("bind", name, enclosing(), [], chains, False))
+
+    def body_line(low):
+        m = DIM_RE.match(low)
+        if m:
+            name, typ, value = m.group(1), m.group(2), m.group(3)
+            chains = vb_type(typ) if typ else []
+            expr = vb_expr(value) if value else None
+            if chains or expr:
+                info.flow.append(("bind", name, enclosing(), [expr] if expr else [], chains, False))
+        m = FOREACH_RE.match(low)
+        if m:
+            name, typ, value = m.group(1), m.group(2), m.group(3)
+            expr = vb_expr(value)
+            info.flow.append(("bind", name, enclosing(), [expr] if expr else [], vb_type(typ) if typ else [], True))
+        toks = TOKEN_RE.findall(low)
+        for i, t in enumerate(toks):
+            if i and toks[i - 1] == ".":
+                continue
+            if t in {"new", "me", "mybase"} or (is_ident(t) and t not in KEYWORDS):
+                parsed = parse_expr(toks, i, KEYWORDS)
+                if parsed and (parsed[0][2] or parsed[0][0] == "new"):
+                    info.flow.append(("use", enclosing(), parsed[0]))
+
     for idx, line in enumerate(lines):
         low = line.lower()
         if member:
             if re.match(rf"^\s*end\s+{member}\b", low):
                 member = None
+            else:
+                body_line(low)
             body.append(line)
             continue
         m = IMPORTS_RE.match(low)
@@ -171,6 +242,7 @@ def scan(rel, text, root_ns=""):
             if re.search(r"\bpartial\b", low[:m.start(1)]):
                 info.partial.add(f"{ns()}.{name}" if ns() else name)
             stack.append((kind, name))
+            info.type_members.setdefault(join(ns(), name), {})
             body.append(line[m.end(2):])
             continue
         m = DELEGATE_RE.match(low)
@@ -179,23 +251,41 @@ def scan(rel, text, root_ns=""):
             info.decls.append((ns(), m.group(1).replace("[", "").replace("]", "")))
             body.append(line[m.end(1):])
             continue
-        # Module members are visible like types in the module's namespace.
-        if stack and stack[-1][0] == "module":
+        in_type = stack and stack[-1][0] in {"class", "module", "structure", "interface"}
+        if in_type:
+            owner = join(ns(), stack[-1][1])
+            m = INHERITS_RE.match(low)
+            if m:
+                for base in m.group(2).split(","):
+                    info.type_bases.setdefault(owner, []).extend(c for c, elem in vb_type(base) if not elem)
+                body.append(line)
+                continue
             m = MEMBER_RE.match(low)
-            if m and (m.group(1) or re.match(r"^\s*(?:<[^>]*>\s*)?(?:public|friend|private|const|dim|shared|readonly)\b", low)):
+            declared = m and (m.group(1) or re.match(r"^\s*(?:<[^>]*>\s*)?(?:public|friend|private|protected|const|dim|shared|readonly)\b", low))
+            if declared:
                 name = m.group(2).replace("[", "").replace("]", "")
-                if name not in KEYWORDS:
-                    info.decls.append((ns(), name))
-                    info.extensions.append((ns(), name))  # <Extension> methods live in modules
                 kind = (m.group(1) or "").split()[0] if m.group(1) else ""
-                if kind in {"sub", "function"}:
+                if name not in KEYWORDS:
+                    typ = MEMBER_TYPE_RE.search(low[m.end(2):])
+                    info.type_members[owner].setdefault(name, []).extend(vb_type(typ.group(1)) if typ else [])
+                    if stack[-1][0] == "module":
+                        # Module members are visible like types in the module's namespace.
+                        info.decls.append((ns(), name))
+                        info.extensions.append((ns(), name))  # <Extension> methods live in modules
+                abstract = re.search(r"\bmustoverride\b", low[:m.start(2)]) or stack[-1][0] == "interface"
+                if kind in {"sub", "function", "operator"} and not abstract:
                     member = kind
-                elif kind == "property":
+                    bind_params(low)
+                elif kind == "property" and not abstract:
                     # An auto-implemented property has no Get/Set block.
                     nxt = lines[idx + 1].lower().lstrip() if idx + 1 < len(lines) else ""
                     nxt = re.sub(r"^(?:<[^>]*>\s*)?(?:(?:public|private|friend|protected)\s+)*", "", nxt)
                     if nxt.startswith(("get", "set")):
                         member = "property"
+                        bind_params(low)
+                elif not kind:
+                    # A field initializer: Private _x As New Foo(), Dim y = Bar.Create()
+                    body_line(low)
         body.append(line)
     if not info.namespaces:
         info.namespaces.add(root_ns)
@@ -209,7 +299,7 @@ def scan(rel, text, root_ns=""):
     return info
 
 
-def mapper(root, warnings):
+def mapper(root, warnings, args):
     files = find_files(root, EXTS, SKIP_DIRS)
     rels, infos, global_imports, root_ns = [], [], set(), {}
     for proj in find_files(root, {".vbproj"}, SKIP_DIRS):
@@ -222,8 +312,10 @@ def mapper(root, warnings):
         project = next((root_ns[d] for d in path.parents if d in root_ns), "")
         infos.append(scan(rel, read_source(path, warnings), project))
         rels.append(rel)
-    edges, unresolved = resolve(infos, fold=True, global_usings=global_imports)
-    return rels, edges, unresolved
+    visible_files, not_compiled = dotnet_projects(root, rels, ".vbproj", warnings)
+    skipped = drop_not_compiled(infos, not_compiled)
+    edges, unresolved = resolve(infos, fold=True, global_usings=global_imports, visible_files=visible_files)
+    return rels, edges, unresolved | skipped
 
 
 if __name__ == "__main__":

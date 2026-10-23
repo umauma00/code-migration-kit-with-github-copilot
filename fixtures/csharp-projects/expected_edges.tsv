@@ -1,0 +1,4 @@
+from	to
+Web/Legacy/OldPage.cs	Web/Helper.cs
+Web/Page.cs	Core/Customer.cs
+Web/Page.cs	Web/Helper.cs

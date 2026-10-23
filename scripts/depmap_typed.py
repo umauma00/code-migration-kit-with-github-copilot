@@ -36,6 +36,9 @@ class FileInfo:
         self.members = set()        # names written after "." (x.Name)
         self.strings = []           # string literal contents (reflection lookups)
         self.dynamic = []           # (reference, reason) the mapper could not resolve statically
+        self.type_members = {}      # type fqn -> {member: [(type chain, is_element)]}
+        self.type_bases = {}        # type fqn -> [base type chain]
+        self.flow = []              # bindings and member chains (see flow_c_like)
 
 
 def dotted(name, fold):
@@ -60,17 +63,22 @@ def join(ns, name):
 
 
 def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
-            nested_lookup=True):
+            nested_lookup=True, visible_files=None):
     """Return (edges, unresolved) for the FileInfo list.
 
     nested_lookup: C# and VB.NET see the types of every enclosing namespace
     (code in a.b.c sees a.b and a) and accept names qualified relative to
     them; Java sees only its own package and fully qualified names.
     attribute_suffix: C# [Foo] may name FooAttribute.
+    visible_files: optional function(rel) -> set of files its project can
+    see (project references, build modules), or None when the file belongs
+    to no project. When a name matches files both inside and outside that
+    set, only those inside become edges.
     """
     types = {}          # fqn -> set(rel)
     extensions = {}     # fqn of an extension method -> set(rel)
     namespaces = set()
+    declared_in = {}    # fqn -> [FileInfo] (members/bases resolve in that file's scope)
     for info in infos:
         for ns in info.namespaces:
             namespaces.update(prefixes(ns))
@@ -78,89 +86,258 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
             types.setdefault(join(ns, name), set()).add(info.rel)
         for ns, name in info.extensions:
             extensions.setdefault(join(ns, name), set()).add(info.rel)
+        for fqn in set(info.type_members) | set(info.type_bases):
+            declared_in.setdefault(fqn, []).append(info)
     global_usings = {dotted(u, fold) for u in global_usings}
-
-    edges, unresolved = set(), set()
 
     def lookup(fqn):
         return types.get(fqn, ())
 
+    class Scope:
+        """Name lookup as seen from one file."""
+
+        def __init__(self, info):
+            self.info = info
+            own = set(info.namespaces) or {""}
+            self.enclosing = set()
+            for ns in own:
+                self.enclosing.update(prefixes(ns) if nested_lookup else [ns])
+            self.usings = set(info.usings) | global_usings
+            self.visible = self.enclosing | {u for u in self.usings if u in namespaces}
+            self.imported = sorted(u for u in self.usings if u in namespaces)
+            self.inner_first = sorted(self.enclosing, key=len, reverse=True)
+            self.cache, self.mention_cache = {}, {}
+            self.simple = {}    # simple name -> fqns from direct imports and aliases
+            for target in sorted(info.direct):
+                segs = target.split(".")
+                fq = self.longest(segs)
+                if fq:
+                    self.simple.setdefault(segs[-1], set()).add(fq)
+            for alias, target in sorted(info.aliases.items()):
+                fq = self.longest(target.split("."))
+                if fq:
+                    self.simple.setdefault(alias, set()).add(fq)
+
+        def simple_name(self, name):
+            """A simple type name, by the language's lookup order: C#/VB look
+            in the innermost enclosing namespace first, then outward, then in
+            imported namespaces; Java takes a single-type import first, then
+            its own package, then on-demand imports. Candidates tied at the
+            first level that has any all count."""
+            if name in self.cache:
+                return self.cache[name]
+            direct = self.simple.get(name, set())
+            found = None
+            if nested_lookup:
+                for ns in self.inner_first:
+                    if join(ns, name) in types:
+                        found = {join(ns, name)}
+                        break
+            elif direct:
+                found = set(direct)
+            else:
+                found = {join(ns, name) for ns in self.enclosing if join(ns, name) in types} or None
+            if found is None:
+                found = {join(u, name) for u in self.imported if join(u, name) in types}
+                if nested_lookup:
+                    found |= direct
+            self.cache[name] = found
+            return found
+
+        @staticmethod
+        def longest(segs):
+            for i in range(len(segs), 0, -1):
+                fq = ".".join(segs[:i])
+                if fq in types:
+                    return fq
+            return None
+
+        def exact(self, segs):
+            """Types a dotted name denotes as a whole (no member suffix)."""
+            if segs[0] in self.info.aliases:
+                segs = self.info.aliases[segs[0]].split(".") + segs[1:]
+            if len(segs) == 1:
+                return self.simple_name(segs[0])
+            # Qualified: from the innermost enclosing namespace outward
+            # (Java: fully qualified only), then through a type's nested name.
+            for ns in self.inner_first if nested_lookup else [""]:
+                fq = join(ns, ".".join(segs))
+                if fq in types:
+                    return {fq}
+            out = set()
+            for h in self.exact(segs[:1]):
+                fq = join(h, ".".join(segs[1:]))
+                if fq in types:
+                    out.add(fq)
+            return out
+
+        def mentioned(self, chain):
+            """Types a written name chain refers to (a type, or a type and members)."""
+            if chain not in self.mention_cache:
+                self.mention_cache[chain] = self._mentioned(chain)
+            return self.mention_cache[chain]
+
+        def _mentioned(self, chain):
+            segs = chain.split(".")
+            if segs[0] in self.info.aliases:
+                segs = self.info.aliases[segs[0]].split(".") + segs[1:]
+            for ns in self.inner_first if nested_lookup else [""]:
+                fq = self.longest((ns.split(".") if ns else []) + segs)
+                if fq:
+                    return {fq}
+            found = self.exact(segs[:1])
+            if not found and attribute_suffix:
+                found = self.exact([segs[0] + attribute_suffix])
+            return found
+
+    scopes = {info.rel: Scope(info) for info in infos}
+    edges, unresolved = set(), set()
+
     def add(src, targets):
+        targets = set(targets)
+        if visible_files and len(targets) > 1:
+            seen = visible_files(src)
+            inside = {t for t in targets if seen is None or t in seen}
+            if inside:
+                targets = inside
         for t in targets:
             if t != src:
                 edges.add((src, t))
 
-    def longest_type_prefix(segs):
-        for i in range(len(segs), 0, -1):
-            hit = lookup(".".join(segs[:i]))
-            if hit:
-                return hit
-        return ()
+    def add_types(src, fqns):
+        files = set()
+        for fq in fqns:
+            files.update(lookup(fq))
+        add(src, files)
+
+    # Member tables, resolved lazily in the declaring file's scope.
+    member_cache, base_cache = {}, {}
+
+    def members_of(fqn):
+        if fqn not in member_cache:
+            table = {}
+            for info in declared_in.get(fqn, ()):
+                scope = scopes[info.rel]
+                for name, chains in info.type_members.get(fqn, {}).items():
+                    slot = table.setdefault(name, set())
+                    for chain, elem in chains:
+                        slot.update((fq, elem) for fq in scope.exact(chain.split(".")))
+            member_cache[fqn] = table
+        return member_cache[fqn]
+
+    def bases_of(fqn):
+        if fqn not in base_cache:
+            base_cache[fqn] = set()
+            found = set()
+            for info in declared_in.get(fqn, ()):
+                for chain in info.type_bases.get(fqn, ()):
+                    found.update(scopes[info.rel].exact(chain.split(".")))
+            base_cache[fqn] = found
+        return base_cache[fqn]
+
+    def closure(fqn):
+        seen, todo = set(), [fqn]
+        while todo:
+            t = todo.pop()
+            if t not in seen:
+                seen.add(t)
+                todo.extend(bases_of(t))
+        return seen
+
+    def member_types(current, name):
+        out = set()
+        for fqn, _ in current:
+            for t in closure(fqn):
+                out.update(members_of(t).get(name, ()))
+        if not out:  # List<Order>.First(), an indexer, LINQ: pass element types on
+            out = {(fq, True) for fq, elem in current if elem}
+        return out
+
+    def has_member(fqn, name):
+        return any(name in members_of(t) for t in closure(fqn))
+
+    def evaluate(scope, env, enclosing, expr):
+        """(final types, every type passed) of one member-access chain."""
+        kind, head, rest = expr
+        passed = set()
+        if kind == "new":
+            current = {(fq, False) for fq in scope.exact(head.split("."))}
+        elif kind == "this":
+            current = {(fq, False) for fq in enclosing[:1]}
+        elif kind == "base":
+            current = {(fq, False) for t in enclosing[:1] for fq in bases_of(t)}
+        else:
+            segs = [head] + rest
+            current = set()
+            if head in env:
+                current, rest = set(env[head]), rest
+            else:
+                owner = next((t for t in enclosing if has_member(t, head)), None)
+                if owner:
+                    current = member_types({(owner, False)}, head)
+                else:
+                    for k in range(len(segs), 0, -1):
+                        hit = scope.exact(segs[:k])
+                        if hit:
+                            current, rest = {(fq, False) for fq in hit}, segs[k:]
+                            break
+                    else:
+                        return set(), passed
+        passed.update(fq for fq, _ in current)
+        for name in rest:
+            current = member_types(current, name)
+            if not current:
+                break
+            passed.update(fq for fq, _ in current)
+        return current, passed
 
     for info in infos:
         src = info.rel
+        scope = scopes[src]
         # Partial parts of one type depend on each other.
         for fqn in info.partial:
             add(src, lookup(fqn))
-        own = set(info.namespaces) or {""}
-        enclosing = set()
-        for ns in own:
-            enclosing.update(prefixes(ns) if nested_lookup else [ns])
-        roots = enclosing if nested_lookup else {""}
-        usings = set(info.usings) | global_usings
-        simple = {}     # simple name -> targets from direct imports
         for target in sorted(info.direct):
             segs = target.split(".")
-            hit = longest_type_prefix(segs)
-            if hit:
-                add(src, hit)
-                simple.setdefault(segs[-1], set()).update(hit)
+            fq = scope.longest(segs)
+            if fq:
+                add(src, lookup(fq))
             elif ".".join(segs[:-1]) in namespaces:
                 unresolved.add((src, target, "import of a type the repository package does not declare"))
-        for alias, target in sorted(info.aliases.items()):
-            segs = target.split(".")
-            hit = longest_type_prefix(segs)
-            if hit:
-                simple.setdefault(alias, set()).update(hit)
-        for u in sorted(usings):
-            hit = lookup(u)
-            if hit:  # Java on-demand import of a type's members, C# using of a type
-                add(src, hit)
-        visible = enclosing | {u for u in usings if u in namespaces}
-
-        def candidates(name):
-            out = set()
-            for ns in visible:
-                out.update(lookup(join(ns, name)))
-            out.update(simple.get(name, ()))
-            return out
-
+        for u in sorted(scope.usings):
+            if lookup(u):  # Java on-demand import of a type's members, C# using of a type
+                add(src, lookup(u))
         for chain in info.names:
-            segs = chain.split(".")
-            if segs[0] in info.aliases:
-                segs = info.aliases[segs[0]].split(".") + segs[1:]
-            # Fully qualified, or qualified relative to an enclosing namespace.
-            hit = ()
-            for ns in sorted(roots, key=len, reverse=True):
-                hit = longest_type_prefix((ns.split(".") if ns else []) + segs)
-                if hit:
-                    break
-            if hit:
-                add(src, hit)
-                continue
-            found = candidates(segs[0])
-            if not found and attribute_suffix:
-                found = candidates(segs[0] + attribute_suffix)
-            add(src, found)
+            add_types(src, scope.mentioned(chain))
         # x.Name() may call an extension method of any visible namespace.
         for name in sorted(info.members):
-            for ns in visible:
+            for ns in scope.visible:
                 add(src, extensions.get(join(ns, name), ()))
-        for s in info.strings:
-            name = s.split(",")[0].strip()
+        for text in info.strings:
+            name = text.split(",")[0].strip()
             name = name.lower() if fold else name
             if "." in name and lookup(name):
                 add(src, lookup(name))
+        # Types reached through variables and member chains.
+        env = {}
+        for step in info.flow:
+            if step[0] == "bind":
+                _, var, enclosing, exprs, chains, foreach = step
+                bound = set()
+                for chain, elem in chains:
+                    bound.update((fq, elem) for fq in scope.exact(chain.split(".")))
+                for expr in exprs:
+                    final, passed = evaluate(scope, env, enclosing, expr)
+                    add_types(src, passed)
+                    if foreach:     # the loop variable is an element
+                        elems = {(fq, False) for fq, elem in final if elem}
+                        final = elems or {(fq, False) for fq, _ in final}
+                    bound.update(final)
+                if bound:
+                    env.setdefault(var, set()).update((fq, elem) for fq, elem in bound)
+            else:
+                _, enclosing, expr = step
+                add_types(src, evaluate(scope, env, enclosing, expr)[1])
         for ref, why in info.dynamic:
             unresolved.add((src, ref, why))
     return edges, unresolved
@@ -304,3 +481,286 @@ MEMBER_RE = re.compile(r"\.\s*@?([^\W\d]\w*)")
 def members(code, fold=False):
     """Names written after a dot: candidates for extension method calls."""
     return {m.group(1).lower() if fold else m.group(1) for m in MEMBER_RE.finditer(code)}
+
+
+# ---------------------------------------------------------------------------
+# Type flow: types used without their name being written.
+#
+# `var x = Factory.Create(); x.Run();` names Factory but not the type Create
+# returns. Declarations do name it, so each file also reports, per declared
+# type, its members' declared types and its base types, plus a list of
+# statements: variable bindings (`var x = expr`, `Foo x`, parameters,
+# foreach) and member-access chains (`a.B().C`). The resolver evaluates the
+# chains against the member table and makes an edge to every type a chain
+# passes through. Types written as generic arguments (List<Order>) are
+# "element" types: a member the resolver cannot find on the container (an
+# external List, LINQ's First(), an indexer) passes them through.
+# Variables are tracked per file, not per method: one name used in two
+# methods gets both types (extra edges, never fewer).
+# ---------------------------------------------------------------------------
+
+PREDEFINED = set("""bool byte sbyte char decimal double float int uint long ulong short ushort
+object string void dynamic nint nuint boolean""".split())
+
+
+def is_ident(tok):
+    return bool(tok) and (tok[0].isalpha() or tok[0] == "_" or (tok[0] == "@" and len(tok) > 1)) and not tok.startswith("@interface")
+
+
+def parse_type(toks, i, keywords):
+    """Type expression at toks[i]: (chains, end) or None. chains holds
+    (dotted name, is_element) for the type and its generic arguments."""
+    n = len(toks)
+    if i >= n:
+        return None
+    t = toks[i]
+    if t in PREDEFINED:
+        j, chains = i + 1, []
+    else:
+        if not is_ident(t) or t in keywords:
+            return None
+        segs = [t.lstrip("@")]
+        j = i + 1
+        while j + 1 < n and toks[j] == "." and is_ident(toks[j + 1]) and toks[j + 1] not in keywords:
+            segs.append(toks[j + 1].lstrip("@"))
+            j += 2
+        chains = [(".".join(segs), False)]
+    if j < n and toks[j] == "<":
+        k = j + 1
+        while True:
+            inner = parse_type(toks, k, keywords)
+            if inner is None:
+                return None
+            chains += [(c, True) for c, _ in inner[0]]
+            k = inner[1]
+            if k < n and toks[k] == ",":
+                k += 1
+                continue
+            if k < n and toks[k] == ">":
+                j = k + 1
+                break
+            return None
+    while j < n:
+        if toks[j] == "?":
+            j += 1
+        elif toks[j] == "[" and j + 1 < n and toks[j + 1] in {"]", ","}:
+            k = j + 1
+            while k < n and toks[k] == ",":
+                k += 1
+            if k >= n or toks[k] != "]":
+                break
+            j = k + 1
+        else:
+            break
+    if t in PREDEFINED and not chains:
+        return [], j
+    return chains, j
+
+
+def skip_balanced(toks, i):
+    """toks[i] opens ( [ or {; return the index after its closing token."""
+    pairs = {"(": ")", "[": "]", "{": "}"}
+    close, level = pairs[toks[i]], 0
+    opener = toks[i]
+    n = len(toks)
+    while i < n:
+        if toks[i] == opener:
+            level += 1
+        elif toks[i] == close:
+            level -= 1
+            if level == 0:
+                return i + 1
+        i += 1
+    return n
+
+
+def parse_expr(toks, i, keywords):
+    """Member-access chain starting at toks[i]: ((kind, head, members), end)
+    or None. kind is "new" (head = type name), "this", "base" or "name"."""
+    n = len(toks)
+    t = toks[i]
+    members = []
+    if t == "new":
+        parsed = parse_type(toks, i + 1, keywords)
+        if not parsed or not parsed[0]:
+            return None
+        head, j = parsed[0][0][0], parsed[1]
+        if j < n and toks[j] in {"(", "{"}:
+            j = skip_balanced(toks, j)
+        kind = "new"
+    elif t in {"this", "base", "super", "me", "mybase"}:
+        kind, head, j = {"me": "this", "mybase": "base", "super": "base"}.get(t, t), "", i + 1
+    elif is_ident(t) and t not in keywords:
+        kind, head, j = "name", t.lstrip("@"), i + 1
+    else:
+        return None
+    while j < n:
+        if toks[j] == "(":
+            j = skip_balanced(toks, j)
+            continue
+        if toks[j] == "[":      # indexer: its declared type, or the element type
+            j = skip_balanced(toks, j)
+            members.append("[]")
+            continue
+        if toks[j] == "<":
+            # Generic method call: Foo<Bar>(...)
+            k = j + 1
+            ok = False
+            while k < n and toks[k] != ">":
+                if not (is_ident(toks[k]) or toks[k] in {",", ".", "<", "[", "]", "?"}):
+                    break
+                k += 1
+            ok = k + 1 < n and toks[k] == ">" and toks[k + 1] == "("
+            if ok:
+                j = k + 1
+                continue
+            break
+        if toks[j] == "!" and j + 1 < n and toks[j + 1] == ".":
+            j += 1
+            continue
+        if toks[j] == "?" and j + 1 < n and toks[j + 1] == ".":
+            j += 1
+            continue
+        if toks[j] == "." and j + 1 < n and is_ident(toks[j + 1]):
+            members.append(toks[j + 1].lstrip("@"))
+            j += 2
+            continue
+        break
+    return (kind, head, members), j
+
+
+def flow_c_like(toks, keywords, language, package=""):
+    """Member table, base types and flow statements of one C# or Java file.
+
+    Returns (members, bases, flow):
+      members: {type fqn: {member: [(chain, is_element)]}}
+      bases:   {type fqn: [chain]}
+      flow:    [("bind", var, enclosing, exprs, chains, foreach)
+                | ("use", enclosing, expr)], in source order
+    """
+    n = len(toks)
+    members, bases, flow = {}, {}, []
+    depth, paren = 0, 0
+    ns_stack, file_ns = [], package
+    type_stack = []         # (fqn, depth of its body)
+    pending = None
+
+    def namespace():
+        return ".".join(p for p in [file_ns] + [x for x, _ in ns_stack] if p)
+
+    def enclosing():
+        return [fqn for fqn, _ in reversed(type_stack)]
+
+    i = 0
+    while i < n:
+        t = toks[i]
+        prev = toks[i - 1] if i else ";"
+        if t == "{":
+            depth += 1
+            if pending:
+                type_stack.append((pending, depth))
+                pending = None
+            i += 1
+            continue
+        if t == "}":
+            if type_stack and type_stack[-1][1] == depth:
+                type_stack.pop()
+            depth -= 1
+            while ns_stack and ns_stack[-1][1] >= depth:
+                ns_stack.pop()
+            i += 1
+            continue
+        if t == "(":
+            paren += 1
+        elif t == ")":
+            paren = max(0, paren - 1)
+        elif t == ";":
+            pending = None      # record X(...); has no body
+        if language == "csharp" and t == "namespace":
+            segs, j = [], i + 1
+            while j < n and is_ident(toks[j]):
+                segs.append(toks[j])
+                if j + 1 < n and toks[j + 1] == ".":
+                    j += 2
+                    continue
+                j += 1
+                break
+            if j < n and toks[j] == ";":
+                file_ns = ".".join(segs)
+            else:
+                ns_stack.append((".".join(segs), depth))
+            i = j
+            continue
+        if t in {"class", "struct", "interface", "enum", "record", "@interface"} and prev not in {".", ":", ",", "<", "(", "new", "where"} \
+                and i + 1 < n:
+            j = i + 1
+            if t == "record" and toks[j] in {"class", "struct"}:
+                j += 1
+            if j < n and is_ident(toks[j]) and toks[j] not in keywords:
+                fqn = join(namespace(), toks[j].lstrip("@"))
+                pending = fqn
+                members.setdefault(fqn, {})
+                j += 1
+                if j < n and toks[j] == "<":
+                    level = 0
+                    while j < n:
+                        level += {"<": 1, ">": -1}.get(toks[j], 0)
+                        j += 1
+                        if level == 0:
+                            break
+                if j < n and toks[j] == "(":       # record parameters
+                    j = skip_balanced(toks, j)
+                if j < n and toks[j] in {":", "extends", "implements"}:
+                    j += 1
+                    while j < n and toks[j] not in {"{", ";", "where"}:
+                        if toks[j] in {",", "implements", "extends"}:
+                            j += 1
+                            continue
+                        parsed = parse_type(toks, j, keywords)
+                        if not parsed:
+                            j += 1
+                            continue
+                        bases.setdefault(fqn, []).extend(c for c, elem in parsed[0] if not elem)
+                        j = max(parsed[1], j + 1)
+                        if j < n and toks[j] == "(":   # record base arguments
+                            j = skip_balanced(toks, j)
+                i = j
+                continue
+        # var x = expr; foreach (var x in expr); for (var x : expr)
+        if t == "var" and i + 2 < n and is_ident(toks[i + 1]) and toks[i + 2] in {"=", "in", ":"}:
+            name = toks[i + 1].lstrip("@")
+            k = i + 3
+            if k < n and toks[k] == "await":
+                k += 1
+            parsed = parse_expr(toks, k, keywords) if k < n else None
+            if parsed:
+                flow.append(("bind", name, enclosing(), [parsed[0]], [], toks[i + 2] != "="))
+            i += 2
+            continue
+        # Declarations: Type name followed by = ; , ) ( { => : in
+        if (is_ident(t) and t not in keywords or t in PREDEFINED) and prev not in {".", "new"}:
+            parsed = parse_type(toks, i, keywords)
+            if parsed and parsed[1] < n - 1:
+                chains, j = parsed
+                name, after = toks[j], toks[j + 1]
+                in_body = type_stack and depth == type_stack[-1][1] and paren == 0
+                if in_body and name == "this" and after == "[":     # indexer
+                    members[type_stack[-1][0]].setdefault("[]", []).extend(chains)
+                    i = j
+                    continue
+                if is_ident(name) and name not in keywords and (
+                        after in {"=", ";", ",", ")", ":", "in"} or (in_body and after in {"(", "{", "<"})
+                        or (not in_body and after in {"&", "|"})):   # x is Foo f && ...
+                    name = name.lstrip("@")
+                    if in_body:
+                        members[type_stack[-1][0]].setdefault(name, []).extend(chains)
+                    elif chains:
+                        flow.append(("bind", name, enclosing(), [], chains, False))
+                    i = j       # continue at the declared name
+                    continue
+        if prev not in {".", "?"} and (t in {"new", "this", "base", "super"} or (is_ident(t) and t not in keywords)):
+            parsed = parse_expr(toks, i, keywords)
+            if parsed and (parsed[0][2] or parsed[0][0] == "new"):
+                flow.append(("use", enclosing(), parsed[0]))
+        i += 1
+    return members, bases, flow

@@ -16,10 +16,22 @@ matches FooAttribute. Fully qualified names, string literals that equal a
 declared type's full name (Type.GetType("A.B")) and partial types (all parts
 linked) count too.
 
+Types used without their name being written are followed through declared
+types (scripts/depmap_typed.py, type flow): `var x = F(); x.M().N()` reaches
+F's return type, M's and N's, through members inherited from base types too;
+parameters, typed locals and foreach variables count, and an element type
+(List<Order>) passes through indexers and LINQ-style calls.
+
+.csproj files are read as text: a name declared in several projects only
+gives edges into the projects the file's project references
+(ProjectReference, transitively), and a file the project does not compile
+(<Compile Remove>, or left out of an old-style project's <Compile Include>
+list) declares nothing and is listed in unresolved.tsv.
+
 Known limits, listed in unresolved.tsv where the source shows them:
-  - a type used without its name being written (var x = F(); x.M(), chained
-    calls, lambda parameters) gives no direct edge; the edge to F's file
-    usually connects it indirectly. Audit these with the sample/diff CLI.
+  - lambda parameters, generic method type inference, overload resolution,
+    `dynamic` and user-defined conversions are not followed. Audit these
+    with the sample/diff CLI.
   - a local variable with a type's name gives an extra edge (conservative).
   - every #if branch is mapped; source generators and T4 output that is not
     checked in is invisible.
@@ -43,7 +55,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # -I drops the script dir
 from depmap_common import find_files, read_source, run  # noqa: E402
-from depmap_typed import FileInfo, TOKEN_RE, chains, dotted, members, resolve, strip_c_like  # noqa: E402
+from depmap_projects import dotnet_projects, drop_not_compiled  # noqa: E402
+from depmap_typed import FileInfo, TOKEN_RE, chains, dotted, flow_c_like, members, resolve, strip_c_like  # noqa: E402
 
 EXTS = {".cs"}
 SKIP_DIRS = {"bin", "obj", "packages"}
@@ -183,6 +196,7 @@ def scan(rel, text):
         code = code[:a] + " " * (b - a) + code[b:]
     info.names = chains(code, KEYWORDS)
     info.members = members(code)
+    info.type_members, info.type_bases, info.flow = flow_c_like([t for t, _, _ in toks], KEYWORDS, "csharp")
     for m in REFLECTION_RE.finditer(code):
         arg = (m.group(2) or "").strip()
         if not arg.startswith('""'):
@@ -190,7 +204,7 @@ def scan(rel, text):
     return info, globals_
 
 
-def mapper(root, warnings):
+def mapper(root, warnings, args):
     files = find_files(root, EXTS, SKIP_DIRS)
     rels, infos, global_usings = [], [], set()
     for path in files:
@@ -201,8 +215,11 @@ def mapper(root, warnings):
         global_usings.update(globals_)
     for proj in find_files(root, {".csproj"}, SKIP_DIRS):
         global_usings.update(CSPROJ_USING_RE.findall(read_source(proj, warnings)))
-    edges, unresolved = resolve(infos, global_usings=global_usings, attribute_suffix="Attribute")
-    return rels, edges, unresolved
+    visible_files, not_compiled = dotnet_projects(root, rels, ".csproj", warnings)
+    skipped = drop_not_compiled(infos, not_compiled)
+    edges, unresolved = resolve(infos, global_usings=global_usings, attribute_suffix="Attribute",
+                                visible_files=visible_files)
+    return rels, edges, unresolved | skipped
 
 
 if __name__ == "__main__":

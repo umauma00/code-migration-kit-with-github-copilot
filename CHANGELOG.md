@@ -10,11 +10,21 @@
   computed name, imports of undeclared repository types). C#, Java and
   VB.NET resolve type names through namespaces, imports, aliases, global
   usings (.cs/.csproj/.vbproj), extension methods, VB module members and
-  partial types, leaning towards extra edges; a type whose name is never
-  written (`var x = f()`) gives no direct edge. PHP follows computable
+  partial types, in the language's lookup order (innermost namespace first;
+  Java single-type import, own package, then `pkg.*`). Types whose name is
+  never written are followed through declared types: member and return
+  types, base types, parameters, typed and `var` locals, foreach variables,
+  indexers and generic element types (`var x = f(); x.M().N()` reaches every
+  type on the way). `.csproj`/`.vbproj` ProjectReference and Maven/Gradle
+  module dependencies narrow a name declared in several projects to the
+  referenced ones, and files a .NET project does not compile declare
+  nothing. Lambda parameters, generic inference and overloads are not
+  followed. PHP follows computable
   include paths and case-insensitive class/function names with namespaces
-  and `use`; COBOL follows COPY, EXEC SQL INCLUDE, CALL 'X' and EXEC CICS
-  LINK/XCTL in fixed or free format. Non-UTF-8 sources are read as cp932,
+  and `use`, narrowed by composer.json autoload (PSR-4, PSR-0, classmap),
+  with `--include-path`; COBOL follows COPY, EXEC SQL INCLUDE, CALL 'X' and
+  EXEC CICS LINK/XCTL in fixed or free format, with `--copy-path` as the
+  copybook search order. Non-UTF-8 sources are read as cp932,
   then Latin-1, with a warning. `source-spec check` suggests the mapper for
   these languages. [Dependency mappers](docs/DEPENDENCY-MAPPERS.md) lists
   them and says how to write an adapter for any other language (static only,

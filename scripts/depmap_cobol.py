@@ -16,6 +16,11 @@ Edges (names compared case-insensitively):
   - CALL 'PROG' / CALL "PROG", and EXEC CICS LINK/XCTL/START PROGRAM('PROG')
     -> the file whose PROGRAM-ID is PROG (or, failing that, whose name is PROG).
 
+--copy-path DIR,DIR is the copybook library concatenation (SYSLIB, COBCPY):
+when a copybook name matches several files, the first listed directory
+holding it wins, and COPY X OF LIB looks first in a listed directory named
+LIB.
+
 Fixed format (sequence area in columns 1-6, indicator in column 7, code in
 8-72) is assumed unless the file says >>SOURCE FORMAT FREE / $SET
 SOURCEFORMAT"FREE", or its lines visibly start in column 1. Comment lines
@@ -32,7 +37,7 @@ Skipped directories: node_modules, __pycache__, generated and every
 directory starting with ".".
 
 Usage:
-  python3 depmap_cobol.py --root path/to/repo --out path/to/migration/depmap
+  python3 depmap_cobol.py --root path/to/repo --out path/to/migration/depmap [--copy-path copy,shared]
 Output: edges.tsv, order.txt, cycles.txt (same contract as depmap_python.py)
 and unresolved.tsv (file, reference, reason).
 
@@ -44,7 +49,7 @@ import sys
 from pathlib import PurePosixPath, Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # -I drops the script dir
-from depmap_common import find_files, read_source, run  # noqa: E402
+from depmap_common import find_files, path_list, read_source, run  # noqa: E402
 
 PROGRAM_EXTS = {".cbl", ".cob", ".cobol", ".pco", ".sqb", ".ccp"}
 COPY_EXTS = {".cpy", ".copy", ".inc", ".cpb"}
@@ -114,7 +119,7 @@ def name_of(m, first):
     return None
 
 
-def mapper(root, warnings):
+def mapper(root, warnings, args):
     files = find_files(root, EXTS)
     rels = [p.relative_to(root).as_posix() for p in files]
     texts = {rel: code_lines(read_source(path, warnings)) for rel, path in zip(rels, files)}
@@ -127,12 +132,22 @@ def mapper(root, warnings):
         for m in PROGRAM_ID_RE.finditer(texts[rel]):
             programs.setdefault(name_of(m, 1).lower(), []).append(rel)
 
+    copy_paths = [p for p in path_list(args.copy_path)]
+
     def copybook(src, name, lib):
         key = name.lower()
         cands = by_name.get(key) or [r for r in by_stem.get(key, []) if PurePosixPath(r).suffix.lower() in COPY_EXTS] \
             or by_stem.get(PurePosixPath(key).stem, [])
         if not cands:
             return None, "copybook not found under --root"
+        # --copy-path is the library concatenation (SYSLIB, COBCPY): the
+        # first directory in it holding the copybook wins; COPY X OF LIB
+        # looks first in a listed directory named LIB.
+        order = sorted(copy_paths, key=lambda d: not lib or PurePosixPath(d).name.lower() != lib.lower())
+        for d in order:
+            here_hits = [c for c in cands if str(PurePosixPath(c).parent).lower() == d.lower()]
+            if len(here_hits) == 1:
+                return here_hits, None
         if len(cands) == 1:
             return cands, None
         here = str(PurePosixPath(src).parent)
@@ -198,4 +213,5 @@ def mapper(root, warnings):
 
 
 if __name__ == "__main__":
-    run("Map file dependencies of a COBOL codebase from its source text.", mapper)
+    run("Map file dependencies of a COBOL codebase from its source text.", mapper,
+        [("--copy-path", "comma-separated copybook directories (relative to --root), searched in order like SYSLIB/COBCPY")])

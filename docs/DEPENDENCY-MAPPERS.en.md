@@ -21,6 +21,11 @@ All of them need only the Python 3 standard library (nothing to install; Windows
 
 On Windows use `py` or `python` instead of `python3`.
 
+Extra options (comma-separated paths relative to `--root`):
+
+- PHP: `--include-path lib,inc` gives PHP's include_path. A relative include is looked up there first, then next to the including file, then at `--root`. `composer.json` autoload (PSR-4, PSR-0, classmap; not under vendor) is read automatically: a class declared in several files maps to the one autoload names.
+- COBOL: `--copy-path copy,shared` gives the copybook search order (like SYSLIB or COBCPY). When a copybook name matches several files, the first listed directory wins; `COPY X OF LIB` looks first in a directory named LIB.
+
 Every mapper writes:
 
 - `edges.tsv`: one edge per line (from → to, paths relative to `--root`)
@@ -34,8 +39,10 @@ The same input always gives byte-identical output. Shift_JIS (cp932) sources are
 
 In C#, Java and VB.NET an import names a namespace, not a file, and types of the same namespace need no import. The mappers build a table of the types each file declares and resolve every name **written** in each file's code against it.
 
-- **They lean towards extra edges.** When several visible types match a simple name, every candidate becomes an edge; a local variable named like a type becomes one too.
-- **They miss types whose name is never written**: the type of `x` in `var x = F(); x.M();`, types in the middle of a call chain, lambda parameter types. The edge to the file declaring `F` is still there, so the migration order usually connects indirectly. Check that review evidence is complete with the [preparation audit](PREPARATION-AUDITS.md) samples and `dependency-diff`.
+- **They follow types whose name is never written.** A table of each type's declared method, property and field types and its base types lets the mappers follow variables and call chains: in `var x = F(); x.M().N();` the return types of `F`, `M` and `N` become edges. Parameters, typed locals and foreach variables count; an element type such as `List<Order>` passes through indexers and LINQ-style calls.
+- **Names resolve in the language's order.** C# and VB.NET look from the innermost namespace outward, then through using/Imports; Java takes single-type imports, then its own package, then `pkg.*`. Candidates tied at the same level all become edges (leaning towards extra edges); a local variable named like a type becomes one too.
+- **Project files narrow candidates.** C# and VB.NET read ProjectReference in `.csproj`/`.vbproj`; Java reads Maven (`pom.xml`) and Gradle (`build.gradle`) module dependencies. When a type name exists in several projects, only the referenced projects' files become edges. A file the build leaves out (`<Compile Remove>`, or missing from an old-style project's `<Compile Include>` list) declares nothing and is listed in `unresolved.tsv`. The files are read as text; MSBuild and Maven are never run.
+- **Still missed:** lambda parameter types, generic method type inference, overload resolution, `dynamic`, VB With blocks. Check that review evidence is complete with the [preparation audit](PREPARATION-AUDITS.md) samples and `dependency-diff`.
 - PHP decides `$obj->m()` at run time, so a full parser cannot resolve it either, and COBOL dependencies are just COPY and CALL names: for these two the bundled mappers lose almost nothing to a real parser.
 
 ## Checking a mapper's output

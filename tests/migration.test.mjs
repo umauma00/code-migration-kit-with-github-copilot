@@ -328,13 +328,17 @@ test('workflow invalid CLI result fails closed and never marks a unit complete',
 test('C#, Java, PHP, VB.NET and COBOL dependency fixtures produce their expected outputs', async t => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'copilot-depmap-legacy-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
-  for (const lang of ['csharp', 'java', 'php', 'vbnet', 'cobol']) {
-    const out = path.join(root, lang), fixture = path.join(kitRoot, 'fixtures', lang);
+  // [mapper, fixture, prefix of the expected files, extra options]
+  const cases = [['csharp', 'csharp'], ['java', 'java'], ['php', 'php'], ['vbnet', 'vbnet'], ['cobol', 'cobol'],
+    ['csharp', 'csharp-projects'], ['java', 'java-modules'], ['php', 'php-composer', 'expected_', ['--include-path', 'lib/inc']],
+    ['cobol', 'cobol', 'expected_copy_path_', ['--copy-path', 'SHARED,copy']]];
+  for (const [lang, name, prefix = 'expected_', options = []] of cases) {
+    const out = path.join(root, `${name}-${prefix}`), fixture = path.join(kitRoot, 'fixtures', name);
     // -I: the mapper must find its shared modules without the script directory on sys.path.
-    const r = await runProcess(python, ['-I', path.join(kitRoot, `scripts/depmap_${lang}.py`), '--root', fixture, '--out', out]);
+    const r = await runProcess(python, ['-I', path.join(kitRoot, `scripts/depmap_${lang}.py`), '--root', fixture, '--out', out, ...options]);
     assert.equal(r.code, 0, r.stderr);
     for (const file of ['edges.tsv', 'order.txt', 'cycles.txt', 'unresolved.tsv'])
-      assert.equal(fs.readFileSync(path.join(out, file), 'utf8'), fs.readFileSync(path.join(fixture, `expected_${file}`), 'utf8'), `${lang} ${file}`);
+      assert.equal(fs.readFileSync(path.join(out, file), 'utf8'), fs.readFileSync(path.join(fixture, `${prefix}${file}`), 'utf8'), `${name} ${prefix}${file}`);
   }
 });
 

@@ -139,21 +139,24 @@ def write_outputs(out: Path, nodes, edges, unresolved):
     return edges, sccs, cycles, rows
 
 
-def run(description, mapper):
-    """Command-line entry shared by the mappers. mapper(root, warnings)
-    returns (files, edges, unresolved) with repo-relative POSIX paths."""
+def run(description, mapper, options=()):
+    """Command-line entry shared by the mappers. mapper(root, warnings, args)
+    returns (files, edges, unresolved) with repo-relative POSIX paths.
+    options: (flag, help) pairs for extra comma-separated list options."""
     for stream in (sys.stdout, sys.stderr):
         # A Windows console encoding (cp932, cp1252...) cannot print every path.
         stream.reconfigure(errors="backslashreplace")
     ap = argparse.ArgumentParser(description=description)
     ap.add_argument("--root", required=True, type=Path)
     ap.add_argument("--out", required=True, type=Path)
+    for flag, text in options:
+        ap.add_argument(flag, default="", help=text)
     args = ap.parse_args()
     root = args.root.resolve()
     if not root.is_dir():
         ap.error(f"--root is not a directory: {args.root}")
     warnings = []
-    files, edges, unresolved = mapper(root, warnings)
+    files, edges, unresolved = mapper(root, warnings, args)
     edges, sccs, cycles, rows = write_outputs(args.out, files, edges, unresolved)
     for w in warnings:
         print(f"WARN {w}", file=sys.stderr)
@@ -162,3 +165,29 @@ def run(description, mapper):
     if len(files) > 1 and not edges:
         print("WARN: 0 edges across multiple files. Check that --root covers the "
               "whole source tree, and read unresolved.tsv.", file=sys.stderr)
+
+
+def path_list(value):
+    """--opt a,b,c -> ['a', 'b', 'c'] as POSIX paths relative to --root."""
+    return [p.strip().replace("\\", "/").strip("/") or "." for p in value.split(",") if p.strip()]
+
+
+def nearest(rel, dirs):
+    """The deepest directory of dirs (POSIX, relative, "" = root) holding rel."""
+    parts = rel.split("/")[:-1]
+    for k in range(len(parts), -1, -1):
+        d = "/".join(parts[:k])
+        if d in dirs:
+            return d
+    return None
+
+
+def reachable(start, deps):
+    """start plus everything deps (node -> iterable of nodes) reaches from it."""
+    seen, todo = set(), [start]
+    while todo:
+        node = todo.pop()
+        if node not in seen:
+            seen.add(node)
+            todo.extend(deps.get(node, ()))
+    return seen
