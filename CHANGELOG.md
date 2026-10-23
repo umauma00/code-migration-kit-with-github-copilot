@@ -32,10 +32,14 @@
   out. Guidance never repeats a candidate message (Markdown or JSON), since it
   may hold the value, and masks an assigned `password=`/`token:` value in any
   other, as well as the value after a password switch (`-P`, `/P`, `/RP`).
-  Clean phrases ("no credentials detected", "0 matches") are cut out first and
-  any finding left wins, however it is joined ("No credentials detected but
-  possible hardcoded password ..."); a message that names a credential but is
-  neither clean nor a known finding counts as a candidate. A clean result
+  Protection does not depend on the rule a message gets: password values are
+  masked before any rule reads it, and a message that names a credential is
+  withheld from every field (message, cause, choices, commands). A finding
+  left after clean phrases are cut out wins, however it is joined, and wins
+  over another rule (a worker's output carrying one); a clause naming a
+  credential without a clean result is unsure, never clean; a check that
+  failed, lacked access or was skipped gets `credential-incomplete`. A clean
+  result
   ("No credentials detected", "0 matches", 「検出されませんでした」) gets
   `credential-clear`, which is informational: `actionRequired: false` in JSON
   and a next step instead of choices in Markdown, so no question; Japanese

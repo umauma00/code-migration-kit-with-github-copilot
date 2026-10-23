@@ -103,6 +103,7 @@ part as unverified in the report — never the value. Finish the report; the
 person checks the line and moves a real value out of the source, not you. If a
 tool you ran flagged one, describe the finding without its text, for example
 `run_migration.mjs guidance --message "credential candidate at src/run.bat line 5"`;
-never paste the tool's raw output into a command line. Guidance withholds a
-candidate message and masks an assigned value, but it cannot unread what
-reached your context.
+never paste the tool's raw output into a command line. Guidance withholds any
+message that names a credential and masks password values in the rest, but it
+cannot unread what reached your context. A check that failed or could not run
+is not a clean result.

@@ -66,6 +66,7 @@ const samples = {
   'worker-output': 'Invalid review result for src/login.py',
   'credential-candidate': 'Local scan: the /P argument is still a literal credential candidate',
   'credential-clear': 'Secret scan: 0 matches',
+  'credential-incomplete': 'Secret scan failed: no access to credentials file',
   unknown: 'something nobody anticipated'
 };
 const recommended = { ja: '（推奨）', en: ' (recommended)' };
@@ -278,4 +279,31 @@ test('doctor shows the review dependency map as pending until phase 01 is record
   fs.rmSync(safePath(root, 'migration/phases/01.json'));
   writeJSON(safePath(root, 'migration/config.json'), { ...loadConfig(root), phasePolicy: 'legacy' });
   assert.equal((await mapCheck()).ok, false);
+});
+
+// Review round 4: protection does not depend on which rule a message gets. A
+// value never reaches any field (message, cause, labels, reasons, commands),
+// an unsure clause after a clean one is not clean, and a check that could not
+// run is not a clean result.
+test('no guidance field repeats a credential value, whichever rule the message gets', () => {
+  const secret = 'ExampleSecret123';
+  const cases = {
+    'credential-candidate': [`credential check returned ${secret} for b.py`, `No credentials detected in a.py; credential check returned ${secret} for b.py`,
+      `No credentials detected, credential check returned ${secret}`, `Copilot implementer failed (exit 1): possible hardcoded password value ${secret}`],
+    'credential-incomplete': [`Secret scan failed: no access to credentials file ${secret}`, '資格情報の検査に必要な権限がありませんでした', `credential scan skipped for ${secret}.bat`],
+    'hook-check': [`Hook check failed: token=${secret}`, `Hook check failed: sqlcmd -P ${secret} took 9000 ms (timeout 5 s)`],
+    'credential-clear': ['No credentials detected', 'Secret scan: none', 'secret scan complete, nothing found', '秘密情報の検査: 0件']
+  };
+  for (const [expected, messages] of Object.entries(cases)) for (const message of messages) for (const language of ['en', 'ja']) {
+    const g = failureGuidance(message, { language, explain: true });
+    assert.equal(g.id, expected, message);
+    assert.equal(g.actionRequired, expected !== 'credential-clear', message);
+    assert.doesNotMatch(JSON.stringify(g) + guidanceMarkdown(g, language), new RegExp(secret), `${language}: ${message}`);
+  }
+  // Japanese prose after a switch is not a value, and stays readable for the rules.
+  assert.equal(failureGuidance('再開時の検査で /P 引数が資格情報候補と判定されました').id, 'credential-candidate');
+  // A message that only mentions a credential keeps its own rule, with the text withheld.
+  const timeout = failureGuidance('password prompt timed out', { language: 'en', explain: true });
+  assert.equal(timeout.id, 'timeout');
+  assert.doesNotMatch(timeout.message, /password prompt/);
 });
