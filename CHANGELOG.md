@@ -1,4 +1,4 @@
-# Unreleased
+# 0.3.2 — 2026-10-23
 
 - 2026-10-23 phase 00 on Windows stopped twice for no kit reason. The host's
   own source check took a `/P` switch for a literal credential, then read
