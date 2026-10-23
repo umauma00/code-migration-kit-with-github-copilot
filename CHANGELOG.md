@@ -1,5 +1,26 @@
 # Unreleased (0.3.0)
 
+- 2026-10-23 every command line is checked against one spec per script
+  (`lib/cli.mjs`). The scripts used to read any `--option` as taking the next
+  word and ignored unknown options and stray words, so `phase --help` failed
+  with "Missing value for --help" and a typo did something else or failed far
+  from its cause. Now an unknown option, a missing value, an option that does
+  not apply, a missing or extra word and a value outside its set (phase IDs,
+  approval stages, `--format`, `--stage`...) stop with the accepted options,
+  and `--help`/`-h` prints the usage on any command. A command-line error gets
+  its own guidance (nothing ran; check `--help`). The guardrail hook takes the
+  runner's flags and commands from the same spec, and a plain help call is no
+  human gate (one with a comment, redirection, substitution or continuation
+  still is). `tests/cli-usage.test.mjs` parses every command written in the
+  guides, prompts, skills, agents, HTML guide and failure guidance; it found
+  `survey --kind facts` in the skills, now `survey run --kind facts`.
+
+- 2026-10-23 models and efforts are chosen in one question. The skill asked
+  one question per role (and per effort); it now asks once, and
+  `models set --assign "implementer=ID:EFFORT,reviewers=ID:EFFORT,..."` records
+  the whole answer under one confirmation, checking every entry before it
+  writes anything. `models list --format markdown` shows the form.
+
 - 2026-10-23 guardrails cover keystrokes typed into a running shell. On
   Windows, Copilot CLI's shell tools are `powershell` and `write_powershell`;
   the hook knew only `write_bash`, so `git push{enter}` sent with
