@@ -1,5 +1,28 @@
 # Unreleased (0.3.0)
 
+- 2026-10-23 Copilot CLI 1.0.103 compatibility: workers no longer pass
+  `--no-remote-export`. 1.0.103 renamed it to `--sync-session off` and stops
+  with "--no-remote-export was renamed", so `doctor --check-cli` reported a
+  missing option and no worker could start. Worker session sync now follows
+  the person's CLI setting; no replacement flag is passed, so older and newer
+  CLIs both run. Flags that change nothing the runner reads are no longer
+  passed either: `-s`, `--no-color`, `--no-ask-user` (with JSON output and
+  `--available-tools view,grep,glob` they made no difference on 1.0.103) and the
+  session `--name`, which needed its own length workaround (100 characters,
+  1.0.98). Sessions keep their runner-chosen `--session-id`.
+- 2026-10-23 steps 00-02 without avoidable stops:
+  - `doctor` runs before the worker models are chosen: it reports them as the
+    failed check `worker models chosen` (guidance: `models list`, then
+    `models set`) and runs every other check. Before, it stopped with
+    "Set an available model ID" explained as an unexpected error.
+  - Japanese questions may offer model IDs (`gpt-5-mini`, `claude-sonnet-4`)
+    as choices: an ASCII identifier with a digit is a name, not English words
+    (adjacent Japanese such as `候補1` still counts; `read-only` stays English).
+    Before, the hook denied the model question.
+  - Folder trust on Windows compares paths without regard to case, so a
+    folder stored as `c:\work` is trusted for `C:\work`.
+  - `phase check 00|00b|01|02|03` checks what `phase complete` checks, so a
+    template RULEBOOK or a missing report is found before the person reviews.
 - 2026-10-22 Windows as a primary platform (see docs/WINDOWS.md):
   - `commands` may name `.cmd`/`.bat` tools (`npm`, `npx`, `mvn`,
     `gradlew.bat`): they run through `cmd.exe /d /s /c` with every argument

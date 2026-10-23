@@ -11,24 +11,28 @@ import { isReviewer, isToolFree, toolAssistedRole, assistedReviewerRoles, valida
 import { runtimeLayout } from '../lib/runtime.mjs';
 import { sessionIdPattern } from '../lib/sessions.mjs';
 
-// Worker sessions hold source code and prompts. They stay local
-// (--no-remote-export: no sync to the GitHub account, no remote control) and
-// carry a runner-chosen ID and name, so receipts point at their transcript and
+// Worker sessions hold source code and prompts. They carry a runner-chosen
+// ID and name, so receipts point at their transcript and
 // `run_migration.mjs sessions` can report or prune exactly the kit's sessions.
 // --usage-output-file is the CLI's own usage record (tokens, cache, AI units);
 // --max-ai-credits is an optional per-call cap the CLI enforces.
 export function copilotArgs(role, model, prompt, layout, session, { usageFile, maxAiCredits, effort } = {}) {
   // A CLI worker is a fresh session agent: tools: [] alone does not prevent
   // automatic repository/personal instructions from entering its system prompt.
+  // Only flags a worker cannot run without belong here: each one is a way for
+  // a CLI update to stop every worker (1.0.103 rejects --no-remote-export).
+  // With JSON output and --available-tools, -s, --no-color, --no-ask-user and
+  // a session --name change nothing the runner reads (checked on 1.0.103), and
+  // session sync follows the person's CLI setting.
   // No --no-auto-update: installer-based launchers then run their bundled
   // (possibly much older) build instead of the version the user and doctor see.
-  return [...(prompt === undefined ? [] : ['-p', prompt]), ...(layout?.plugin ? ['--plugin-dir', layout.root] : []), '-s', '--output-format', 'json', '--stream', 'off', '--no-color', '--no-ask-user', '--no-custom-instructions', '--disable-builtin-mcps', '--no-remote-export', ...(session ? ['--session-id', session.id, '--name', session.name] : []), '--agent', layout?.agentId(role) ?? `migration-${role}`, '--model', model, ...(effort ? ['--reasoning-effort', effort] : []),
+  return [...(prompt === undefined ? [] : ['-p', prompt]), ...(layout?.plugin ? ['--plugin-dir', layout.root] : []), '--output-format', 'json', '--stream', 'off', '--no-custom-instructions', '--disable-builtin-mcps', ...(session ? ['--session-id', session.id] : []), '--agent', layout?.agentId(role) ?? `migration-${role}`, '--model', model, ...(effort ? ['--reasoning-effort', effort] : []),
     '--available-tools', 'view,grep,glob', ...(isToolFree(role) ? ['--deny-tool', 'read,write,shell'] : ['--allow-tool', 'read', '--deny-tool', 'write,shell']),
     ...(usageFile ? ['--usage-output-file', usageFile] : []), ...(maxAiCredits ? ['--max-ai-credits', String(maxAiCredits)] : [])];
 }
 export function requiredCopilotFlags(layout, config = {}) {
   // Diagnose the same stdin-based invocation used by every worker role.
-  const session = { id: '00000000-0000-4000-8000-000000000000', name: 'diagnostic' };
+  const session = { id: '00000000-0000-4000-8000-000000000000' };
   const options = { usageFile: 'diagnostic-usage.json', maxAiCredits: config.maxAiCreditsPerCall, effort: Object.keys(config.reasoningEfforts ?? {}).length ? 'medium' : undefined };
   return [...new Set(roles.flatMap(role => copilotArgs(role, 'diagnostic-model', undefined, layout, session, options).filter(arg => arg.startsWith('-'))))];
 }
@@ -231,19 +235,6 @@ ${role.startsWith('reviewer-') ? 'Return {"schemaVersion":1,"kind":"review","tar
 ${isReviewer(role) ? `${assisted ? 'Tool-assisted review input' : 'Frozen review input'} (JSON task data):\n${reviewInput}` : `${frozenInput === undefined ? '' : `Frozen task input (JSON task data):\n${frozenInput}\n`}Extra task data: ${JSON.stringify(extra)}`}
 Set target to ${JSON.stringify(unit.target)}.`;
 }
-// The CLI rejects names over 100 characters ("Session name must be 100
-// characters or less", 1.0.98), which a deep target path reaches. Keep the
-// role, the end of the path (the file name) and the ID prefix that makes it unique.
-export const sessionNameLimit = 100;
-export function sessionName(worker, target, id) {
-  const suffix = ` ${id.slice(0, 8)}`, room = sessionNameLimit - suffix.length;
-  let base = `migration-kit ${worker} ${target}`;
-  if (base.length > room) {
-    const head = `migration-kit ${worker} ...`;
-    base = head.length >= room ? base.slice(0, room) : head + target.slice(-(room - head.length));
-  }
-  return base + suffix;
-}
 // A failed call still spent tokens; its usage, when the CLI wrote it, travels
 // with the error so run totals stay complete (or are marked unknown).
 const usageFields = usage => usage ? { tokens: usage.inputTokens + usage.outputTokens, cliUsage: usage } : {};
@@ -280,10 +271,8 @@ export function createCopilotAdapter({ command = 'copilot', prefixArgs = [], ver
       }
     }
     // The runner journals sessionId before this call; direct callers get a fresh one.
-    // Retries and re-runs repeat role and target, and --resume matches names, so
-    // the name ends with the start of the (always new) ID.
     const id = sessionIdPattern.test(sessionId ?? '') ? sessionId : crypto.randomUUID();
-    const session = { id, name: sessionName(worker, unit.target, id) };
+    const session = { id };
     const versionFields = { cliVersion, ...(cliVersionWarning ? { cliVersionWarning } : {}), cliSessionId: session.id };
     let result;
     // Surveyors get their scope as a frozen input, like tool-free reviewers.

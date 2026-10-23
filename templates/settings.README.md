@@ -8,7 +8,9 @@ The automated runner starts a fresh `copilot -p` call for each role with:
 
 - `--available-tools view,grep,glob`
 - `--allow-tool read --deny-tool write,shell`
-- explicit `--agent` and `--model`, no fleet/autopilot; no `--no-auto-update`, which
+- explicit `--agent` and `--model`, no fleet/autopilot; no flag that changes
+  nothing the runner reads (`-s`, `--no-color`, `--no-ask-user`, `--name`): each
+  is one more way for a CLI update to stop every worker; no `--no-auto-update`, which
   would make native-installer launchers run their older bundled build
 - `MIGRATION_KIT_ROLE` for the installed preToolUse backstop. Only the
   tool-assisted reviewers (`reviewer-semantics-read`, `reviewer-rules-read`) also
@@ -17,9 +19,10 @@ The automated runner starts a fresh `copilot -p` call for each role with:
   of other workers' records. That variable admits every `.github/hooks` file in
   the project, so the other roles, already limited by the flags above, follow
   folder trust
-- `--no-remote-export`, `--session-id <uuid>` and `--name "migration-kit ROLE TARGET ID8"` (the first 8 characters of the new ID):
-  worker transcripts hold source code and prompts, so they stay on this machine
-  instead of syncing to the GitHub account (the CLI default; the flag is accepted by 1.0.98, its effect on an authenticated account is not verified yet). The runner journals
+- `--session-id <uuid>`: worker transcripts hold source code and prompts. The kit passes no
+  session-sync flag (CLI 1.0.103 renamed `--no-remote-export` to
+  `--sync-session off` and rejects the old name), so whether they also sync to
+  the GitHub account follows the person's CLI setting. The runner journals
   each ID before the call (`migration/runs/<run>/cli-sessions.jsonl`) and the
   attempt or survey record keeps it as `cliSessionId`; `sessions status | prune`
   reports or deletes exactly those sessions, never the user's own

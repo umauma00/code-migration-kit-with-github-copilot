@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { lockRun, loadConfig, readManifest, contextHash, unitState, done, safePath, readJSON, parseArgs, verificationFiles, loadReviewDependencies, reviewSources, reviewDependencyPath } from '../lib/core.mjs';
+import { lockRun, loadConfig, unsetModels, readManifest, contextHash, unitState, done, safePath, readJSON, parseArgs, verificationFiles, loadReviewDependencies, reviewSources, reviewDependencyPath } from '../lib/core.mjs';
 import { strictPhases, phaseRecorded } from '../lib/phases.mjs';
 import { validateWorkerProfile, assistedReviewerRoles } from '../lib/review.mjs';
 import { runProcess } from '../lib/process.mjs';
@@ -70,6 +70,8 @@ Options: --root PATH (default cwd), --copilot PATH (default copilot)
 Configuration: migration/config.json. No command commits or pushes changes.`;
 export async function doctor(root, config, { checkCLI = false, command = 'copilot' } = {}) {
   const checks = [{ check: 'configuration', ok: true }];
+  const unset = unsetModels(config);
+  checks.push(unset.length ? { check: 'worker models chosen', ok: false, missing: unset, note: 'Choose them with models list and models set; the other checks run without them.' } : { check: 'worker models chosen', ok: true });
   const layout = runtimeLayout(root, config);
   for (const role of ['orchestrator', 'implementer', 'reviewer-semantics', 'reviewer-rules', 'arbiter', 'fixer', 'surveyor', 'preparation-auditor', ...assistedReviewerRoles]) {
     const p = layout.agentPath(role), file = safePath(layout.root, p);
@@ -233,7 +235,7 @@ export async function main(argv = process.argv.slice(2)) {
     console.log(args.format === 'json' ? JSON.stringify(g, null, 2) : guidanceMarkdown(g, language));
     return;
   }
-  const config = loadConfig(root), controller = new AbortController();
+  const config = loadConfig(root, { requireModels: cmd !== 'doctor' }), controller = new AbortController();
   const abort = () => controller.abort();
   process.once('SIGINT', abort); process.once('SIGTERM', abort);
   try {

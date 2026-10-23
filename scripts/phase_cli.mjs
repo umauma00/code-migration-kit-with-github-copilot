@@ -40,7 +40,14 @@ export function phaseCommand(root, config, action, phase, options = {}) {
     if (!report.ok) throw new Error(report.blockers[0].reason);
     return report.workflow;
   }
-  if (action === 'check') { validate(root,config,phase); return {phase,ready:true}; }
+  if (action === 'check') {
+    validate(root,config,phase);
+    // A manually recorded phase is checked as phase complete would check it
+    // (artifacts, drafted rules, dependency map), so "ready" is not followed
+    // by a refused completion after the person has reviewed it.
+    if (['00','00b','01','02','03'].includes(phase)) completePhase(root,config,phase,'check',{},{dryRun:true,confirmNoDependencies:Boolean(options['confirm-no-dependencies'])});
+    return {phase,ready:true};
+  }
   if (!['init','start','complete'].includes(action)) throw new Error('Use phase init|next|check ID|start ID|complete ID --note TEXT');
   const release = lockRun(root,`phase-${action}-${phase ?? 'policy'}`);
   try {
