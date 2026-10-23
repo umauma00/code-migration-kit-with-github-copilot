@@ -114,11 +114,17 @@ test('PowerShell reads beside a kit command are not guardrails writes; the refus
   const make = `node "${kit}\\make_review_dependencies.mjs" --source-root src --edges migration/depmap/edges.tsv`;
   for (const command of [make, `${make}; Test-Path migration/guardrails.json`, `${make}; Get-Item migration/* | Select-Object Name`,
     `Set-Location ${f.root}; ${make}; Get-ChildItem | Format-Table *`, `${make}; Get-ChildItem migration -Filter *.json | Select-Object Name, Length`,
-    `${make}; Select-String -Path migration/* -Pattern edges`, `${make}; findstr /S /N edges migration\\*`])
+    `${make}; Select-String -Path migration/* -Pattern edges`, `${make}; findstr /S /N edges migration\\*`,
+    // PowerShell names are case-insensitive; a pipe into a writer with its own named target is checked on that target.
+    'Get-Content migration/guardrails.json', 'get-content migration/guardrails.json', 'GET-CONTENT migration/guardrails.json', 'GC migration/guardrails.json',
+    'Get-ChildItem migration/* | Out-File migration/file-list.txt'])
     assert.equal(decide(command), null, command);
   for (const command of ['Set-Content migration/guardrails.json "{}"', 'echo {} > migration/guardrails.json', 'Copy-Item x.json migration/guardrails.json',
     'Remove-Item -Recurse migration', 'Get-ChildItem migration/* | Remove-Item', 'Get-ChildItem migration/* | ForEach-Object { $_.Delete() }',
-    'Test-Path migration/guardrails.json > migration/guardrails.json', 'sort -o migration/guardrails.json a.txt', 'cp a.json migration/*']) {
+    'Test-Path migration/guardrails.json > migration/guardrails.json', 'sort -o migration/guardrails.json a.txt', 'cp a.json migration/*',
+    // A script block or a pipe into a command that takes its path from the pipeline can change what the reader lists.
+    'Get-ChildItem migration/* | Where-Object { Remove-Item -LiteralPath $_.FullName; $true }', 'Get-ChildItem migration/* | Set-Content -Value x',
+    'Get-ChildItem migration/* | iex', 'Get-ChildItem migration/* | Out-File migration/guardrails.json']) {
     const d = decide(command);
     assert.equal(d?.decision, 'deny', command);
     assert.match(d.reason, /Matched: `[^`]+`/, command);

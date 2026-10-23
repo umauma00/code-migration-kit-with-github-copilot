@@ -14,7 +14,7 @@ import { mini, prepare } from './helpers.mjs';
 import { loadConfig, safePath, atomicWrite, writeJSON } from '../lib/core.mjs';
 import { phaseCommand } from '../scripts/phase_cli.mjs';
 import { migrationStatus, statusTodo, statusChecklist } from '../lib/status.mjs';
-import { failureGuidance, guidanceRuleIds, doctorGuidance } from '../lib/guidance.mjs';
+import { failureGuidance, guidanceRuleIds, doctorGuidance, guidanceMarkdown } from '../lib/guidance.mjs';
 import { interactiveDecision, installGuardrails } from '../lib/guardrails.mjs';
 import { setPreferences } from '../lib/preferences.mjs';
 import { runProcess } from '../lib/process.mjs';
@@ -122,6 +122,25 @@ test('guidance --message explains a message, and a credential suspicion stops no
   assert.ok(!g.options.some(o => o.command), 'no command runs on a suspected credential');
   assert.match(g.cause, /no phase stops on one/);
   assert.equal(failureGuidance('No credentials detected', { language: 'en' }).recommended, 'continue');
+  // A finding in any clause wins over a clean clause in the same message, and
+  // its value never reaches the output.
+  for (const message of ['Secret scan: 0 matches\nPotential hardcoded password at src/config.bat:17',
+    'No credentials detected, but possible hardcoded password: sqlcmd -P ExampleSecret123',
+    '資格情報は検出されませんでした。しかし、ハードコードされたパスワードを検知しました: schtasks /U admin /P ExampleSecret123']) {
+    const result = failureGuidance(message, { language: 'en', explain: true });
+    assert.equal(result.id, 'credential-candidate', message);
+    assert.doesNotMatch(JSON.stringify(result) + guidanceMarkdown(result, 'en'), /ExampleSecret123/, message);
+  }
+  // Outside the credential rules, a value after a password switch is masked; -p is not one.
+  assert.equal(failureGuidance('sqlcmd -S db -U sa -P ExampleSecret123 failed', { explain: true }).message, 'sqlcmd -S db -U sa -P *** failed');
+  assert.equal(failureGuidance('mkdir -p migration/x failed', { explain: true }).message, 'mkdir -p migration/x failed');
+  // A clean result only informs: no question, in either language.
+  for (const language of ['en', 'ja']) {
+    const clear = failureGuidance('No credentials detected', { language, explain: true });
+    assert.equal(clear.actionRequired, false);
+    assert.doesNotMatch(guidanceMarkdown(clear, language), /Choose how to proceed|どれで進めるか/);
+  }
+  assert.equal(g.actionRequired, true);
   const root = project(t), script = safePath(root, 'migration-kit/scripts/run_migration.mjs');
   for (const [message, cause] of [[samples['credential-candidate'], /suspected a literal credential/], ['something nobody anticipated', /kit has no entry for this message/]]) {
     const out = await runProcess(process.execPath, [script, 'guidance', '--message', message], { cwd: root });

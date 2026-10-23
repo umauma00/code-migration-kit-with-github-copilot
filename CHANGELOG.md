@@ -6,9 +6,12 @@
   knew only POSIX readers, so `Test-Path migration/guardrails.json`,
   `Get-Item migration/*` or `Format-Table *` after `Set-Location` on the same
   line refused the whole line. PowerShell and cmd.exe readers and formatters
-  (`Test-Path`, `Get-ChildItem`, `Select-String`, `findstr`, `Select-Object`,
-  `Format-Table`...) now count as reads, unless their output is piped into a
-  command that writes, moves or deletes. The refusal names the word that
+  (`Test-Path`, `Get-ChildItem`, `Get-Content`, `Select-String`, `findstr`,
+  `Select-Object`, `Format-Table`...) now count as reads, in any letter case.
+  The exemption holds only when every command they pipe into is a reader or
+  writes to a target named in its own segment (`Out-File`, checked on that
+  target); a script block (`{ ... }`) or a pipe into `Remove-Item`,
+  `Set-Content` or `iex` voids it. The refusal names the word that
   matched, and the `guardrails-write` guidance offers dropping it or splitting
   the line when no change was meant.
 
@@ -24,8 +27,12 @@
   checking the line, continuing 00 without reading it, or moving a real value
   out. Guidance never repeats a candidate message (Markdown or JSON), since it
   may hold the value, and masks an assigned `password=`/`token:` value in any
-  other. A clean result ("No credentials detected", "0 matches",
-  「検出されませんでした」) gets `credential-clear` and no question; Japanese
+  other, as well as the value after a password switch (`-P`, `/P`, `/RP`).
+  Messages are read clause by clause, and a finding in any clause wins over a
+  clean one ("0 matches" then "possible hardcoded password"). A clean result
+  ("No credentials detected", "0 matches", 「検出されませんでした」) gets
+  `credential-clear`, which is informational: `actionRequired: false` in JSON
+  and a next step instead of choices in Markdown, so no question; Japanese
   findings such as 「検知しました」「見つかりました」 are recognized. Prompt 00's
   "Credentials in the source" says to stop reading a candidate line, keep
   only its file and line number, and pass guidance a description, never the
