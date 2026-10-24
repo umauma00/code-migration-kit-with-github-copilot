@@ -372,6 +372,10 @@ test('C#, Java, PHP, VB.NET and COBOL dependency fixtures produce their expected
     assert.equal(r.code, 0, r.stderr);
     for (const file of ['edges.tsv', 'order.txt', 'cycles.txt', 'unresolved.tsv'])
       assert.equal(fs.readFileSync(path.join(out, file), 'utf8'), fs.readFileSync(path.join(fixture, `${prefix}${file}`), 'utf8'), `${name} ${prefix}${file}`);
+    // Libraries no file declares go to external.tsv, never to unresolved.tsv.
+    const external = path.join(fixture, `${prefix}external.tsv`);
+    assert.equal(fs.readFileSync(path.join(out, 'external.tsv'), 'utf8'),
+      fs.existsSync(external) ? fs.readFileSync(external, 'utf8') : 'namespace\tfiles\tfirst_file\n', `${name} ${prefix}external.tsv`);
   }
 });
 

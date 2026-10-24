@@ -59,7 +59,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # -I drops the script dir
-from depmap_common import find_files, path_list, read_source, run  # noqa: E402
+from depmap_common import EXTERNAL, find_files, path_list, read_source, run  # noqa: E402
 
 EXTS = {".php", ".inc", ".phtml", ".php3", ".php4", ".php5", ".module"}
 # Drupal's PHP files (.install, .test, .theme, .engine, .profile): mapped
@@ -700,9 +700,7 @@ def mapper(root, warnings, args):
     for top, (names, files) in sorted(tops.items()):
         name = next(iter(names)) if len(names) == 1 else top
         files = sorted(files)
-        unresolved.add((files[0], name, f"namespace no file under --root declares, used by "
-                        f"{len(files)} file(s): an external library (if it is your own, put its "
-                        "source under --root)"))
+        unresolved.add((files[0], name, EXTERNAL + str(len(files))))
     return rels, edges, unresolved
 
 

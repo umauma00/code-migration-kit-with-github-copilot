@@ -15,9 +15,8 @@ never built, run or tested to map it.
 Run the bundled mapper with its options (`--include-var`, `--include-path`,
 `--copy-path`, the choice of `--root`) and read its warnings. Most "it misses
 edges" cases are a wrong `--root` or a missing option. An in-house library
-whose source is outside `--root` shows up in `unresolved.tsv` as "namespace no
-file under --root declares": put its source under `--root` (map the parent
-directory) rather than writing an adapter.
+whose source is outside `--root` shows up in `external.tsv`: put its source
+under `--root` (map the parent directory) rather than writing an adapter.
 
 ## 2. Choose the implementation language
 
@@ -27,7 +26,8 @@ directory) rather than writing an adapter.
 | **Another language** (the source language, e.g. a Roslyn or JavaParser syntax tree, or the target language) | Only when its runtime is already installed, the adapter reads source text only (a syntax tree, never a compile or run of the project), and the user agreed: a parser library needs a download and an SDK. |
 
 Either way the adapter lives in `migration/tools/depmap-<language>/`, never in
-`migration-kit/`, and writes the same four files.
+`migration-kit/`, and writes the same four files (plus `external.tsv` when it
+can tell libraries apart; `depmap_common.py` writes it).
 
 ## 3. Copy the closest bundled mapper (Python)
 

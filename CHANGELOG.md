@@ -60,7 +60,7 @@
   mapper) or another installed language, which mapper to start from, the
   fixture and the habits that keep it right. An imported namespace or
   package no file under `--root` declares (C#, VB.NET, Java, PHP; platform
-  libraries left out) is listed once per library in `unresolved.tsv`, so an
+  libraries left out) is listed once per library in a new `external.tsv`, so an
   in-house library outside `--root` is not silently missed. A
   using or alias target inside a namespace block is relative to the
   enclosing namespaces, and once resolved is kept as a full name.

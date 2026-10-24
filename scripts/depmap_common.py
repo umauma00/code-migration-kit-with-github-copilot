@@ -17,6 +17,11 @@ import argparse
 import sys
 from pathlib import Path
 
+# Reason of an unresolved row that is really an external library: such rows
+# go to external.tsv (namespace, files using it, first file), not
+# unresolved.tsv. The reason carries the file count after the marker.
+EXTERNAL = "\x00external:"
+
 # Never walked, for every language. Any path component starting with "." is
 # skipped too.
 COMMON_SKIP = {"node_modules", "__pycache__"}
@@ -165,12 +170,15 @@ def clean(text):
 
 
 def write_outputs(out: Path, nodes, edges, unresolved):
-    """Write edges.tsv, order.txt, cycles.txt and unresolved.tsv; return
-    (batches, cycles)."""
+    """Write edges.tsv, order.txt, cycles.txt, unresolved.tsv and
+    external.tsv; return (edges, batches, cycles, unresolved rows, external
+    rows)."""
     edges = sorted(set(e for e in edges if e[0] != e[1]))
     sccs = tarjan_scc(nodes, edges)
     cycles = [s for s in sccs if len(s) > 1]
-    rows = sorted(set((a, clean(r), clean(why)) for a, r, why in unresolved))
+    external = sorted(set((clean(r), int(why[len(EXTERNAL):]), a)
+                          for a, r, why in unresolved if why.startswith(EXTERNAL)))
+    rows = sorted(set((a, clean(r), clean(why)) for a, r, why in unresolved if not why.startswith(EXTERNAL)))
     out.mkdir(parents=True, exist_ok=True)
 
     def write(name, text):
@@ -186,7 +194,9 @@ def write_outputs(out: Path, nodes, edges, unresolved):
           + "".join("\t".join(s) + "\n" for s in cycles))
     write("unresolved.tsv", "file\treference\treason\n"
           + "".join(f"{a}\t{r}\t{why}\n" for a, r, why in rows))
-    return edges, sccs, cycles, rows
+    write("external.tsv", "namespace\tfiles\tfirst_file\n"
+          + "".join(f"{n}\t{k}\t{a}\n" for n, k, a in external))
+    return edges, sccs, cycles, rows, external
 
 
 def run(description, mapper, options=()):
@@ -215,11 +225,11 @@ def run(description, mapper, options=()):
                             f"{f.encode('utf-8', 'backslashreplace').decode('ascii', 'replace')}. "
                             "Later steps (make_manifest.py, the kit CLI) need UTF-8 paths: "
                             "rename it to UTF-8 and map again before building the manifest")
-    edges, sccs, cycles, rows = write_outputs(args.out, files, edges, unresolved)
+    edges, sccs, cycles, rows, external = write_outputs(args.out, files, edges, unresolved)
     for w in warnings:
         print(f"WARN {w}", file=sys.stderr)
-    print(f"files={len(files)} edges={len(edges)} batches={len(sccs)} cycles={len(cycles)} unresolved={len(rows)}")
-    print(f"wrote {args.out}/edges.tsv, order.txt, cycles.txt, unresolved.tsv")
+    print(f"files={len(files)} edges={len(edges)} batches={len(sccs)} cycles={len(cycles)} unresolved={len(rows)} external={len(external)}")
+    print(f"wrote {args.out}/edges.tsv, order.txt, cycles.txt, unresolved.tsv, external.tsv")
     if len(files) > 1 and not edges:
         print("WARN: 0 edges across multiple files. Check that --root covers the "
               "whole source tree, and read unresolved.tsv.", file=sys.stderr)

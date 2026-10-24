@@ -53,9 +53,10 @@ C#・Java・VB.NET では、`using` や `import` はファイルではなく名�
 ## 解析器の結果を確かめる
 
 1. 5ファイル試行：全体を作る前に5ファイルで実行し、`edges.tsv` と `unresolved.tsv` をユーザーに見せる
-2. `unresolved.tsv` を全件確認する：外部ライブラリなら問題なし、リポジトリ内のファイルを指すべきものは `review-dependencies.json` に追記する。「namespace no file under --root declares」の行は、どのファイルも宣言していない名前空間・パッケージ（C#・VB.NET・Java の using/Imports/import、PHP の名前空間付きの名前）で、ライブラリごとに1行です（System・Microsoft・java.* などの標準ライブラリは除く）。自作ライブラリなのにソースが `--root` の外にあると辺が出ないので、ここに出たら、そのソースも入る親ディレクトリを `--root` にして作り直します
-3. 除外ディレクトリ（各スクリプト冒頭のコメントに記載）が案件に合っているか確認する。ビルド出力（bin・obj・target・build・out）や vendor・packages は、`--root` 直下かビルドファイル（.csproj・pom.xml・composer.json など）の横にあるときだけ除外します。同じ名前のパッケージやフォルダは読みます。除外したディレクトリにソースがあれば警告（`WARN skipped ...`）が出ます。ディレクトリのシンボリックリンクはたどります（同じディレクトリが2つのパスで見えるときは両方のファイルとして読みます）。祖先を指すループだけは止めて `WARN symlink loop not followed` を出します
-4. 結果は `migration/depmap/report.md` にまとめる（対応構文、除外、未解決、監査結果）
+2. `unresolved.tsv` を全件確認する：外部ライブラリなら問題なし、リポジトリ内のファイルを指すべきものは `review-dependencies.json` に追記する
+3. `external.tsv` で自作ライブラリが無いか見る：C#・VB.NET・Java・PHP の解析器は、どのファイルも宣言していない名前空間・パッケージ（using/Imports/import、PHP の名前空間付きの名前）を、ライブラリごとに1行（名前空間、使っているファイル数、最初のファイル）で書きます。System・Microsoft・java.* などの標準ライブラリは載りません。Spring や log4net のような一般の外部ライブラリは載りますが、問題ありません。自作ライブラリなのにソースが `--root` の外にあると辺が出ないので、ここに出たら、そのソースも入る親ディレクトリを `--root` にして作り直します。ソースが無い（DLL・JAR だけ）なら、移行計画でそのライブラリをどう扱うか（一緒に移す・そのまま使う）をユーザーと決めます
+4. 除外ディレクトリ（各スクリプト冒頭のコメントに記載）が案件に合っているか確認する。ビルド出力（bin・obj・target・build・out）や vendor・packages は、`--root` 直下かビルドファイル（.csproj・pom.xml・composer.json など）の横にあるときだけ除外します。同じ名前のパッケージやフォルダは読みます。除外したディレクトリにソースがあれば警告（`WARN skipped ...`）が出ます。ディレクトリのシンボリックリンクはたどります（同じディレクトリが2つのパスで見えるときは両方のファイルとして読みます）。祖先を指すループだけは止めて `WARN symlink loop not followed` を出します
+5. 結果は `migration/depmap/report.md` にまとめる（対応構文、除外、未解決、監査結果）
 
 ## 同梱されていない言語：アダプタを自作する
 
@@ -65,7 +66,7 @@ C#・Java・VB.NET では、`using` や `import` はファイルではなく名�
 
 - **静的解析だけ。** ソースファイルを読むだけにする。元のアプリのビルド・実行・テストはしない（ソースが唯一の仕様の案件では、元のアプリが動かないことが前提）
 - **置き場所は `migration/tools/depmap-<言語>/`。** キット本体（`migration-kit/`）は変更しない
-- **出力は同梱版と同じ契約。** `edges.tsv`（ヘッダー `from<TAB>to`）、`order.txt`、`cycles.txt`、`unresolved.tsv`（ヘッダー `file<TAB>reference<TAB>reason`）。パスは `--root` からの相対パスで `/` 区切り、並びは整列済み
+- **出力は同梱版と同じ契約。** `edges.tsv`（ヘッダー `from<TAB>to`）、`order.txt`、`cycles.txt`、`unresolved.tsv`（ヘッダー `file<TAB>reference<TAB>reason`）。外部ライブラリを見分けられるなら `external.tsv`（ヘッダー `namespace<TAB>files<TAB>first_file`）も。パスは `--root` からの相対パスで `/` 区切り、並びは整列済み
 - **決定的にする。** ファイルは整列して走査し、同じ入力で同じ出力にする。乱数・時刻・並列実行の順序に依存しない
 - **追加インストールを避ける。** Python の標準ライブラリだけで書くのが第一候補。コンパイラ系のライブラリ（Roslyn、JavaParser など）が必要なら、使う前にユーザーに確認する（ネットワーク接続やSDKが要るため）
 - **見落としより多めを選ぶ。** 迷ったら辺を足す。解決できない参照は捨てずに `unresolved.tsv` に書く

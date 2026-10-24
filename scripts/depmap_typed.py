@@ -28,6 +28,8 @@ import re
 import sys
 import threading
 
+from depmap_common import EXTERNAL
+
 
 class FileInfo:
     def __init__(self, rel):
@@ -175,7 +177,7 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
     set, only those inside become edges.
     standard: top namespaces of the platform library (System, java...). An
     imported namespace the repository does not declare and that is not under
-    one is listed once in unresolved.tsv: it may be an in-house library whose
+    one is listed once in external.tsv: it may be an in-house library whose
     source is outside --root.
     """
     types = {}          # fqn -> set(rel)
@@ -767,9 +769,7 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
         if any(".".join(segs[:k]) in external for k in range(1, len(segs))):
             continue
         files = sorted(files)
-        unresolved.add((files[0], name, f"namespace no file under --root declares, imported by "
-                        f"{len(files)} file(s): an external library (if it is your own, put its "
-                        "source under --root)"))
+        unresolved.add((files[0], name, EXTERNAL + str(len(files))))
     return edges, unresolved
 
 
