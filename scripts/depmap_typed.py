@@ -440,6 +440,52 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
     return edges, unresolved
 
 
+def hole_expr(hole):
+    """The expression of an interpolation hole without its :format. The
+    format starts at the first ":" outside brackets that is not part of
+    "::" (global::X); a ternary must be parenthesized there anyway."""
+    depth, k, n = 0, 0, len(hole)
+    while k < n:
+        ch = hole[k]
+        if ch in "([{":
+            depth += 1
+        elif ch in ")]}":
+            depth -= 1
+        elif ch in "\"'":
+            end = hole.find(ch, k + 1)
+            k = n if end < 0 else end
+        elif ch == ":" and depth <= 0:
+            if hole.startswith("::", k):
+                k += 2
+                continue
+            return hole[:k]
+        k += 1
+    return hole
+
+
+def raw_holes(body, dollars):
+    """Holes of a C# 11 interpolated raw string (body between the quote
+    fences): with one $ a hole is {expr}, with $$ it is {{expr}}, and so on."""
+    holes, k, n = [], 0, len(body)
+    closer = "}" * dollars
+    while k < n:
+        if body[k] == "{":
+            run = k
+            while run < n and body[run] == "{":
+                run += 1
+            if run - k >= dollars:
+                end = body.find(closer, run)
+                if end < 0:
+                    break
+                holes.append(body[run:end])
+                k = end + len(closer)
+                continue
+            k = run
+            continue
+        k += 1
+    return holes
+
+
 def strip_c_like(text, csharp=False):
     """Remove comments and string/char contents from C# or Java source.
 
@@ -486,11 +532,13 @@ def strip_c_like(text, csharp=False):
         # String prefixes: C# $, @, $@, @$ (and $$ raw interpolation).
         j = i
         interp = verbatim = False
+        dollars = 0
         if csharp:
             while j < n and text[j] in "$@" and j - i < 4:
-                interp |= text[j] == "$"
+                dollars += text[j] == "$"
                 verbatim |= text[j] == "@"
                 j += 1
+            interp = dollars > 0
             if j == i or j >= n or text[j] != '"':
                 j = i
                 interp = verbatim = False
@@ -504,7 +552,8 @@ def strip_c_like(text, csharp=False):
                 end = n if end < 0 else end
                 body = text[q:end]
                 strings.append(body)
-                out.append('""' + "\n" * body.count("\n"))
+                holes = raw_holes(body, dollars) if interp else []
+                out.append('""' + "".join(f" ({hole_expr(h)}) " for h in holes) + "\n" * body.count("\n"))
                 i = end + len(fence)
                 continue
             k = j + 1
@@ -531,8 +580,8 @@ def strip_c_like(text, csharp=False):
                             depth += 1
                         elif text[h] == "}":
                             depth -= 1
-                        elif text[h] == '"':  # nested literal: skip it
-                            h2 = text.find('"', h + 1)
+                        elif text[h] in "\"'":  # nested literal: skip it
+                            h2 = text.find(text[h], h + 1)
                             h = n if h2 < 0 else h2
                         h += 1
                     holes.append(text[k + 1:h - 1])
@@ -541,7 +590,7 @@ def strip_c_like(text, csharp=False):
                 buf.append(ch)
                 k += 1
             strings.append("".join(buf))
-            out.append('""' + "".join(f" ({hole.split(':')[0]}) " for hole in holes))
+            out.append('""' + "".join(f" ({hole_expr(hole)}) " for hole in holes))
             i = k + 1
             continue
         out.append(c)

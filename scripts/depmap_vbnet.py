@@ -109,8 +109,11 @@ def strip_vb(text):
         while i < n:
             c = raw[i]
             if c == '"':
+                interp = bool(out) and out[-1] == "$"
+                if interp:
+                    out.pop()
                 j = i + 1
-                s = []
+                s, holes = [], []
                 while j < n:
                     if raw[j] == '"' and j + 1 < n and raw[j + 1] == '"':
                         s.append('"')
@@ -118,10 +121,37 @@ def strip_vb(text):
                         continue
                     if raw[j] == '"':
                         break
+                    if interp and raw[j] == "{":
+                        if raw.startswith("{{", j):
+                            j += 2
+                            continue
+                        # $"...{expr:format}...": the expression is code.
+                        depth, h, expr = 1, j + 1, []
+                        while h < n and depth:
+                            ch = raw[h]
+                            if ch == '"':       # a literal inside the hole
+                                end = raw.find('"', h + 1)
+                                h = n if end < 0 else end + 1
+                                expr.append('""')
+                                continue
+                            depth += {"{": 1, "}": -1}.get(ch, 0)
+                            if depth:
+                                expr.append(ch)
+                            h += 1
+                        expr = "".join(expr)
+                        level = 0
+                        for k, ch in enumerate(expr):
+                            level += {"(": 1, ")": -1}.get(ch, 0)
+                            if ch == ":" and level <= 0:
+                                expr = expr[:k]
+                                break
+                        holes.append(expr)
+                        j = h
+                        continue
                     s.append(raw[j])
                     j += 1
                 strings.append("".join(s))
-                out.append('""')
+                out.append('""' + "".join(f" ({h}) " for h in holes))
                 i = j + 1
                 if i < n and raw[i] in "cC":  # "x"c char literal
                     i += 1
@@ -298,7 +328,7 @@ def scan(rel, text, root_ns=""):
                     # An auto-implemented property has no Get/Set block.
                     nxt = lines[idx + 1].lower().lstrip() if idx + 1 < len(lines) else ""
                     nxt = re.sub(r"^(?:<[^>]*>\s*)?(?:(?:public|private|friend|protected)\s+)*", "", nxt)
-                    if nxt.startswith(("get", "set")):
+                    if re.match(r"(?:get|set)\b", nxt):     # not Settings As ...
                         member = "property"
                         bind_params(low)
                 elif not kind:

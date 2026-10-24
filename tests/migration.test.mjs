@@ -343,6 +343,9 @@ test('C#, Java, PHP, VB.NET and COBOL dependency fixtures produce their expected
     // or die and string callables, COBOL CALL across lines.
     ['csharp', 'csharp-review'], ['java', 'java-packages'], ['vbnet', 'vbnet-continuation'],
     ['php', 'php-includes'], ['cobol', 'cobol-call-newline'],
+    // Interpolation holes (C# and VB), VB auto-property followed by Settings,
+    // PHP string callables only in callback positions.
+    ['csharp', 'csharp-interp'], ['vbnet', 'vbnet-interp'],
     ['php', 'php-relative', 'expected_', ['--include-path', 'lib']]];
   for (const [lang, name, prefix = 'expected_', options = []] of cases) {
     const out = path.join(root, `${name}-${prefix}`), fixture = path.join(kitRoot, 'fixtures', name);
@@ -352,6 +355,24 @@ test('C#, Java, PHP, VB.NET and COBOL dependency fixtures produce their expected
     for (const file of ['edges.tsv', 'order.txt', 'cycles.txt', 'unresolved.tsv'])
       assert.equal(fs.readFileSync(path.join(out, file), 'utf8'), fs.readFileSync(path.join(fixture, `${prefix}${file}`), 'utf8'), `${name} ${prefix}${file}`);
   }
+});
+
+test('a mapper survives a file name that is not UTF-8', { skip: process.platform !== 'linux' && 'needs a byte-string file system' }, async t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'copilot-depmap-bytes-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const src = path.join(root, 'src');
+  fs.mkdirSync(src);
+  // 商品.cbl in Shift_JIS, as an unpacked legacy archive leaves it on Linux.
+  const name = Buffer.concat([Buffer.from(src + '/'), Buffer.from([0x8f, 0xa4, 0x95, 0x69]), Buffer.from('.cbl')]);
+  fs.writeFileSync(name, '       IDENTIFICATION DIVISION.\n       PROGRAM-ID. SHOHIN.\n');
+  fs.writeFileSync(path.join(src, 'main.cbl'), "       IDENTIFICATION DIVISION.\n       PROGRAM-ID. MAIN.\n       PROCEDURE DIVISION.\n           CALL 'SHOHIN'.\n");
+  const out = path.join(root, 'out');
+  const r = await runProcess(python, ['-I', path.join(kitRoot, 'scripts/depmap_cobol.py'), '--root', src, '--out', out]);
+  assert.equal(r.code, 0, r.stderr);
+  assert.match(r.stderr, /file name is not UTF-8/);
+  // The edge keeps the original bytes, so the path still opens.
+  const edges = fs.readFileSync(path.join(out, 'edges.tsv'));
+  assert.ok(edges.includes(Buffer.concat([Buffer.from('main.cbl\t'), Buffer.from([0x8f, 0xa4, 0x95, 0x69])])), edges.toString('latin1'));
 });
 
 test('typed-language mappers give the same output under every hash seed', async t => {

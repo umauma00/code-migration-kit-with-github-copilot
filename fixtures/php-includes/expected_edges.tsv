@@ -1,5 +1,6 @@
 from	to
 cb.php	hooks.php
+cb.php	sorter.php
 index.php	lib/a.php
 index.php	lib/b.php
 index.php	lib/c.php

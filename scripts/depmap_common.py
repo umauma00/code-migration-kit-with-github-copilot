@@ -159,7 +159,9 @@ def write_outputs(out: Path, nodes, edges, unresolved):
     out.mkdir(parents=True, exist_ok=True)
 
     def write(name, text):
-        with open(out / name, "w", encoding="utf-8", newline="\n") as f:
+        # A file name that is not UTF-8 (a Shift_JIS name unpacked on Linux)
+        # keeps its original bytes, so the path still opens.
+        with open(out / name, "w", encoding="utf-8", errors="surrogateescape", newline="\n") as f:
             f.write(text)
 
     write("edges.tsv", "from\tto\n" + "".join(f"{a}\t{b}\n" for a, b in edges))
@@ -190,6 +192,12 @@ def run(description, mapper, options=()):
         ap.error(f"--root is not a directory: {args.root}")
     warnings = []
     files, edges, unresolved = mapper(root, warnings, args)
+    for f in files:
+        try:
+            f.encode("utf-8")
+        except UnicodeEncodeError:
+            warnings.append(f"file name is not UTF-8; written with its original bytes: "
+                            f"{f.encode('utf-8', 'backslashreplace').decode('ascii', 'replace')}")
     edges, sccs, cycles, rows = write_outputs(args.out, files, edges, unresolved)
     for w in warnings:
         print(f"WARN {w}", file=sys.stderr)

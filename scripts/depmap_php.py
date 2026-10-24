@@ -63,6 +63,14 @@ from depmap_common import find_files, path_list, read_source, run  # noqa: E402
 
 EXTS = {".php", ".inc", ".phtml", ".php3", ".php4", ".php5", ".module"}
 BARE_NAME_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+# Functions whose string arguments name a callback, class or function.
+CALLBACK_FUNCTIONS = set("""array_map array_filter array_walk array_walk_recursive array_reduce
+usort uasort uksort call_user_func call_user_func_array forward_static_call
+forward_static_call_array is_callable function_exists class_exists method_exists
+is_subclass_of is_a register_shutdown_function register_tick_function
+spl_autoload_register set_error_handler set_exception_handler iterator_apply
+preg_replace_callback ob_start header_register_callback add_action add_filter
+add_shortcode""".split())
 SKIP_DIRS = {"vendor"}
 MARKERS = {"composer.json"}        # SKIP_DIRS count only beside it (or at --root)
 KEYWORDS = set("""abstract and array as break callable case catch class clone const continue declare
@@ -149,6 +157,7 @@ class FileInfo:
         self.refs = []          # (namespace, name, is_call, uses)
         self.includes = []      # (keyword, expression parts)
         self.strings = []
+        self.callables = []     # names in string callables: ("function" | "class", name)
         self.dynamic = []
 
 
@@ -262,6 +271,35 @@ def scan(rel, text):
             if not (prev.lower() in {"function", "const"} and not t.startswith("\\")):
                 info.refs.append((ns, t, at(i + 1) == "(", uses))
         i += 1
+    # String callables: a string argument of a function that takes a
+    # callback ('my_cb'), and the class of a ['Cls', 'm'] / array('Cls', 'm')
+    # pair. Other strings that only equal a name are not references.
+    for k, (t, _) in enumerate(toks):
+        if not t.startswith(STR):
+            continue
+        name = string(t).strip().lstrip("\\")
+        if not BARE_NAME_RE.fullmatch(name):
+            continue
+        before = at(k - 1)
+        if (before == "[" or (before == "(" and at(k - 2).lower() == "array")) and at(k + 1) == "," \
+                and at(k + 2).startswith(STR) and at(k + 3) in {"]", ")"}:
+            info.callables.append(("class", name))
+            continue
+        level, j = 0, k - 1
+        while j >= 0 and k - j < 200:
+            tok = at(j)
+            if tok in {")", "]"}:
+                level += 1
+            elif tok in {"(", "["}:
+                if level == 0:
+                    break
+                level -= 1
+            elif tok in {";", "{", "}"}:
+                j = -1
+                break
+            j -= 1
+        if j > 0 and at(j) == "(" and at(j - 1).lower().lstrip("\\") in CALLBACK_FUNCTIONS:
+            info.callables.append(("function", name))
     return info
 
 
@@ -424,12 +462,10 @@ def mapper(root, warnings, args):
             name = s.strip().lstrip("\\").split("::")[0].replace("\\\\", "\\")
             if "\\" in name or "::" in s:
                 add(classes(name.lower()))
-            elif BARE_NAME_RE.fullmatch(name):
-                # A string callable ('my_cb', [ 'Cls', 'm' ]) names a global
-                # function or class; a word that merely equals one gives an
-                # extra edge (conservative).
-                add(functions.get(name.lower(), ()))
-                add(classes(name.lower()))
+        # A string callable names a global function or class (never
+        # namespace-relative).
+        for kind, name in info.callables:
+            add(functions.get(name.lower(), ()) if kind == "function" else classes(name.lower()))
         for ref, why in info.dynamic:
             unresolved.add((src, ref, why))
     return rels, edges, unresolved
