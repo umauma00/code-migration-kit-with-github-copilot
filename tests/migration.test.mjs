@@ -364,7 +364,13 @@ test('C#, Java, PHP, VB.NET and COBOL dependency fixtures produce their expected
     // Real-tree findings: guarded PHP fallbacks, define() literals and
     // --include-var in include paths, dirname(dirname(__FILE__)).
     ['php', 'php-real'], ['php', 'php-real', 'expected_vars_', ['--include-var', 'root=,ext=php,IP=mw']],
-    ['php', 'php-relative', 'expected_', ['--include-path', 'lib']]];
+    ['php', 'php-relative', 'expected_', ['--include-path', 'lib']],
+    // Re-review: global usings of a removed file, <Using> in an XML comment,
+    // a shared file linked only under a Condition, UTF-16 and binary sources;
+    // Maven groupId:artifactId; PHP callback positions, dynamic callbacks and
+    // a missing __DIR__ include; VB.NET nested types and a commented-out
+    // RootNamespace.
+    ['csharp', 'csharp-rereview'], ['java', 'java-rereview'], ['php', 'php-rereview'], ['vbnet', 'vbnet-rereview']];
   for (const [lang, name, prefix = 'expected_', options = []] of cases) {
     const out = path.join(root, `${name}-${prefix}`), fixture = path.join(kitRoot, 'fixtures', name);
     // -I: the mapper must find its shared modules without the script directory on sys.path.
@@ -392,6 +398,26 @@ test('a directory symlink loop is walked once', { skip: process.platform === 'wi
   assert.equal(r.code, 0, r.stderr);
   assert.match(r.stdout, /files=2 edges=1 /);
   assert.match(r.stderr, /symlink loop not followed: sub\/loop\//);
+});
+
+test('a ProjectReference to a missing project file and an unread Maven groupId are warned about', async t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'copilot-depmap-refs-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const csharp = await runProcess(python, ['-I', path.join(kitRoot, 'scripts/depmap_csharp.py'),
+    '--root', path.join(kitRoot, 'fixtures/csharp-rereview'), '--out', path.join(root, 'cs')]);
+  assert.equal(csharp.code, 0, csharp.stderr);
+  assert.match(csharp.stderr, /ProjectReference \.\.\\Lib\\Missing\.csproj is not found under --root \(RefName\/Lib\/Lib\.csproj is the project file there\)/);
+  const tree = path.join(root, 'maven');
+  for (const [dir, group] of [['a', 'one'], ['b', 'two']]) {
+    fs.mkdirSync(path.join(tree, dir), { recursive: true });
+    fs.writeFileSync(path.join(tree, dir, 'pom.xml'), `<project><groupId>${group}</groupId><artifactId>core</artifactId></project>\n`);
+  }
+  fs.mkdirSync(path.join(tree, 'app'));
+  fs.writeFileSync(path.join(tree, 'app', 'pom.xml'), '<project><artifactId>app</artifactId><dependencies><dependency>'
+    + '<groupId>${core.group}</groupId><artifactId>core</artifactId></dependency></dependencies></project>\n');
+  const java = await runProcess(python, ['-I', path.join(kitRoot, 'scripts/depmap_java.py'), '--root', tree, '--out', path.join(root, 'java')]);
+  assert.equal(java.code, 0, java.stderr);
+  assert.match(java.stderr, /app\/pom\.xml: dependency \$\{core\.group\}:core matches 2 modules \(a, b\)/);
 });
 
 test('a directory symlink that is not a loop is read under its own path', { skip: process.platform === 'win32' && 'symlinks need privileges on Windows' }, async t => {

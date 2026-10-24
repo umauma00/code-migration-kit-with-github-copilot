@@ -94,8 +94,11 @@
   property (`$(Gen)`) is treated like a Condition, a file linked in from
   another directory belongs to every project that compiles it (its global
   usings, references and VB RootNamespace apply), a conditional
-  `EnableDefaultCompileItems` keeps the default files as "maybe", and ProjectReference paths
-  ignore case; Gradle Kotlin `project(path = ":x")` and `projects.x`
+  `EnableDefaultCompileItems` keeps the default files as "maybe", a ProjectReference must name an existing
+  project file (case ignored) or is warned about, Maven dependencies match
+  by groupId:artifactId, global usings of a file the build leaves out apply
+  nowhere, project-file comments are not read, and a shared file linked in
+  only under a Condition is listed; Gradle Kotlin `project(path = ":x")` and `projects.x`
   accessors are read. C# 14 `extension(...)` blocks, attributed enum
   members, VB.NET `Imports A, B` and PHP 7 classes named `Enum`, `Match` or
   `From` are understood; a Java import on the same line as `package` is
@@ -103,19 +106,24 @@
   `class_alias` alias is a class of its file. Code nested past Python's
   recursion limit is parsed on a larger stack instead of stopping the
   mapper. Lambda parameters, generic inference and overloads
-  are not followed. PHP follows computable
+  are not followed; a VB.NET type nested in a class is its own type.
+  PHP follows computable
   include paths and case-insensitive class/function names with namespaces
   and `use`, narrowed by composer.json autoload (PSR-4, PSR-0, classmap),
   with `--include-path` (an explicit `./` or `../` include never uses it:
   it is looked up next to the including file and at `--root`, and is listed
   as unresolved when those differ; `DIRECTORY_SEPARATOR`, `DS`,
   `realpath()` and a trailing `or die(...)` are understood), and string
-  callables (a string argument of `array_map`, `usort`, `call_user_func`,
-  `add_action`... and `['Cls', 'm']` pairs, by plain or namespaced name)
-  give edges to the function or class of that name; COBOL follows COPY, EXEC SQL INCLUDE, CALL 'X' (also with
+  callables (a string in a callback position of `array_map`, `usort`,
+  `call_user_func`, `add_action`... and `['Cls', 'm']` pairs, by plain or
+  namespaced name) give edges to the function or class of that name, while
+  a variable callback, `$f()` and an include missing at its `__DIR__` path
+  are listed as unresolved; COBOL follows COPY, EXEC SQL INCLUDE, CALL 'X' (also with
   the literal on a later line) and EXEC CICS LINK/XCTL in fixed or free
-  format, with `--copy-path` as the copybook search order. Non-UTF-8 sources are read as cp932,
-  then Latin-1, with a warning. `source-spec check` suggests the mapper for
+  format, with `--copy-path` as the copybook search order. UTF-16/UTF-32 sources are read by their
+  byte order mark; other non-UTF-8 sources are read as cp932, then Latin-1,
+  with a warning, and a file with NUL bytes that is not UTF-16 is listed as
+  not analysed. `source-spec check` suggests the mapper for
   these languages. [Dependency mappers](docs/DEPENDENCY-MAPPERS.md) lists
   them and says how to write an adapter for any other language (static only,
   under `migration/tools/`, same output files, hand-written fixture first);

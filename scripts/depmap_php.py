@@ -68,16 +68,19 @@ EXTS = {".php", ".inc", ".phtml", ".php3", ".php4", ".php5", ".module"}
 PHP_IF_TAGGED = {".install", ".test", ".theme", ".engine", ".profile"}
 # A function or class name in a string, maybe namespaced (App\Util\conv).
 BARE_NAME_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*(?:\\[A-Za-z_][A-Za-z0-9_]*)*")
-# Functions whose string arguments name a callback, class or function.
-# Existence checks (function_exists, class_exists, is_callable...) are not
-# references: two polyfills guarded by function_exists('f') would else
-# depend on each other.
-CALLBACK_FUNCTIONS = set("""array_map array_filter array_walk array_walk_recursive array_reduce
-usort uasort uksort call_user_func call_user_func_array forward_static_call
-forward_static_call_array is_subclass_of is_a register_shutdown_function register_tick_function
-spl_autoload_register set_error_handler set_exception_handler iterator_apply
-preg_replace_callback ob_start header_register_callback add_action add_filter
-add_shortcode""".split())
+# Functions that take a callback, and the 0-based positions of their
+# callback arguments: call_user_func('strtolower', 'business') names
+# strtolower, not business. Existence checks (function_exists,
+# class_exists, is_callable...) are not references: two polyfills guarded
+# by function_exists('f') would else depend on each other.
+CALLBACK_FUNCTIONS = {
+    **dict.fromkeys("""array_map call_user_func call_user_func_array forward_static_call
+forward_static_call_array register_shutdown_function register_tick_function spl_autoload_register
+set_error_handler set_exception_handler ob_start header_register_callback""".split(), (0,)),
+    **dict.fromkeys("""array_filter array_walk array_walk_recursive array_reduce usort uasort uksort
+iterator_apply preg_replace_callback add_action add_filter add_shortcode""".split(), (1,)),
+    "is_subclass_of": (0, 1), "is_a": (0, 1),     # class names
+}
 # Existence checks that guard a fallback declaration (!function_exists('f')).
 GUARDS = {"function_exists": "function", "class_exists": "class", "interface_exists": "class",
           "trait_exists": "class", "enum_exists": "class", "defined": "const"}
@@ -388,22 +391,33 @@ def scan(rel, text):
             if not (prev.lower() in {"function", "const"} and not t.startswith("\\")):
                 info.refs.append((ns, t, at(i + 1) == "(", uses))
         i += 1
-    # String callables: a string argument of a function that takes a
-    # callback ('my_cb'), and the class of a ['Cls', 'm'] / array('Cls', 'm')
-    # pair. Other strings that only equal a name are not references.
+    # String callables: the callback argument of a function that takes one
+    # ('my_cb'), and the class of a ['Cls', 'm'] / array('Cls', 'm') pair.
+    # Other strings that only equal a name are not references. A callback
+    # held in a variable, and $f(), name nothing the source shows.
     for k, (t, _) in enumerate(toks):
-        if not t.startswith(STR):
+        if t.startswith("$") and at(k + 1) == "(" and at(k - 1) not in {"->", "?->", "::"} \
+                and at(k - 1).lower() != "new":
+            info.dynamic.append((f"{t}()", "function name computed at run time"))
             continue
-        name = string(t).strip().lstrip("\\").replace("\\\\", "\\")
-        if not BARE_NAME_RE.fullmatch(name):
+        is_string = t.startswith(STR)
+        if is_string:
+            name = string(t).strip().lstrip("\\").replace("\\\\", "\\")
+            if not BARE_NAME_RE.fullmatch(name):
+                continue
+            before = at(k - 1)
+            if (before == "[" or (before == "(" and at(k - 2).lower() == "array")) and at(k + 1) == "," \
+                    and at(k + 2).startswith(STR) and at(k + 3) in {"]", ")"}:
+                info.callables.append(("class", name))
+                continue
+        elif not t.startswith("$"):
             continue
-        before = at(k - 1)
-        if (before == "[" or (before == "(" and at(k - 2).lower() == "array")) and at(k + 1) == "," \
-                and at(k + 2).startswith(STR) and at(k + 3) in {"]", ")"}:
-            info.callables.append(("class", name))
+        # A whole string argument, or one that starts with a variable
+        # ($cb, $this->handler), at a callback position of the call.
+        if at(k - 1) not in {"(", ","} or (is_string and at(k + 1) not in {",", ")"}):
             continue
-        level, j = 0, k - 1
-        while j >= 0 and k - j < 200:
+        level, j, position = 0, k - 1, 0
+        while j >= 0 and k - j < 400:
             tok = at(j)
             if tok in {")", "]"}:
                 level += 1
@@ -411,12 +425,22 @@ def scan(rel, text):
                 if level == 0:
                     break
                 level -= 1
+            elif tok == "," and level == 0:
+                position += 1
             elif tok in {";", "{", "}"}:
                 j = -1
                 break
             j -= 1
-        if j > 0 and at(j) == "(" and at(j - 1).lower().lstrip("\\") in CALLBACK_FUNCTIONS:
+        if j <= 0 or at(j) != "(" or at(j - 2) in {"->", "?->", "::"} or at(j - 2).lower() == "function":
+            continue
+        func = at(j - 1).lower().lstrip("\\")
+        if position not in CALLBACK_FUNCTIONS.get(func, ()):
+            continue
+        if is_string:
             info.callables.append(("function", name))
+        else:
+            more = "" if at(k + 1) in {",", ")"} else "..."
+            info.dynamic.append((f"{func}({t}{more})", "callback computed at run time"))
     return info
 
 
@@ -538,6 +562,10 @@ def resolve_include(src, parts, info, by_rel, by_tail, include_path=(), variable
     for c in cand:
         if c in by_rel:
             return [c], None
+    if base is not None:
+        # __DIR__ . '/x.php' names one path: a same-named file elsewhere is
+        # another file, not the one included.
+        return None, f"included file not found at {cand[0]}"
     # Last resort: the path without its leading /, ./ and ../ parts.
     tail = posixpath.normpath(path)
     while tail.startswith(("/", "./", "../")):

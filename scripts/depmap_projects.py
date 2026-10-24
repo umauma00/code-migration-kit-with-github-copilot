@@ -9,7 +9,7 @@ not run. What they give:
   - which project or module each source file belongs to (the deepest
     directory above it holding a .csproj/.vbproj, pom.xml or build.gradle);
   - which projects each one references (ProjectReference, a Maven dependency
-    on a sibling module's artifactId, Gradle project(':a:b')), transitively;
+    on a sibling module's groupId:artifactId, Gradle project(':a:b')), transitively;
   - .NET files a project does not compile (<Compile Remove>, or an old-style
     project that lists its <Compile Include> files and leaves the file out).
     Include and Remove are item lists ("a.cs;b.cs"); * and ? stay within one
@@ -217,7 +217,7 @@ def dotnet_projects(root, rels, project_ext, warnings):
     projects they reference hold, or None outside any project. not_compiled
     maps a file no project compiles to (the project that leaves it out,
     whether that depends on an unevaluated Condition or property); texts
-    maps a project directory to its project file's text."""
+    maps a project directory to its project file's text, comments removed."""
     projects = {}       # project dir -> (project file rel, text)
     for proj in find_files(root, {project_ext}, {"bin": {project_ext}, "obj": {project_ext}, "packages": {".sln"}}):
         d = rel_dir(proj, root)
@@ -233,7 +233,7 @@ def dotnet_projects(root, rels, project_ext, warnings):
     if not projects:
         return None, {}, {rel: () for rel in rels}, {}
     owner = {rel: nearest(rel, projects) for rel in rels}
-    by_lower = {d.lower(): d for d in projects}     # Windows paths ignore case
+    by_file = {proj_rel.lower(): d for d, (proj_rel, _) in projects.items()}   # Windows paths ignore case
     refs = {}
     compiled_by = {rel: [] for rel in rels}         # rel -> [(project dir, "yes" | "maybe")]
     left_out = {}       # rel -> (owner project file, "no" | "maybe")
@@ -241,14 +241,15 @@ def dotnet_projects(root, rels, project_ext, warnings):
         refs[d] = set()
         for value in (v for m in PROJECT_REF_RE.finditer(COMMENT_RE.sub("", text))
                       for v in attr_values(INCLUDE_ATTR_RE, m.group(1))):
-            target = posixpath.dirname(msbuild_path(d, value))
-            target = target if target in projects else by_lower.get(target.lower())
+            path = msbuild_path(d, value)
+            target = by_file.get(path.lower())
             if target is not None:
                 refs[d].add(target)
             else:
-                path = msbuild_path(d, value)
+                there = projects.get(posixpath.dirname(path))
                 where = ("uses an MSBuild property" if "$(" in value else
                          "is not under --root" if path == ".." or path.startswith("../") else
+                         f"is not found under --root ({there[0]} is the project file there)" if there else
                          "is not found under --root (no project file there)")
                 warnings.append(f"{proj_rel}: ProjectReference {value} {where}")
         sdk = SDK_RE.search(text)
@@ -298,6 +299,10 @@ def dotnet_projects(root, rels, project_ext, warnings):
                     not_compiled[rel] = (proj_rel, True)
             elif not compiled_by[rel]:
                 not_compiled[rel] = (proj_rel, False)
+        elif compiled_by[rel] and not any(st == "yes" for _, st in compiled_by[rel]):
+            # A file outside any project that projects link in only under
+            # a Condition.
+            not_compiled[rel] = (", ".join(projects[d][0] for d in dirs), True)
     members = {}
     for rel, dirs in projects_of.items():
         for d in dirs:
@@ -312,11 +317,13 @@ def dotnet_projects(root, rels, project_ext, warnings):
             cache[dirs] = set().union(*(members.get(p, set()) for d in dirs for p in reachable(d, refs)))
         return cache[dirs]
 
-    texts = {d: text for d, (_, text) in projects.items()}
+    texts = {d: COMMENT_RE.sub("", text) for d, (_, text) in projects.items()}
     return visible_files, not_compiled, projects_of, texts
 
 
 POM_ARTIFACT_RE = re.compile(r"<artifactId>\s*([^<\s]+)\s*</artifactId>")
+POM_GROUP_RE = re.compile(r"<groupId>\s*([^<\s]+)\s*</groupId>")
+POM_PARENT_RE = re.compile(r"<parent>(.*?)</parent>", re.DOTALL)
 POM_STRIP_RE = re.compile(r"<(parent|dependencies|dependencyManagement|build|profiles|plugins|reporting)\b.*?</\1>", re.DOTALL)
 POM_DEPENDENCY_RE = re.compile(r"<dependency>(.*?)</dependency>", re.DOTALL)
 # project(":core"), project(path: ":core") and Kotlin's project(path = ":core").
@@ -369,11 +376,23 @@ def java_modules(root, rels, warnings):
         for path in paths:
             text = read_source(path, warnings)
             if path.name == "pom.xml":
+                text = COMMENT_RE.sub("", text)
                 body = POM_STRIP_RE.sub("", text)
                 m = POM_ARTIFACT_RE.search(body)
+                # The module's groupId, else its parent's (Maven inherits it).
+                parent = POM_PARENT_RE.search(text)
+                g = POM_GROUP_RE.search(body) or (parent and POM_GROUP_RE.search(parent.group(1)))
+                group = g.group(1) if g else None
                 if m:
-                    artifact_of[m.group(1)] = d
-                wanted[d] = {a for dep in POM_DEPENDENCY_RE.findall(text) for a in POM_ARTIFACT_RE.findall(dep)}
+                    artifact_of.setdefault(m.group(1), []).append((group, d))
+                wanted[d] = []
+                for dep in POM_DEPENDENCY_RE.findall(text):
+                    a, g = POM_ARTIFACT_RE.search(dep), POM_GROUP_RE.search(dep)
+                    if a:
+                        dep_group = g.group(1) if g else None
+                        if dep_group in {"${project.groupId}", "${pom.groupId}", "${groupId}"}:
+                            dep_group = group
+                        wanted[d].append((dep_group, a.group(1)))
             else:
                 base = next((s for s in reversed(settings_dirs) if d == s or d.startswith(s + "/") or s == ""), "")
                 for ref in GRADLE_PROJECT_RE.findall(text):
@@ -391,8 +410,23 @@ def java_modules(root, rels, warnings):
                         if target is not None:
                             modules[d].add(target)
                             break
-    for d, artifacts in wanted.items():
-        modules[d].update(artifact_of[a] for a in artifacts if a in artifact_of and artifact_of[a] != d)
+    # A dependency names a module by groupId:artifactId. Modules that share
+    # an artifactId under different groupIds are different modules; a
+    # groupId the mapper cannot read (a property, an unread parent) keeps
+    # every module of that artifactId and is reported.
+    for d, deps in sorted(wanted.items()):
+        for group, artifact in deps:
+            found = artifact_of.get(artifact, [])
+            exact = [m for g, m in found if g is not None and g == group]
+            if exact or group is not None and not group.startswith("${") and all(g is not None for g, _ in found):
+                targets = exact
+            else:
+                targets = [m for _, m in found]
+                if len(targets) > 1:
+                    warnings.append(f"{d or '.'}/pom.xml: dependency {group or '?'}:{artifact} matches "
+                                    f"{len(targets)} modules ({', '.join(sorted(m or '.' for m in targets))}); "
+                                    "its groupId is not read, so it sees all of them")
+            modules[d].update(t for t in targets if t != d)
     owner = {rel: nearest(rel, builds) for rel in rels}
     members = {}
     for rel, d in owner.items():

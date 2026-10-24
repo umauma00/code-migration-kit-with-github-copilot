@@ -1,0 +1,8 @@
+# migration order: one batch per line, dependencies first
+data/hooks.php
+data/main.php
+data/business.php
+dyn/inc.php
+dyn/main.php
+inc/app/main.php
+inc/unrelated/config.php

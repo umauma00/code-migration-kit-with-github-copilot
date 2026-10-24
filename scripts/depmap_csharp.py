@@ -550,27 +550,33 @@ def mapper(root, warnings, args):
     # global using, global using static, global aliases (and <Using> items in
     # the .csproj) apply to every file of their project; files outside any
     # project share one set. A file linked into several projects takes the
-    # directives of each, and its own global usings apply to each.
+    # directives of each, and its own global usings apply to each. A file no
+    # project compiles gives none; one compiled only under an unevaluated
+    # Condition gives its own, and an alias it shares with another file
+    # keeps both targets.
     usings, aliases, static = {}, {}, {}
     for info, (globals_, global_aliases, global_static) in zip(infos, project_globals):
+        if info.rel in not_compiled and not not_compiled[info.rel][1]:
+            continue
         for d in projects_of[info.rel] or (None,):
             usings.setdefault(d, set()).update(globals_)
             static.setdefault(d, set()).update(global_static)
             for name, target in global_aliases.items():
-                aliases.setdefault(d, {}).setdefault(name, target)
+                aliases.setdefault(d, {}).setdefault(name, set()).add(target)
     for d, text in sorted(texts.items()):
         names, named, statics = csproj_usings(text)
         usings.setdefault(d, set()).update(names)
         static.setdefault(d, set()).update(statics)
         for name, target in named.items():
-            aliases.setdefault(d, {}).setdefault(name, target)
+            aliases.setdefault(d, {}).setdefault(name, set()).add(target)
     for info in infos:
         for d in projects_of[info.rel] or (None,):
             info.usings.update(dotted(u, False) for u in usings.get(d, ()))
             info.project_static.update(dotted(u, False) for u in static.get(d, ()))
-            for name, target in sorted(aliases.get(d, {}).items()):
-                if info.aliases.setdefault(name, target) != target:
-                    info.alias_more.setdefault(name, set()).add(target)
+            for name, targets in sorted(aliases.get(d, {}).items()):
+                for target in sorted(targets):
+                    if info.aliases.setdefault(name, target) != target:
+                        info.alias_more.setdefault(name, set()).add(target)
     skipped = drop_not_compiled(infos, not_compiled)
     edges, unresolved = resolve(infos, attribute_suffix="Attribute", visible_files=visible_files,
                                  standard=DOTNET_STANDARD)

@@ -60,7 +60,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # -I drops the script dir
 from depmap_common import find_files, read_source, run  # noqa: E402
-from depmap_projects import QUOTED, attr_values, dotnet_projects, drop_not_compiled  # noqa: E402
+from depmap_projects import COMMENT_RE, QUOTED, attr_values, dotnet_projects, drop_not_compiled  # noqa: E402
 from depmap_typed import DOTNET_STANDARD, GLOBAL, PREDEFINED, TOKEN_RE, FileInfo, chains, is_ident, join, members, parse_expr, resolve, scan_or_none  # noqa: E402
 
 EXTS = {".vb"}
@@ -243,6 +243,16 @@ def scan(rel, text, root_ns=""):
             return ".".join([parts[0][len("global."):]] + parts[1:])
         return ".".join([root_ns] + parts if root_ns else parts)
 
+    def declare(name):
+        """A type (or delegate) declared at this point. One nested in a class
+        is a type of its own (N.A.Inner and N.B.Inner); a Module's members,
+        nested types too, are promoted to its namespace."""
+        info.namespaces.add(ns())
+        info.decls.append((ns(), name))
+        outer = [n for kind, n in stack if kind != "namespace"]
+        if outer and stack[-1][0] != "module":
+            info.nested[join(ns(), name)] = join(ns(), ".".join(outer + [name]))
+
     def enclosing():
         return [join(ns(), name) for kind, name in reversed(stack) if kind != "namespace"]
 
@@ -312,8 +322,7 @@ def scan(rel, text, root_ns=""):
                 stack.append((kind, name))
                 info.namespaces.add(ns())
                 continue
-            info.namespaces.add(ns())
-            info.decls.append((ns(), name))
+            declare(name)
             if re.search(r"\bpartial\b", low[:m.start(1)]):
                 info.partial.add(f"{ns()}.{name}" if ns() else name)
             stack.append((kind, name))
@@ -323,8 +332,7 @@ def scan(rel, text, root_ns=""):
             continue
         m = DELEGATE_RE.match(low)
         if m:
-            info.namespaces.add(ns())
-            info.decls.append((ns(), m.group(1).replace("[", "").replace("]", "")))
+            declare(m.group(1).replace("[", "").replace("]", ""))
             body.append((ns(), line[m.end(1):]))
             continue
         in_type = stack and stack[-1][0] in {"class", "module", "structure", "interface"}
@@ -397,7 +405,7 @@ def mapper(root, warnings, args):
     visible_files, not_compiled, projects_of, texts = dotnet_projects(root, rels, ".vbproj", warnings)
     root_ns = {}
     for proj in find_files(root, {".vbproj"}, SKIP_DIRS):
-        m = ROOT_NS_RE.search(read_source(proj, warnings))
+        m = ROOT_NS_RE.search(COMMENT_RE.sub("", read_source(proj, warnings)))
         d = proj.parent.relative_to(root).as_posix()
         root_ns.setdefault("" if d == "." else d, (m.group(1).strip() if m else proj.stem).lower())
     infos, deep = [], set()

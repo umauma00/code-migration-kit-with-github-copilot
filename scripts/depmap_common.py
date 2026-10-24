@@ -91,11 +91,38 @@ def find_files(root: Path, exts, skip_dirs=(), markers=(), warnings=None):
     return sorted(out)
 
 
+# Byte order marks, longest first (the UTF-32 LE one starts like UTF-16 LE's).
+BOMS = ((b"\xff\xfe\x00\x00", "utf-32-le"), (b"\x00\x00\xfe\xff", "utf-32-be"),
+        (b"\xff\xfe", "utf-16-le"), (b"\xfe\xff", "utf-16-be"))
+UNREADABLE = {}     # path -> reason: files read_source could not decode as text
+
+
 def read_source(path: Path, warnings):
-    """Decode a source file. Legacy trees are often Shift_JIS (cp932) or
-    Latin-1, so UTF-8 is tried first, then cp932, then Latin-1 (never fails).
-    A fallback is reported because identifiers outside ASCII depend on it."""
+    """Decode a source file. A UTF-16/UTF-32 byte order mark is followed;
+    otherwise UTF-8 is tried first, then cp932 (legacy trees are often
+    Shift_JIS), then Latin-1 (never fails). A fallback is reported because
+    identifiers outside ASCII depend on it. Text with NUL bytes and no mark
+    is read as UTF-16 when every other byte is NUL; else it is not text, and
+    run() lists the file in unresolved.tsv."""
     data = path.read_bytes()
+    for bom, codec in BOMS:
+        if data.startswith(bom):
+            try:
+                return data[len(bom):].decode(codec)
+            except UnicodeDecodeError:
+                UNREADABLE[path] = f"starts with a {codec} byte order mark but does not decode; not analysed"
+                return ""
+    if b"\x00" in data:
+        for codec, nuls in (("utf-16-le", data[1::2]), ("utf-16-be", data[0::2])):
+            if len(data) % 2 == 0 and nuls.count(0) >= len(nuls) * 0.9:
+                try:
+                    text = data.decode(codec)
+                    warnings.append(f"decoded as {codec} (no byte order mark): {path}")
+                    return text
+                except UnicodeDecodeError:
+                    break
+        UNREADABLE[path] = "holds NUL bytes (binary, or an encoding without a byte order mark); not analysed"
+        return ""
     try:
         return data.decode("utf-8-sig")
     except UnicodeDecodeError:
@@ -217,6 +244,16 @@ def run(description, mapper, options=()):
         ap.error(f"--root is not a directory: {args.root}")
     warnings = []
     files, edges, unresolved = mapper(root, warnings, args)
+    listed = set(files)
+    for path, why in sorted(UNREADABLE.items()):
+        try:
+            rel = path.resolve().relative_to(root).as_posix()
+        except ValueError:
+            rel = None
+        if rel in listed:
+            unresolved = set(unresolved) | {(rel, "(whole file)", why)}
+        else:
+            warnings.append(f"{why}: {path}")
     for f in files:
         try:
             f.encode("utf-8")
