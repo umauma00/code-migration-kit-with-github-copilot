@@ -178,7 +178,12 @@ units failed), `doctor` prints it for every failed check, and
 `status --format markdown` appends it for blocked units; for failures from any other tool (a
 script, a worker, a hook denial), run
 `run_migration.mjs guidance --message "<the error text>"` to get the same
-structure. A TODO or question tool that is unavailable or rejects a call is not
+structure. Its output starts with "What to do about this message"
+(「渡されたメッセージへの対処」) and exits 0:
+that is the explanation you asked for, not guidance failing, even when the
+message is not in the kit's catalog. When it says no decision is needed
+(`actionRequired: false` in JSON, for example a credential check that found
+nothing), continue without asking. A TODO or question tool that is unavailable or rejects a call is not
 a failed step: use the chat fallbacks above. Adapt the guidance with what you
 actually observed, then report:
 

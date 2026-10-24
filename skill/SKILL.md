@@ -117,7 +117,8 @@ Follow [When a step fails](../docs/PHASE-HANDOFF.md#when-a-step-fails) for every
 failed command, refused gate or blocked unit: cause, impact, at least two
 choices plus pause, exactly one recommended option first, a reason for each,
 then ask with the question tool and wait. Runner errors already print this
-guidance; for other failures run `run_migration.mjs guidance --message TEXT`.
+guidance; for other failures run `run_migration.mjs guidance --message TEXT`
+(its exit 0 output explains that message; it is not guidance failing).
 Never choose on the user's behalf or offer routing around a guardrail.
 
 ## Ordered workflow entry

@@ -235,7 +235,7 @@ export async function main(argv = process.argv.slice(2)) {
   }
   if (cmd === 'guidance') {
     if (typeof args.message !== 'string' || !args.message.trim()) throw new Error('guidance requires --message TEXT (the error to explain)');
-    const g = failureGuidance(args.message, { root, language });
+    const g = failureGuidance(args.message, { root, language, explain: true });
     console.log(args.format === 'json' ? JSON.stringify(g, null, 2) : guidanceMarkdown(g, language));
     return;
   }

@@ -14,7 +14,7 @@ import { mini, prepare } from './helpers.mjs';
 import { loadConfig, safePath, atomicWrite, writeJSON } from '../lib/core.mjs';
 import { phaseCommand } from '../scripts/phase_cli.mjs';
 import { migrationStatus, statusTodo, statusChecklist } from '../lib/status.mjs';
-import { failureGuidance, guidanceRuleIds, doctorGuidance } from '../lib/guidance.mjs';
+import { failureGuidance, guidanceRuleIds, doctorGuidance, guidanceMarkdown } from '../lib/guidance.mjs';
 import { interactiveDecision, installGuardrails } from '../lib/guardrails.mjs';
 import { setPreferences } from '../lib/preferences.mjs';
 import { runProcess } from '../lib/process.mjs';
@@ -64,6 +64,9 @@ const samples = {
   'build-failed': 'Build failed (exit 2)',
   timeout: 'Copilot reviewer timed out after 600 s',
   'worker-output': 'Invalid review result for src/login.py',
+  'credential-candidate': 'Local scan: the /P argument is still a literal credential candidate',
+  'credential-clear': 'Secret scan: 0 matches',
+  'credential-incomplete': 'Secret scan failed: no access to credentials file',
   unknown: 'something nobody anticipated'
 };
 const recommended = { ja: '（推奨）', en: ' (recommended)' };
@@ -99,6 +102,76 @@ test('every failure rule offers two choices plus pause, the recommendation first
   for (const message of ['Phase 00 is not reviewed for current inputs', 'Phase 03 is not reviewed for current inputs', 'Phase 05c is not reviewed for current inputs',
     '"npm test" is denied by migration/guardrails.json during the migration.'])
     assertContract(failureGuidance(message, { language: 'en' }), message, 'en');
+});
+
+// A Windows phase 00 run stopped twice: a host's own scan took a /P switch for a
+// password, then read the guidance it asked for as a second failure.
+test('guidance --message explains a message, and a credential suspicion stops no phase', async t => {
+  const id = message => failureGuidance(message, { language: 'en' }).id;
+  for (const message of [samples['credential-candidate'], '再開時の検査で /P 引数が資格情報候補と判定されました', 'Possible hardcoded password in deploy.bat',
+    'secret scan found 1 match', 'Secret scan found 2 matches', '1 credential candidate found; no other matches', 'credential candidate at src/run.bat line 5',
+    'ハードコードされたパスワードを検知しました', '認証情報が見つかりました', 'シークレットが見つかりました'])
+    assert.equal(id(message), 'credential-candidate', message);
+  // A clean result needs no question, though it names a credential and "detected".
+  for (const message of ['No credentials detected', 'No secret candidates found', 'Secret scan: 0 matches', 'Secret scan: none', 'secret scan complete, nothing found',
+    '資格情報は検出されませんでした', 'シークレットは見つかりませんでした', '秘密情報の検査: 0件'])
+    assert.equal(id(message), 'credential-clear', message);
+  for (const message of ['Bad credentials', 'Copilot implementer failed (exit 1): To authenticate, you can use any of the following methods'])
+    assert.equal(id(message), 'copilot-auth', message);
+  const g = failureGuidance(samples['credential-candidate'], { language: 'en' });
+  assert.deepEqual(g.options.map(o => o.id), ['check-line', 'skip-line', 'move-secret', 'pause']);
+  assert.ok(!g.options.some(o => o.command), 'no command runs on a suspected credential');
+  assert.match(g.cause, /no phase stops on one/);
+  assert.equal(failureGuidance('No credentials detected', { language: 'en' }).recommended, 'continue');
+  // A finding in any clause wins over a clean clause in the same message, and
+  // its value never reaches the output.
+  for (const message of ['Secret scan: 0 matches\nPotential hardcoded password at src/config.bat:17',
+    'No credentials detected, but possible hardcoded password: sqlcmd -P ExampleSecret123',
+    '資格情報は検出されませんでした。しかし、ハードコードされたパスワードを検知しました: schtasks /U admin /P ExampleSecret123',
+    // In one clause, however they are joined.
+    'No credentials detected but possible hardcoded password value ExampleSecret123', 'Secret scan: 0 matches but potential leaked token value ExampleSecret123',
+    '資格情報は検出されませんでしたがハードコードされたパスワードを検知しました ExampleSecret123',
+    // Names a credential but is neither clean nor a known finding: unsure is never clean.
+    'credential check returned ExampleSecret123']) {
+    const result = failureGuidance(message, { language: 'en', explain: true });
+    assert.equal(result.id, 'credential-candidate', message);
+    assert.doesNotMatch(JSON.stringify(result) + guidanceMarkdown(result, 'en'), /ExampleSecret123/, message);
+  }
+  // Outside the credential rules, a message with a value after a password switch is withheld; -p is not one.
+  for (const value of ['ExampleSecret123', '仮の秘密値123', 'Example秘密123'])
+    assert.doesNotMatch(JSON.stringify(failureGuidance(`sqlcmd -S db -U sa -P ${value} failed`, { explain: true })), new RegExp(value));
+  assert.equal(failureGuidance('mkdir -p migration/x failed', { explain: true }).message, 'mkdir -p migration/x failed');
+  for (const message of ['token expired for user', 'Found 2 matches in src']) assert.equal(id(message), 'unknown', message);
+  // A clean result only informs: no question, in either language.
+  for (const language of ['en', 'ja']) {
+    const clear = failureGuidance('No credentials detected', { language, explain: true });
+    assert.equal(clear.actionRequired, false);
+    assert.doesNotMatch(guidanceMarkdown(clear, language), /Choose how to proceed|どれで進めるか/);
+  }
+  assert.equal(g.actionRequired, true);
+  const root = project(t), script = safePath(root, 'migration-kit/scripts/run_migration.mjs');
+  for (const [message, cause] of [[samples['credential-candidate'], /suspected a literal credential/], ['something nobody anticipated', /kit has no entry for this message/]]) {
+    const out = await runProcess(process.execPath, [script, 'guidance', '--message', message], { cwd: root });
+    assert.equal(out.code, 0, out.stderr);
+    assert.match(out.stdout, /^## What to do about this message\n- Note: the guidance command succeeded\./);
+    assert.doesNotMatch(out.stdout, /did not succeed|did not complete/);
+    assert.match(out.stdout, cause);
+    assert.match(out.stdout, /- Message: `/);
+  }
+  // A candidate's text may carry the value: neither output repeats it, and any
+  // other message has an assigned value masked.
+  const secret = 'ExampleSecret123';
+  for (const [message, format] of [[`Possible hardcoded password: sqlcmd -P ${secret}`, 'markdown'], [`Possible hardcoded password: sqlcmd -P ${secret}`, 'json'],
+    [`ハードコードされたパスワードを検知しました: schtasks /U admin /P ${secret}`, 'json'], [`deploy failed: password=${secret}`, 'markdown'], [`deploy failed: token: "${secret}"`, 'json']]) {
+    const out = await runProcess(process.execPath, [script, 'guidance', '--message', message, '--format', format], { cwd: root });
+    assert.equal(out.code, 0, out.stderr);
+    assert.doesNotMatch(out.stdout + out.stderr, new RegExp(secret), `${format}: ${message}`);
+  }
+  setPreferences(root, { language: 'ja' });
+  const ja = await runProcess(process.execPath, [script, 'guidance', '--message', 'something nobody anticipated', '--format', 'json'], { cwd: root });
+  assert.equal(JSON.parse(ja.stdout).explained, true);
+  // A runner error keeps its failure heading.
+  assert.match((await runProcess(process.execPath, [script, 'phase', 'start', '04'], { cwd: root })).stderr, /## うまくいきませんでした/);
 });
 
 test('a survey command names the kind the error reports, or none when it is unknown', () => {
@@ -207,4 +280,54 @@ test('doctor shows the review dependency map as pending until phase 01 is record
   fs.rmSync(safePath(root, 'migration/phases/01.json'));
   writeJSON(safePath(root, 'migration/config.json'), { ...loadConfig(root), phasePolicy: 'legacy' });
   assert.equal((await mapCheck()).ok, false);
+});
+
+// Review round 4: protection does not depend on which rule a message gets. A
+// value never reaches any field (message, cause, labels, reasons, commands),
+// an unsure clause after a clean one is not clean, and a check that could not
+// run is not a clean result.
+test('no guidance field repeats a credential value, whichever rule the message gets', () => {
+  const secret = 'ExampleSecret123';
+  const cases = {
+    'credential-candidate': [`credential check returned ${secret} for b.py`, `No credentials detected in a.py; credential check returned ${secret} for b.py`,
+      `No credentials detected in a.py and credential check returned ${secret} for b.py`,
+      `No credentials detected, credential check returned ${secret}`, `Copilot implementer failed (exit 1): possible hardcoded password value ${secret}`],
+    'credential-incomplete': [`Secret scan failed: no access to credentials file ${secret}`, '資格情報の検査に必要な権限がありませんでした', `credential scan skipped for ${secret}.bat`,
+      // A clean phrase from a scan that crashed, ran in part or exited non-zero is not clean (review round 7).
+      'Secret scan: no secrets found; scanner crashed', 'Secret scan: no secrets found; partial scan', 'Secret scan: no secrets found; only 3 of 10 files scanned',
+      'Secret scan: no secrets found; 2 files unreadable', 'Secret scan: no secrets found. Tool exited with code 2', 'Secret scan: no secrets found (scan limit reached)',
+      'Secret scan: nothing found. Token expired for GitHub', 'シークレットの検査: 検出なし（一部のファイルは読めませんでした）'],
+    // A failed build or worker that only names a password keeps its own rule.
+    'build-failed': ['Build failed (exit 1): missing PASSWORD environment variable'], 'worker-output': ['Copilot implementer failed (exit 1): cannot open src/password.py'],
+    'hook-check': [`Hook check failed: token=${secret}`, `Hook check failed: sqlcmd -P ${secret} took 9000 ms (timeout 5 s)`],
+    'credential-clear': ['No credentials detected', 'Secret scan: none', 'secret scan complete, nothing found', '秘密情報の検査: 0件',
+      'Secret scan complete: 0 matches, 0 errors', 'No credentials detected. No errors reported.', '秘密情報の検査: 0件、エラーなし',
+      'Secret scan found no issues', 'secret scan: passed', 'secret scan: ok', 'シークレットの検査: エラーなし、問題なし']
+  };
+  for (const [expected, messages] of Object.entries(cases)) for (const message of messages) for (const language of ['en', 'ja']) {
+    const g = failureGuidance(message, { language, explain: true });
+    assert.equal(g.id, expected, message);
+    assert.equal(g.actionRequired, expected !== 'credential-clear', message);
+    assert.doesNotMatch(JSON.stringify(g) + guidanceMarkdown(g, language), new RegExp(secret), `${language}: ${message}`);
+  }
+  // Review round 6: a value is protected by its syntax, not by how it looks:
+  // lowercase, short, quoted, an upper-case key, or not ASCII.
+  for (const [message, value] of [['Hook check failed: token=huntertwo', 'huntertwo'], ['Hook check failed: sqlcmd -P huntertwo took 9000 ms', 'huntertwo'],
+    ['Hook check failed: TOKEN=ExampleSecret123', 'ExampleSecret123'], ['Hook check failed: token=q1', 'q1'], ['Hook check failed: password="two words" took 1 ms', 'two words'],
+    ["Hook check failed: Password: 'hunter' took 1 ms", 'hunter'], ['Hook check failed: sqlcmd -P 仮の秘密値 took 9000 ms', '仮の秘密値'],
+    // A key inside a longer name, and a value attached to a SQL client's switch (review round 7).
+    ['Hook check failed: DB_PASSWORD=huntertwo', 'huntertwo'], ['Hook check failed: MYSQL_PWD=huntertwo', 'huntertwo'],
+    ['Hook check failed: DB_PASSWORD_PROD=huntertwo', 'huntertwo'], ['Hook check failed: sqlcmd -Phuntertwo took 9000 ms', 'huntertwo'],
+    ['Hook check failed: mysql -u root -phuntertwo took 9000 ms', 'huntertwo']])
+    for (const language of ['en', 'ja']) {
+      const g = failureGuidance(message, { language, explain: true });
+      assert.equal(g.id, 'hook-check', message);
+      assert.ok(!(JSON.stringify(g) + guidanceMarkdown(g, language)).includes(value), `${language}: ${message}`);
+    }
+  // Japanese prose after a switch is not a value, and stays readable for the rules.
+  assert.equal(failureGuidance('再開時の検査で /P 引数が資格情報候補と判定されました').id, 'credential-candidate');
+  // A message that only mentions a credential keeps its own rule, with the text withheld.
+  const timeout = failureGuidance('password prompt timed out', { language: 'en', explain: true });
+  assert.equal(timeout.id, 'timeout');
+  assert.doesNotMatch(timeout.message, /password prompt/);
 });
