@@ -16,10 +16,17 @@ table of the types each file declares. Two passes:
 The approximation is conservative: when a simple name matches several visible
 types, every candidate becomes an edge (more edges, never fewer); a local
 variable that happens to share a type's name also becomes an edge. Partial
-types declared in several files link all their parts both ways.
+types declared in several files link all their parts both ways. A type that
+several files declare without partial (copies of one source, alternatives
+for different builds) does not link those files to each other: a file that
+declares a name refers to its own declaration. Each such duplicate is
+listed in unresolved.tsv, and every other file that names it gets an edge
+to each copy.
 """
 
 import re
+import sys
+import threading
 
 
 class FileInfo:
@@ -29,6 +36,7 @@ class FileInfo:
         self.decls = []             # (namespace, name) of declared types/members
         self.extensions = []        # (namespace, name) of members called as x.Name (C# extension methods, VB module members)
         self.partial = set()        # FQNs declared partial in this file
+        self.member_decls = set()   # FQNs in decls that are VB Module members, not types
         self.usings = set()         # imported namespaces (or types: Java on-demand of a type)
         self.blocks = {}            # C# namespace block context -> Directives written in it
         self.aliases = {}           # alias -> dotted target
@@ -99,6 +107,39 @@ def prefixes(ns):
 
 def join(ns, name):
     return f"{ns}.{name}" if ns else name
+
+
+def scan_or_none(scan, rel, text, rows, *args):
+    """scan(rel, text, *args). The parsers recurse once per bracket, so a
+    file nested past Python's recursion limit is scanned again on a thread
+    with a large stack and limit; past that too, None and a row in rows."""
+    try:
+        return scan(rel, text, *args)
+    except RecursionError:
+        pass
+    result, old_limit, old_stack = [], sys.getrecursionlimit(), threading.stack_size()
+
+    def deep():
+        try:
+            result.append(scan(rel, text, *args))
+        except RecursionError:
+            pass
+    try:
+        threading.stack_size(256 * 1024 * 1024)
+        sys.setrecursionlimit(200000)
+        worker = threading.Thread(target=deep)
+        worker.start()
+        worker.join()
+    except (ValueError, RuntimeError, MemoryError):
+        pass
+    finally:
+        sys.setrecursionlimit(old_limit)
+        threading.stack_size(old_stack)
+    if result:
+        return result[0]
+    rows.add((rel, "(whole file)", "nesting too deep to parse; the file is kept "
+              "without its declarations or references"))
+    return None
 
 
 def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
@@ -287,11 +328,33 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
             if t != src:
                 edges.add((src, t))
 
+    own = {}            # rel -> FQNs it declares (its own declaration wins)
+    partial_types = set()
+    for info in infos:
+        partial_types |= info.partial
+        for ns, name in info.decls:
+            own.setdefault(info.rel, set()).add(join(ns, name))
+
     def add_types(src, fqns):
         files = set()
+        mine = own.get(src, ())
         for fq in fqns:
+            if fq in mine and fq not in partial_types:
+                continue        # its own type; another copy is not a dependency
             files.update(lookup(fq))
         add(src, files)
+
+    # Non-partial types declared in several files that can see each other.
+    member_decls = set().union(*(info.member_decls for info in infos)) if infos else set()
+    for fq, files in sorted(types.items()):
+        if len(files) < 2 or fq in partial_types or fq in member_decls:
+            continue
+        for rel in sorted(files):
+            seen = visible_files(rel) if visible_files else None
+            others = sorted(f for f in files if f != rel and (seen is None or f in seen))
+            if others:
+                unresolved.add((rel, fq, "also declared in " + ", ".join(others)
+                                + "; the copies are not linked to each other, files that name it get an edge to each"))
 
     # Member tables, resolved lazily in the scope of the type's declaration.
     member_cache, base_cache = {}, {}
@@ -393,7 +456,7 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
         heads = {chain.split(".")[0] for _, chain in info.names} | info.members
         for target in sorted(info.project_static - info.direct):
             fq = longest(target.split("."))
-            if fq and any(has_member(fq, name) for name in sorted(heads)):
+            if fq and any(has_member(fq, name) or join(fq, name) in types for name in sorted(heads)):
                 add(src, lookup(fq))
         usings = set(info.usings) | global_usings
         usings = usings.union(*(b.usings for b in info.blocks.values()))
@@ -711,11 +774,14 @@ def is_ident(tok):
     return bool(tok) and (tok[0].isalpha() or tok[0] == "_" or (tok[0] == "@" and len(tok) > 1)) and not tok.startswith("@interface")
 
 
-def parse_type(toks, i, keywords):
+MAX_GENERIC_DEPTH = 64     # deeper <...> is not read as a type (parsing it is quadratic)
+
+
+def parse_type(toks, i, keywords, depth=0):
     """Type expression at toks[i]: (chains, end) or None. chains holds
     (dotted name, is_element) for the type and its generic arguments."""
     n = len(toks)
-    if i >= n:
+    if i >= n or depth > MAX_GENERIC_DEPTH:
         return None
     t = toks[i]
     root = global_at(toks, i)
@@ -736,7 +802,7 @@ def parse_type(toks, i, keywords):
     if j < n and toks[j] == "<":
         k = j + 1
         while True:
-            inner = parse_type(toks, k, keywords)
+            inner = parse_type(toks, k, keywords, depth + 1)
             if inner is None:
                 return None
             chains += [(c, True) for c, _ in inner[0]]
@@ -886,9 +952,10 @@ def flow_c_like(toks, keywords, language, package=""):
                 pending = None
             i += 1
             continue
-        # Enum members: { Red, Blue = 2 } (global using static Colors; Red).
+        # Enum members: { Red, [Description("b")] Blue = 2 } (global using
+        # static Colors; Red).
         if type_stack and type_stack[-1][0] in enums and depth == type_stack[-1][1] \
-                and prev in {"{", ","} and is_ident(t) and toks[i + 1:i + 2] and toks[i + 1] in {",", "}", "="}:
+                and prev in {"{", ",", "]"} and is_ident(t) and toks[i + 1:i + 2] and toks[i + 1] in {",", "}", "="}:
             members[type_stack[-1][0]].setdefault(t.lstrip("@"), [])
         if t == "}":
             if type_stack and type_stack[-1][1] == depth:

@@ -348,6 +348,13 @@ test('C#, Java, PHP, VB.NET and COBOL dependency fixtures produce their expected
     ['csharp', 'csharp-interp'], ['vbnet', 'vbnet-interp'],
     // #if branches with unequal braces.
     ['csharp', 'csharp-ifdef'],
+    // Final pass: duplicate non-partial types, attributed enum members, C# 14
+    // extension blocks, MSBuild items in document order, $(Prop) items,
+    // linked files, ProjectReference case; VB Imports lists; Gradle Kotlin
+    // project(path = ...) and projects.x; PHP 7 class Enum/Match/From and
+    // dotted file names.
+    ['csharp', 'csharp-final'], ['csharp', 'csharp-msbuild'], ['vbnet', 'vbnet-final'],
+    ['java', 'java-final'], ['php', 'php-final'],
     ['php', 'php-relative', 'expected_', ['--include-path', 'lib']]];
   for (const [lang, name, prefix = 'expected_', options = []] of cases) {
     const out = path.join(root, `${name}-${prefix}`), fixture = path.join(kitRoot, 'fixtures', name);
@@ -371,6 +378,34 @@ test('a directory symlink loop is walked once', { skip: process.platform === 'wi
   const r = await runProcess(python, ['-I', path.join(kitRoot, 'scripts/depmap_csharp.py'), '--root', root, '--out', out]);
   assert.equal(r.code, 0, r.stderr);
   assert.match(r.stdout, /files=2 edges=1 /);
+  assert.match(r.stderr, /symlink loop not followed: sub\/loop\//);
+});
+
+test('a directory symlink that is not a loop is read under its own path', { skip: process.platform === 'win32' && 'symlinks need privileges on Windows' }, async t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'copilot-depmap-link-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  fs.mkdirSync(path.join(root, 'sub'));
+  fs.writeFileSync(path.join(root, 'sub', 'A.cs'), 'class A { }\n');
+  fs.writeFileSync(path.join(root, 'B.cs'), 'class B { A a; }\n');
+  fs.symlinkSync('sub', path.join(root, 'alias'));
+  const out = path.join(root, '..', `${path.basename(root)}-out`);
+  t.after(() => fs.rmSync(out, { recursive: true, force: true }));
+  const r = await runProcess(python, ['-I', path.join(kitRoot, 'scripts/depmap_csharp.py'), '--root', root, '--out', out]);
+  assert.equal(r.code, 0, r.stderr);
+  // alias/A.cs and sub/A.cs are both files of the tree; B.cs gets an edge to each.
+  assert.match(r.stdout, /files=3 edges=2 /);
+});
+
+test('deeply nested code is parsed, not a crash', async t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'copilot-depmap-deep-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const n = 3000;
+  fs.writeFileSync(path.join(root, 'A.cs'), `class A { void M() { var x = ${'('.repeat(n)}new B()${')'.repeat(n)}; var y = new List<${'List<'.repeat(n)}int${'>'.repeat(n)}>(); } }\n`);
+  fs.writeFileSync(path.join(root, 'B.cs'), 'class B { }\n');
+  const out = path.join(root, 'out');
+  const r = await runProcess(python, ['-I', path.join(kitRoot, 'scripts/depmap_csharp.py'), '--root', root, '--out', out]);
+  assert.equal(r.code, 0, r.stderr);
+  assert.equal(fs.readFileSync(path.join(out, 'edges.tsv'), 'utf8'), 'from\tto\nA.cs\tB.cs\n');
 });
 
 test('a mapper survives a file name that is not UTF-8', { skip: process.platform !== 'linux' && 'needs a byte-string file system' }, async t => {
@@ -396,7 +431,8 @@ test('typed-language mappers give the same output under every hash seed', async 
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   // Set iteration order follows PYTHONHASHSEED; the output must not. (No -I:
   // it would ignore PYTHONHASHSEED.)
-  for (const [lang, name] of [['csharp', 'csharp-scopes'], ['csharp', 'csharp-aliases'], ['csharp', 'csharp-review'], ['vbnet', 'vbnet-items'], ['csharp', 'csharp']]) {
+  for (const [lang, name] of [['csharp', 'csharp-scopes'], ['csharp', 'csharp-aliases'], ['csharp', 'csharp-review'], ['vbnet', 'vbnet-items'], ['csharp', 'csharp'],
+    ['csharp', 'csharp-final'], ['csharp', 'csharp-msbuild'], ['vbnet', 'vbnet-final']]) {
     const fixture = path.join(kitRoot, 'fixtures', name);
     for (const seed of ['0', '1', '2', '3']) {
       const out = path.join(root, `${name}-${seed}`);

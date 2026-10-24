@@ -50,17 +50,21 @@ def find_files(root: Path, exts, skip_dirs=(), markers=(), warnings=None):
             return False
 
     out, skipped = [], []
-    seen = set()        # resolved directories: a symlink loop is walked once
 
-    def walk(d, top):
+    def walk(d, top, ancestors):
+        # A directory symlink is followed, so two paths to one directory are
+        # both mapped (as copies); one that points back at a directory being
+        # walked (a loop) is not.
         try:
             real = d.resolve()
-            if real in seen:
+            if real in ancestors:
+                if warnings is not None:
+                    warnings.append(f"symlink loop not followed: {d.relative_to(root).as_posix()}/")
                 return
-            seen.add(real)
             entries = sorted(d.iterdir())
         except OSError:
             return
+        ancestors = ancestors | {real}
         for p in entries:
             if p.is_dir():
                 name = p.name
@@ -69,11 +73,11 @@ def find_files(root: Path, exts, skip_dirs=(), markers=(), warnings=None):
                 if name.lower() in skip and (top or beside_marker(d, skip[name.lower()])):
                     skipped.append(p)
                     continue
-                walk(p, False)
+                walk(p, False, ancestors)
             elif p.is_file() and p.suffix.lower() in exts:
                 out.append(p)
 
-    walk(root, True)
+    walk(root, True, frozenset())
     if warnings is not None:
         for d in skipped:
             if any(p.is_file() and p.suffix.lower() in exts for p in d.rglob("*")):

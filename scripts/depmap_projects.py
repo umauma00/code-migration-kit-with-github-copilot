@@ -83,6 +83,29 @@ def attr_values(regex, text):
 GLOB_CACHE = {}
 
 
+def compile_state(rel, items, by_default):
+    r"""Whether a project compiles rel: "yes", "no" or "maybe" (it depends on
+    an unevaluated Condition or property). Items apply in document order, as
+    MSBuild evaluates them: <Compile Remove="Legacy\**" /> then
+    <Compile Include="Legacy\Keep.cs" /> compiles Keep.cs."""
+    compiled, maybe_add, maybe_drop = by_default, False, False
+    for kind, pattern, conditional, unknown in items:
+        if not unknown and not glob_match(rel, pattern):
+            continue
+        if conditional or unknown:
+            if kind == "include":
+                maybe_add = True
+            else:
+                maybe_drop = True
+        elif kind == "include":
+            compiled, maybe_drop = True, False
+        else:
+            compiled, maybe_add = False, False
+    if compiled:
+        return "maybe" if maybe_drop else "yes"
+    return "maybe" if maybe_add else "no"
+
+
 def glob_match(rel, pattern):
     """MSBuild wildcards: * and ? stay within one directory, ** spans any
     number of directories (none too). Case is ignored, as MSBuild does on
@@ -128,32 +151,44 @@ def dotnet_projects(root, rels, project_ext, warnings):
     if not projects:
         return None, {}, {rel: None for rel in rels}, {}
     owner = {rel: nearest(rel, projects) for rel in rels}
-    refs, not_compiled = {}, {}
+    by_lower = {d.lower(): d for d in projects}     # Windows paths ignore case
+    refs, not_compiled, linked = {}, {}, {}
     for d, (proj_rel, text) in projects.items():
         refs[d] = set()
         for value in (v for m in PROJECT_REF_RE.finditer(COMMENT_RE.sub("", text))
                       for v in attr_values(INCLUDE_ATTR_RE, m.group(1))):
             target = posixpath.dirname(msbuild_path(d, value))
-            if target in projects:
+            target = target if target in projects else by_lower.get(target.lower())
+            if target is not None:
                 refs[d].add(target)
             else:
                 warnings.append(f"{proj_rel}: ProjectReference {value} is not under --root")
-        mine = [rel for rel in rels if owner[rel] == d]
         explicit = not SDK_RE.search(text) or NO_DEFAULT_RE.search(text)
-        items = [(kind, msbuild_path(d, v), cond) for kind, v, cond in compile_items(text)]
-        includes = [(p, cond) for kind, p, cond in items if kind == "include"]
-        removes = [(p, cond) for kind, p, cond in items if kind == "remove"]
-        for rel in mine:
-            inc = {cond for p, cond in includes if glob_match(rel, p)}
-            rem = {cond for p, cond in removes if glob_match(rel, p)}
-            if False in rem or (explicit and includes and not inc):
-                not_compiled[rel] = (proj_rel, False)
-            elif rem or (explicit and includes and False not in inc):
-                not_compiled[rel] = (proj_rel, True)
+        # (kind, path, conditional, unknown): an item whose value uses an
+        # MSBuild property or item ($(Src)\*.cs) may match any file.
+        items = [(kind, msbuild_path(d, v), cond, bool(re.search(r"[$@%]\(", v)))
+                 for kind, v, cond in compile_items(text)]
+        lists_files = any(kind == "include" for kind, _, _, _ in items)
+        # Files of other directories are linked in only by a path or
+        # wildcard that names them: $(IntermediateOutputPath)X.cs would
+        # otherwise link every file under --root into every project.
+        known = [item for item in items if not item[3]]
+        links = any(kind == "include" for kind, _, _, _ in known)
+        for rel in rels:
+            if owner[rel] == d:
+                state = compile_state(rel, items, not explicit or not lists_files)
+                if state != "yes":
+                    not_compiled[rel] = (proj_rel, state == "maybe")
+            elif links and compile_state(rel, known, False) != "no":
+                # <Compile Include="..\Shared\X.cs" />: a file of another
+                # directory linked into this project.
+                linked.setdefault(d, set()).add(rel)
     members = {}
     for rel, d in owner.items():
         if d is not None:
             members.setdefault(d, set()).add(rel)
+    for d, files in linked.items():
+        members.setdefault(d, set()).update(files)
     cache = {}
 
     def visible_files(rel):
@@ -171,8 +206,30 @@ def dotnet_projects(root, rels, project_ext, warnings):
 POM_ARTIFACT_RE = re.compile(r"<artifactId>\s*([^<\s]+)\s*</artifactId>")
 POM_STRIP_RE = re.compile(r"<(parent|dependencies|dependencyManagement|build|profiles|plugins|reporting)\b.*?</\1>", re.DOTALL)
 POM_DEPENDENCY_RE = re.compile(r"<dependency>(.*?)</dependency>", re.DOTALL)
-GRADLE_PROJECT_RE = re.compile(r"""project\s*\(\s*(?:path\s*:\s*)?['"](:[^'"]*)['"]""")
+# project(":core"), project(path: ":core") and Kotlin's project(path = ":core").
+GRADLE_PROJECT_RE = re.compile(r"""project\s*\(\s*(?:path\s*[:=]\s*)?['"](:[^'"]*)['"]""")
+# Type-safe accessors: projects.core, projects.myLib (my-lib), projects.libs.core.
+GRADLE_ACCESSOR_RE = re.compile(r"\bprojects((?:\s*\.\s*[A-Za-z_]\w*)+)")
 GRADLE_SETTINGS = ("settings.gradle", "settings.gradle.kts")
+
+
+def gradle_accessors(base, builds):
+    """Lower-cased accessor chain (core, mylib, libs.core) -> project dir for
+    the Gradle projects under the settings directory base. Gradle turns
+    kebab-case and snake_case names into camelCase accessors."""
+    out = {}
+    for target in builds:
+        if base and not target.startswith(base + "/"):
+            continue
+        rel = target[len(base) + 1:] if base else target
+        if not rel:
+            continue
+        chain = []
+        for seg in rel.split("/"):
+            words = [w for w in re.split(r"[-_]", seg) if w]
+            chain.append((words[0] + "".join(w[:1].upper() + w[1:] for w in words[1:])) if words else seg)
+        out[".".join(chain).lower()] = target
+    return out
 
 
 def java_modules(root, rels, warnings):
@@ -211,6 +268,16 @@ def java_modules(root, rels, warnings):
                     target = "" if target == "." else target
                     if target in builds:
                         modules[d].add(target)
+                accessors = gradle_accessors(base, builds)
+                for chain in GRADLE_ACCESSOR_RE.findall(text):
+                    parts = [p.strip() for p in chain.split(".") if p.strip()]
+                    # The longest prefix that names a project; the rest is
+                    # a property of it (projects.core.dependencyProject).
+                    for k in range(len(parts), 0, -1):
+                        target = accessors.get(".".join(parts[:k]).lower())
+                        if target is not None:
+                            modules[d].add(target)
+                            break
     for d, artifacts in wanted.items():
         modules[d].update(artifact_of[a] for a in artifacts if a in artifact_of and artifact_of[a] != d)
     owner = {rel: nearest(rel, builds) for rel in rels}
@@ -243,7 +310,8 @@ def drop_not_compiled(infos, not_compiled):
         project, conditional = not_compiled[info.rel]
         if conditional:
             rows.add((info.rel, "(whole file)",
-                      f"compiled by {project} only under a Condition that is not evaluated; its declarations are kept"))
+                      f"compiled by {project} only under a Condition or MSBuild property that is not evaluated; "
+                      "its declarations are kept"))
             continue
         info.decls, info.extensions, info.partial = [], [], set()
         info.type_members, info.type_bases = {}, {}

@@ -1,0 +1,5 @@
+from	to
+App/Main.cs	App/Gen/Made.cs
+App/Main.cs	App/Late.cs
+App/Main.cs	Shared/Linked.cs
+App/Main.cs	lib/LibType.cs

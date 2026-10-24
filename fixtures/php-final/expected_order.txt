@@ -1,0 +1,9 @@
+# migration order: one batch per line, dependencies first
+app/.settings.php
+app/boot.php
+lib/Enum.php
+lib/Color.php
+lib/From.php
+lib/Match.php
+lib/keywords.php
+lib/use.php

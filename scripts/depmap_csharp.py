@@ -69,7 +69,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # -I drops the script dir
 from depmap_common import find_files, read_source, run  # noqa: E402
 from depmap_projects import QUOTED, dotnet_projects, drop_not_compiled  # noqa: E402
-from depmap_typed import BLOCK, GLOBAL, Directives, FileInfo, TOKEN_RE, chains_at, dotted, flow_c_like, members, resolve, strip_c_like  # noqa: E402
+from depmap_typed import BLOCK, GLOBAL, Directives, FileInfo, TOKEN_RE, chains_at, dotted, flow_c_like, members, resolve, scan_or_none, strip_c_like  # noqa: E402
 
 EXTS = {".cs"}
 # Build output beside a project, NuGet's packages/ beside a solution (or at --root).
@@ -239,6 +239,32 @@ def scan(rel, text):
                 ns = current()
                 info.namespaces.add(ns)
                 info.extensions.append((ns, name))
+        elif t == "extension" and prev in {"{", "}", ";", "]"} and i + 1 < len(toks) and toks[i + 1][0] in {"(", "<"}:
+            # C# 14 extension block: extension(string s) { bool IsBlank => ...; }.
+            # Its members are called as s.IsBlank, like extension methods.
+            j, level = i + 1, 0
+            while j < len(toks):
+                level += {"(": 1, ")": -1, "<": 1, ">": -1}.get(toks[j][0], 0)
+                j += 1
+                if level == 0 and toks[j - 1][0] == ")":
+                    break
+            if j < len(toks) and toks[j][0] == "{":
+                ns, level, j = current(), 0, j
+                while j < len(toks):
+                    tok = toks[j][0]
+                    if tok == "{":
+                        level += 1
+                    elif tok == "}":
+                        level -= 1
+                        if level == 0:
+                            break
+                    elif level == 1 and j + 1 < len(toks) and toks[j + 1][0] in {"(", "=>", "{", "<"} \
+                            and tok not in KEYWORDS and (tok[0].isalpha() or tok[0] == "_") \
+                            and (toks[j - 1][0] in {">", "]", "?"} or toks[j - 1][0][0].isalnum() or toks[j - 1][0][0] == "_") \
+                            and toks[j - 1][0] not in {"new", "return", "=>", "nameof", "typeof", "await"}:
+                        info.namespaces.add(ns)
+                        info.extensions.append((ns, tok.lstrip("@")))
+                    j += 1
         i += 1
     if not info.namespaces:
         info.namespaces.add("")
@@ -277,10 +303,10 @@ def csproj_usings(text):
 
 def mapper(root, warnings, args):
     files = find_files(root, EXTS, SKIP_DIRS, warnings=warnings)
-    rels, infos, project_globals = [], [], []
+    rels, infos, project_globals, deep = [], [], [], set()
     for path in files:
         rel = path.relative_to(root).as_posix()
-        info, globals_ = scan(rel, read_source(path, warnings))
+        info, globals_ = scan_or_none(scan, rel, read_source(path, warnings), deep) or (FileInfo(rel), (set(), {}, set()))
         rels.append(rel)
         infos.append(info)
         project_globals.append(globals_)
@@ -309,7 +335,7 @@ def mapper(root, warnings, args):
             info.aliases.setdefault(name, target)
     skipped = drop_not_compiled(infos, not_compiled)
     edges, unresolved = resolve(infos, attribute_suffix="Attribute", visible_files=visible_files)
-    return rels, edges, unresolved | skipped
+    return rels, edges, unresolved | skipped | deep
 
 
 if __name__ == "__main__":

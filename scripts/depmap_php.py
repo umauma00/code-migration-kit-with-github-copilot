@@ -82,6 +82,10 @@ exit extends final finally fn for foreach function global goto if implements inc
 instanceof insteadof interface isset list match namespace new or print private protected public
 readonly require require_once return static switch throw trait try unset use var while xor yield
 self parent true false null int float bool string void mixed never object iterable die from""".split())
+# Keywords that older PHP allowed as class names (class Enum before 8.1,
+# class Match before 8.0, From never reserved). Away from their keyword
+# use (enum Name, match (...), yield from) they are names.
+SOFT = {"enum", "match", "from"}
 NAME_RE = re.compile(r"\\?[A-Za-z_\x80-\uffff][\w\x80-\uffff]*(?:\\[A-Za-z_\x80-\uffff][\w\x80-\uffff]*)*")
 STR = "\x01"   # string placeholder: \x01<index>\x02 (never part of a name)
 
@@ -233,7 +237,7 @@ def scan(rel, text):
             i = j
             continue
         elif low in {"class", "interface", "trait", "enum"} and prev not in {"::", "new", "->", "?->"} \
-                and NAME_RE.fullmatch(at(i + 1)) and at(i + 1).lower() not in KEYWORDS:
+                and NAME_RE.fullmatch(at(i + 1)) and (at(i + 1).lower() not in KEYWORDS or at(i + 1).lower() in SOFT):
             name = at(i + 1)
             info.classes.append(f"{ns}\\{name}".lstrip("\\"))
             # The body starts at the next "{" at this depth.
@@ -270,7 +274,9 @@ def scan(rel, text):
             info.dynamic.append((f"new {at(i + 1)}", "class name computed at run time"))
         elif t.startswith("$") and at(i + 1) == "::":
             info.dynamic.append((f"{t}::", "class name computed at run time"))
-        elif NAME_RE.fullmatch(t) and low not in KEYWORDS and prev not in {"->", "?->", "::"}:
+        elif NAME_RE.fullmatch(t) and prev not in {"->", "?->", "::"} and (low not in KEYWORDS or (
+                low in SOFT and not (low == "match" and at(i + 1) == "(" and prev.lower() != "new")
+                and not (low == "from" and prev.lower() == "yield"))):
             if not (prev.lower() in {"function", "const"} and not t.startswith("\\")):
                 info.refs.append((ns, t, at(i + 1) == "(", uses))
         i += 1
@@ -372,7 +378,10 @@ def resolve_include(src, parts, info, by_rel, by_tail, include_path=()):
     for c in cand:
         if c in by_rel:
             return [c], None
-    tail = posixpath.normpath(path.lstrip("./").lstrip("/"))
+    # Last resort: the path without its leading /, ./ and ../ parts.
+    tail = posixpath.normpath(path)
+    while tail.startswith(("/", "./", "../")):
+        tail = tail.split("/", 1)[1] if "/" in tail else ""
     hits = by_tail.get(tail.lower(), [])
     if len(hits) == 1:
         return hits, None

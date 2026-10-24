@@ -53,7 +53,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # -I drops the script dir
 from depmap_common import find_files, read_source, run  # noqa: E402
 from depmap_projects import java_modules  # noqa: E402
-from depmap_typed import FileInfo, TOKEN_RE, chains, flow_c_like, resolve, strip_c_like  # noqa: E402
+from depmap_typed import FileInfo, TOKEN_RE, chains, flow_c_like, resolve, scan_or_none, strip_c_like  # noqa: E402
 
 EXTS = {".java"}
 SKIP_DIRS = {"target", "build", "out"}
@@ -103,13 +103,13 @@ def scan(rel, text):
 
 def mapper(root, warnings, args):
     files = find_files(root, EXTS, SKIP_DIRS, MARKERS, warnings)
-    rels, infos = [], []
+    rels, infos, deep = [], [], set()
     for path in files:
         rel = path.relative_to(root).as_posix()
-        infos.append(scan(rel, read_source(path, warnings)))
+        infos.append(scan_or_none(scan, rel, read_source(path, warnings), deep) or FileInfo(rel))
         rels.append(rel)
     edges, unresolved = resolve(infos, nested_lookup=False, visible_files=java_modules(root, rels, warnings))
-    return rels, edges, unresolved
+    return rels, edges, unresolved | deep
 
 
 if __name__ == "__main__":

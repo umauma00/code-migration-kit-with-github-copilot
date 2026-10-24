@@ -61,7 +61,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # -I drops the script dir
 from depmap_common import find_files, read_source, run  # noqa: E402
 from depmap_projects import QUOTED, attr_values, dotnet_projects, drop_not_compiled  # noqa: E402
-from depmap_typed import GLOBAL, PREDEFINED, TOKEN_RE, FileInfo, chains, is_ident, join, members, parse_expr, resolve  # noqa: E402
+from depmap_typed import GLOBAL, PREDEFINED, TOKEN_RE, FileInfo, chains, is_ident, join, members, parse_expr, resolve, scan_or_none  # noqa: E402
 
 EXTS = {".vb"}
 # Build output and My Project beside a project, NuGet's packages/ beside a
@@ -80,7 +80,8 @@ INHERITS_RE = re.compile(r"^\s*(inherits|implements)\s+(.+)$")
 PARAM_RE = re.compile(r"(?:byval\s+|byref\s+|optional\s+|paramarray\s+)*([a-z_]\w*)(?:\(\))?\s+as\s+([\w.]+(?:\s*\(\s*of\s+[^)]*\))?)")
 DIM_RE = re.compile(r"^\s*(?:(?:dim|static|const|using|private|public|friend|protected|shared|readonly)\s+)+([a-z_]\w*)(?:\(\))?\s*(?:as\s+(?:new\s+)?([\w.]+(?:\s*\(\s*of\s+[^)]*\))?))?(?:\s*=\s*(.+))?")
 FOREACH_RE = re.compile(r"^\s*for\s+each\s+([a-z_]\w*)(?:\s+as\s+([\w.]+(?:\s*\(\s*of\s+[^)]*\))?))?\s+in\s+(.+)$")
-IMPORTS_RE = re.compile(r"^\s*imports\s+(?:([\w\[\]]+)\s*=\s*)?([\w.\[\]]+)\s*$", re.IGNORECASE)
+IMPORTS_RE = re.compile(r"^\s*imports\s+(.+?)\s*$", re.IGNORECASE)
+IMPORT_CLAUSE_RE = re.compile(r"^(?:([\w\[\]]+)\s*=\s*)?([\w.\[\]]+)$")
 ROOT_NS_RE = re.compile(r"<RootNamespace>\s*([^<]*?)\s*</RootNamespace>", re.IGNORECASE)
 VBPROJ_IMPORT_RE = re.compile(r"<Import\s+Include\s*=\s*" + QUOTED, re.IGNORECASE)
 REFLECTION_RE = re.compile(r"\b(createobject|activator\s*\.\s*createinstance|type\s*\.\s*gettype|assembly\s*\.\s*load\w*)\s*\(\s*((?:[^()]|\([^()]*\))+?)?\s*\)", re.IGNORECASE)
@@ -110,7 +111,9 @@ def strip_vb(text):
         while i < n:
             c = raw[i]
             if c == '"':
-                interp = bool(out) and out[-1] == "$"
+                # $"..." interpolates; s$ is a type character on a name.
+                interp = (bool(out) and out[-1] == "$"
+                          and not (len(out) > 1 and (out[-2].isalnum() or out[-2] in "_]")))
                 if interp:
                     out.pop()
                 j = i + 1
@@ -282,11 +285,17 @@ def scan(rel, text, root_ns=""):
             continue
         m = IMPORTS_RE.match(low)
         if m:
-            alias, target = m.group(1), m.group(2).replace("[", "").replace("]", "")
-            if alias:
-                info.aliases[alias.replace("[", "").replace("]", "")] = target
-            else:
-                info.usings.add(target)
+            # Imports A, B = C.D: one clause per comma. XML namespace
+            # imports (<xmlns:...>) name no type and are skipped.
+            for clause in m.group(1).split(","):
+                c = IMPORT_CLAUSE_RE.match(clause.strip())
+                if not c:
+                    continue
+                alias, target = c.group(1), c.group(2).replace("[", "").replace("]", "")
+                if alias:
+                    info.aliases[alias.replace("[", "").replace("]", "")] = target
+                else:
+                    info.usings.add(target)
             continue
         m = END_RE.match(low)
         if m:
@@ -338,6 +347,7 @@ def scan(rel, text, root_ns=""):
                     if stack[-1][0] == "module":
                         # Module members are visible like types in the module's namespace.
                         info.decls.append((ns(), name))
+                        info.member_decls.add(join(ns(), name))
                         info.extensions.append((ns(), name))  # <Extension> methods live in modules
                 abstract = re.search(r"\bmustoverride\b", low[:m.start(2)]) or stack[-1][0] == "interface"
                 if kind in {"sub", "function", "operator"} and not abstract:
@@ -369,14 +379,14 @@ def scan(rel, text, root_ns=""):
 
 def mapper(root, warnings, args):
     files = find_files(root, EXTS, SKIP_DIRS, warnings=warnings)
-    rels, infos, root_ns = [], [], {}
+    rels, infos, root_ns, deep = [], [], {}, set()
     for proj in find_files(root, {".vbproj"}, SKIP_DIRS):
         m = ROOT_NS_RE.search(read_source(proj, warnings))
         root_ns.setdefault(proj.parent, (m.group(1).strip() if m else proj.stem).lower())
     for path in files:
         rel = path.relative_to(root).as_posix()
         project = next((root_ns[d] for d in path.parents if d in root_ns), "")
-        infos.append(scan(rel, read_source(path, warnings), project))
+        infos.append(scan_or_none(scan, rel, read_source(path, warnings), deep, project) or FileInfo(rel))
         rels.append(rel)
     visible_files, not_compiled, owner, texts = dotnet_projects(root, rels, ".vbproj", warnings)
     # Project-level <Import Include> applies to the files of its project only.
@@ -385,7 +395,7 @@ def mapper(root, warnings, args):
         info.usings.update(name.lower() for name in attr_values(VBPROJ_IMPORT_RE, text) if name.strip())
     skipped = drop_not_compiled(infos, not_compiled)
     edges, unresolved = resolve(infos, fold=True, visible_files=visible_files)
-    return rels, edges, unresolved | skipped
+    return rels, edges, unresolved | skipped | deep
 
 
 if __name__ == "__main__":

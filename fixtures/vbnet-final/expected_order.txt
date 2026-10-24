@@ -1,0 +1,10 @@
+# migration order: one batch per line, dependencies first
+Alpha.vb
+Beta.vb
+Gamma.vb
+Helpers.vb
+Hidden.vb
+Shown.vb
+Suffix.vb
+Twice.vb
+Use.vb

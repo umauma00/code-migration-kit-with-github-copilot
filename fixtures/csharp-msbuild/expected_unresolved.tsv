@@ -1,0 +1,3 @@
+file	reference	reason
+App/Gen/Made.cs	(whole file)	compiled by App/App.csproj only under a Condition or MSBuild property that is not evaluated; its declarations are kept
+Shared/Linked.cs	App.LinkedType	also declared in other/Copies.cs; the copies are not linked to each other, files that name it get an edge to each

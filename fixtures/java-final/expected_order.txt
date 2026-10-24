@@ -1,0 +1,8 @@
+# migration order: one batch per line, dependencies first
+core/src/main/java/c/Core.java
+my-lib/src/main/java/m/Lib.java
+app/src/main/java/a/App.java
+dup/Copy1.java
+dup/Copy2.java
+other/src/main/java/c/Core.java
+other/src/main/java/m/Lib.java

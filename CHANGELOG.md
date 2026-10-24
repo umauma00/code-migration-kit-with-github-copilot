@@ -49,8 +49,18 @@
   `global using static`; a VB.NET line starting with `.` continues
   the previous one (outside With); PHP existence checks
   (`function_exists('f')`) are not references; COBOL keywords match whole
-  words only (`ON-CALL`, `END-CALL`); a directory symlink loop is walked
-  once. Lambda parameters, generic inference and overloads
+  words only (`ON-CALL`, `END-CALL`); directory symlinks are followed
+  and only a loop back to an ancestor is stopped. A type declared without
+  `partial` in two files is no longer linked to its copy (a false cycle);
+  users get an edge to each and the copies are listed in `unresolved.tsv`.
+  MSBuild Include/Remove apply in document order, an item that uses a
+  property (`$(Gen)`) is treated like a Condition, a file linked in from
+  another directory belongs to the project, and ProjectReference paths
+  ignore case; Gradle Kotlin `project(path = ":x")` and `projects.x`
+  accessors are read. C# 14 `extension(...)` blocks, attributed enum
+  members, VB.NET `Imports A, B` and PHP 7 classes named `Enum`, `Match` or
+  `From` are understood. Code nested past Python's recursion limit is
+  parsed on a larger stack instead of stopping the mapper. Lambda parameters, generic inference and overloads
   are not followed. PHP follows computable
   include paths and case-insensitive class/function names with namespaces
   and `use`, narrowed by composer.json autoload (PSR-4, PSR-0, classmap),
