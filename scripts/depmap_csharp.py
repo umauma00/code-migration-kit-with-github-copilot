@@ -123,6 +123,7 @@ def scan(rel, text):
     globals_, global_aliases, global_static = [], {}, []
     depth, file_ns, stack = 0, "", []  # stack: (namespace, depth before its "{", block context)
     blocks = 0
+    file_ctx = None         # block context of a file-scoped namespace (namespace N;)
     contexts = [(0, "")]    # (offset, context from there on)
 
     def current():
@@ -131,7 +132,7 @@ def scan(rel, text):
     def context():
         """The namespace, tagged with the innermost namespace block (BLOCK):
         using directives belong to the block they are written in."""
-        return stack[-1][2] if stack else current()
+        return stack[-1][2] if stack else file_ctx or current()
 
     i = 0
     while i < len(toks):
@@ -150,7 +151,12 @@ def scan(rel, text):
         elif t == "namespace":
             name, j = read_dotted(toks, i + 1)
             if j < len(toks) and toks[j][0] == ";":
+                # namespace N; is a block to the end of the file: a using
+                # after it belongs to N, one before it to the file.
                 file_ns = name
+                blocks += 1
+                file_ctx = f"{name}{BLOCK}{blocks}"
+                info.blocks[file_ctx] = Directives(None)
             else:
                 blocks += 1
                 parent = stack[-1][2] if stack else None
@@ -310,17 +316,18 @@ def mapper(root, warnings, args):
         rels.append(rel)
         infos.append(info)
         project_globals.append(globals_)
-    visible_files, not_compiled, owner, texts = dotnet_projects(root, rels, ".csproj", warnings)
+    visible_files, not_compiled, projects_of, texts = dotnet_projects(root, rels, ".csproj", warnings)
     # global using, global using static, global aliases (and <Using> items in
     # the .csproj) apply to every file of their project; files outside any
-    # project share one set.
+    # project share one set. A file linked into several projects takes the
+    # directives of each, and its own global usings apply to each.
     usings, aliases, static = {}, {}, {}
     for info, (globals_, global_aliases, global_static) in zip(infos, project_globals):
-        d = owner[info.rel]
-        usings.setdefault(d, set()).update(globals_)
-        static.setdefault(d, set()).update(global_static)
-        for name, target in global_aliases.items():
-            aliases.setdefault(d, {}).setdefault(name, target)
+        for d in projects_of[info.rel] or (None,):
+            usings.setdefault(d, set()).update(globals_)
+            static.setdefault(d, set()).update(global_static)
+            for name, target in global_aliases.items():
+                aliases.setdefault(d, {}).setdefault(name, target)
     for d, text in sorted(texts.items()):
         names, named, statics = csproj_usings(text)
         usings.setdefault(d, set()).update(names)
@@ -328,11 +335,11 @@ def mapper(root, warnings, args):
         for name, target in named.items():
             aliases.setdefault(d, {}).setdefault(name, target)
     for info in infos:
-        d = owner[info.rel]
-        info.usings.update(dotted(u, False) for u in usings.get(d, ()))
-        info.project_static.update(dotted(u, False) for u in static.get(d, ()))
-        for name, target in aliases.get(d, {}).items():
-            info.aliases.setdefault(name, target)
+        for d in projects_of[info.rel] or (None,):
+            info.usings.update(dotted(u, False) for u in usings.get(d, ()))
+            info.project_static.update(dotted(u, False) for u in static.get(d, ()))
+            for name, target in sorted(aliases.get(d, {}).items()):
+                info.aliases.setdefault(name, target)
     skipped = drop_not_compiled(infos, not_compiled)
     edges, unresolved = resolve(infos, attribute_suffix="Attribute", visible_files=visible_files)
     return rels, edges, unresolved | skipped | deep

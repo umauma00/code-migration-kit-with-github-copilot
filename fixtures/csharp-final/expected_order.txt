@@ -4,6 +4,12 @@ Dup/Two.cs
 Dup/Use.cs
 Ext/StrExt.cs
 Ext/Use.cs
+FileScoped/Real.cs
+FileScoped/Main.cs
+FileScoped/Shadow.cs
+Lookup/Real.cs
+Lookup/Main.cs
+Lookup/Shadow.cs
 Statics/Mode.cs
 Statics/Outer.cs
 Statics/Globals.cs

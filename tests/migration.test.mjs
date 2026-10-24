@@ -356,6 +356,8 @@ test('C#, Java, PHP, VB.NET and COBOL dependency fixtures produce their expected
     // PHP string holes and class_alias.
     ['csharp', 'csharp-final'], ['csharp', 'csharp-msbuild'], ['vbnet', 'vbnet-final'],
     ['java', 'java-final'], ['php', 'php-final'],
+    // A file linked into several projects belongs to each (VB RootNamespace too).
+    ['vbnet', 'vbnet-linked'],
     ['php', 'php-relative', 'expected_', ['--include-path', 'lib']]];
   for (const [lang, name, prefix = 'expected_', options = []] of cases) {
     const out = path.join(root, `${name}-${prefix}`), fixture = path.join(kitRoot, 'fixtures', name);

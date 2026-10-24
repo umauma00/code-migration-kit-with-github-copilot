@@ -60,7 +60,10 @@ TAG_RE = re.compile(r"<(/?)(ItemGroup|Choose|When|Otherwise|Target|Compile)\b" +
 COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
 PROJECT_REF_RE = re.compile(r"<ProjectReference\b" + ATTRS + r"/?>", re.IGNORECASE)
 INCLUDE_ATTR_RE = re.compile(r"\bInclude\s*=\s*" + QUOTED, re.IGNORECASE)
-NO_DEFAULT_RE = re.compile(r"<EnableDefaultCompileItems>\s*false\s*</EnableDefaultCompileItems>", re.IGNORECASE)
+# EnableDefaultCompileItems / EnableDefaultItems, with the elements that
+# can put a condition around them.
+DEFAULT_TAG_RE = re.compile(r"<(/?)(PropertyGroup|Choose|When|Otherwise|Target|EnableDefaultCompileItems|EnableDefaultItems)\b"
+                            + ATTRS + r"(/?)>(?:([^<]*)</\2\s*>)?", re.IGNORECASE)
 SDK_RE = re.compile(r"<Project\s[^>]*\bSdk\s*=", re.IGNORECASE)
 
 
@@ -73,6 +76,35 @@ def msbuild_path(base, value):
     """A project-relative MSBuild path (backslashes, ..) as a root-relative path."""
     joined = posixpath.normpath(posixpath.join(base, value.strip().replace("\\", "/")))
     return "" if joined == "." else joined
+
+
+def default_items(text):
+    """Whether an SDK project compiles the *.cs/*.vb files under it by
+    default: True, False, or "maybe" when EnableDefaultCompileItems (or
+    EnableDefaultItems) is set under a Condition or to a property."""
+    text = COMMENT_RE.sub("", text)
+    state, stack = True, []
+    for m in DEFAULT_TAG_RE.finditer(text):
+        closing, name, attr_text, empty, value = m.groups()
+        name = name.lower()
+        if not name.startswith("enabledefault"):
+            if closing:
+                while stack and stack.pop()[0] != name:
+                    pass
+            elif not empty:
+                cond = name != "propertygroup" or re.search(r"\bCondition\s*=", attr_text, re.IGNORECASE)
+                stack.append((name, bool(cond)))
+            continue
+        if closing or value is None:
+            continue
+        value = value.strip().lower()
+        new = True if value == "true" else False if value == "false" else "maybe"
+        conditional = re.search(r"\bCondition\s*=", attr_text, re.IGNORECASE) or any(c for _, c in stack)
+        if not conditional:
+            state = new
+        elif new != state:
+            state = "maybe"
+    return state
 
 
 def compile_items(text):
@@ -119,7 +151,8 @@ def compile_state(rel, items, by_default):
     an unevaluated Condition or property). Items apply in document order, as
     MSBuild evaluates them: <Compile Remove="Legacy\**" /> then
     <Compile Include="Legacy\Keep.cs" /> compiles Keep.cs."""
-    compiled, maybe_add, maybe_drop = by_default, False, False
+    # by_default "maybe": compiled unless an unevaluated setting turns it off.
+    compiled, maybe_add, maybe_drop = bool(by_default), False, by_default == "maybe"
     for kind, pattern, conditional, unknown, excludes in items:
         if not unknown and not glob_match(rel, pattern):
             continue
@@ -169,14 +202,16 @@ def glob_match(rel, pattern):
 
 
 def dotnet_projects(root, rels, project_ext, warnings):
-    """(visible_files, not_compiled, owner, texts) for C# (.csproj) or VB.NET (.vbproj).
+    """(visible_files, not_compiled, projects_of, texts) for C# (.csproj) or VB.NET (.vbproj).
 
-    visible_files(rel) -> set of files its project and the projects it
-    references hold, or None outside any project. not_compiled maps a file
-    to (the project that leaves it out of its build, whether that depends on
-    an unevaluated Condition). owner maps every file to its project
-    directory (None outside any project); texts maps a project directory to
-    its project file's text."""
+    projects_of maps every file to the directories of the projects that
+    compile it: the project of its directory, and any project that links it
+    in with <Compile Include="..\\Shared\\X.cs" /> (empty outside any
+    project). visible_files(rel) -> set of files those projects and the
+    projects they reference hold, or None outside any project. not_compiled
+    maps a file no project compiles to (the project that leaves it out,
+    whether that depends on an unevaluated Condition or property); texts
+    maps a project directory to its project file's text."""
     projects = {}       # project dir -> (project file rel, text)
     for proj in find_files(root, {project_ext}, {"bin": {project_ext}, "obj": {project_ext}, "packages": {".sln"}}):
         d = rel_dir(proj, root)
@@ -190,10 +225,12 @@ def dotnet_projects(root, rels, project_ext, warnings):
             warnings.append(f"{projects[d][0]}: tags not read at line {lines} (a raw < in an attribute "
                             "value? MSBuild needs &lt;); their items and conditions are ignored")
     if not projects:
-        return None, {}, {rel: None for rel in rels}, {}
+        return None, {}, {rel: () for rel in rels}, {}
     owner = {rel: nearest(rel, projects) for rel in rels}
     by_lower = {d.lower(): d for d in projects}     # Windows paths ignore case
-    refs, not_compiled, linked = {}, {}, {}
+    refs = {}
+    compiled_by = {rel: [] for rel in rels}         # rel -> [(project dir, "yes" | "maybe")]
+    left_out = {}       # rel -> (owner project file, "no" | "maybe")
     for d, (proj_rel, text) in projects.items():
         refs[d] = set()
         for value in (v for m in PROJECT_REF_RE.finditer(COMMENT_RE.sub("", text))
@@ -204,14 +241,15 @@ def dotnet_projects(root, rels, project_ext, warnings):
                 refs[d].add(target)
             else:
                 warnings.append(f"{proj_rel}: ProjectReference {value} is not under --root")
-        explicit = not SDK_RE.search(text) or NO_DEFAULT_RE.search(text)
+        by_default = default_items(text) if SDK_RE.search(text) else False
         # (kind, path, conditional, unknown, excludes): an item whose value uses an
         # MSBuild property or item ($(Src)\*.cs) may match any file.
         def unknown(value):
             return bool(re.search(r"[$@%]\(", value))
         items = [(kind, msbuild_path(d, v), cond, unknown(v), tuple((msbuild_path(d, x), unknown(x)) for x in ex))
                  for kind, v, cond, ex in compile_items(text)]
-        lists_files = any(item[0] == "include" for item in items)
+        if by_default is False and not any(item[0] == "include" for item in items):
+            by_default = True       # a project that lists no files: its directory's files
         # Files of other directories are linked in only by a path or
         # wildcard that names them: $(IntermediateOutputPath)X.cs would
         # otherwise link every file under --root into every project.
@@ -219,31 +257,47 @@ def dotnet_projects(root, rels, project_ext, warnings):
         links = any(item[0] == "include" for item in known)
         for rel in rels:
             if owner[rel] == d:
-                state = compile_state(rel, items, not explicit or not lists_files)
+                state = compile_state(rel, items, by_default)
                 if state != "yes":
-                    not_compiled[rel] = (proj_rel, state == "maybe")
-            elif links and compile_state(rel, known, False) != "no":
+                    left_out[rel] = (proj_rel, state)
+            elif links:
                 # <Compile Include="..\Shared\X.cs" />: a file of another
                 # directory linked into this project.
-                linked.setdefault(d, set()).add(rel)
+                state = compile_state(rel, known, False)
+            else:
+                continue
+            if state != "no":
+                compiled_by[rel].append((d, state))
+    # A file belongs to every project that compiles it (or may): its owner
+    # and the projects that link it in. One that none compiles stays with
+    # its owner, which leaves it out.
+    projects_of, not_compiled = {}, {}
+    for rel in rels:
+        dirs = sorted(d for d, _ in compiled_by[rel])
+        projects_of[rel] = tuple(dirs) or ((owner[rel],) if owner[rel] is not None else ())
+        if rel in left_out:
+            proj_rel, state = left_out[rel]
+            if state == "maybe" or any(st == "maybe" for _, st in compiled_by[rel]):
+                if not any(st == "yes" for _, st in compiled_by[rel]):
+                    not_compiled[rel] = (proj_rel, True)
+            elif not compiled_by[rel]:
+                not_compiled[rel] = (proj_rel, False)
     members = {}
-    for rel, d in owner.items():
-        if d is not None:
+    for rel, dirs in projects_of.items():
+        for d in dirs:
             members.setdefault(d, set()).add(rel)
-    for d, files in linked.items():
-        members.setdefault(d, set()).update(files)
     cache = {}
 
     def visible_files(rel):
-        d = owner.get(rel)
-        if d is None:
+        dirs = projects_of.get(rel, ())
+        if not dirs:
             return None
-        if d not in cache:
-            cache[d] = set().union(*(members.get(p, set()) for p in reachable(d, refs)))
-        return cache[d]
+        if dirs not in cache:
+            cache[dirs] = set().union(*(members.get(p, set()) for d in dirs for p in reachable(d, refs)))
+        return cache[dirs]
 
     texts = {d: text for d, (_, text) in projects.items()}
-    return visible_files, not_compiled, owner, texts
+    return visible_files, not_compiled, projects_of, texts
 
 
 POM_ARTIFACT_RE = re.compile(r"<artifactId>\s*([^<\s]+)\s*</artifactId>")

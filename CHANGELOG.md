@@ -10,7 +10,8 @@
   computed name, imports of undeclared repository types). C#, Java and
   VB.NET resolve type names through namespaces, imports, aliases, global
   usings (.cs/.csproj/.vbproj), extension methods, VB module members and
-  partial types, in the language's lookup order (innermost namespace first;
+  partial types, in the language's lookup order (innermost namespace first,
+  with the usings of each namespace declaration at its own step;
   Java single-type import, own package, then `pkg.*`). Types whose name is
   never written are followed through declared types: member and return
   types, base types, parameters, typed and `var` locals, foreach variables,
@@ -56,7 +57,9 @@
   MSBuild Include/Remove apply in document order, an Include's `Exclude`
   applies to that item (`Update` is not read), an item that uses a
   property (`$(Gen)`) is treated like a Condition, a file linked in from
-  another directory belongs to the project, and ProjectReference paths
+  another directory belongs to every project that compiles it (its global
+  usings, references and VB RootNamespace apply), a conditional
+  `EnableDefaultCompileItems` keeps the default files as "maybe", and ProjectReference paths
   ignore case; Gradle Kotlin `project(path = ":x")` and `projects.x`
   accessors are read. C# 14 `extension(...)` blocks, attributed enum
   members, VB.NET `Imports A, B` and PHP 7 classes named `Enum`, `Match` or

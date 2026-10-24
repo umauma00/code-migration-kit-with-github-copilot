@@ -377,22 +377,48 @@ def scan(rel, text, root_ns=""):
     return info
 
 
+def merge_info(info, other):
+    """Add what other (the same file scanned under another RootNamespace)
+    declares and names to info."""
+    for key, value in vars(other).items():
+        mine = getattr(info, key)
+        if isinstance(mine, list):
+            mine.extend(v for v in value if v not in mine)
+        elif isinstance(mine, set):
+            mine |= value
+        elif isinstance(mine, dict):
+            for k, v in value.items():
+                mine.setdefault(k, v)
+
+
 def mapper(root, warnings, args):
     files = find_files(root, EXTS, SKIP_DIRS, warnings=warnings)
-    rels, infos, root_ns, deep = [], [], {}, set()
+    rels = [path.relative_to(root).as_posix() for path in files]
+    visible_files, not_compiled, projects_of, texts = dotnet_projects(root, rels, ".vbproj", warnings)
+    root_ns = {}
     for proj in find_files(root, {".vbproj"}, SKIP_DIRS):
         m = ROOT_NS_RE.search(read_source(proj, warnings))
-        root_ns.setdefault(proj.parent, (m.group(1).strip() if m else proj.stem).lower())
-    for path in files:
-        rel = path.relative_to(root).as_posix()
-        project = next((root_ns[d] for d in path.parents if d in root_ns), "")
-        infos.append(scan_or_none(scan, rel, read_source(path, warnings), deep, project) or FileInfo(rel))
-        rels.append(rel)
-    visible_files, not_compiled, owner, texts = dotnet_projects(root, rels, ".vbproj", warnings)
-    # Project-level <Import Include> applies to the files of its project only.
+        d = proj.parent.relative_to(root).as_posix()
+        root_ns.setdefault("" if d == "." else d, (m.group(1).strip() if m else proj.stem).lower())
+    infos, deep = [], set()
+    for path, rel in zip(files, rels):
+        # A file linked into several projects is compiled under each one's
+        # RootNamespace: it declares its types in every one of them.
+        spaces = sorted({root_ns[d] for d in projects_of[rel] if d in root_ns})
+        if not spaces:
+            spaces = [next((root_ns[d] for d in sorted(root_ns, key=len, reverse=True)
+                            if d == "" or rel.startswith(d + "/")), "")]
+        text = read_source(path, warnings)
+        info = scan_or_none(scan, rel, text, deep, spaces[0]) or FileInfo(rel)
+        for space in spaces[1:]:
+            other = scan_or_none(scan, rel, text, deep, space)
+            if other:
+                merge_info(info, other)
+        infos.append(info)
+    # Project-level <Import Include> applies to the files of its projects only.
     for info in infos:
-        text = texts.get(owner[info.rel], "")
-        info.usings.update(name.lower() for name in attr_values(VBPROJ_IMPORT_RE, text) if name.strip())
+        for d in projects_of[info.rel]:
+            info.usings.update(name.lower() for name in attr_values(VBPROJ_IMPORT_RE, texts.get(d, "")) if name.strip())
     skipped = drop_not_compiled(infos, not_compiled)
     edges, unresolved = resolve(infos, fold=True, visible_files=visible_files)
     return rels, edges, unresolved | skipped | deep

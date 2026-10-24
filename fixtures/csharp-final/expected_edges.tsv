@@ -2,6 +2,8 @@ from	to
 Dup/Use.cs	Dup/One.cs
 Dup/Use.cs	Dup/Two.cs
 Ext/Use.cs	Ext/StrExt.cs
+FileScoped/Main.cs	FileScoped/Real.cs
+Lookup/Main.cs	Lookup/Real.cs
 Statics/Globals.cs	Statics/Mode.cs
 Statics/Globals.cs	Statics/Outer.cs
 Statics/Use.cs	Statics/Mode.cs
