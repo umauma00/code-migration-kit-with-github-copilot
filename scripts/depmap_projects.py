@@ -80,14 +80,17 @@ def msbuild_path(base, value):
 
 def default_items(text):
     """Whether an SDK project compiles the *.cs/*.vb files under it by
-    default: True, False, or "maybe" when EnableDefaultCompileItems (or
-    EnableDefaultItems) is set under a Condition or to a property."""
+    default: True, False, or "maybe". Both EnableDefaultItems and
+    EnableDefaultCompileItems must be on (EnableDefaultItems=true does not
+    undo EnableDefaultCompileItems=false). Each is "maybe" when set under a
+    Condition or to a property."""
     text = COMMENT_RE.sub("", text)
-    state, stack = True, []
+    state = {"enabledefaultitems": True, "enabledefaultcompileitems": True}
+    stack = []
     for m in DEFAULT_TAG_RE.finditer(text):
         closing, name, attr_text, empty, value = m.groups()
         name = name.lower()
-        if not name.startswith("enabledefault"):
+        if name not in state:
             if closing:
                 while stack and stack.pop()[0] != name:
                     pass
@@ -101,10 +104,13 @@ def default_items(text):
         new = True if value == "true" else False if value == "false" else "maybe"
         conditional = re.search(r"\bCondition\s*=", attr_text, re.IGNORECASE) or any(c for _, c in stack)
         if not conditional:
-            state = new
-        elif new != state:
-            state = "maybe"
-    return state
+            state[name] = new
+        elif new != state[name]:
+            state[name] = "maybe"
+    values = state.values()
+    if False in values:
+        return False
+    return "maybe" if "maybe" in values else True
 
 
 def compile_items(text):

@@ -7,9 +7,15 @@ Ext/Use.cs
 FileScoped/Real.cs
 FileScoped/Main.cs
 FileScoped/Shadow.cs
+Flow/Model.cs
+Flow/Factory.cs
+Flow/Main.cs
+Flow/RootFactory.cs
 Lookup/Real.cs
 Lookup/Main.cs
 Lookup/Shadow.cs
+RelAlias/Real.cs
+RelAlias/Main.cs
 Statics/Mode.cs
 Statics/Outer.cs
 Statics/Globals.cs

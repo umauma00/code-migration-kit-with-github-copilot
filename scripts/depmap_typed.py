@@ -176,6 +176,7 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
     # A using inside a C# namespace block is relative to the enclosing
     # namespaces (using Models; inside namespace Acme.Web may mean
     # Acme.Models): take the innermost that exists.
+    names_known = namespaces | set(types)
     for info in infos:
         for ctx, block in info.blocks.items():
             outer = prefixes(context_ns(ctx))
@@ -186,6 +187,10 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
                 return next((join(p, name) for p in outer if join(p, name) in known), name)
             block.usings = {absolute(u, namespaces) for u in block.usings}
             block.direct = {absolute(d, types) for d in block.direct}
+            # using T = R; in namespace N may mean N.R, as a using does; a
+            # global:: target keeps its mark.
+            block.aliases = {a: t if t.startswith(GLOBAL) else absolute(t, names_known)
+                             for a, t in block.aliases.items()}
 
     def lookup(fqn):
         return types.get(fqn, ())
@@ -1016,6 +1021,7 @@ def flow_c_like(toks, keywords, language, package=""):
     depth, paren = 0, 0
     ns_stack, file_ns = [], package     # ns_stack: (name, depth, block number)
     blocks = 0
+    file_block = None       # block number of a file-scoped namespace (namespace N;)
     type_stack = []         # (fqn, depth of its body)
     enums = set()
     pending = None
@@ -1024,7 +1030,9 @@ def flow_c_like(toks, keywords, language, package=""):
         return ".".join(p for p in [file_ns] + [x for x, _, _ in ns_stack] if p)
 
     def context():
-        return f"{namespace()}{BLOCK}{ns_stack[-1][2]}" if ns_stack else namespace()
+        if ns_stack:
+            return f"{namespace()}{BLOCK}{ns_stack[-1][2]}"
+        return f"{namespace()}{BLOCK}{file_block}" if file_block else namespace()
 
     def enclosing():
         return [fqn for fqn, _ in reversed(type_stack)]
@@ -1069,7 +1077,10 @@ def flow_c_like(toks, keywords, language, package=""):
                 j += 1
                 break
             if j < n and toks[j] == ";":
+                # Numbered like scan()'s blocks: its usings belong to it.
                 file_ns = ".".join(segs)
+                blocks += 1
+                file_block = blocks
             else:
                 blocks += 1
                 ns_stack.append((".".join(segs), depth, blocks))

@@ -3,6 +3,7 @@ App/Gen/Made.cs	(whole file)	compiled by App/App.csproj only under a Condition, 
 Classic/Legacy/Widget.cs	(whole file)	not compiled by Classic/Classic.csproj; its declarations are ignored
 Classic/Skip.cs	(whole file)	not compiled by Classic/Classic.csproj; its declarations are ignored
 Cond/Opt/O.cs	(whole file)	compiled by Cond/Cond.csproj only under a Condition, MSBuild property or import that is not evaluated; its declarations are kept
+Defaults/Old.cs	(whole file)	not compiled by Defaults/Defaults.csproj; its declarations are ignored
 Maybe/Main.cs	(whole file)	compiled by Maybe/Maybe.csproj only under a Condition, MSBuild property or import that is not evaluated; its declarations are kept
 Maybe/Part.cs	(whole file)	compiled by Maybe/Maybe.csproj only under a Condition, MSBuild property or import that is not evaluated; its declarations are kept
 Nest/Heavy.cs	(whole file)	compiled by Nest/Nest.csproj only under a Condition, MSBuild property or import that is not evaluated; its declarations are kept

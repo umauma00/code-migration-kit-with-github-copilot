@@ -9,6 +9,9 @@ Classic/Legacy/Widget.cs	Classic/Panel.cs
 Classic/Legacy/Widget.cs	Classic/Widget.cs
 Classic/Panel.cs	Classic/Widget.cs
 Cond/Main.cs	Cond/Opt/O.cs
+Defaults/Main.cs	Defaults/Real.cs
+Defaults/Old.cs	Defaults/Main.cs
+Defaults/Old.cs	Defaults/Real.cs
 Maybe/Main.cs	Maybe/Part.cs
 Nest/Main.cs	Nest/Heavy.cs
 Nest/Main.cs	Nest/Late.cs
