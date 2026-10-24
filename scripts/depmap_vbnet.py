@@ -126,16 +126,16 @@ def strip_vb(text):
                             j += 2
                             continue
                         # $"...{expr:format}...": the expression is code.
-                        depth, h, expr = 1, j + 1, []
-                        while h < n and depth:
+                        nest, h, expr = 1, j + 1, []
+                        while h < n and nest:
                             ch = raw[h]
                             if ch == '"':       # a literal inside the hole
                                 end = raw.find('"', h + 1)
                                 h = n if end < 0 else end + 1
                                 expr.append('""')
                                 continue
-                            depth += {"{": 1, "}": -1}.get(ch, 0)
-                            if depth:
+                            nest += {"{": 1, "}": -1}.get(ch, 0)
+                            if nest:
                                 expr.append(ch)
                             h += 1
                         expr = "".join(expr)

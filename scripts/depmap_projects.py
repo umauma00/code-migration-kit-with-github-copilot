@@ -181,12 +181,15 @@ def java_modules(root, rels, warnings):
     modules = {}        # module dir -> set of module dirs it depends on (unresolved names first)
     artifact_of, wanted = {}, {}
     builds = {}
-    for name in ("pom.xml", "build.gradle", "build.gradle.kts"):
-        for path in sorted(root.rglob(name)):
-            parts = path.relative_to(root).parts
-            if any(p.startswith(".") or p in {"target", "build", "node_modules", "out"} for p in parts[:-1]):
-                continue
-            builds.setdefault(rel_dir(path, root), []).append(path)
+    # Build files in build-output directories are skipped by the same rule
+    # as sources (only at --root or beside a build file), so a module that
+    # lives in a directory named build is still a module.
+    names = ("pom.xml", "build.gradle", "build.gradle.kts")
+    found = find_files(root, {".xml", ".gradle", ".kts"}, {"target", "build", "out"}, set(names) | {"build.xml"})
+    for name in names:
+        for path in found:
+            if path.name == name:
+                builds.setdefault(rel_dir(path, root), []).append(path)
     if not builds:
         return None
     settings_dirs = sorted({rel_dir(p, root) for n in GRADLE_SETTINGS for p in root.rglob(n)

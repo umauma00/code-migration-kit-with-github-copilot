@@ -497,6 +497,13 @@ def strip_c_like(text, csharp=False):
     C# preprocessor lines are dropped: every #if branch is mapped.
     """
     out, strings = [], []
+
+    def hole_code(hole):
+        """A hole's expression as code: its own literals are blanked (so
+        $"{(n == 1 ? "Item" : "Items")}" names no type), nested holes kept."""
+        code, inner = strip_c_like(hole_expr(hole), csharp)
+        strings.extend(inner)
+        return " (" + code + ") "
     i, n = 0, len(text)
     line_start = True
     while i < n:
@@ -543,7 +550,7 @@ def strip_c_like(text, csharp=False):
                 j = i
                 interp = verbatim = False
         if j < n and text[j] == '"':
-            if text.startswith('"""', j):
+            if text.startswith('"""', j) and not verbatim:     # @"""x"" y" is verbatim, not raw
                 q = j
                 while q < n and text[q] == '"':
                     q += 1
@@ -553,7 +560,7 @@ def strip_c_like(text, csharp=False):
                 body = text[q:end]
                 strings.append(body)
                 holes = raw_holes(body, dollars) if interp else []
-                out.append('""' + "".join(f" ({hole_expr(h)}) " for h in holes) + "\n" * body.count("\n"))
+                out.append('""' + "".join(hole_code(h) for h in holes) + "\n" * body.count("\n"))
                 i = end + len(fence)
                 continue
             k = j + 1
@@ -590,7 +597,7 @@ def strip_c_like(text, csharp=False):
                 buf.append(ch)
                 k += 1
             strings.append("".join(buf))
-            out.append('""' + "".join(f" ({hole_expr(hole)}) " for hole in holes))
+            out.append('""' + "".join(hole_code(hole) for hole in holes))
             i = k + 1
             continue
         out.append(c)

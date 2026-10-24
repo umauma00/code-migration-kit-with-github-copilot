@@ -13,3 +13,13 @@ class Use
     string F() => $"{(c == '}' ? M.Other.N : 0)}";
     char c;
 }
+
+// @"""x"" y" is a verbatim string that starts with an escaped quote, not a
+// raw string: the code after it is still read. A literal inside a hole is a
+// string, not a type name.
+class Verbatim
+{
+    string q = @"""Hello"" world";
+    int z = Zed.N;
+    string Count(int n) => $"{n} {(n == 1 ? "Item" : "Items")}";
+}

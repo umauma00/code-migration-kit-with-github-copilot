@@ -62,7 +62,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))  # -I drops the script 
 from depmap_common import find_files, path_list, read_source, run  # noqa: E402
 
 EXTS = {".php", ".inc", ".phtml", ".php3", ".php4", ".php5", ".module"}
-BARE_NAME_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+# A function or class name in a string, maybe namespaced (App\Util\conv).
+BARE_NAME_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*(?:\\[A-Za-z_][A-Za-z0-9_]*)*")
 # Functions whose string arguments name a callback, class or function.
 CALLBACK_FUNCTIONS = set("""array_map array_filter array_walk array_walk_recursive array_reduce
 usort uasort uksort call_user_func call_user_func_array forward_static_call
@@ -277,7 +278,7 @@ def scan(rel, text):
     for k, (t, _) in enumerate(toks):
         if not t.startswith(STR):
             continue
-        name = string(t).strip().lstrip("\\")
+        name = string(t).strip().lstrip("\\").replace("\\\\", "\\")
         if not BARE_NAME_RE.fullmatch(name):
             continue
         before = at(k - 1)
@@ -462,8 +463,8 @@ def mapper(root, warnings, args):
             name = s.strip().lstrip("\\").split("::")[0].replace("\\\\", "\\")
             if "\\" in name or "::" in s:
                 add(classes(name.lower()))
-        # A string callable names a global function or class (never
-        # namespace-relative).
+        # A string callable names a function or class by its fully
+        # qualified name (never namespace-relative).
         for kind, name in info.callables:
             add(functions.get(name.lower(), ()) if kind == "function" else classes(name.lower()))
         for ref, why in info.dynamic:

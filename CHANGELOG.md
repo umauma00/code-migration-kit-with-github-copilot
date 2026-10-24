@@ -41,7 +41,8 @@
   directories are mapped. Names inside C# interpolation holes count in
   every form (parenthesized ternaries, `global::`, `$"""` and `$$"""` raw
   strings), and so do those in VB.NET `$"...{expr}..."`. A file name that is
-  not UTF-8 is written with its original bytes, with a warning. Lambda parameters, generic inference and overloads
+  not UTF-8 is written with its original bytes, with a warning to rename
+  it before `make_manifest.py`, which stops with a clear error on one. Lambda parameters, generic inference and overloads
   are not followed. PHP follows computable
   include paths and case-insensitive class/function names with namespaces
   and `use`, narrowed by composer.json autoload (PSR-4, PSR-0, classmap),
@@ -50,8 +51,8 @@
   as unresolved when those differ; `DIRECTORY_SEPARATOR`, `DS`,
   `realpath()` and a trailing `or die(...)` are understood), and string
   callables (a string argument of `array_map`, `usort`, `call_user_func`,
-  `add_action`... and `['Cls', 'm']` pairs) give edges to the function or
-  class of that name; COBOL follows COPY, EXEC SQL INCLUDE, CALL 'X' (also with
+  `add_action`... and `['Cls', 'm']` pairs, by plain or namespaced name)
+  give edges to the function or class of that name; COBOL follows COPY, EXEC SQL INCLUDE, CALL 'X' (also with
   the literal on a later line) and EXEC CICS LINK/XCTL in fixed or free
   format, with `--copy-path` as the copybook search order. Non-UTF-8 sources are read as cp932,
   then Latin-1, with a warning. `source-spec check` suggests the mapper for

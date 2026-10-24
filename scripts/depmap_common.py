@@ -197,7 +197,9 @@ def run(description, mapper, options=()):
             f.encode("utf-8")
         except UnicodeEncodeError:
             warnings.append(f"file name is not UTF-8; written with its original bytes: "
-                            f"{f.encode('utf-8', 'backslashreplace').decode('ascii', 'replace')}")
+                            f"{f.encode('utf-8', 'backslashreplace').decode('ascii', 'replace')}. "
+                            "Later steps (make_manifest.py, the kit CLI) need UTF-8 paths: "
+                            "rename it to UTF-8 and map again before building the manifest")
     edges, sccs, cycles, rows = write_outputs(args.out, files, edges, unresolved)
     for w in warnings:
         print(f"WARN {w}", file=sys.stderr)
