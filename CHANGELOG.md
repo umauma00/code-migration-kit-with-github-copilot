@@ -53,7 +53,9 @@
   reads Drupal `.install`/`.test`/`.theme`/`.engine`/`.profile` files that
   contain `<?php`, replaces `--include-var` values inside strings
   (`"$IP/x.php"`) and uses `define()` constants whose value is a computable
-  path. A
+  path. When a bundled mapper fails or cannot read a project's syntax, the
+  docs, skill and prompt 01 say what to do: try its options, then fix a copy
+  under `migration/tools/depmap-<language>/` and report it. A
   using or alias target inside a namespace block is relative to the
   enclosing namespaces, and once resolved is kept as a full name.
   VB.NET joins implicitly continued lines (a trailing comma, an open

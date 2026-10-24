@@ -29,7 +29,9 @@ level. Bundled mappers cover Python, JS/TS, C/C++, C#, Java, VB.NET, PHP and COB
 only and never build or run the original. Review their `unresolved.tsv`. Another
 language or unsupported syntax needs an adapter written under
 `migration/tools/depmap-<language>/` by that document's rules, not an agent's
-guessed graph.
+guessed graph. When a bundled mapper fails or falls short, follow that
+document's "When a bundled mapper fails" steps: fix a copy there, never
+`migration-kit/`, and record it in `depmap/report.md`.
 
 Draft `migration/RULEBOOK.md` with the user. Decide all ambiguous mappings once:
 architecture, null/exception/number semantics, library choices, names, imports,

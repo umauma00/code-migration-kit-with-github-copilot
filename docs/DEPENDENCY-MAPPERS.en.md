@@ -80,3 +80,14 @@ For a language with no bundled mapper (RPG, PL/I, Delphi, VB6, Perl...) or synta
 5. Generate the whole map and record supported and unsupported syntax, exclusions and unresolved references in `depmap/report.md`.
 
 After changing the adapter, regenerate the map and redo phase 01's checks (five-file trial, audits, and the dependency declaration from `make_review_dependencies.mjs`).
+
+### When a bundled mapper fails or falls short
+
+When a bundled mapper stops with an error, or cannot read the project's syntax (many `unresolved.tsv` rows with the same reason, obvious edges missing), do not stop the work. Handle it in this order:
+
+1. **Try the options first.** `--include-var`, `--include-path`, `--copy-path`, the choice of `--root`, or a skipped-directory warning often explain it.
+2. **Otherwise, copy the bundled mapper and fix the copy.** Copy the mapper and the shared parts it imports (whichever of `depmap_common.py`, `depmap_typed.py` and `depmap_projects.py` it needs) to `migration/tools/depmap-<language>/` and fix them there. Never change the kit's own files (`migration-kit/`). Before fixing, make the smallest example that fails as a fixture and write its expected output by hand (steps 2 and 3 above).
+3. **Write it down in `depmap/report.md`:** the original error (or the syntax it could not read), what was changed, the fixture, and how the output differs from the bundled mapper's (edge, cycle and unresolved counts).
+4. **Tell the user** in the phase 01 report that a fixed copy was used instead of the bundled mapper. When the fix rests on a guess (the language specification does not decide what the syntax means), ask the user before using it.
+
+In every case, a dependency graph the agent guesses is not accepted.

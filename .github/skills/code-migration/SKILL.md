@@ -129,7 +129,11 @@ They read source text only: never build or run the original to map it. Show
 the five-file trial with its `unresolved.tsv`. For any other language, write an
 adapter under `migration/tools/depmap-<language>/` by that document's rules
 (static, deterministic, same output files, hand-written fixture first); never
-hand-write the graph.
+hand-write the graph. If a bundled mapper fails or cannot read the syntax, try
+its options first, then copy it (with the shared `depmap_*.py` it imports) to
+`migration/tools/depmap-<language>/`, fix the copy against a hand-written
+fixture, never `migration-kit/`, and report the error, the change and the
+output difference in `depmap/report.md`.
 
 ## Keep the parent's context small
 
