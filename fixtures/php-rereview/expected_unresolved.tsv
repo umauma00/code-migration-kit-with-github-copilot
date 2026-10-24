@@ -1,6 +1,8 @@
 file	reference	reason
-data/main.php	array_map($this...)	callback computed at run time
+data/main.php	array_map($this->mapper)	callback computed at run time
 dyn/main.php	$cb()	function name computed at run time
 dyn/main.php	call_user_func($cb)	callback computed at run time
 dyn/main.php	call_user_func_array($cb)	callback computed at run time
+expr/main.php	call_user_func('handle_' . $suffix)	callback computed at run time
+expr/main.php	call_user_func_array(get_callback())	callback computed at run time
 inc/app/main.php	require __DIR__ . '/config.php'	included file not found at inc/app/config.php

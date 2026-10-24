@@ -2,6 +2,9 @@
 CommentUsing/Right.cs
 CommentUsing/Use.cs
 CommentUsing/Wrong.cs
+CondAlias/A.cs
+CondAlias/B.cs
+CondAlias/Main.cs
 CondApp/A.cs
 CondShared/X.cs
 RefName/Lib/M.cs

@@ -97,7 +97,7 @@
   `EnableDefaultCompileItems` keeps the default files as "maybe", a ProjectReference must name an existing
   project file (case ignored) or is warned about, Maven dependencies match
   by groupId:artifactId, global usings of a file the build leaves out apply
-  nowhere, project-file comments are not read, and a shared file linked in
+  nowhere, an alias whose `<Using>` items give several targets keeps each, project-file comments are not read, and a shared file linked in
   only under a Condition is listed; Gradle Kotlin `project(path = ":x")` and `projects.x`
   accessors are read. C# 14 `extension(...)` blocks, attributed enum
   members, VB.NET `Imports A, B` and PHP 7 classes named `Enum`, `Match` or
@@ -116,9 +116,10 @@
   `realpath()` and a trailing `or die(...)` are understood), and string
   callables (a string in a callback position of `array_map`, `usort`,
   `call_user_func`, `add_action`... and `['Cls', 'm']` pairs, by plain or
-  namespaced name) give edges to the function or class of that name, while
-  a variable callback, `$f()` and an include missing at its `__DIR__` path
-  are listed as unresolved; COBOL follows COPY, EXEC SQL INCLUDE, CALL 'X' (also with
+  namespaced name) give edges to the function or class of that name, named arguments (`callback: 'f'`) included and `is_a` strings read as
+  class names, while a callback computed at run time (`$cb`, `'on_' . $x`,
+  `get_cb()`), `$f()` and an include missing at its `__DIR__` path are
+  listed as unresolved; COBOL follows COPY, EXEC SQL INCLUDE, CALL 'X' (also with
   the literal on a later line) and EXEC CICS LINK/XCTL in fixed or free
   format, with `--copy-path` as the copybook search order. UTF-16/UTF-32 sources are read by their
   byte order mark; other non-UTF-8 sources are read as cp932, then Latin-1,

@@ -521,7 +521,9 @@ EXPRESSION_WORDS = {"is", "as", "switch", "with", "and", "or", "not", "when"}
 
 
 def csproj_usings(text):
-    """(usings, aliases, static usings) of the <Using> items of a .csproj."""
+    """(usings, aliases, static usings) of the <Using> items of a .csproj.
+    aliases maps a name to every target its items give: Conditions are not
+    evaluated, so Debug's and Release's alias both stay."""
     usings, aliases, static = [], {}, []
     for m in CSPROJ_USING_RE.finditer(text):
         attrs = {k.lower(): a or b for k, a, b in CSPROJ_ATTR_RE.findall(m.group(1))}
@@ -529,7 +531,7 @@ def csproj_usings(text):
         if not name:
             continue
         if attrs.get("alias", "").strip():
-            aliases[attrs["alias"].strip()] = name
+            aliases.setdefault(attrs["alias"].strip(), []).append(name)
         elif attrs.get("static", "").strip().lower() == "true":
             static.append(name)
         else:
@@ -567,8 +569,13 @@ def mapper(root, warnings, args):
         names, named, statics = csproj_usings(text)
         usings.setdefault(d, set()).update(names)
         static.setdefault(d, set()).update(statics)
-        for name, target in named.items():
-            aliases.setdefault(d, {}).setdefault(name, set()).add(target)
+        for name, targets in named.items():
+            aliases.setdefault(d, {}).setdefault(name, set()).update(targets)
+    for d, named in sorted(aliases.items(), key=lambda x: x[0] or ""):
+        for name, targets in sorted(named.items()):
+            if len(targets) > 1:
+                warnings.append(f"{d or '.'}: global alias {name} has {len(targets)} targets ({', '.join(sorted(targets))}), "
+                                "probably under Conditions that are not evaluated; files that use it get an edge to each")
     for info in infos:
         for d in projects_of[info.rel] or (None,):
             info.usings.update(dotted(u, False) for u in usings.get(d, ()))

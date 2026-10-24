@@ -79,8 +79,11 @@ forward_static_call_array register_shutdown_function register_tick_function spl_
 set_error_handler set_exception_handler ob_start header_register_callback""".split(), (0,)),
     **dict.fromkeys("""array_filter array_walk array_walk_recursive array_reduce usort uasort uksort
 iterator_apply preg_replace_callback add_action add_filter add_shortcode""".split(), (1,)),
-    "is_subclass_of": (0, 1), "is_a": (0, 1),     # class names
 }
+CALLBACK_PARAM = "callback"     # the parameter's name in each of them (named arguments)
+# Functions whose string arguments name a class: positions and parameter names.
+CLASS_NAME_FUNCTIONS = {"is_subclass_of": ((0, 1), ("object_or_class", "class")),
+                        "is_a": ((0, 1), ("object_or_class", "class"))}
 # Existence checks that guard a fallback declaration (!function_exists('f')).
 GUARDS = {"function_exists": "function", "class_exists": "class", "interface_exists": "class",
           "trait_exists": "class", "enum_exists": "class", "defined": "const"}
@@ -392,56 +395,82 @@ def scan(rel, text):
                 info.refs.append((ns, t, at(i + 1) == "(", uses))
         i += 1
     # String callables: the callback argument of a function that takes one
-    # ('my_cb'), and the class of a ['Cls', 'm'] / array('Cls', 'm') pair.
-    # Other strings that only equal a name are not references. A callback
-    # held in a variable, and $f(), name nothing the source shows.
+    # ('my_cb', or callback: 'my_cb'), and the class of a ['Cls', 'm'] /
+    # array('Cls', 'm') pair. Other strings that only equal a name are not
+    # references. A callback the source does not name ($cb, 'on_' . $x,
+    # get_callback()), and $f(), are listed as dynamic.
     for k, (t, _) in enumerate(toks):
         if t.startswith("$") and at(k + 1) == "(" and at(k - 1) not in {"->", "?->", "::"} \
                 and at(k - 1).lower() != "new":
             info.dynamic.append((f"{t}()", "function name computed at run time"))
-            continue
-        is_string = t.startswith(STR)
-        if is_string:
+        elif t.startswith(STR) and (at(k - 1) == "[" or (at(k - 1) == "(" and at(k - 2).lower() == "array")) \
+                and at(k + 1) == "," and at(k + 2).startswith(STR) and at(k + 3) in {"]", ")"}:
             name = string(t).strip().lstrip("\\").replace("\\\\", "\\")
-            if not BARE_NAME_RE.fullmatch(name):
-                continue
-            before = at(k - 1)
-            if (before == "[" or (before == "(" and at(k - 2).lower() == "array")) and at(k + 1) == "," \
-                    and at(k + 2).startswith(STR) and at(k + 3) in {"]", ")"}:
+            if BARE_NAME_RE.fullmatch(name):
                 info.callables.append(("class", name))
-                continue
-        elif not t.startswith("$"):
+        func = t.lower().lstrip("\\")
+        if at(k + 1) != "(" or at(k - 1) in {"->", "?->", "::"} or at(k - 1).lower() in {"function", "new"}:
             continue
-        # A whole string argument, or one that starts with a variable
-        # ($cb, $this->handler), at a callback position of the call.
-        if at(k - 1) not in {"(", ","} or (is_string and at(k + 1) not in {",", ")"}):
-            continue
-        level, j, position = 0, k - 1, 0
-        while j >= 0 and k - j < 400:
-            tok = at(j)
-            if tok in {")", "]"}:
-                level += 1
-            elif tok in {"(", "["}:
-                if level == 0:
-                    break
-                level -= 1
-            elif tok == "," and level == 0:
-                position += 1
-            elif tok in {";", "{", "}"}:
-                j = -1
-                break
-            j -= 1
-        if j <= 0 or at(j) != "(" or at(j - 2) in {"->", "?->", "::"} or at(j - 2).lower() == "function":
-            continue
-        func = at(j - 1).lower().lstrip("\\")
-        if position not in CALLBACK_FUNCTIONS.get(func, ()):
-            continue
-        if is_string:
-            info.callables.append(("function", name))
+        if func in CALLBACK_FUNCTIONS:
+            positions, params, kind = CALLBACK_FUNCTIONS[func], (CALLBACK_PARAM,), "function"
+        elif func in CLASS_NAME_FUNCTIONS:
+            (positions, params), kind = CLASS_NAME_FUNCTIONS[func], "class"
         else:
-            more = "" if at(k + 1) in {",", ")"} else "..."
-            info.dynamic.append((f"{func}({t}{more})", "callback computed at run time"))
+            continue
+        for position, arg in enumerate(call_arguments(toks, k + 1)):
+            if len(arg) > 2 and NAME_RE.fullmatch(at(arg[0])) and at(arg[1]) == ":":
+                if at(arg[0]).lower() not in params:     # callback: 'f' (PHP 8 named argument)
+                    continue
+                arg = arg[2:]
+            elif position not in positions:
+                continue
+            first = at(arg[0])
+            if len(arg) == 1 and first.startswith(STR):
+                name = string(first).strip().lstrip("\\").replace("\\\\", "\\")
+                if BARE_NAME_RE.fullmatch(name):
+                    info.callables.append((kind, name))
+            elif kind == "function" and not static_callable([at(j) for j in arg]):
+                text = "".join(f"'{string(at(j))}'" if at(j).startswith(STR) else " . " if at(j) == "." else at(j)
+                               for j in arg).replace(" .  .  . ", "...")
+                text = text if len(text) <= 60 else text[:57] + "..."
+                info.dynamic.append((f"{func}({text})", "callback computed at run time"))
     return info
+
+
+def call_arguments(toks, open_at):
+    """Token indices of each top-level argument of the call whose "(" is at
+    open_at (empty when the call is not closed within 2000 tokens)."""
+    args, current, level = [], [], 0
+    for j in range(open_at + 1, min(len(toks), open_at + 2000)):
+        tok = toks[j][0]
+        if tok in {"(", "[", "{"}:
+            level += 1
+        elif tok in {")", "]", "}"}:
+            if level == 0:
+                return args + [current] if current else args
+            level -= 1
+        elif tok == "," and level == 0:
+            args.append(current)
+            current = []
+            continue
+        current.append(j)
+    return []
+
+
+def static_callable(arg):
+    """Whether a callback argument names its target in the source or needs no
+    file edge: a string ('Cls::m' strings are read as class names), a
+    closure, a [$obj, 'm'] / ['Cls', 'm'] pair, or a first-class callable
+    f(...) / Cls::m(...). Anything else ($cb, 'on_' . $x, get_cb()) is
+    computed at run time."""
+    if not arg:
+        return True
+    first = arg[0].lower()
+    if len(arg) == 1 and arg[0].startswith(STR):
+        return True
+    if first in {"function", "fn", "static"} or first == "[" or (first == "array" and arg[1:2] == ["("]):
+        return True
+    return len(arg) >= 6 and arg[-5:] == ["(", ".", ".", ".", ")"]     # f(...)
 
 
 def const_values_unique(values):

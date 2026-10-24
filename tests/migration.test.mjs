@@ -367,8 +367,9 @@ test('C#, Java, PHP, VB.NET and COBOL dependency fixtures produce their expected
     ['php', 'php-relative', 'expected_', ['--include-path', 'lib']],
     // Re-review: global usings of a removed file, <Using> in an XML comment,
     // a shared file linked only under a Condition, UTF-16 and binary sources;
-    // Maven groupId:artifactId; PHP callback positions, dynamic callbacks and
-    // a missing __DIR__ include; VB.NET nested types and a commented-out
+    // Maven groupId:artifactId; PHP callback positions and named arguments,
+    // dynamic callbacks (variables, concatenation, calls) and a missing
+    // __DIR__ include; <Using> aliases under Conditions; VB.NET nested types and a commented-out
     // RootNamespace.
     ['csharp', 'csharp-rereview'], ['java', 'java-rereview'], ['php', 'php-rereview'], ['vbnet', 'vbnet-rereview']];
   for (const [lang, name, prefix = 'expected_', options = []] of cases) {
@@ -400,13 +401,14 @@ test('a directory symlink loop is walked once', { skip: process.platform === 'wi
   assert.match(r.stderr, /symlink loop not followed: sub\/loop\//);
 });
 
-test('a ProjectReference to a missing project file and an unread Maven groupId are warned about', async t => {
+test('a missing ProjectReference, a conditional alias and an unread Maven groupId are warned about', async t => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'copilot-depmap-refs-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const csharp = await runProcess(python, ['-I', path.join(kitRoot, 'scripts/depmap_csharp.py'),
     '--root', path.join(kitRoot, 'fixtures/csharp-rereview'), '--out', path.join(root, 'cs')]);
   assert.equal(csharp.code, 0, csharp.stderr);
   assert.match(csharp.stderr, /ProjectReference \.\.\\Lib\\Missing\.csproj is not found under --root \(RefName\/Lib\/Lib\.csproj is the project file there\)/);
+  assert.match(csharp.stderr, /CondAlias: global alias Model has 2 targets \(CA\.Model, CB\.Model\)/);
   const tree = path.join(root, 'maven');
   for (const [dir, group] of [['a', 'one'], ['b', 'two']]) {
     fs.mkdirSync(path.join(tree, dir), { recursive: true });
