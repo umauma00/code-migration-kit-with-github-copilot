@@ -22,7 +22,8 @@
   voids the exemption, a listing of `migration/` piped into a command that
   changes what it receives (`Get-ChildItem migration | Remove-Item`,
   `ls migration | xargs rm`) is refused, and `-Path:value` counts like
-  `-Path value`.
+  `-Path value`. Pipes are read per pipeline: a command after `;`, `&&`,
+  `||` or a newline is not piped from the one before it.
 
 - 2026-10-23 phase 00 on Windows stopped twice for no kit reason. The host's
   own source check took a `/P` switch for a literal credential, then read

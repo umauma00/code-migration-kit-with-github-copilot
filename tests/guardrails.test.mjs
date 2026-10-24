@@ -117,7 +117,11 @@ test('PowerShell reads beside a kit command are not guardrails writes; the refus
     `${make}; Select-String -Path migration/* -Pattern edges`, `${make}; findstr /S /N edges migration\\*`,
     // PowerShell names are case-insensitive; a pipe into a writer with its own named target is checked on that target.
     'Get-Content migration/guardrails.json', 'get-content migration/guardrails.json', 'GET-CONTENT migration/guardrails.json', 'GC migration/guardrails.json',
-    'Get-ChildItem migration/* | Out-File migration/file-list.txt'])
+    'Get-ChildItem migration/* | Out-File migration/file-list.txt',
+    // A pipe joins only the commands it connects: a listing of migration/ before ;, &&, || or a newline is not piped (review round 8).
+    'Get-ChildItem migration; Get-ChildItem temp | Remove-Item', 'Get-ChildItem migration && Get-ChildItem temp | Remove-Item',
+    'gci migration || gci temp | ri', 'Get-ChildItem migration\nGet-ChildItem temp | Remove-Item',
+    'Get-Content migration/guardrails.json; Get-ChildItem temp | ForEach-Object { $_.Name }'])
     assert.equal(decide(command), null, command);
   for (const command of ['Set-Content migration/guardrails.json "{}"', 'echo {} > migration/guardrails.json', 'Copy-Item x.json migration/guardrails.json',
     'Remove-Item -Recurse migration', 'Get-ChildItem migration/* | Remove-Item', 'Get-ChildItem migration/* | ForEach-Object { $_.Delete() }',
@@ -133,6 +137,7 @@ test('PowerShell reads beside a kit command are not guardrails writes; the refus
     'Write-Output (Get-Item migration/guardrails.json).Delete()', '[IO.File]::Delete(\'migration/guardrails.json\')',
     'Get-ChildItem migration | Remove-Item', 'Get-ChildItem migration | del', 'Get-ChildItem -Path migration -Recurse | Remove-Item',
     'gci migration | Where-Object Name -eq guardrails.json | Remove-Item', 'Get-ChildItem . -Recurse -Filter guardrails.json | ri', 'ls migration | xargs rm',
+    'Get-ChildItem temp; Get-ChildItem migration | Remove-Item', '(Get-ChildItem migration; Get-ChildItem temp) | Remove-Item',
     'Set-Content -Path:migration/guardrails.json x', 'x | Out-File -FilePath:migration/guardrails.json', 'Remove-Item -Path:migration/guardrails.json']) {
     const d = decide(command);
     assert.equal(d?.decision, 'deny', command);
