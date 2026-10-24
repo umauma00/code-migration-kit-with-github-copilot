@@ -10,4 +10,7 @@ Classic/Legacy/Widget.cs
 Classic/Skip.cs
 Cond/Opt/O.cs
 Cond/Main.cs
+Nest/Heavy.cs
+Nest/Optional.cs
+Nest/Main.cs
 other/Copies.cs

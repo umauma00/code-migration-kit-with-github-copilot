@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- An empty ItemGroup does not hide the Condition of the next one. -->
+  <ItemGroup />
+  <ItemGroup Condition="'$(Lite)' == 'true'">
+    <Compile Remove="Heavy.cs" />
+  </ItemGroup>
+  <!-- A Remove after a nested Choose is still inside the outer When. -->
+  <Choose>
+    <When Condition="'$(A)' == '1'">
+      <Choose>
+        <When Condition="'$(B)' == '1'">
+          <ItemGroup><Compile Include="Extra.cs" /></ItemGroup>
+        </When>
+      </Choose>
+      <ItemGroup><Compile Remove="Optional.cs" /></ItemGroup>
+    </When>
+  </Choose>
+</Project>

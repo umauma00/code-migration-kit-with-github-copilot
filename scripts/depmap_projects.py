@@ -33,11 +33,14 @@ from depmap_common import find_files, nearest, reachable, read_source  # noqa: E
 
 QUOTED = r"""(?:"([^"]*)"|'([^']*)')"""     # an XML attribute value, either quote
 # Attributes of a tag; a quoted value may hold ">" (Condition="'$(A)' >= '1'").
-ATTRS = r"""((?:[^>"']|"[^"]*"|'[^']*')*?)"""
-COMPILE_RE = re.compile(r"<Compile\b" + ATTRS + r"/?>", re.IGNORECASE)
+# A value never holds a raw "<", which keeps a broken quote from running on
+# through the rest of the file.
+ATTRS = r"""((?:[^<>"']|"[^"<]*"|'[^'<]*')*?)"""
 # Update only changes metadata of items already listed, so it is not read.
 ITEM_ATTR_RE = re.compile(r"\b(Include|Remove|Exclude|Condition)\s*=\s*" + QUOTED, re.IGNORECASE)
-CONDITIONAL_RE = re.compile(r"<(ItemGroup|When|Otherwise)\b" + ATTRS + r">(.*?)</\1\s*>", re.IGNORECASE | re.DOTALL)
+# Start, end and empty tags of the elements that can put a condition
+# around a <Compile> item, and the items themselves.
+TAG_RE = re.compile(r"<(/?)(ItemGroup|Choose|When|Otherwise|Compile)\b" + ATTRS + r"(/?)>", re.IGNORECASE)
 COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
 PROJECT_REF_RE = re.compile(r"<ProjectReference\b" + ATTRS + r"/?>", re.IGNORECASE)
 INCLUDE_ATTR_RE = re.compile(r"\bInclude\s*=\s*" + QUOTED, re.IGNORECASE)
@@ -62,16 +65,23 @@ def compile_items(text):
     the item, on its ItemGroup, or a <Choose> branch around it. excludes:
     the Exclude values of an Include (they apply to that item only)."""
     text = COMMENT_RE.sub("", text)
-    guarded = []        # spans under a condition
-    for m in CONDITIONAL_RE.finditer(text):
-        if m.group(1).lower() != "itemgroup" or re.search(r"\bCondition\s*=", m.group(2), re.IGNORECASE):
-            guarded.append((m.start(), m.end()))
-    for m in re.finditer(r"<Choose\b.*?</Choose\s*>", text, re.IGNORECASE | re.DOTALL):
-        guarded.append((m.start(), m.end()))
     items = []
-    for m in COMPILE_RE.finditer(text):
-        attrs = {k.lower(): a or b for k, a, b in ITEM_ATTR_RE.findall(m.group(1))}
-        conditional = "condition" in attrs or any(a <= m.start() < b for a, b in guarded)
+    stack = []          # open ItemGroup/Choose/When/Otherwise: whether each is a condition
+    for m in TAG_RE.finditer(text):
+        closing, name, attr_text, empty = m.group(1), m.group(2).lower(), m.group(3), m.group(4)
+        if name != "compile":
+            if closing:
+                # Pop to the matching start tag (a missing end tag is forgiven).
+                while stack and stack.pop()[0] != name:
+                    pass
+            elif not empty:
+                cond = name != "itemgroup" or re.search(r"\bCondition\s*=", attr_text, re.IGNORECASE)
+                stack.append((name, bool(cond)))
+            continue
+        if closing:
+            continue
+        attrs = {k.lower(): a or b for k, a, b in ITEM_ATTR_RE.findall(attr_text)}
+        conditional = "condition" in attrs or any(c for _, c in stack)
         excludes = tuple(v.strip() for v in attrs.get("exclude", "").split(";") if v.strip())
         for kind in ("include", "remove"):
             for value in attrs.get(kind, "").split(";"):
