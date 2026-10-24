@@ -287,7 +287,9 @@ def dotnet_projects(root, rels, project_ext, warnings):
         projects_of[rel] = tuple(dirs) or ((owner[rel],) if owner[rel] is not None else ())
         if rel in left_out:
             proj_rel, state = left_out[rel]
-            if state == "maybe" or any(st == "maybe" for _, st in compiled_by[rel]):
+            if state == "maybe":
+                not_compiled[rel] = (proj_rel, True)    # kept, and listed, even if another project links it
+            elif any(st == "maybe" for _, st in compiled_by[rel]):
                 if not any(st == "yes" for _, st in compiled_by[rel]):
                     not_compiled[rel] = (proj_rel, True)
             elif not compiled_by[rel]:

@@ -8,6 +8,8 @@ App2/Tool.cs
 App2/Globals.cs
 Shared2/Thing.cs
 App2/Main.cs
+CA/Sub/T.cs
+CB/Main.cs
 Classic/Widget.cs
 Classic/Panel.cs
 Classic/Legacy/Widget.cs

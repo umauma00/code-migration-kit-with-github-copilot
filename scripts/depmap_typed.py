@@ -366,12 +366,13 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
                 segs, root = rooted(self.unalias(segs))
                 fq = longest(segs)
                 found = {fq} if fq else self.exact(segs[:1])
-            if attribute_suffix:
-                # [Foo] / [A.B.Foo] may name FooAttribute; the compiler tries
-                # both names, so both count.
-                found = set(found) | self.exact([segs[0] + attribute_suffix])
-                if len(segs) > 1:
-                    found |= self.exact(segs[:-1] + [segs[-1] + attribute_suffix])
+            if not found and attribute_suffix:
+                # [Foo] / [A.B.Foo] may name FooAttribute. Not when Foo itself
+                # resolves: a mention is not known to be an attribute, and
+                # Foo -> FooAttribute would be a false edge (and cycle).
+                found = self.exact([segs[0] + attribute_suffix])
+                if not found and len(segs) > 1:
+                    found = self.exact(segs[:-1] + [segs[-1] + attribute_suffix])
             return found
 
         def _stepwise(self, segs):

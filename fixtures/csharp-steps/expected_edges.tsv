@@ -1,5 +1,6 @@
 from	to
-Attr/V.cs	Attr/F.cs
-Attr/V.cs	Attr/L.cs
+Attr/CacheAttribute.cs	Attr/Cache.cs
+Attr/V.cs	Attr/Cache.cs
+Attr/V.cs	Attr/Only.cs
 Shadow/U.cs	Shadow/A.cs
 Shadow/U.cs	Shadow/Z.cs

@@ -1,5 +1,6 @@
 file	reference	reason
 App/Gen/Made.cs	(whole file)	compiled by App/App.csproj only under a Condition, MSBuild property or import that is not evaluated; its declarations are kept
+CA/Sub/T.cs	(whole file)	compiled by CA/CA.csproj only under a Condition, MSBuild property or import that is not evaluated; its declarations are kept
 Classic/Legacy/Widget.cs	(whole file)	not compiled by Classic/Classic.csproj; its declarations are ignored
 Classic/Skip.cs	(whole file)	not compiled by Classic/Classic.csproj; its declarations are ignored
 Cond/Opt/O.cs	(whole file)	compiled by Cond/Cond.csproj only under a Condition, MSBuild property or import that is not evaluated; its declarations are kept

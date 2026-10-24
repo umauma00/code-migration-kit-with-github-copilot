@@ -5,6 +5,7 @@ App/Main.cs	Shared/Linked.cs
 App/Main.cs	lib/LibType.cs
 App2/Globals.cs	App2/Tool.cs
 App2/Main.cs	Shared2/Thing.cs
+CB/Main.cs	CA/Sub/T.cs
 Classic/Legacy/Widget.cs	Classic/Panel.cs
 Classic/Legacy/Widget.cs	Classic/Widget.cs
 Classic/Panel.cs	Classic/Widget.cs

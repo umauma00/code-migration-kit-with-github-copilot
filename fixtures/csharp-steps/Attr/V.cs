@@ -1,3 +1,2 @@
-// [Foo] may be Foo or FooAttribute; the compiler tries both, so both count.
-using Lib;
-namespace N2 { [Foo] class V { } }
+// [Only] has no Only type, so it is OnlyAttribute.
+namespace N2 { [Only] class V { Cache c; } }
