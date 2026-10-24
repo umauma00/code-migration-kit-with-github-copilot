@@ -1,6 +1,14 @@
 from	to
+AliasFlow/Main.cs	AliasFlow/Model.cs
+AliasFlow/Main.cs	AliasFlow/Real.cs
+AliasFlow/Real.cs	AliasFlow/Model.cs
+AliasFlow/Shadow.cs	AliasFlow/WrongModel.cs
 Attr/CacheAttribute.cs	Attr/Cache.cs
 Attr/V.cs	Attr/Cache.cs
 Attr/V.cs	Attr/Only.cs
+AttrBoth/Index.cs	AttrBoth/Plain.cs
+AttrBoth/Main.cs	AttrBoth/BarAttr.cs
+AttrBoth/Main.cs	AttrBoth/Plain.cs
+AttrBoth/Main.cs	AttrBoth/Real.cs
 Shadow/U.cs	Shadow/A.cs
 Shadow/U.cs	Shadow/Z.cs

@@ -44,6 +44,7 @@ class FileInfo:
         self.direct = set()         # dotted targets imported one by one (Java import a.B, C# using static)
         self.project_static = set() # C# global using static of another file: an edge only where a member is used
         self.names = []             # (namespace written in, dotted name chain) mentioned in code
+        self.attribute_names = []   # the names in names written as an attribute ([Foo])
         self.members = set()        # names written after "." (x.Name)
         self.strings = []           # string literal contents (reflection lookups)
         self.dynamic = []           # (reference, reason) the mapper could not resolve statically
@@ -91,6 +92,11 @@ def dotted(name, fold):
     if not root and name.lower().startswith("global.") and fold:    # VB Global.X
         root, name = True, name[len("global."):]
     return GLOBAL + name if root else name
+
+
+def rooted_name(name):
+    """name marked as written from the root namespace (global::)."""
+    return name if name.startswith(GLOBAL) else GLOBAL + name
 
 
 def rooted(segs):
@@ -187,10 +193,14 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
                 return next((join(p, name) for p in outer if join(p, name) in known), name)
             block.usings = {absolute(u, namespaces) for u in block.usings}
             block.direct = {absolute(d, types) for d in block.direct}
-            # using T = R; in namespace N may mean N.R, as a using does; a
-            # global:: target keeps its mark.
-            block.aliases = {a: t if t.startswith(GLOBAL) else absolute(t, names_known)
+            # using T = R; in namespace N may mean N.R, as a using does. The
+            # result is a full name: it is marked global:: so that T.X is
+            # not looked up relative to the namespaces around T again.
+            block.aliases = {a: rooted_name(absolute(t, names_known))
                              for a, t in block.aliases.items()}
+        # A file-level (or project) alias target is a full name too.
+        info.aliases = {a: rooted_name(t) for a, t in info.aliases.items()}
+        info.alias_more = {a: {rooted_name(t) for t in ts} for a, ts in info.alias_more.items()}
 
     def lookup(fqn):
         return types.get(fqn, ())
@@ -367,12 +377,20 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
                 fq = longest(segs)
                 found = {fq} if fq else self.exact(segs[:1])
             if not found and attribute_suffix:
-                # [Foo] / [A.B.Foo] may name FooAttribute. Not when Foo itself
-                # resolves: a mention is not known to be an attribute, and
-                # Foo -> FooAttribute would be a false edge (and cycle).
+                # A name not known to be written as an attribute may still
+                # be one (the scan missed it): FooAttribute when Foo is not
+                # found.
+                found = self.attribute(chain)
+            return found
+
+        def attribute(self, chain):
+            """Types [chain] may name with the attribute suffix: [Foo] and
+            [A.B.Foo] may mean FooAttribute even where Foo exists (C# takes
+            the one that is an attribute; both count)."""
+            segs = chain.split(".")
+            found = self.exact(segs[:-1] + [segs[-1] + attribute_suffix])
+            if not found and len(segs) > 1:
                 found = self.exact([segs[0] + attribute_suffix])
-                if not found and len(segs) > 1:
-                    found = self.exact(segs[:-1] + [segs[-1] + attribute_suffix])
             return found
 
         def _stepwise(self, segs):
@@ -559,6 +577,9 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
                 add(src, lookup(u))
         for ctx, chain in info.names:
             add_types(src, scope_of(info, ctx).mentioned(chain))
+        if attribute_suffix:
+            for ctx, chain in info.attribute_names:
+                add_types(src, scope_of(info, ctx).attribute(chain))
         # x.Name() may call an extension method of any namespace visible
         # somewhere in the file.
         visible = set(file_scope.visible)

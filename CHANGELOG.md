@@ -31,9 +31,11 @@
   any depth; attributes may use either quote. A file left out only under a
   Condition keeps its declarations and is listed in `unresolved.tsv`.
   MSBuild paths are matched without case, as on Windows, and a
-  ProjectReference is read whatever its attribute order. Qualified
-  attributes (`[A.B.Required]`) also try the `Attribute` suffix, and a
-  using inside a namespace block is relative to the enclosing namespaces.
+  ProjectReference is read whatever its attribute order. A name in an
+  attribute list (`[Foo]`, `[A.B.Required]`, `[return: Foo]`) counts both
+  `Foo` and `FooAttribute`; elsewhere `Foo` does not mean `FooAttribute`. A
+  using or alias target inside a namespace block is relative to the
+  enclosing namespaces, and once resolved is kept as a full name.
   VB.NET joins implicitly continued lines (a trailing comma, an open
   parenthesis). Build-output and third-party directories (bin, obj,
   target, build, out, vendor, packages) are skipped only at `--root` or

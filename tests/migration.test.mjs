@@ -358,7 +358,8 @@ test('C#, Java, PHP, VB.NET and COBOL dependency fixtures produce their expected
     ['java', 'java-final'], ['php', 'php-final'],
     // A file linked into several projects belongs to each (VB RootNamespace too).
     ['vbnet', 'vbnet-linked'],
-    // using static does not bring the type's own name; [Foo] falls back to FooAttribute only.
+    // using static does not bring the type's own name; [Foo] as an attribute counts Foo and FooAttribute,
+    // Foo elsewhere only Foo; an alias target is a full name in type flow too.
     ['csharp', 'csharp-steps'],
     ['php', 'php-relative', 'expected_', ['--include-path', 'lib']]];
   for (const [lang, name, prefix = 'expected_', options = []] of cases) {

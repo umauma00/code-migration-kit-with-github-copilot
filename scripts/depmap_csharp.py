@@ -11,8 +11,8 @@ A C# `using` names a namespace, not a file, so edges come from type names
 struct, interface, enum, record, delegate) and extension methods form a table,
 and every name a file's code mentions is resolved through its enclosing
 namespaces, using directives, global usings (in .cs files and
-<Using Include> in .csproj), using aliases and using static. [Foo] also
-matches FooAttribute. Fully qualified names, string literals that equal a
+<Using Include> in .csproj), using aliases and using static. [Foo] in an
+attribute list also matches FooAttribute. Fully qualified names, string literals that equal a
 declared type's full name (Type.GetType("A.B")) and partial types (all parts
 linked) count too.
 
@@ -69,7 +69,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # -I drops the script dir
 from depmap_common import find_files, read_source, run  # noqa: E402
 from depmap_projects import ATTRS, QUOTED, dotnet_projects, drop_not_compiled  # noqa: E402
-from depmap_typed import BLOCK, GLOBAL, Directives, FileInfo, TOKEN_RE, chains_at, dotted, flow_c_like, members, resolve, scan_or_none, strip_c_like  # noqa: E402
+from depmap_typed import BLOCK, CHAIN_RE, GLOBAL, Directives, FileInfo, TOKEN_RE, chains_at, dotted, flow_c_like, members, resolve, scan_or_none, strip_c_like  # noqa: E402
 
 EXTS = {".cs"}
 # Build output beside a project, NuGet's packages/ beside a solution (or at --root).
@@ -278,8 +278,12 @@ def scan(rel, text):
         code = code[:a] + " " * (b - a) + code[b:]
     # Each name is resolved from the namespace it is written in.
     offsets = [o for o, _ in contexts]
-    info.names = [(contexts[bisect.bisect_right(offsets, pos) - 1][1], name)
-                  for pos, name in chains_at(code, KEYWORDS)]
+    info.names, info.attribute_names = [], []
+    for pos, name in chains_at(code, KEYWORDS):
+        ref = (contexts[bisect.bisect_right(offsets, pos) - 1][1], name)
+        info.names.append(ref)
+        if attribute_name_at(code, pos, CHAIN_RE.match(code, pos).end()):
+            info.attribute_names.append(ref)
     info.members = members(code)
     info.type_members, info.type_bases, info.flow, info.type_ns = flow_c_like(
         [t for t, _, _ in toks], KEYWORDS, "csharp")
@@ -288,6 +292,56 @@ def scan(rel, text):
         if not arg.startswith('""'):
             info.dynamic.append((f"{dotted(m.group(1), False)}({arg})", "reflection with a computed type name"))
     return info, (globals_, global_aliases, global_static)
+
+
+# Attribute targets ([assembly: Foo], [return: Foo]).
+ATTRIBUTE_TARGETS = {"assembly", "module", "field", "event", "method", "param",
+                     "property", "return", "type", "typevar"}
+
+
+def attribute_name_at(code, start, end):
+    """Whether the name at code[start:end] is an attribute's name: the head
+    of an item of a [...] attribute list (followed by "(", "," or "]"). A
+    [ counts as an attribute list where a declaration may begin, not after
+    a value (a[Foo] is an indexer, x = [Foo] a collection)."""
+    k = end
+    while k < len(code) and code[k].isspace():
+        k += 1
+    if k >= len(code) or code[k] not in "(,]":
+        return False
+    k = start - 1
+    while k >= 0 and code[k].isspace():
+        k -= 1
+    if k >= 0 and code[k] == ":":       # [target: Foo]
+        k -= 1
+        while k >= 0 and code[k].isspace():
+            k -= 1
+        word_end = k + 1
+        while k >= 0 and (code[k].isalnum() or code[k] == "_"):
+            k -= 1
+        if code[k + 1:word_end] not in ATTRIBUTE_TARGETS:
+            return False
+        while k >= 0 and code[k].isspace():
+            k -= 1
+    elif k >= 0 and code[k] == ",":     # [A, Foo]: back to the open [
+        depth = 0
+        while k > 0:
+            k -= 1
+            c = code[k]
+            if c in ")]}":
+                depth += 1
+            elif c in "([{":
+                if depth == 0:
+                    break
+                depth -= 1
+        else:
+            return False
+    if k < 0 or code[k] != "[":
+        return False
+    k -= 1
+    while k >= 0 and code[k].isspace():
+        k -= 1
+    return k < 0 or code[k] in ";{}](<,"
 
 
 def csproj_usings(text):

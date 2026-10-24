@@ -1,8 +1,18 @@
 # migration order: one batch per line, dependencies first
+AliasFlow/Model.cs
+AliasFlow/Real.cs
+AliasFlow/Main.cs
+AliasFlow/WrongModel.cs
+AliasFlow/Shadow.cs
 Attr/Cache.cs
 Attr/CacheAttribute.cs
 Attr/Only.cs
 Attr/V.cs
+AttrBoth/BarAttr.cs
+AttrBoth/Plain.cs
+AttrBoth/Index.cs
+AttrBoth/Real.cs
+AttrBoth/Main.cs
 Shadow/A.cs
 Shadow/Z.cs
 Shadow/U.cs
