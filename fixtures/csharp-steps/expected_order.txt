@@ -1,0 +1,7 @@
+# migration order: one batch per line, dependencies first
+Attr/F.cs
+Attr/L.cs
+Attr/V.cs
+Shadow/A.cs
+Shadow/Z.cs
+Shadow/U.cs

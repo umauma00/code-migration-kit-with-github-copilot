@@ -339,7 +339,8 @@ def mapper(root, warnings, args):
             info.usings.update(dotted(u, False) for u in usings.get(d, ()))
             info.project_static.update(dotted(u, False) for u in static.get(d, ()))
             for name, target in sorted(aliases.get(d, {}).items()):
-                info.aliases.setdefault(name, target)
+                if info.aliases.setdefault(name, target) != target:
+                    info.alias_more.setdefault(name, set()).add(target)
     skipped = drop_not_compiled(infos, not_compiled)
     edges, unresolved = resolve(infos, attribute_suffix="Attribute", visible_files=visible_files)
     return rels, edges, unresolved | skipped | deep

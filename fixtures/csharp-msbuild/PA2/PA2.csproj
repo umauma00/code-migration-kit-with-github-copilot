@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Shared3/S.cs is compiled by PA2 and PB2, with a different X in each. -->
+  <ItemGroup><Compile Include="..\Shared3\S.cs" /><Using Include="A2.Foo" Alias="X" /></ItemGroup>
+</Project>

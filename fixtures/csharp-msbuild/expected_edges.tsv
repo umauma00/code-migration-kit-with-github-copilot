@@ -13,4 +13,7 @@ Maybe/Main.cs	Maybe/Part.cs
 Nest/Main.cs	Nest/Heavy.cs
 Nest/Main.cs	Nest/Late.cs
 Nest/Main.cs	Nest/Optional.cs
+NoDefault/A.cs	NoDefault/B.cs
 Shared2/Thing.cs	App2/Tool.cs
+Shared3/S.cs	PA2/AF.cs
+Shared3/S.cs	PB2/BF.cs

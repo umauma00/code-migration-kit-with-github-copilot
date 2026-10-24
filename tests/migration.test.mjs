@@ -358,6 +358,8 @@ test('C#, Java, PHP, VB.NET and COBOL dependency fixtures produce their expected
     ['java', 'java-final'], ['php', 'php-final'],
     // A file linked into several projects belongs to each (VB RootNamespace too).
     ['vbnet', 'vbnet-linked'],
+    // using static does not bring the type's own name; [Foo] is Foo and FooAttribute.
+    ['csharp', 'csharp-steps'],
     ['php', 'php-relative', 'expected_', ['--include-path', 'lib']]];
   for (const [lang, name, prefix = 'expected_', options = []] of cases) {
     const out = path.join(root, `${name}-${prefix}`), fixture = path.join(kitRoot, 'fixtures', name);

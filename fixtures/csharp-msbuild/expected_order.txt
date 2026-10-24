@@ -20,4 +20,9 @@ Nest/Heavy.cs
 Nest/Late.cs
 Nest/Optional.cs
 Nest/Main.cs
+NoDefault/B.cs
+NoDefault/A.cs
+PA2/AF.cs
+PB2/BF.cs
+Shared3/S.cs
 other/Copies.cs

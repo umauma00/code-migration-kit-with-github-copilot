@@ -241,7 +241,8 @@ def dotnet_projects(root, rels, project_ext, warnings):
                 refs[d].add(target)
             else:
                 warnings.append(f"{proj_rel}: ProjectReference {value} is not under --root")
-        by_default = default_items(text) if SDK_RE.search(text) else False
+        sdk = SDK_RE.search(text)
+        by_default = default_items(text) if sdk else False
         # (kind, path, conditional, unknown, excludes): an item whose value uses an
         # MSBuild property or item ($(Src)\*.cs) may match any file.
         def unknown(value):
@@ -249,7 +250,10 @@ def dotnet_projects(root, rels, project_ext, warnings):
         items = [(kind, msbuild_path(d, v), cond, unknown(v), tuple((msbuild_path(d, x), unknown(x)) for x in ex))
                  for kind, v, cond, ex in compile_items(text)]
         if by_default is False and not any(item[0] == "include" for item in items):
-            by_default = True       # a project that lists no files: its directory's files
+            # A project that lists no files: an old-style one compiles its
+            # directory's files; an SDK one that turned the defaults off
+            # gets them from an import the mapper does not read.
+            by_default = "maybe" if sdk else True
         # Files of other directories are linked in only by a path or
         # wildcard that names them: $(IntermediateOutputPath)X.cs would
         # otherwise link every file under --root into every project.
@@ -407,7 +411,7 @@ def drop_not_compiled(infos, not_compiled):
         project, conditional = not_compiled[info.rel]
         if conditional:
             rows.add((info.rel, "(whole file)",
-                      f"compiled by {project} only under a Condition or MSBuild property that is not evaluated; "
+                      f"compiled by {project} only under a Condition, MSBuild property or import that is not evaluated; "
                       "its declarations are kept"))
             continue
         info.decls, info.extensions, info.partial = [], [], set()

@@ -40,6 +40,7 @@ class FileInfo:
         self.usings = set()         # imported namespaces (or types: Java on-demand of a type)
         self.blocks = {}            # C# namespace block context -> Directives written in it
         self.aliases = {}           # alias -> dotted target
+        self.alias_more = {}        # alias -> further targets (a file compiled by projects with different global aliases)
         self.direct = set()         # dotted targets imported one by one (Java import a.B, C# using static)
         self.project_static = set() # C# global using static of another file: an edge only where a member is used
         self.names = []             # (namespace written in, dotted name chain) mentioned in code
@@ -196,25 +197,44 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
                 return fq
         return None
 
+    nested_types = {}   # type fqn -> its nested types' fqns
+    for fq in types:
+        parent = fq.rpartition(".")[0]
+        if parent in types:
+            nested_types.setdefault(parent, set()).add(fq)
+
     class Level:
         """One step of C#/VB name lookup: a namespace, and the directives of
         the declaration written for it (the file's own and the project's
         global ones belong to the root step)."""
 
-        def __init__(self, ns, usings, aliases, direct):
+        def __init__(self, ns, usings, aliases, direct, more=None):
             self.ns = ns
             self.imported = sorted(u for u in usings if u in namespaces)
             self.aliases = aliases
+            self.more = more or {}  # alias -> further targets
             self.simple = {}    # simple name -> fqns from direct imports and aliases
             for target in sorted(direct):
                 segs = target.split(".")
                 fq = longest(segs)
-                if fq:
+                if not fq:
+                    continue
+                if nested_lookup:
+                    # C# using static T brings T's nested types into scope,
+                    # not the name T itself.
+                    for inner in sorted(nested_types.get(fq, ())):
+                        self.simple.setdefault(inner.rpartition(".")[2], set()).add(inner)
+                else:
                     self.simple.setdefault(segs[-1], set()).add(fq)
             for alias, target in sorted(aliases.items()):
-                fq = longest(rooted(target.split("."))[0])
-                if fq:
-                    self.simple.setdefault(alias, set()).add(fq)
+                for each in [target] + sorted(self.more.get(alias, ())):
+                    fq = longest(rooted(each.split("."))[0])
+                    if fq:
+                        self.simple.setdefault(alias, set()).add(fq)
+
+        def targets(self, alias):
+            """Every target of an alias at this step."""
+            return [self.aliases[alias]] + sorted(self.more.get(alias, ()))
 
     class Scope:
         """Name lookup as seen from one namespace of one file."""
@@ -232,7 +252,7 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
                 block_ctx = info.blocks[block_ctx].parent
             self.levels = []
             for level_ns in self.inner_first:
-                usings, aliases, direct = set(), {}, set()
+                usings, aliases, direct, more = set(), {}, set(), {}
                 for block in by_ns.get(level_ns, ()):
                     usings |= block.usings
                     direct |= block.direct
@@ -243,7 +263,8 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
                     direct |= info.direct | info.project_static
                     for alias, target in info.aliases.items():
                         aliases.setdefault(alias, target)
-                self.levels.append(Level(level_ns, usings, aliases, direct))
+                    more = info.alias_more
+                self.levels.append(Level(level_ns, usings, aliases, direct, more))
             # Java (no nested lookup) has one step; its imports are file-wide.
             self.aliases = {}
             for level in self.levels:
@@ -340,11 +361,12 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
                 segs, root = rooted(self.unalias(segs))
                 fq = longest(segs)
                 found = {fq} if fq else self.exact(segs[:1])
-            if not found and attribute_suffix:
-                # [Foo] / [A.B.Foo] may name FooAttribute.
-                found = self.exact([segs[0] + attribute_suffix])
-                if not found and len(segs) > 1:
-                    found = self.exact(segs[:-1] + [segs[-1] + attribute_suffix])
+            if attribute_suffix:
+                # [Foo] / [A.B.Foo] may name FooAttribute; the compiler tries
+                # both names, so both count.
+                found = set(found) | self.exact([segs[0] + attribute_suffix])
+                if len(segs) > 1:
+                    found |= self.exact(segs[:-1] + [segs[-1] + attribute_suffix])
             return found
 
         def _stepwise(self, segs):
@@ -360,10 +382,13 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
                 if join(level.ns, segs[0]) in namespaces:
                     continue        # a namespace of that name; its type may be further out
                 if segs[0] in level.aliases:
-                    target, root = rooted(level.aliases[segs[0]].split("."))
-                    fq = longest(target + segs[1:])
-                    if fq:
-                        return {fq}
+                    found = set()
+                    for each in level.targets(segs[0]):
+                        fq = longest(rooted(each.split("."))[0] + segs[1:])
+                        if fq:
+                            found.add(fq)
+                    if found:
+                        return found
                 found = set(level.simple.get(segs[0], ())) or {
                     join(u, segs[0]) for u in level.imported if join(u, segs[0]) in types}
                 if found:
