@@ -33,8 +33,10 @@ Known limits, listed in unresolved.tsv where the source shows them:
   - wiring outside Java source (Spring XML, ServiceLoader files, JSP) is not
     read; add those edges as semantic evidence.
 
-Skipped directories: target, build, out, plus node_modules, __pycache__,
-generated and every directory starting with ".".
+Skipped directories: target, build and out at --root or beside pom.xml,
+build.gradle(.kts) or build.xml (a package named build or out is still
+walked), plus node_modules, __pycache__ and every directory starting with
+".". Each skipped directory holding .java files is printed as a warning.
 
 Usage:
   python3 depmap_java.py --root path/to/repo --out path/to/migration/depmap
@@ -55,6 +57,7 @@ from depmap_typed import FileInfo, TOKEN_RE, chains, flow_c_like, resolve, strip
 
 EXTS = {".java"}
 SKIP_DIRS = {"target", "build", "out"}
+MARKERS = {"pom.xml", "build.gradle", "build.gradle.kts", "build.xml"}  # SKIP_DIRS count only beside these (or at --root)
 KEYWORDS = set("""abstract assert boolean break byte case catch char class const continue default do
 double else enum extends final finally float for goto if implements import instanceof int interface
 long native new package private protected public return short static strictfp super switch
@@ -99,7 +102,7 @@ def scan(rel, text):
 
 
 def mapper(root, warnings, args):
-    files = find_files(root, EXTS, SKIP_DIRS)
+    files = find_files(root, EXTS, SKIP_DIRS, MARKERS, warnings)
     rels, infos = [], []
     for path in files:
         rel = path.relative_to(root).as_posix()

@@ -18,29 +18,62 @@ import sys
 from pathlib import Path
 
 # Never walked, for every language. Any path component starting with "." is
-# skipped too. Language-specific additions (bin/obj, vendor, target...) are
-# passed by each mapper and printed in its header comment.
-COMMON_SKIP = {"node_modules", "__pycache__", "generated"}
+# skipped too.
+COMMON_SKIP = {"node_modules", "__pycache__"}
 # A repository-copy install (migration-kit/) and run metadata (migration/)
 # are never sources to port. Skipped only at the top of --root and only when
 # the marker proves it is the kit, as in depmap_python.py.
 KIT_DIRS = {"migration-kit": "scripts/run_migration.mjs", "migration": "config.json"}
 
 
-def find_files(root: Path, exts, skip_dirs=()):
-    """Sorted source files under root whose suffix (case-insensitive) is in exts."""
-    skip = COMMON_SKIP | set(skip_dirs)
+def find_files(root: Path, exts, skip_dirs=(), markers=(), warnings=None):
+    """Sorted source files under root whose suffix (case-insensitive) is in exts.
+
+    skip_dirs are build-output or third-party directory names (bin, target,
+    vendor...). One is skipped only at the top of root or beside a build
+    file (markers: file names such as "pom.xml", or suffixes such as
+    ".csproj"), so a package or folder that happens to be called build or
+    out is still walked. skip_dirs may also map each name to its own
+    markers. Each skipped directory holding source files is reported in
+    warnings."""
+    if isinstance(skip_dirs, dict):
+        skip = {d.lower(): {m.lower() for m in ms} for d, ms in skip_dirs.items()}
+    else:
+        skip = {d.lower(): {m.lower() for m in markers} for d in skip_dirs}
     kit = {name for name, marker in KIT_DIRS.items() if (root / name / marker).is_file()}
-    out = []
-    for p in root.rglob("*"):
-        if not p.is_file() or p.suffix.lower() not in exts:
-            continue
-        parts = p.relative_to(root).parts
-        if parts[0] in kit:
-            continue
-        if any(part.startswith(".") or part.lower() in skip for part in parts[:-1]):
-            continue
-        out.append(p)
+
+    def beside_marker(d, wanted):
+        try:
+            return any(f.is_file() and (f.name.lower() in wanted or f.suffix.lower() in wanted)
+                       for f in d.iterdir())
+        except OSError:
+            return False
+
+    out, skipped = [], []
+
+    def walk(d, top):
+        try:
+            entries = sorted(d.iterdir())
+        except OSError:
+            return
+        for p in entries:
+            if p.is_dir():
+                name = p.name
+                if name.startswith(".") or name.lower() in COMMON_SKIP or (top and name in kit):
+                    continue
+                if name.lower() in skip and (top or beside_marker(d, skip[name.lower()])):
+                    skipped.append(p)
+                    continue
+                walk(p, False)
+            elif p.is_file() and p.suffix.lower() in exts:
+                out.append(p)
+
+    walk(root, True)
+    if warnings is not None:
+        for d in skipped:
+            if any(p.is_file() and p.suffix.lower() in exts for p in d.rglob("*")):
+                warnings.append(f"skipped build-output/third-party directory with sources: "
+                                f"{d.relative_to(root).as_posix()}/")
     return sorted(out)
 
 

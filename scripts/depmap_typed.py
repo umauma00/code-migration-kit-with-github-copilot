@@ -131,6 +131,17 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
         for fqn in set(info.type_members) | set(info.type_bases):
             declared_in.setdefault(fqn, []).append(info)
     global_usings = {dotted(u, fold) for u in global_usings}
+    # A using inside a C# namespace block is relative to the enclosing
+    # namespaces (using Models; inside namespace Acme.Web may mean
+    # Acme.Models): take the innermost that exists.
+    for info in infos:
+        for ctx, block in info.blocks.items():
+            outer = prefixes(context_ns(ctx))
+
+            def absolute(name, known):
+                return next((join(p, name) for p in outer if join(p, name) in known), name)
+            block.usings = {absolute(u, namespaces) for u in block.usings}
+            block.direct = {absolute(d, types) for d in block.direct}
 
     def lookup(fqn):
         return types.get(fqn, ())
@@ -248,7 +259,10 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
                     return {fq}
             found = self.exact(segs[:1])
             if not found and attribute_suffix:
+                # [Foo] / [A.B.Foo] may name FooAttribute.
                 found = self.exact([segs[0] + attribute_suffix])
+                if not found and len(segs) > 1:
+                    found = self.exact(segs[:-1] + [segs[-1] + attribute_suffix])
             return found
 
     scopes = {}

@@ -41,8 +41,10 @@ Known limits, listed in unresolved.tsv where the source shows them:
   - every #If branch is mapped. VB6 (.bas/.cls/.frm) is a different
     language and is not read.
 
-Skipped directories: bin, obj, packages, My Project, plus node_modules,
-__pycache__, generated and every directory starting with ".".
+Skipped directories: bin, obj and My Project at --root or beside a .vbproj,
+packages at --root or beside a .sln, plus node_modules, __pycache__ and every directory
+starting with ".". Each skipped directory holding .vb files is printed as
+a warning.
 
 Usage:
   python3 depmap_vbnet.py --root path/to/repo --out path/to/migration/depmap
@@ -62,7 +64,9 @@ from depmap_projects import QUOTED, attr_values, dotnet_projects, drop_not_compi
 from depmap_typed import GLOBAL, PREDEFINED, TOKEN_RE, FileInfo, chains, is_ident, join, members, parse_expr, resolve  # noqa: E402
 
 EXTS = {".vb"}
-SKIP_DIRS = {"bin", "obj", "packages", "my project"}
+# Build output and My Project beside a project, NuGet's packages/ beside a
+# solution (or at --root).
+SKIP_DIRS = {"bin": {".vbproj"}, "obj": {".vbproj"}, "my project": {".vbproj"}, "packages": {".sln"}}
 MODIFIERS = (r"(?:(?:public|private|friend|protected|partial|mustinherit|notinheritable|shadows|"
              r"shared|overloads|overrides|overridable|notoverridable|mustoverride|static|default|"
              r"readonly|writeonly|async|iterator|widening|narrowing|withevents|const|dim)\s+)*")
@@ -95,9 +99,11 @@ when while widening with withevents writeonly xor async await iterator yield val
 
 def strip_vb(text):
     """Logical lines with comments and string contents removed. Returns
-    (lines, strings). A trailing " _" joins the next physical line; ":"
-    outside strings splits statements."""
+    (lines, strings). A trailing " _" joins the next physical line, and so
+    do VB 10's implicit continuations: an open ( or { and a line ending in
+    , ( { & + = or a dot. ":" outside strings splits statements."""
     lines, strings, buf = [], [], []
+    depth = 0           # ( and { left open by the lines in buf
     for raw in text.splitlines():
         out, i, n = [], 0, len(raw)
         while i < n:
@@ -131,9 +137,13 @@ def strip_vb(text):
         if line.endswith(" _") or line == "_":
             buf.append(line[:-1])
             continue
+        depth = max(0, depth + line.count("(") + line.count("{") - line.count(")") - line.count("}"))
+        if line and (depth or line[-1] in ",({&+=."):
+            buf.append(line)
+            continue
         buf.append(line)
         joined = " ".join(buf)
-        buf = []
+        buf, depth = [], 0
         # ":" separates statements (but not ":=" named arguments).
         lines.extend(part for part in re.split(r":(?!=)", joined))
     if buf:
@@ -309,7 +319,7 @@ def scan(rel, text, root_ns=""):
 
 
 def mapper(root, warnings, args):
-    files = find_files(root, EXTS, SKIP_DIRS)
+    files = find_files(root, EXTS, SKIP_DIRS, warnings=warnings)
     rels, infos, root_ns = [], [], {}
     for proj in find_files(root, {".vbproj"}, SKIP_DIRS):
         m = ROOT_NS_RE.search(read_source(proj, warnings))

@@ -40,8 +40,9 @@ Known limits, listed in unresolved.tsv where the source shows them:
     $obj is usually named elsewhere in the file and gives the edge.
   - a local name equal to a declared function or constant gives an extra edge.
 
-Skipped directories: vendor, plus node_modules, __pycache__, generated and
-every directory starting with ".".
+Skipped directories: vendor at --root or beside composer.json, plus
+node_modules, __pycache__ and every directory starting with ".". Each
+skipped directory holding PHP files is printed as a warning.
 
 Usage:
   python3 depmap_php.py --root path/to/repo --out path/to/migration/depmap [--include-path lib,inc]
@@ -61,7 +62,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))  # -I drops the script 
 from depmap_common import find_files, path_list, read_source, run  # noqa: E402
 
 EXTS = {".php", ".inc", ".phtml", ".php3", ".php4", ".php5", ".module"}
+BARE_NAME_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 SKIP_DIRS = {"vendor"}
+MARKERS = {"composer.json"}        # SKIP_DIRS count only beside it (or at --root)
 KEYWORDS = set("""abstract and array as break callable case catch class clone const continue declare
 default do echo else elseif empty enddeclare endfor endforeach endif endswitch endwhile enum eval
 exit extends final finally fn for foreach function global goto if implements include include_once
@@ -144,7 +147,7 @@ class FileInfo:
         self.rel = rel
         self.classes, self.functions, self.constants = [], [], []   # declared FQNs
         self.refs = []          # (namespace, name, is_call, uses)
-        self.includes = []      # (expression parts) or None for dynamic
+        self.includes = []      # (keyword, expression parts)
         self.strings = []
         self.dynamic = []
 
@@ -244,7 +247,7 @@ def scan(rel, text):
             while j < n and at(j) not in {";"}:
                 parts.append(at(j))
                 j += 1
-            info.includes.append(parts)
+            info.includes.append((low, parts))
             i = j
             continue
         elif low == "new" and at(i + 1).lower() == "class":
@@ -267,10 +270,17 @@ def resolve_include(src, parts, info, by_rel, by_tail, include_path=()):
     base, pieces, unknown_prefix = None, [], False
     k = 0
     toks = [p for p in parts if p not in {"(", ")"}]
+    # require 'a.php' or die(...): only the path expression counts.
+    stop = next((j for j, p in enumerate(toks) if p.lower() in {"or", "||"}), len(toks))
+    toks = toks[:stop]
     while k < len(toks):
         t = toks[k]
         tl = t.lower()
-        if t.startswith(STR):
+        if tl in {"directory_separator", "ds"}:
+            pieces.append("/")      # DS is the usual define('DS', DIRECTORY_SEPARATOR)
+        elif tl == "realpath":
+            pass                    # realpath(x) names the same file as x
+        elif t.startswith(STR):
             piece = info.strings[int(t[1:-1])]
             if "$" in piece:
                 return None, "include path computed at run time"
@@ -331,7 +341,7 @@ def resolve_include(src, parts, info, by_rel, by_tail, include_path=()):
 
 
 def mapper(root, warnings, args):
-    files = find_files(root, EXTS, SKIP_DIRS)
+    files = find_files(root, EXTS, SKIP_DIRS, MARKERS, warnings)
     rels, infos = [], []
     for path in files:
         rel = path.relative_to(root).as_posix()
@@ -381,13 +391,13 @@ def mapper(root, warnings, args):
                 if t != src:
                     edges.add((src, t))
 
-        for parts in info.includes:
+        for keyword, parts in info.includes:
             hit, why = resolve_include(src, parts, info, by_rel, by_tail, include_path)
             if hit:
                 add(hit)
             if why:     # unresolved, or resolved to several candidates
                 expr = " ".join("'" + info.strings[int(p[1:-1])] + "'" if p.startswith(STR) else p for p in parts)
-                unresolved.add((src, f"include {expr}", why))
+                unresolved.add((src, f"{keyword} {expr}", why))
         for ns, name, is_call, uses in info.refs:
             if name.startswith("\\"):
                 full = name[1:]
@@ -413,6 +423,12 @@ def mapper(root, warnings, args):
         for s in info.strings:
             name = s.strip().lstrip("\\").split("::")[0].replace("\\\\", "\\")
             if "\\" in name or "::" in s:
+                add(classes(name.lower()))
+            elif BARE_NAME_RE.fullmatch(name):
+                # A string callable ('my_cb', [ 'Cls', 'm' ]) names a global
+                # function or class; a word that merely equals one gives an
+                # extra edge (conservative).
+                add(functions.get(name.lower(), ()))
                 add(classes(name.lower()))
         for ref, why in info.dynamic:
             unresolved.add((src, ref, why))

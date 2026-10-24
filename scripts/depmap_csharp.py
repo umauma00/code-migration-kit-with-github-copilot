@@ -46,8 +46,11 @@ Known limits, listed in unresolved.tsv where the source shows them:
   - reflection with a computed name (Type.GetType(x), Activator.CreateInstance,
     Assembly.Load) is reported as unresolved.
 
-Skipped directories: bin, obj, packages, plus node_modules, __pycache__,
-generated and every directory starting with ".".
+Skipped directories: bin and obj at --root or beside a .csproj, packages at
+--root or beside a .sln (a namespace folder with one of these names is
+still walked), plus
+node_modules, __pycache__ and every directory starting with ".". Each
+skipped directory holding .cs files is printed as a warning.
 
 Usage:
   python3 depmap_csharp.py --root path/to/repo --out path/to/migration/depmap
@@ -68,7 +71,8 @@ from depmap_projects import QUOTED, dotnet_projects, drop_not_compiled  # noqa: 
 from depmap_typed import BLOCK, Directives, FileInfo, TOKEN_RE, chains_at, dotted, flow_c_like, members, resolve, strip_c_like  # noqa: E402
 
 EXTS = {".cs"}
-SKIP_DIRS = {"bin", "obj", "packages"}
+# Build output beside a project, NuGet's packages/ beside a solution (or at --root).
+SKIP_DIRS = {"bin": {".csproj"}, "obj": {".csproj"}, "packages": {".sln"}}
 TYPE_KEYWORDS = {"class", "struct", "interface", "enum", "record"}
 KEYWORDS = set("""abstract as base bool break byte case catch char checked class const continue
 decimal default delegate do double else enum event explicit extern false finally fixed float for
@@ -261,7 +265,7 @@ def csproj_usings(text):
 
 
 def mapper(root, warnings, args):
-    files = find_files(root, EXTS, SKIP_DIRS)
+    files = find_files(root, EXTS, SKIP_DIRS, warnings=warnings)
     rels, infos, project_globals = [], [], []
     for path in files:
         rel = path.relative_to(root).as_posix()

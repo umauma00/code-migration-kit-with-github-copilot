@@ -1,0 +1,3 @@
+from	to
+src/com/acme/Main.java	src/com/acme/build/Builder.java
+src/com/acme/Main.java	src/com/acme/out/Sink.java

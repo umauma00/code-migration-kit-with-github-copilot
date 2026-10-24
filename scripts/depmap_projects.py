@@ -32,12 +32,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))  # -I drops the script 
 from depmap_common import find_files, nearest, reachable, read_source  # noqa: E402
 
 QUOTED = r"""(?:"([^"]*)"|'([^']*)')"""     # an XML attribute value, either quote
-ATTR = r"\s+Include\s*=\s*" + QUOTED
 COMPILE_RE = re.compile(r"<Compile\b([^>]*?)/?>", re.IGNORECASE)
 ITEM_ATTR_RE = re.compile(r"\b(Include|Remove|Condition)\s*=\s*" + QUOTED, re.IGNORECASE)
 CONDITIONAL_RE = re.compile(r"<(ItemGroup|When|Otherwise)\b([^>]*)>(.*?)</\1\s*>", re.IGNORECASE | re.DOTALL)
 COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
-PROJECT_REF_RE = re.compile(r"<ProjectReference" + ATTR, re.IGNORECASE)
+PROJECT_REF_RE = re.compile(r"<ProjectReference\b([^>]*?)/?>", re.IGNORECASE)
+INCLUDE_ATTR_RE = re.compile(r"\bInclude\s*=\s*" + QUOTED, re.IGNORECASE)
 NO_DEFAULT_RE = re.compile(r"<EnableDefaultCompileItems>\s*false\s*</EnableDefaultCompileItems>", re.IGNORECASE)
 SDK_RE = re.compile(r"<Project\s[^>]*\bSdk\s*=", re.IGNORECASE)
 
@@ -85,7 +85,8 @@ GLOB_CACHE = {}
 
 def glob_match(rel, pattern):
     """MSBuild wildcards: * and ? stay within one directory, ** spans any
-    number of directories (none too)."""
+    number of directories (none too). Case is ignored, as MSBuild does on
+    Windows, where legacy .NET projects are built."""
     if pattern not in GLOB_CACHE:
         out, i = [], 0
         while i < len(pattern):
@@ -104,7 +105,7 @@ def glob_match(rel, pattern):
             else:
                 out.append(re.escape(pattern[i]))
                 i += 1
-        GLOB_CACHE[pattern] = re.compile("".join(out))
+        GLOB_CACHE[pattern] = re.compile("".join(out), re.IGNORECASE)
     return GLOB_CACHE[pattern].fullmatch(rel) is not None
 
 
@@ -118,7 +119,7 @@ def dotnet_projects(root, rels, project_ext, warnings):
     directory (None outside any project); texts maps a project directory to
     its project file's text."""
     projects = {}       # project dir -> (project file rel, text)
-    for proj in find_files(root, {project_ext}, {"bin", "obj", "packages"}):
+    for proj in find_files(root, {project_ext}, {"bin": {project_ext}, "obj": {project_ext}, "packages": {".sln"}}):
         d = rel_dir(proj, root)
         if d in projects:
             warnings.append(f"several {project_ext} files in {d or '.'}; using {projects[d][0]}")
@@ -130,7 +131,8 @@ def dotnet_projects(root, rels, project_ext, warnings):
     refs, not_compiled = {}, {}
     for d, (proj_rel, text) in projects.items():
         refs[d] = set()
-        for value in attr_values(PROJECT_REF_RE, text):
+        for value in (v for m in PROJECT_REF_RE.finditer(COMMENT_RE.sub("", text))
+                      for v in attr_values(INCLUDE_ATTR_RE, m.group(1))):
             target = posixpath.dirname(msbuild_path(d, value))
             if target in projects:
                 refs[d].add(target)

@@ -1,0 +1,6 @@
+from	to
+cb.php	hooks.php
+index.php	lib/a.php
+index.php	lib/b.php
+index.php	lib/c.php
+index.php	lib/d.php

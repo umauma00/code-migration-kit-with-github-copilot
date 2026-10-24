@@ -337,6 +337,12 @@ test('C#, Java, PHP, VB.NET and COBOL dependency fixtures produce their expected
     // aliases per namespace block, global using static, single-quoted
     // attributes, MSBuild * within one directory.
     ['csharp', 'csharp-scopes'], ['csharp', 'csharp-items'], ['vbnet', 'vbnet-items'], ['csharp', 'csharp-aliases'],
+    // Build-output directories only beside a build file, case-insensitive
+    // MSBuild paths, ProjectReference attribute order, qualified attributes,
+    // relative using in a block, VB implicit continuation, PHP DS/realpath/
+    // or die and string callables, COBOL CALL across lines.
+    ['csharp', 'csharp-review'], ['java', 'java-packages'], ['vbnet', 'vbnet-continuation'],
+    ['php', 'php-includes'], ['cobol', 'cobol-call-newline'],
     ['php', 'php-relative', 'expected_', ['--include-path', 'lib']]];
   for (const [lang, name, prefix = 'expected_', options = []] of cases) {
     const out = path.join(root, `${name}-${prefix}`), fixture = path.join(kitRoot, 'fixtures', name);
@@ -353,7 +359,7 @@ test('typed-language mappers give the same output under every hash seed', async 
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   // Set iteration order follows PYTHONHASHSEED; the output must not. (No -I:
   // it would ignore PYTHONHASHSEED.)
-  for (const [lang, name] of [['csharp', 'csharp-scopes'], ['csharp', 'csharp-aliases'], ['vbnet', 'vbnet-items'], ['csharp', 'csharp']]) {
+  for (const [lang, name] of [['csharp', 'csharp-scopes'], ['csharp', 'csharp-aliases'], ['csharp', 'csharp-review'], ['vbnet', 'vbnet-items'], ['csharp', 'csharp']]) {
     const fixture = path.join(kitRoot, 'fixtures', name);
     for (const seed of ['0', '1', '2', '3']) {
       const out = path.join(root, `${name}-${seed}`);

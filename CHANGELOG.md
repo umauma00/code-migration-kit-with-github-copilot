@@ -28,15 +28,28 @@
   names a member of the type. `<Compile Include/Remove>` values are item
   lists (`a.cs;b.cs`); `*` and `?` stay within one directory and `**` spans
   any depth; attributes may use either quote. A file left out only under a
-  Condition keeps its declarations and is listed in `unresolved.tsv`. Lambda parameters, generic inference and overloads
+  Condition keeps its declarations and is listed in `unresolved.tsv`.
+  MSBuild paths are matched without case, as on Windows, and a
+  ProjectReference is read whatever its attribute order. Qualified
+  attributes (`[A.B.Required]`) also try the `Attribute` suffix, and a
+  using inside a namespace block is relative to the enclosing namespaces.
+  VB.NET joins implicitly continued lines (a trailing comma, an open
+  parenthesis). Build-output and third-party directories (bin, obj,
+  target, build, out, vendor, packages) are skipped only at `--root` or
+  beside a build file, so a Java package named `build` is mapped, and each
+  skipped directory holding sources is printed as a warning; `generated`
+  directories are mapped. Lambda parameters, generic inference and overloads
   are not followed. PHP follows computable
   include paths and case-insensitive class/function names with namespaces
   and `use`, narrowed by composer.json autoload (PSR-4, PSR-0, classmap),
   with `--include-path` (an explicit `./` or `../` include never uses it:
   it is looked up next to the including file and at `--root`, and is listed
-  as unresolved when those differ); COBOL follows COPY, EXEC SQL INCLUDE, CALL 'X' and
-  EXEC CICS LINK/XCTL in fixed or free format, with `--copy-path` as the
-  copybook search order. Non-UTF-8 sources are read as cp932,
+  as unresolved when those differ; `DIRECTORY_SEPARATOR`, `DS`,
+  `realpath()` and a trailing `or die(...)` are understood), and string
+  callables (`'my_cb'`, `['Cls', 'm']`) give edges to the function or class
+  of that name; COBOL follows COPY, EXEC SQL INCLUDE, CALL 'X' (also with
+  the literal on a later line) and EXEC CICS LINK/XCTL in fixed or free
+  format, with `--copy-path` as the copybook search order. Non-UTF-8 sources are read as cp932,
   then Latin-1, with a warning. `source-spec check` suggests the mapper for
   these languages. [Dependency mappers](docs/DEPENDENCY-MAPPERS.md) lists
   them and says how to write an adapter for any other language (static only,

@@ -33,8 +33,8 @@ Known limits, listed in unresolved.tsv:
   - COPY ... REPLACING is followed to the copybook but the replacement is
     not applied; JCL, PROCs and BMS maps are not read.
 
-Skipped directories: node_modules, __pycache__, generated and every
-directory starting with ".".
+Skipped directories: node_modules, __pycache__ and every directory
+starting with ".".
 
 Usage:
   python3 depmap_cobol.py --root path/to/repo --out path/to/migration/depmap [--copy-path copy,shared]
@@ -105,7 +105,9 @@ def mask_literals(text):
     """Blank every literal that is not a program or copybook name, so that
     DISPLAY "CALL 'X'" is not read as a CALL."""
     def repl(m):
-        if OPERAND_RE.search(text[max(0, m.start() - 16):m.start()]):
+        # The keyword may sit lines above the literal (CALL / 'X' on its own line).
+        before = text[max(0, m.start() - 400):m.start()].rstrip()
+        if OPERAND_RE.search(before[-24:]):
             return m.group(0)
         return m.group(0)[0] + " " * (len(m.group(0)) - 2) + m.group(0)[-1]
     return STRING_RE.sub(repl, text)
@@ -120,7 +122,7 @@ def name_of(m, first):
 
 
 def mapper(root, warnings, args):
-    files = find_files(root, EXTS)
+    files = find_files(root, EXTS, warnings=warnings)
     rels = [p.relative_to(root).as_posix() for p in files]
     texts = {rel: code_lines(read_source(path, warnings)) for rel, path in zip(rels, files)}
 

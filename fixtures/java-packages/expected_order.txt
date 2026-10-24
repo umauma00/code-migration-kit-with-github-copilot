@@ -1,0 +1,4 @@
+# migration order: one batch per line, dependencies first
+src/com/acme/build/Builder.java
+src/com/acme/out/Sink.java
+src/com/acme/Main.java
