@@ -23,6 +23,7 @@ projects the file's own project can see. A project that sees none of the
 candidates keeps them all.
 """
 
+import bisect
 import posixpath
 import re
 import sys
@@ -38,6 +39,20 @@ QUOTED = r"""(?:"([^"]*)"|'([^']*)')"""     # an XML attribute value, either quo
 ATTRS = r"""((?:[^<>"']|"[^"<]*"|'[^'<]*')*?)"""
 # Update only changes metadata of items already listed, so it is not read.
 ITEM_ATTR_RE = re.compile(r"\b(Include|Remove|Exclude|Condition)\s*=\s*" + QUOTED, re.IGNORECASE)
+# Start tags this module reads; one that ATTRS cannot read to its ">" is
+# malformed (a raw "<" in a value): warned about, since its items are lost.
+READ_TAG_RE = re.compile(r"<(?:ItemGroup|Choose|When|Otherwise|Target|Compile|ProjectReference|Using|Import)\b", re.IGNORECASE)
+WHOLE_TAG_RE = re.compile(r"<[\w.:-]+" + ATTRS + r"/?>")
+
+
+def malformed_lines(text):
+    """Line numbers of start tags this module reads that do not parse."""
+    text = COMMENT_RE.sub(lambda m: "\n" * m.group(0).count("\n"), text)
+    starts = [m.start() for m in READ_TAG_RE.finditer(text) if not WHOLE_TAG_RE.match(text, m.start())]
+    newlines = [i for i, c in enumerate(text) if c == "\n"] if starts else []
+    return [bisect.bisect(newlines, at) + 1 for at in starts]
+
+
 # Start, end and empty tags of the elements that can put a condition
 # around a <Compile> item, and the items themselves. Items in a <Target>
 # change only when that target runs, so they count as conditional.
@@ -169,6 +184,11 @@ def dotnet_projects(root, rels, project_ext, warnings):
             warnings.append(f"several {project_ext} files in {d or '.'}; using {projects[d][0]}")
             continue
         projects[d] = (proj.relative_to(root).as_posix(), read_source(proj, warnings))
+        bad = malformed_lines(projects[d][1])
+        if bad:
+            lines = ", ".join(map(str, bad[:5])) + (f" and {len(bad) - 5} more" if len(bad) > 5 else "")
+            warnings.append(f"{projects[d][0]}: tags not read at line {lines} (a raw < in an attribute "
+                            "value? MSBuild needs &lt;); their items and conditions are ignored")
     if not projects:
         return None, {}, {rel: None for rel in rels}, {}
     owner = {rel: nearest(rel, projects) for rel in rels}

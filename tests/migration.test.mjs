@@ -397,6 +397,18 @@ test('a directory symlink that is not a loop is read under its own path', { skip
   assert.match(r.stdout, /files=3 edges=2 /);
 });
 
+test('a project tag with a raw < in an attribute value is warned about', async t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'copilot-depmap-lt-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  // MSBuild cannot load it either (it needs &lt;); the condition is lost, so say so.
+  fs.writeFileSync(path.join(root, 'P.csproj'), '<Project ToolsVersion="4.0">\n<ItemGroup Condition="$(A) < 2">\n<Compile Include="A.cs" />\n</ItemGroup>\n</Project>\n');
+  fs.writeFileSync(path.join(root, 'A.cs'), 'class A { }\n');
+  const out = path.join(root, 'out');
+  const r = await runProcess(python, ['-I', path.join(kitRoot, 'scripts/depmap_csharp.py'), '--root', root, '--out', out]);
+  assert.equal(r.code, 0, r.stderr);
+  assert.match(r.stderr, /P\.csproj: tags not read at line 2 \(a raw < in an attribute value\?/);
+});
+
 test('deeply nested code is parsed, not a crash', async t => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'copilot-depmap-deep-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
