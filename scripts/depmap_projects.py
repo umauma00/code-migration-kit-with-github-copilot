@@ -33,7 +33,8 @@ from depmap_common import find_files, nearest, reachable, read_source  # noqa: E
 
 QUOTED = r"""(?:"([^"]*)"|'([^']*)')"""     # an XML attribute value, either quote
 COMPILE_RE = re.compile(r"<Compile\b([^>]*?)/?>", re.IGNORECASE)
-ITEM_ATTR_RE = re.compile(r"\b(Include|Remove|Condition)\s*=\s*" + QUOTED, re.IGNORECASE)
+# Update only changes metadata of items already listed, so it is not read.
+ITEM_ATTR_RE = re.compile(r"\b(Include|Remove|Exclude|Condition)\s*=\s*" + QUOTED, re.IGNORECASE)
 CONDITIONAL_RE = re.compile(r"<(ItemGroup|When|Otherwise)\b([^>]*)>(.*?)</\1\s*>", re.IGNORECASE | re.DOTALL)
 COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
 PROJECT_REF_RE = re.compile(r"<ProjectReference\b([^>]*?)/?>", re.IGNORECASE)
@@ -54,9 +55,10 @@ def msbuild_path(base, value):
 
 
 def compile_items(text):
-    """(kind, value, conditional) of every <Compile Include/Remove> item, one
-    per entry of its ;-separated list. conditional: a Condition on the item,
-    on its ItemGroup, or a <Choose> branch around it."""
+    """(kind, value, conditional, excludes) of every <Compile Include/Remove>
+    item, one per entry of its ;-separated list. conditional: a Condition on
+    the item, on its ItemGroup, or a <Choose> branch around it. excludes:
+    the Exclude values of an Include (they apply to that item only)."""
     text = COMMENT_RE.sub("", text)
     guarded = []        # spans under a condition
     for m in CONDITIONAL_RE.finditer(text):
@@ -68,10 +70,11 @@ def compile_items(text):
     for m in COMPILE_RE.finditer(text):
         attrs = {k.lower(): a or b for k, a, b in ITEM_ATTR_RE.findall(m.group(1))}
         conditional = "condition" in attrs or any(a <= m.start() < b for a, b in guarded)
+        excludes = tuple(v.strip() for v in attrs.get("exclude", "").split(";") if v.strip())
         for kind in ("include", "remove"):
             for value in attrs.get(kind, "").split(";"):
                 if value.strip():
-                    items.append((kind, value.strip(), conditional))
+                    items.append((kind, value.strip(), conditional, excludes if kind == "include" else ()))
     return items
 
 
@@ -89,9 +92,14 @@ def compile_state(rel, items, by_default):
     MSBuild evaluates them: <Compile Remove="Legacy\**" /> then
     <Compile Include="Legacy\Keep.cs" /> compiles Keep.cs."""
     compiled, maybe_add, maybe_drop = by_default, False, False
-    for kind, pattern, conditional, unknown in items:
+    for kind, pattern, conditional, unknown, excludes in items:
         if not unknown and not glob_match(rel, pattern):
             continue
+        # Include="**\*.cs" Exclude="Legacy\**": the item skips Legacy.
+        if any(not u and glob_match(rel, x) for x, u in excludes):
+            continue
+        if any(u for _, u in excludes):
+            unknown = True      # Exclude="$(Skip)" may skip rel
         if conditional or unknown:
             if kind == "include":
                 maybe_add = True
@@ -164,16 +172,18 @@ def dotnet_projects(root, rels, project_ext, warnings):
             else:
                 warnings.append(f"{proj_rel}: ProjectReference {value} is not under --root")
         explicit = not SDK_RE.search(text) or NO_DEFAULT_RE.search(text)
-        # (kind, path, conditional, unknown): an item whose value uses an
+        # (kind, path, conditional, unknown, excludes): an item whose value uses an
         # MSBuild property or item ($(Src)\*.cs) may match any file.
-        items = [(kind, msbuild_path(d, v), cond, bool(re.search(r"[$@%]\(", v)))
-                 for kind, v, cond in compile_items(text)]
-        lists_files = any(kind == "include" for kind, _, _, _ in items)
+        def unknown(value):
+            return bool(re.search(r"[$@%]\(", value))
+        items = [(kind, msbuild_path(d, v), cond, unknown(v), tuple((msbuild_path(d, x), unknown(x)) for x in ex))
+                 for kind, v, cond, ex in compile_items(text)]
+        lists_files = any(item[0] == "include" for item in items)
         # Files of other directories are linked in only by a path or
         # wildcard that names them: $(IntermediateOutputPath)X.cs would
         # otherwise link every file under --root into every project.
         known = [item for item in items if not item[3]]
-        links = any(kind == "include" for kind, _, _, _ in known)
+        links = any(item[0] == "include" for item in known)
         for rel in rels:
             if owner[rel] == d:
                 state = compile_state(rel, items, not explicit or not lists_files)

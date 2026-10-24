@@ -7,3 +7,9 @@ lib/From.php
 lib/Match.php
 lib/keywords.php
 lib/use.php
+tpl/Column.php
+tpl/Limit.php
+tpl/Report.php
+tpl/alias.php
+tpl/Legacy.php
+tpl/Plain.php

@@ -90,9 +90,31 @@ NAME_RE = re.compile(r"\\?[A-Za-z_\x80-\uffff][\w\x80-\uffff]*(?:\\[A-Za-z_\x80-
 STR = "\x01"   # string placeholder: \x01<index>\x02 (never part of a name)
 
 
+def php_holes(body):
+    """Code inside the {$...} and ${...} holes of an interpolated string
+    ("...{$this->t(Hd::class)}..."), each wrapped in parentheses."""
+    out, i, n = [], 0, len(body)
+    while i < n:
+        if body[i] == "\\":
+            i += 2
+            continue
+        if body.startswith("{$", i) or body.startswith("${", i):
+            j, level = i + 2, 1
+            while j < n and level:
+                level += {"{": 1, "}": -1}.get(body[j], 0)
+                j += 1
+            start = i + 1 if body[i] == "{" else i + 2
+            out.append(" (" + body[start:j - 1].replace("\n", " ") + ")")
+            i = j
+            continue
+        i += 1
+    return "".join(out)
+
+
 def php_code(text):
     """Code between PHP open and close tags, comments removed and each string
-    replaced by a placeholder. Returns (code, strings)."""
+    replaced by a placeholder. Returns (code, strings). The code inside the
+    holes of a "..." string or heredoc follows its placeholder."""
     out, strings = [], []
     i, n = 0, len(text)
     in_php = False
@@ -130,6 +152,15 @@ def php_code(text):
         if c in "'\"":
             j, buf = i + 1, []
             while j < n and text[j] != c:
+                if c == '"' and text.startswith("{$", j):
+                    # A hole may hold quotes of its own: "{$a["k"]}".
+                    k, level = j + 1, 1
+                    while k < n and level:
+                        level += {"{": 1, "}": -1}.get(text[k], 0)
+                        k += 1
+                    buf.append(text[j:k])
+                    j = k
+                    continue
                 if text[j] == "\\" and j + 1 < n:
                     nxt = text[j + 1]
                     buf.append(nxt if nxt in "\\'\"$" else text[j:j + 2])
@@ -138,7 +169,8 @@ def php_code(text):
                 buf.append(text[j])
                 j += 1
             strings.append("".join(buf))
-            out.append(f"{STR}{len(strings) - 1}\x02" + "\n" * text.count("\n", i, j))
+            holes = php_holes(text[i + 1:j]) if c == '"' else ""
+            out.append(f"{STR}{len(strings) - 1}\x02" + holes + "\n" * text.count("\n", i, j))
             i = j + 1
             continue
         if c == "<" and text.startswith("<<<", i):
@@ -149,7 +181,8 @@ def php_code(text):
                 stop = n if not end else end.end()
                 body = text[i + m.end():end.start() if end else n]
                 strings.append(body)
-                out.append(f"{STR}{len(strings) - 1}\x02" + "\n" * body.count("\n"))
+                holes = php_holes(body) if m.group(1) != "'" else ""     # not a nowdoc
+                out.append(f"{STR}{len(strings) - 1}\x02" + holes + "\n" * body.count("\n"))
                 i = stop
                 continue
         out.append(c)
@@ -256,6 +289,19 @@ def scan(rel, text):
             info.constants.append(f"{ns}\\{at(i + 1)}".lstrip("\\"))
             i += 2
             continue
+        elif low == "class_alias" and at(i + 1) == "(" and prev not in {"->", "?->", "::"}:
+            # class_alias(Orig::class, 'Old'): the alias is a class this
+            # file declares, so extends Old reaches the original through it.
+            j, level = i + 2, 0
+            while j < n and not (level == 0 and at(j) in {",", ")"}):
+                level += {"(": 1, "[": 1, ")": -1, "]": -1}.get(at(j), 0)
+                j += 1
+            alias = at(j + 1) if at(j) == "," else ""
+            if alias.startswith(STR) and at(j + 2) in {")", ","} and BARE_NAME_RE.fullmatch(
+                    string(alias).strip().lstrip("\\").replace("\\\\", "\\")):
+                info.classes.append(string(alias).strip().lstrip("\\").replace("\\\\", "\\"))
+            else:
+                info.dynamic.append(("class_alias(...)", "alias name computed at run time"))
         elif low == "define" and at(i + 1) == "(" and at(i + 2).startswith(STR):
             info.constants.append(string(at(i + 2)).lstrip("\\"))
         elif low in {"include", "include_once", "require", "require_once"}:

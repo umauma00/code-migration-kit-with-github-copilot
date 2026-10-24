@@ -53,15 +53,18 @@
   and only a loop back to an ancestor is stopped. A type declared without
   `partial` in two files is no longer linked to its copy (a false cycle);
   users get an edge to each and the copies are listed in `unresolved.tsv`.
-  MSBuild Include/Remove apply in document order, an item that uses a
+  MSBuild Include/Remove apply in document order, an Include's `Exclude`
+  applies to that item (`Update` is not read), an item that uses a
   property (`$(Gen)`) is treated like a Condition, a file linked in from
   another directory belongs to the project, and ProjectReference paths
   ignore case; Gradle Kotlin `project(path = ":x")` and `projects.x`
   accessors are read. C# 14 `extension(...)` blocks, attributed enum
   members, VB.NET `Imports A, B` and PHP 7 classes named `Enum`, `Match` or
-  `From` are understood, and a Java import
-  on the same line as `package` is read. Code nested past Python's recursion limit is
-  parsed on a larger stack instead of stopping the mapper. Lambda parameters, generic inference and overloads
+  `From` are understood; a Java import on the same line as `package` is
+  read; PHP `{$...}` holes in strings and heredocs are code, and a
+  `class_alias` alias is a class of its file. Code nested past Python's
+  recursion limit is parsed on a larger stack instead of stopping the
+  mapper. Lambda parameters, generic inference and overloads
   are not followed. PHP follows computable
   include paths and case-insensitive class/function names with namespaces
   and `use`, narrowed by composer.json autoload (PSR-4, PSR-0, classmap),

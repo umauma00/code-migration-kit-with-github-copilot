@@ -352,7 +352,8 @@ test('C#, Java, PHP, VB.NET and COBOL dependency fixtures produce their expected
     // extension blocks, MSBuild items in document order, $(Prop) items,
     // linked files, ProjectReference case; VB Imports lists; Gradle Kotlin
     // project(path = ...) and projects.x; PHP 7 class Enum/Match/From and
-    // dotted file names; a Java import on the package line.
+    // dotted file names; a Java import on the package line; MSBuild Exclude;
+    // PHP string holes and class_alias.
     ['csharp', 'csharp-final'], ['csharp', 'csharp-msbuild'], ['vbnet', 'vbnet-final'],
     ['java', 'java-final'], ['php', 'php-final'],
     ['php', 'php-relative', 'expected_', ['--include-path', 'lib']]];

@@ -4,4 +4,8 @@ App/Late.cs
 Shared/Linked.cs
 lib/LibType.cs
 App/Main.cs
+Classic/Widget.cs
+Classic/Panel.cs
+Classic/Legacy/Widget.cs
+Classic/Skip.cs
 other/Copies.cs
