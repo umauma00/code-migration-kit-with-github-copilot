@@ -173,6 +173,8 @@ node migration-kit/scripts/make_review_dependencies.mjs \
   --source-roots pkg,shared --depmap-root . --edges migration/depmap/edges.tsv
 ```
 
+同梱の解析器は Python・JS/TS・C/C++・C#・Java・VB.NET・PHP・COBOL 用で、どれもソースを読むだけです（元のアプリは実行しません）。各言語のコマンドと、同梱版のない言語のアダプタの作り方は[依存解析器](docs/DEPENDENCY-MAPPERS.md)にあります。
+
 JSON形式は `{"schemaVersion":1,"dependencies":{"src/a.py":["src/b.py"],"src/b.py":[]}}` です。`--depmap-root` 省略時は単一の `--source-root` を解析ルートとみなすため、従来のコマンドも使えます。列挙は指定したソースルート内に限定し、孤立ファイルにも `[]` を作ります。対象外ファイルから始まる辺（例：tests → pkg）は除外し、標準出力の `ignoredEdges` に列挙します。対象ソースから範囲外への依存（例：pkg → shared）は停止し、必要なルートの追加を求めます。解析器の対応構文・除外・未解決import・除外された辺を監査し、inventoryのevidence等に必要な意味上の参照も追加してください。解析ルートが複数なら別々の `--out migration/PATH.json` へ生成して1つのmapへ統合します。閉包に必要なキーやファイルが欠けていれば停止します。mapと明示依存の変更で承認・完了記録が失効します。
 
 以下は既定の **runtime方式** のコマンド例です。元環境が使えない案件は、明示的な [source-only方式](docs/SOURCE-ONLY.md) の準備記録とbuild/smoke→handoff経路を使います。

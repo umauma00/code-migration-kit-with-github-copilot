@@ -1,0 +1,10 @@
+# migration order: one batch per line, dependencies first
+A/Attr.cs
+A/Helper.cs
+A/Order.cs
+B/Helper.cs
+Legacy/Models/Order2.cs
+Legacy/Packages/Pack.cs
+Legacy/Main.cs
+Web/Data/Generated/Entity.cs
+Web/Use.cs

@@ -1,0 +1,4 @@
+file	reference	reason
+mw/index.php	require_once ( '$IP/includes/Setup.php' )	include path computed at run time
+mw/text.php	require_once ( '$IP/includes/Setup.php' )	include path computed at run time
+sub/page.php	include ( $root . 'includes/funcs.' . $ext )	include path computed at run time

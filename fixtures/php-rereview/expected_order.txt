@@ -1,0 +1,26 @@
+# migration order: one batch per line, dependencies first
+cb/known.php
+cb/dyn.php
+data/hooks.php
+data/main.php
+data/business.php
+dyn/inc.php
+dyn/main.php
+expr/boot.php
+expr/data_names.php
+expr/handler.php
+expr/klass.php
+expr/mapper.php
+expr/others.php
+expr/main.php
+inc/app/main.php
+inc/unrelated/config.php
+long/handler.php	long/main.php
+more/cb_activate.php
+more/cb_arr.php
+more/cb_key.php
+more/cb_udiff.php
+more/cb_val.php
+more/foo.php
+more/main.php
+short/handler.php	short/main.php

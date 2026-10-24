@@ -79,6 +79,16 @@ test('source-spec init previews, then switches an existing runtime project and d
   assert.match(readiness.commands.reviewDependencies, /--depmap-root src /);
 });
 
+test('source-as-spec suggests the bundled mapper for each legacy language, C# before C', t => {
+  const root = project(t);
+  initSourceSpec(root, loadConfig(root), { apply: true });
+  const config = loadConfig(root);
+  const command = language => sourceSpecReadiness(root, { ...config, sourceLanguage: language }).commands.dependencyMap;
+  for (const [language, script] of [['C#', 'csharp'], ['csharp', 'csharp'], ['Java', 'java'], ['PHP', 'php'], ['VB.NET', 'vbnet'], ['COBOL', 'cobol'], ['C', 'c'], ['C++', 'c'], ['JavaScript', 'ts']])
+    assert.match(command(language), new RegExp(`depmap_${script}\\.(?:py|mjs) --root src `), language);
+  assert.match(command('RPG'), /No bundled parser for RPG; write a deterministic adapter under migration\/tools\/ \(docs\/DEPENDENCY-MAPPERS\.md\)/);
+});
+
 test('one user OK records 00b-02 together; unfilled contracts and gaps stop with guidance', async t => {
   const root = project(t, { preparationProfile: 'source-as-spec' });
   let config = loadConfig(root);

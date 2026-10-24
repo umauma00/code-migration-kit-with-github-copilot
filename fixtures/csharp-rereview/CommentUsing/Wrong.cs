@@ -1,0 +1,1 @@
+namespace Wrong { class Model {} }

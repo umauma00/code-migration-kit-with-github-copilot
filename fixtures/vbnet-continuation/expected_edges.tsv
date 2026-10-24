@@ -1,0 +1,8 @@
+from	to
+Chain.vb	Product.vb
+Chain.vb	Result.vb
+Chain.vb	Widget.vb
+Factory.vb	Widget.vb
+Product.vb	Result.vb
+Use.vb	Factory.vb
+Use.vb	Widget.vb

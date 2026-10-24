@@ -1,0 +1,2 @@
+file	reference	reason
+mw/text.php	require_once ( '$IP/includes/Setup.php' )	include path computed at run time

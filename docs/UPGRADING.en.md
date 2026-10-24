@@ -1,6 +1,13 @@
-# Upgrading (0.3.2 and earlier releases)
+# Upgrading (0.4.0 and earlier releases)
 
 [日本語](UPGRADING.md) | English
+
+## 0.4.0 (dependency mappers for C#, Java, VB.NET, PHP and COBOL)
+
+Existing approvals and completion records are revoked once because the kit's files (lib, scripts) change. Re-validate from judge. Completed outputs are kept; the re-run only reviews them again.
+
+1. Phase 01 can use bundled mappers for C#, Java, VB.NET, PHP and COBOL ([dependency mappers](DEPENDENCY-MAPPERS.en.md)). A project that uses its own tool for these languages (under `migration/tools/` or elsewhere) should compare it with the bundled mapper before switching. Switching changes the map and the dependency declaration, so phase 01's checks and approvals are redone.
+2. The new mappers also write `unresolved.tsv`. Review every row in phase 01's report.
 
 ## 0.3.2 (phase 00 no longer stops on a credential suspicion or misread guidance)
 

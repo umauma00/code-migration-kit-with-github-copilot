@@ -1,0 +1,4 @@
+from	to
+mods/app/src/Main2.java	mods/build/src/p/Util.java
+src/com/acme/Main.java	src/com/acme/build/Builder.java
+src/com/acme/Main.java	src/com/acme/out/Sink.java

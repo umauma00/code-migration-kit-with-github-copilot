@@ -1,0 +1,95 @@
+# 依存解析器（同梱版と自作アダプタ）
+
+日本語 | [English](DEPENDENCY-MAPPERS.en.md)
+
+工程01の依存マップは、**ソースを読むだけの決定的な解析器**で作ります。元のアプリをビルドしたり実行したりはしません。[ソースを唯一の仕様とする方式](SOURCE-AS-SPEC.md)でも同じ解析器を使います。
+
+## 同梱の解析器
+
+どれも Python 3 の標準ライブラリだけで動きます（追加インストール不要、Windows・macOS・Linux 共通）。
+
+| 元の言語 | コマンド | 辺の根拠 |
+|---|---|---|
+| Python | `python3 migration-kit/scripts/depmap_python.py --root src --out migration/depmap` | import（ast で解析） |
+| JS / TS | `node migration-kit/scripts/depmap_ts.mjs --root src --out migration/depmap` | import / export from / require |
+| C / C++ | `python3 migration-kit/scripts/depmap_c.py --root src --out migration/depmap` | `#include "..."`、実装と同名ヘッダ |
+| C# | `python3 migration-kit/scripts/depmap_csharp.py --root src --out migration/depmap` | 型名（名前空間・using・global using・別名・using static・拡張メソッド・partial） |
+| Java | `python3 migration-kit/scripts/depmap_java.py --root src --out migration/depmap` | 型名（同じパッケージ・import・`pkg.*`・static import・完全修飾名） |
+| VB.NET | `python3 migration-kit/scripts/depmap_vbnet.py --root src --out migration/depmap` | 型名と Module のメンバー（Imports・RootNamespace・大文字小文字を区別しない） |
+| PHP | `python3 migration-kit/scripts/depmap_php.py --root src --out migration/depmap` | include / require のパス、クラス・関数・定数の名前（namespace・use） |
+| COBOL | `python3 migration-kit/scripts/depmap_cobol.py --root src --out migration/depmap` | COPY、EXEC SQL INCLUDE、CALL 'PROG'、EXEC CICS LINK/XCTL |
+
+Windows では `python3` の代わりに `py` または `python` を使います。
+
+追加のオプション（どちらも `--root` からの相対パスをカンマ区切りで指定）：
+
+- PHP：`--include-var phpbb_root_path=phpBB/,phpEx=php` で include パスに使われる変数（`$NAME`）や定数（`NAME`）の値を指定できます（ディレクトリは `--root` からの相対パス）。`"$IP/includes/x.php"` のように `"..."` の文字列やヒアドキュメントの中に書いた変数も置き換えます（`'...'` の中の `$IP` は文字なので置き換えません）。`define('WPINC', 'wp-includes')` のように全ファイルで同じ相対パスのリテラルを与える定数と、`define('DO_MAINTENANCE', dirname(__FILE__) . '/doMaintenance.php')` のように計算できるパスを与える定数は自動で使います（同じ定数を別のファイルが違う値で define していれば使いません）。Drupal の `.install`・`.test`・`.theme`・`.engine`・`.profile` は `<?php` を含むときだけ PHP のファイルとして読みます。`--include-path lib,inc` で PHP の include_path を指定します。相対パスの include はまずここを探し、次に include したファイルの場所、最後に `--root` を探します。`./x` や `../x` のように明示した相対パスは作業ディレクトリ基準なので include_path は使わず、include したファイルの場所と `--root` だけを探します。この2つで別のファイルになるときは両方を辺にし、`unresolved.tsv` にも載せます。`composer.json`（vendor 以外）の autoload（PSR-4・PSR-0・classmap）は自動で読みます。同じクラスが複数のファイルにあるときは autoload が指すファイルを選びます
+- COBOL：`--copy-path copy,shared` でコピーブックの検索順（SYSLIB や COBCPY に相当）を指定します。同じ名前のコピーブックが複数あるときは、先に書いたディレクトリのものを選びます。`COPY X OF LIB` は LIB という名前のディレクトリを先に探します
+
+出力は共通です。
+
+- `edges.tsv`：1行1辺（依存元 → 依存先、`--root` からの相対パス）
+- `order.txt`：移行順（依存先が先、循環は1行にまとめる）
+- `cycles.txt`：2ファイル以上の循環
+- `unresolved.tsv`（C#・Java・VB.NET・PHP・COBOL）：見えたのにファイルへ結び付けられなかった参照と理由。動的な include、データ項目経由の CALL、計算した名前のリフレクション、リポジトリ内パッケージに無い型の import など
+
+同じ入力なら毎回バイト単位で同じ出力になります。Shift_JIS（cp932）のソースも読めます（UTF-8 で読めないファイルは警告を出して cp932、それも駄目なら Latin-1 で読みます。cp932 として読めても、かなや全角記号が1つもないファイルは欧文の Windows-1252 とみなして Latin-1 で読みます）。UTF-16・UTF-32 は BOM で判定します。BOM の無い UTF-16 は、1バイトおきに NUL が並ぶときだけ UTF-16 として読み、警告を出します。それ以外で NUL を含むファイルはテキストとして読めないので解析せず、`unresolved.tsv` に `(whole file)` として載せます。
+
+## 精度について（型の言語）
+
+C#・Java・VB.NET では、`using` や `import` はファイルではなく名前空間を指し、同じ名前空間の型は import なしで使えます。そこで解析器は「各ファイルが宣言する型の表」を作り、各ファイルのコードに**書かれている名前**をその表で解決します。
+
+- **名前が書かれていない型もたどります。** 各型のメソッド・プロパティ・フィールドの宣言型と継承元を表にして、`var x = F(); x.M().N();` のように変数やメソッドチェーンを通る型（`F` の戻り値の型、`M` と `N` の戻り値の型）を辺にします。引数・型付きのローカル変数・foreach の変数も使います。`List<Order>` のような要素の型は、インデクサや LINQ 風の呼び出しを通しても引き継ぎます。
+- **名前の解決は言語の優先順に従います。** 名前は書かれている名前空間ブロックから探します（1ファイルに複数のブロックがあっても、ブロックごとに解決します）。ブロック内の using・別名・using static は、そのブロックと内側のブロックにだけ効きます（同じ名前空間の別ブロックには効きません）。C#・VB.NET は内側の名前空間から外側へ1段ずつ探し、各段でその名前空間の型、次にその名前空間の宣言に書かれた別名・using を見ます（ファイル直下と global using は最後の段です。`namespace N;` の後の using は N の段に入ります）。`global::X` / `Global.X` はルートの名前空間から探します。Java は単一型 import、自分のパッケージ、`pkg.*` の順。同じ順位に複数の候補があるときは全部を辺にします（多めに出る方向）。型と同名のローカル変数も辺になります。`using static T` が持ち込むのは T のメンバーと入れ子の型で、T という名前そのものではありません。属性の位置に書かれた `[Foo]`（`[Foo<int>]`、ラムダ・ファイナライザーの属性も含む）は、`Foo` と `FooAttribute` の両方を辺にします（C# はそのうち属性である方を選びます）。属性の位置でない `Foo`（`F([Foo])` や初期化子の `{ [Foo] }` などのコレクション式も含む）は `FooAttribute` を指しません。タプルなどの別名 `using P = (A a, B b);` は、中の型を別名が書かれたファイルからの辺にします（global using の場合も宣言ファイルだけです）。
+- **プロジェクトファイルで候補を絞ります。** C#・VB.NET は `.csproj`/`.vbproj` の ProjectReference、Java は Maven（`pom.xml`）と Gradle（`build.gradle`）のモジュール依存を読み、同じ名前の型が複数のプロジェクトにあるときは、参照しているプロジェクト側だけを辺にします。ビルド対象外のファイル（`<Compile Remove>`、古い形式のプロジェクトで `<Compile Include>` に無いもの）は型を提供せず、`unresolved.tsv` に載ります。Include/Remove の値はアイテムのリスト（`a.cs;b.cs`）として読みます。ワイルドカードは MSBuild と同じく `*`・`?` が1階層の中だけ、`**` が任意の深さに一致します。属性値は `"` と `'` のどちらで囲んでも読みます。Include の `Exclude` はその Include にだけ効きます（`Include="**\*.cs" Exclude="Legacy\**"`）。`Update` はメタデータを変えるだけなので読みません。Include と Remove は書かれた順に適用します（`Remove="Legacy\**"` の後の `Include="Legacy\Keep.cs"` は Keep.cs をビルド対象に戻します）。Condition とプロパティ（`$(Gen)`）は評価しません。条件付き（項目・ItemGroup・`<Choose>` の分岐・`<Target>` の中）やプロパティを使った項目でだけ入る・外れるファイルは型を残したまま `unresolved.tsv` に載せます。別のディレクトリのファイルを `<Compile Include="..\Shared\X.cs" />` で取り込むと、取り込んだプロジェクトのファイルにもなります（そのプロジェクトの global using・参照範囲・VB の RootNamespace が効きます。プロジェクトごとに別名の行き先が違うときは全部を辺にします。元のプロジェクトが外していてもビルド対象です）。SDK 形式で既定の項目を切り、`<Compile>` を1つも書いていないプロジェクトは、読まない import が項目を足すかもしれないので「入るかもしれない」とします。既定のファイルが入るのは `EnableDefaultItems` と `EnableDefaultCompileItems` の両方が有効なときだけです。どちらかを Condition の下で false にしている場合は、既定のファイルを「入るかもしれない」として扱います。ProjectReference はプロジェクトファイルのパスまで一致を確かめます（大文字小文字は区別しません）。そこに無いファイルを指していれば警告します。Maven の依存は groupId:artifactId で照合します。artifactId が同じでも groupId が違えば別のモジュールです。groupId がプロパティで書かれているなど読めないときは、同じ artifactId のモジュールを全部候補にして警告します。Gradle は `project(":core")`・`project(path: ":core")`・Kotlin の `project(path = ":core")` と型安全アクセサ（`projects.core`、`my-lib` は `projects.myLib`）を読みます。global using とその別名、`<Using Include>`・`<Import Include>` は同じプロジェクトのファイルにだけ効きます。同じ別名に行き先が複数ある場合（Debug と Release で Condition を分けた `<Using Alias>` など）は、全部を辺にして警告します。ビルド対象外のファイルに書かれた global using は、どのファイルにも効きません。プロジェクトファイルの XML コメント（`<!-- ... -->`）の中は読みません。どのプロジェクトのディレクトリにも無い共有ファイルを Condition 付きでだけ取り込んでいる場合も、`unresolved.tsv` に載せます。`global using static`（と `<Using Static="true">`）は、その型のメンバーを書いている同じプロジェクトのファイルから辺になります。属性値に生の `<` があるタグ（MSBuild 自身も読めない不正な XML）は読めないので、行番号付きの警告を出します。ファイルはテキストとして読むだけで、MSBuild や Maven は実行しません。
+- **拡張メソッドは受け手の型で絞ります。** `x.Name()` は、見える名前空間にある拡張メソッド `Name` への辺になります。`string.Join(...)` や `Math.Min(...)` のような静的呼び出しは数えません。`x` の型が分かる（変数・引数・フィールド・`this`）ときは、受け手の型が合う拡張メソッドだけを辺にし、その型自身に同名のメンバーがあれば辺にしません。型が分からず、`Add`・`Contains`・`Select` のようにフレームワークの型にも同名のメンバーがあり、拡張メソッドの受け手もフレームワークの型のときは、辺にせず `unresolved.tsv` に載せます。
+- **入れ子の型**（クラスの中のクラスや delegate）は同名の型の重複とはみなしません。入れ子の型の名前は、まずそれを宣言したファイルの中ではその型を指し（Java の `DescriptorImpl` のように多くのクラスが同名の入れ子を持っていても、別のファイルの入れ子へ辺を出しません）、`Outer.Inner` と書けばその型を指します。別のファイルからは単純名では見えないので、外側の名前空間にある入れ子の型が using 先の同名の型を隠すことはありません（ほかに候補が無いときだけ入れ子の型を辺にします）。それ以外で同じ名前のトップレベルの型があれば、その名前はトップレベルの型を指します。VB.NET も同じです。ただし Module の中の型は名前空間の型として扱われるので、入れ子とはみなしません。
+- C# で宣言されている名前（`public string Schema {`、`Foo bar =`、`void Run(` の `Schema`・`bar`・`Run`）は型の参照として数えません（プロパティ名と同名の型へ偽の辺が出ていました）。
+- **同じ型を partial なしで2つのファイルが宣言しているとき**は、2つを互いに結びません（結ぶと偽の循環になります）。その型を使うファイルからは両方へ辺を出し、`unresolved.tsv` に「also declared in ...」と載せます。ビルドから片方が外れている、あるいはプロジェクトが分かれているはずなので確認してください。VB の Module のメンバー（`Sub Log` が2つの Module にある）は重複として扱いません。
+- **まだ見落とすもの：** ラムダ引数の型、入れ子の型と同じ名前のトップレベルの型を、同じファイルの別のクラスから使う参照（ファイル内では入れ子の型を指すとみなします）、ジェネリックメソッドの型推論、オーバーロードの選択、`dynamic`、VB の With ブロック。レビュー根拠（一緒に読むファイル）として不足していないかは、[準備監査](PREPARATION-AUDITS.md)の抜き取りと `dependency-diff` で確かめてください。
+- PHP の関数・クラス・定数は、そのファイル自身が宣言していればそれを指します。複数のファイルが宣言しているときは、そのファイルの include（たどった先も含む）が読み込むものを選び、読み込む先に無ければ全部を辺にします（develop/ のスクリプトにコピーされた `define()` へ、本体から辺が出ていました）。
+- PHP の `if (!function_exists('f')) { function f() ... }` のように存在チェックで囲んだ宣言（互換用の予備の定義）は、囲まれていない `f` の宣言があればそちらだけを辺にします（テーマの予備の定義へ core から辺が出て、偽の循環になっていました）。囲まれた宣言しかなければ、それを辺にします。
+- PHP はメソッド呼び出し先が実行時に決まる言語なので、本物の構文解析器を使っても `$obj->m()` の行き先は分かりません。COBOL の依存は COPY と CALL の名前だけで決まります。この2言語では、本物の解析器を使っても得られる情報はあまり増えません。ただし同梱版が読むのは書かれた名前と、計算できるパス（`__DIR__`・`dirname(__FILE__)`・`DIRECTORY_SEPARATOR`・`DS`・`realpath()`）だけです。それ以外は `unresolved.tsv` に載ります。`"...{$this->t(Cls::class)}..."` やヒアドキュメントの `{$...}` の中はコードとして読みます（nowdoc は読みません。穴の中の `'Order'` のような引用符付きの文字列と `${name}` は名前として扱いません）。`class_alias(Orig::class, 'Old')`（`\class_alias('Orig', 'Old')` も）の別名はそのファイルが宣言するクラスとして扱い、別名が計算される場合は `unresolved.tsv` に載せます。PHP の文字列 callable は、コールバックを受け取る関数（`array_map`・`usort`・`call_user_func`・`add_action` など）のコールバックの位置にある文字列引数と、`['Cls', 'm']` の形のときだけ、同名の関数・クラスへの辺にします。`call_user_func('strtolower', 'business')` の `business` や `add_action('init', ...)` のフック名のようなデータの引数、配列キーなどの普通の文字列は、参照として扱いません。名前付き引数（`call_user_func(callback: 'f')`）も読みます。`is_a($x, 'Cls')`・`is_subclass_of` の文字列はクラス名として扱います。コールバックの位置にある引数が、変数を含まない文字列・`null`・クロージャ・`f(...)`・クラスが決まっているペア（`[$this, 'm']`・`['Cls', 'm']`・`[Cls::class, 'm']`）のどれでもない場合（`call_user_func($cb)`・`usort($a, $this->cmp)`・`"on_$x"`・`'on_' . $x`・`get_callback()`・`[$class, 'm']` など）と、`$f()` のような変数関数の呼び出しは、`unresolved.tsv` に載せます。`__DIR__` や `dirname(__FILE__)` で場所が決まる include は、そのパスにファイルが無ければ、別の場所の同名ファイルを辺にはせず `unresolved.tsv` に載せます。
+
+## 解析器の結果を確かめる
+
+1. 5ファイル試行：全体を作る前に5ファイルで実行し、`edges.tsv` と `unresolved.tsv` をユーザーに見せる
+2. `unresolved.tsv` を全件確認する：外部ライブラリなら問題なし、リポジトリ内のファイルを指すべきものは `review-dependencies.json` に追記する
+3. `external.tsv` で自作ライブラリが無いか見る：C#・VB.NET・Java・PHP の解析器は、どのファイルも宣言していない名前空間・パッケージ（using/Imports/import、PHP の名前空間付きの名前）を、名前空間ごとに1行（名前空間、使っているファイル数、最初のファイル）で書きます。親の名前空間も載るときは親の行にまとめます（`log4net.Config` は `log4net` の行）。兄弟の名前空間（`com.fasterxml.jackson.databind` と `com.fasterxml.jackson.core`）は別の行です。System・Microsoft・Windows・Mono、java・javax・jakarta・jdk・sun・com.sun・org.w3c・org.xml などの標準ライブラリは載りません（javax・jakarta は丸ごと外すので、`javax.inject` や `jakarta.persistence` も載りません）。VB.NET は最初に書かれた大文字小文字で載せます。Spring や log4net のような一般の外部ライブラリは載りますが、問題ありません。自作ライブラリなのにソースが `--root` の外にあると辺が出ないので、ここに出たら、そのソースも入る親ディレクトリを `--root` にして作り直します。ソースが無い（DLL・JAR だけ）なら、移行計画でそのライブラリをどう扱うか（一緒に移す・そのまま使う）をユーザーと決めます
+4. 除外ディレクトリ（各スクリプト冒頭のコメントに記載）が案件に合っているか確認する。ビルド出力（bin・obj・target・build・out）や vendor・packages は、`--root` 直下かビルドファイル（.csproj・pom.xml・composer.json など）の横にあるときだけ除外します。同じ名前のパッケージやフォルダは読みます。除外したディレクトリにソースがあれば警告（`WARN skipped ...`）が出ます。ディレクトリのシンボリックリンクはたどります（同じディレクトリが2つのパスで見えるときは両方のファイルとして読みます）。祖先を指すループだけは止めて `WARN symlink loop not followed` を出します
+5. 結果は `migration/depmap/report.md` にまとめる（対応構文、除外、未解決、監査結果）
+
+## 同梱されていない言語：アダプタを自作する
+
+同梱版のない言語（RPG、PL/I、Delphi、VB6、Perl など）や、同梱版では足りない構文がある場合は、エージェントが**アダプタ（専用の解析器）**を書きます。エージェントが推測で書いた依存グラフは使えません。作り方のコツ（Python で同梱版をコピーして作るか、他の言語で作るかの選び方、どの同梱版から始めるか、フィクスチャの作り方）は **depmap-adapter スキル**にまとめてあります。
+
+### 守ること
+
+- **静的解析だけ。** ソースファイルを読むだけにする。元のアプリのビルド・実行・テストはしない（ソースが唯一の仕様の案件では、元のアプリが動かないことが前提）
+- **置き場所は `migration/tools/depmap-<言語>/`。** キット本体（`migration-kit/`）は変更しない
+- **出力は同梱版と同じ契約。** `edges.tsv`（ヘッダー `from<TAB>to`）、`order.txt`、`cycles.txt`、`unresolved.tsv`（ヘッダー `file<TAB>reference<TAB>reason`）。外部ライブラリを見分けられるなら `external.tsv`（ヘッダー `namespace<TAB>files<TAB>first_file`）も。パスは `--root` からの相対パスで `/` 区切り、並びは整列済み
+- **決定的にする。** ファイルは整列して走査し、同じ入力で同じ出力にする。乱数・時刻・並列実行の順序に依存しない
+- **追加インストールを避ける。** Python の標準ライブラリだけで書くのが第一候補。コンパイラ系のライブラリ（Roslyn、JavaParser など）が必要なら、使う前にユーザーに確認する（ネットワーク接続やSDKが要るため）
+- **見落としより多めを選ぶ。** 迷ったら辺を足す。解決できない参照は捨てずに `unresolved.tsv` に書く
+- **除外ディレクトリはスクリプト冒頭に一覧で書く。** 生成物・ビルド出力・第三者コードの除外を、読めば分かるようにする
+
+### 手順
+
+1. 対象言語で依存が生まれる構文を列挙する（ファイル取り込み、モジュール参照、型名、呼び出し、設定ファイル経由の結び付けなど）
+2. `migration/tools/depmap-<言語>/fixture/` に小さなテスト用ソースを作る。循環、除外ディレクトリ、コメントや文字列の中の偽の参照、動的な参照を必ず含める
+3. 期待する `expected_edges.tsv` などを**手で**書いてからアダプタを実装し、出力と比較する
+4. 実ソースで5ファイル試行をして、ユーザーに見せる（工程01の決まり）
+5. 全体を生成し、`depmap/report.md` に対応構文・未対応構文・除外・未解決を書く
+
+アダプタを直したら、依存マップを作り直し、工程01の確認（5ファイル試行・監査・`make_review_dependencies.mjs` による依存宣言の再生成）をやり直します。
+
+### 同梱版が落ちた・足りないとき
+
+同梱の解析器がエラーで止まった、または案件の構文を読めない（`unresolved.tsv` に同じ理由の行が大量に出る、明らかな辺が出ない）ときは、作業を止めずに次の順で対処します。
+
+1. **まずオプションで直せないか見る。** `--include-var`・`--include-path`・`--copy-path`、`--root` の取り方、除外ディレクトリの警告で解決することがあります
+2. **直せなければ、同梱版をコピーして直してよい。** 解析器と、それが読み込む共通部分（`depmap_common.py`・`depmap_typed.py`・`depmap_projects.py` のうち必要なもの）を `migration/tools/depmap-<言語>/` にコピーし、そこで直します。キット本体（`migration-kit/`）のファイルは変更しません。直す前に、落ちる・読めない最小の例をフィクスチャとして作り、期待する出力を手で書きます（上の手順2・3と同じ）
+3. **`depmap/report.md` に書く。** 元のエラー（またはどの構文を読めなかったか）、どこを直したか、フィクスチャ、同梱版との出力の違い（辺の数・循環・未解決の件数）
+4. **ユーザーに知らせる。** 工程01の報告で、同梱版ではなく直したコピーを使ったことを伝えます。直し方が推測に頼るとき（その構文の意味が言語仕様から決まらないなど）は、使う前にユーザーに確認します
+
+どの場合も、エージェントが推測で書いた依存グラフは使いません。

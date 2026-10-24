@@ -1,0 +1,8 @@
+# migration order: one batch per line, dependencies first
+backup/Report.php
+legacy/Report.php
+lib/inc/helpers.php
+src/Models/User.php
+index.php
+old/User.php
+tools/helpers.php

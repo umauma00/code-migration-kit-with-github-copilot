@@ -1,0 +1,4 @@
+# migration order: one batch per line, dependencies first
+a-right/src/main/java/lib/Model.java
+app/src/main/java/app/Use.java
+z-wrong/src/main/java/lib/Model.java

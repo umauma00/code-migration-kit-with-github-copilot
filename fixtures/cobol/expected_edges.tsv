@@ -1,0 +1,9 @@
+from	to
+copy/ORDREC.cpy	copy/CUSTREC.cpy
+src/ORDMAIN.cbl	SHARED/CUSTREC.cpy
+src/ORDMAIN.cbl	copy/DBTYPES.cpy
+src/ORDMAIN.cbl	copy/ORDREC.cpy
+src/ORDMAIN.cbl	src/printer.cbl
+src/ORDMAIN.cbl	src/taxcalc.cob
+src/printer.cbl	copy/DBTYPES.cpy
+src/taxcalc.cob	copy/ORDREC.cpy

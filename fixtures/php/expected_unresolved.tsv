@@ -1,0 +1,3 @@
+file	reference	reason
+index.php	include $pluginDir . '/plugin.php'	include path computed at run time
+index.php	new $class	class name computed at run time

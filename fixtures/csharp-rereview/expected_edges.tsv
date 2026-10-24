@@ -1,0 +1,11 @@
+from	to
+CommentUsing/Use.cs	CommentUsing/Right.cs
+CondAlias/Main.cs	CondAlias/A.cs
+CondAlias/Main.cs	CondAlias/B.cs
+CondShared/X.cs	CondApp/A.cs
+RefName/App/U.cs	RefName/Lib/M.cs
+RemovedGlobals/AGlobals.cs	RemovedGlobals/Wrong.cs
+RemovedGlobals/Use.cs	RemovedGlobals/Right.cs
+RemovedGlobals/ZGlobals.cs	RemovedGlobals/Right.cs
+Utf16/NoBom.cs	Utf16/Model.cs
+Utf16/Use.cs	Utf16/Model.cs

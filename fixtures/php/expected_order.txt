@@ -1,0 +1,8 @@
+# migration order: one batch per line, dependencies first
+config.php
+legacy/old_report.php	lib/db.php
+lib/functions.php
+src/Models/Customer.php	src/Models/Order.php
+src/Models/Invoice.php
+src/Services/OrderService.php
+index.php

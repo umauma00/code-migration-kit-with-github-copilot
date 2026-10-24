@@ -1,0 +1,7 @@
+# migration order: one batch per line, dependencies first
+Result.vb
+Product.vb
+Widget.vb
+Chain.vb
+Factory.vb
+Use.vb
