@@ -10,5 +10,9 @@ AttrBoth/Index.cs	AttrBoth/Plain.cs
 AttrBoth/Main.cs	AttrBoth/BarAttr.cs
 AttrBoth/Main.cs	AttrBoth/Plain.cs
 AttrBoth/Main.cs	AttrBoth/Real.cs
+AttrExpr/Decl.cs	AttrExpr/Foo.cs
+AttrExpr/Decl.cs	AttrExpr/FooAttribute.cs
+AttrExpr/FooAttribute.cs	AttrExpr/Main.cs
+AttrExpr/Main.cs	AttrExpr/Foo.cs
 Shadow/U.cs	Shadow/A.cs
 Shadow/U.cs	Shadow/Z.cs

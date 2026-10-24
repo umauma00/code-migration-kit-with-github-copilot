@@ -302,8 +302,9 @@ ATTRIBUTE_TARGETS = {"assembly", "module", "field", "event", "method", "param",
 def attribute_name_at(code, start, end):
     """Whether the name at code[start:end] is an attribute's name: the head
     of an item of a [...] attribute list (followed by "(", "," or "]"). A
-    [ counts as an attribute list where a declaration may begin, not after
-    a value (a[Foo] is an indexer, x = [Foo] a collection)."""
+    [ counts as an attribute list where a declaration may begin and when
+    a declaration follows it, not after a value (a[Foo] is an indexer,
+    x = [Foo] and F([Foo]) collections)."""
     k = end
     while k < len(code) and code[k].isspace():
         k += 1
@@ -338,10 +339,43 @@ def attribute_name_at(code, start, end):
             return False
     if k < 0 or code[k] != "[":
         return False
+    open_at = k
     k -= 1
     while k >= 0 and code[k].isspace():
         k -= 1
-    return k < 0 or code[k] in ";{}](<,"
+    if k >= 0 and code[k] not in ";{}](<,":
+        return False
+    # What follows the list tells a declaration from an expression: an
+    # attribute list is followed by what it applies to ([Foo] class C,
+    # [Foo] int x, [Foo] T, [A][B], [Foo] () => 1) or ends the file
+    # ([assembly: Foo]). A collection expression or an initializer's
+    # index (F([Foo]), { [Foo] }, { [Foo] = 1 }) is followed by ")", ",",
+    # "}", "=", ";" or an operator word.
+    depth, k = 0, open_at
+    while k < len(code):
+        if code[k] in "([{":
+            depth += 1
+        elif code[k] in ")]}":
+            depth -= 1
+            if depth == 0:
+                break
+        k += 1
+    else:
+        return False
+    k += 1
+    while k < len(code) and code[k].isspace():
+        k += 1
+    if k == len(code):
+        return True
+    m = WORD_RE.match(code, k)
+    if m:
+        return m.group(0) not in EXPRESSION_WORDS
+    return code[k] in "[(#"
+
+
+WORD_RE = re.compile(r"@?[^\W\d]\w*")
+# Words that continue an expression after a collection ([a] is [..], [a] switch ...).
+EXPRESSION_WORDS = {"is", "as", "switch", "with", "and", "or", "not", "when"}
 
 
 def csproj_usings(text):
