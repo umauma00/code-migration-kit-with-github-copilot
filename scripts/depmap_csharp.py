@@ -69,7 +69,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # -I drops the script dir
 from depmap_common import find_files, read_source, run  # noqa: E402
 from depmap_projects import ATTRS, QUOTED, dotnet_projects, drop_not_compiled  # noqa: E402
-from depmap_typed import BLOCK, CHAIN_RE, GLOBAL, Directives, FileInfo, TOKEN_RE, chains_at, dotted, flow_c_like, members, resolve, scan_or_none, strip_c_like  # noqa: E402
+from depmap_typed import BLOCK, CHAIN_RE, GLOBAL, Directives, FileInfo, PREDEFINED, TOKEN_RE, chains_at, dotted, flow_c_like, join, resolve, scan_or_none, strip_c_like  # noqa: E402
 
 EXTS = {".cs"}
 # Build output beside a project, NuGet's packages/ beside a solution (or at --root).
@@ -85,6 +85,56 @@ init value add remove partial global record nint nuint not and or with""".split(
 REFLECTION_RE = re.compile(r"\b(Type\s*\.\s*GetType|Activator\s*\.\s*CreateInstance|Assembly\s*\.\s*Load\w*)\s*\(\s*((?:[^()]|\([^()]*\))+?)?\s*\)")
 CSPROJ_USING_RE = re.compile(r"<Using\b" + ATTRS + r"/?>", re.IGNORECASE)
 CSPROJ_ATTR_RE = re.compile(r"\b(Include|Alias|Static)\s*=\s*" + QUOTED, re.IGNORECASE)
+
+
+def receiver_name(toks, j):
+    """Simple name of the type at toks[j] (an extension method's receiver,
+    after this and ref/in/scoped): string for string, List for
+    System.Collections.Generic.List<T>."""
+    while j < len(toks) and toks[j][0] in {"this", "ref", "in", "scoped", "readonly"}:
+        j += 1
+    name = ""
+    while j < len(toks):
+        t = toks[j][0]
+        if t[0].isalpha() or t[0] in "_@":
+            name = t.lstrip("@")
+            j += 1
+            if j < len(toks) and toks[j][0] in {".", ":"}:
+                while j < len(toks) and toks[j][0] in {".", ":"}:
+                    j += 1
+                continue
+        break
+    return name
+
+
+# Classes whose methods are static: Math.Min(...) and string.Join(...) are
+# not calls of an extension method named Min or Join.
+STATIC_RECEIVERS = set("""Math MathF Path File Directory Convert Console Environment Activator
+Interlocked BitConverter Regex Enumerable Queryable String Array Enum Guid Task Debug Trace Marshal
+Buffer Encoding TimeSpan DateTime DateTimeOffset Int16 Int32 Int64 UInt32 Double Single Decimal
+Boolean Char Byte Object Type Assembly Thread ThreadPool Parallel Monitor Nullable GC Process
+Tuple ValueTuple ArgumentNullException ObjectDisposedException""".split())
+MEMBER_CALL_RE = re.compile(r"(@?[^\W\d]\w*)?\s*\.\s*@?([^\W\d]\w*)")
+
+
+def member_calls(code):
+    """(receiver, name) of every name written after a dot: receiver is the
+    variable before the dot (x in x.Name) or "" when the receiver is an
+    expression. A dot after a predefined type or a static-only class
+    (string.Join, Math.Min) is a static call, never an extension method
+    call, and is left out."""
+    out = set()
+    for m in MEMBER_CALL_RE.finditer(code):
+        head = m.group(1)
+        k = m.start(1) - 1 if head else -1
+        while k >= 0 and code[k].isspace():
+            k -= 1
+        if head and k >= 0 and code[k] in ".)]":
+            head = None         # a.Math.Min: Math is a member, not the class
+        if head and (head in PREDEFINED or head in STATIC_RECEIVERS):
+            continue
+        out.add(((head or "").lstrip("@"), m.group(2)))
+    return out
 
 
 def read_dotted(toks, j):
@@ -125,6 +175,8 @@ def scan(rel, text):
     blocks = 0
     file_ctx = None         # block context of a file-scoped namespace (namespace N;)
     contexts = [(0, "")]    # (offset, context from there on)
+    type_depths = []        # depth inside each enclosing type body
+    type_pending = False    # a type declaration whose body has not opened yet
 
     def current():
         return ".".join(p for p in [file_ns] + [n for n, _, _ in stack] if p)
@@ -140,7 +192,14 @@ def scan(rel, text):
         prev = toks[i - 1][0] if i else ";"
         if t == "{":
             depth += 1
+            if type_pending:
+                type_depths.append(depth)
+                type_pending = False
+        elif t == ";":
+            type_pending = False    # record R(int X); has no body
         elif t == "}":
+            if type_depths and type_depths[-1] == depth:
+                type_depths.pop()
             depth -= 1
             popped = False
             while stack and stack[-1][1] >= depth:
@@ -220,6 +279,9 @@ def scan(rel, text):
                 ns = current()
                 info.namespaces.add(ns)
                 info.decls.append((ns, name))
+                if type_depths:     # nested: a type of its own, not a copy of a same-named one
+                    info.nested.add(f"{ns}.{name}" if ns else name)
+                type_pending = True
                 k = i - 1
                 while k >= 0 and toks[k][0] in KEYWORDS:
                     if toks[k][0] == "partial":
@@ -241,6 +303,8 @@ def scan(rel, text):
                 ns = current()
                 info.namespaces.add(ns)
                 info.decls.append((ns, toks[k][0].lstrip("@")))
+                if type_depths:
+                    info.nested.add(join(ns, toks[k][0].lstrip("@")))
         elif t == "(" and i + 2 < len(toks) and toks[i + 1][0] == "this" and toks[i - 1][0] not in KEYWORDS \
                 and (toks[i + 2][0][0].isalpha() or toks[i + 2][0][0] == "_"):
             # Extension method: Name(this T x) or Name<T>(this T x).
@@ -257,6 +321,7 @@ def scan(rel, text):
                 ns = current()
                 info.namespaces.add(ns)
                 info.extensions.append((ns, name))
+                info.extension_receivers.setdefault(join(ns, name), set()).add(receiver_name(toks, i + 2))
         elif t == "extension" and prev in {"{", "}", ";", "]"} and i + 1 < len(toks) and toks[i + 1][0] in {"(", "<"}:
             # C# 14 extension block: extension(string s) { bool IsBlank => ...; }.
             # Its members are called as s.IsBlank, like extension methods.
@@ -266,6 +331,7 @@ def scan(rel, text):
                 j += 1
                 if level == 0 and toks[j - 1][0] == ")":
                     break
+            receiver = receiver_name(toks, next((m + 1 for m in range(i + 1, j) if toks[m][0] == "("), j))
             if j < len(toks) and toks[j][0] == "{":
                 ns, level, j = current(), 0, j
                 while j < len(toks):
@@ -282,6 +348,7 @@ def scan(rel, text):
                             and toks[j - 1][0] not in {"new", "return", "=>", "nameof", "typeof", "await"}:
                         info.namespaces.add(ns)
                         info.extensions.append((ns, tok.lstrip("@")))
+                        info.extension_receivers.setdefault(join(ns, tok.lstrip("@")), set()).add(receiver)
                     j += 1
         i += 1
     if not info.namespaces:
@@ -297,7 +364,8 @@ def scan(rel, text):
         info.names.append(ref)
         if attribute_name_at(code, pos, CHAIN_RE.match(code, pos).end(), brackets):
             info.attribute_names.append(ref)
-    info.members = members(code)
+    info.member_calls = member_calls(code)
+    info.members = {name for _, name in info.member_calls}
     info.type_members, info.type_bases, info.flow, info.type_ns = flow_c_like(
         [t for t, _, _ in toks], KEYWORDS, "csharp")
     for m in REFLECTION_RE.finditer(code):

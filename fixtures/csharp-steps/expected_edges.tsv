@@ -20,6 +20,14 @@ AttrMore/Gen.cs	AttrMore/BarAttribute.cs
 AttrMore/Gen.cs	AttrMore/Foo.cs
 AttrMore/Lam.cs	AttrMore/Foo.cs
 AttrMore/Lam.cs	AttrMore/FooAttribute.cs
+ExtRecv/BagExt.cs	ExtRecv/S.cs
+ExtRecv/Derived.cs	ExtRecv/Neg.cs
+ExtRecv/Derived.cs	ExtRecv/RespExt.cs
+ExtRecv/DictExt.cs	ExtRecv/U.cs
+ExtRecv/NegExt.cs	ExtRecv/Neg.cs
+ExtRecv/RespExt.cs	ExtRecv/Neg.cs
+ExtRecv/RespExt.cs	ExtRecv/NegExt.cs
+Nested/D.cs	Nested/C.cs
 Shadow/U.cs	Shadow/A.cs
 Shadow/U.cs	Shadow/Z.cs
 TupleAlias/U.cs	TupleAlias/Cust.cs

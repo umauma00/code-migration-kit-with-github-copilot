@@ -246,7 +246,11 @@ def dotnet_projects(root, rels, project_ext, warnings):
             if target is not None:
                 refs[d].add(target)
             else:
-                warnings.append(f"{proj_rel}: ProjectReference {value} is not under --root")
+                path = msbuild_path(d, value)
+                where = ("uses an MSBuild property" if "$(" in value else
+                         "is not under --root" if path == ".." or path.startswith("../") else
+                         "is not found under --root (no project file there)")
+                warnings.append(f"{proj_rel}: ProjectReference {value} {where}")
         sdk = SDK_RE.search(text)
         by_default = default_items(text) if sdk else False
         # (kind, path, conditional, unknown, excludes): an item whose value uses an

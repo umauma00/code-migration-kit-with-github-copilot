@@ -35,7 +35,16 @@
   attribute list (`[Foo]`, `[A.B.Required]`, `[return: Foo]`) counts both
   `Foo` and `FooAttribute`; elsewhere, collection expressions
   (`F([Foo])`, `{ [Foo] }`) included, `Foo` does not mean `FooAttribute`; the
-  types in a tuple alias (`using P = (A a, B b);`) count where it is written. A
+  types in a tuple alias (`using P = (A a, B b);`) count where it is written. Checked on old open
+  source trees (Nancy, ShareX, Umbraco 7, WordPress, phpBB 3.0): C# extension
+  methods are narrowed by receiver type (static calls such as `string.Join`
+  do not count; `x.Add()` on a framework type with an unknown receiver is
+  listed in `unresolved.tsv`); nested types are not reported as duplicates;
+  a PHP declaration behind `!function_exists('f')` is used only when no
+  unguarded one exists; PHP include paths take `--include-var NAME=VALUE`,
+  constants with one relative `define()` literal and nested
+  `dirname(dirname(__FILE__))`; Windows-1252 text is no longer reported as
+  cp932, and a missing ProjectReference says it is missing. A
   using or alias target inside a namespace block is relative to the
   enclosing namespaces, and once resolved is kept as a full name.
   VB.NET joins implicitly continued lines (a trailing comma, an open

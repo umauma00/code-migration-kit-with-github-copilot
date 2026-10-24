@@ -1,0 +1,7 @@
+from	to
+a/b/c.php	a/top.php
+app/caller.php	lib/compat.php
+app/caller.php	lib/real.php
+inc/main.php	wp-inc/http.php
+lib/compat.php	lib/real.php
+theme/functions.php	lib/real.php

@@ -91,14 +91,20 @@ def read_source(path: Path, warnings):
     Latin-1, so UTF-8 is tried first, then cp932, then Latin-1 (never fails).
     A fallback is reported because identifiers outside ASCII depend on it."""
     data = path.read_bytes()
-    for enc in ("utf-8-sig", "cp932"):
-        try:
-            text = data.decode(enc)
-            if enc != "utf-8-sig":
-                warnings.append(f"decoded as {enc}: {path}")
+    try:
+        return data.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        pass
+    try:
+        text = data.decode("cp932")
+        # Western text (a (c) or an accented letter in a comment) often
+        # decodes as cp932 too, into half-width katakana or a stray kanji;
+        # Japanese text has kana or full-width punctuation.
+        if any(0x3000 <= ord(c) <= 0x30FF or 0xFF01 <= ord(c) <= 0xFF5E for c in text):
+            warnings.append(f"decoded as cp932: {path}")
             return text
-        except UnicodeDecodeError:
-            continue
+    except UnicodeDecodeError:
+        pass
     warnings.append(f"decoded as latin-1: {path}")
     return data.decode("latin-1")
 

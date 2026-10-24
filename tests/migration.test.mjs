@@ -361,6 +361,9 @@ test('C#, Java, PHP, VB.NET and COBOL dependency fixtures produce their expected
     // using static does not bring the type's own name; [Foo] as an attribute counts Foo and FooAttribute,
     // Foo elsewhere (collection expressions too) only Foo; an alias target is a full name in type flow too.
     ['csharp', 'csharp-steps'],
+    // Real-tree findings: guarded PHP fallbacks, define() literals and
+    // --include-var in include paths, dirname(dirname(__FILE__)).
+    ['php', 'php-real'], ['php', 'php-real', 'expected_vars_', ['--include-var', 'root=,ext=php']],
     ['php', 'php-relative', 'expected_', ['--include-path', 'lib']]];
   for (const [lang, name, prefix = 'expected_', options = []] of cases) {
     const out = path.join(root, `${name}-${prefix}`), fixture = path.join(kitRoot, 'fixtures', name);
@@ -438,6 +441,21 @@ test('long comma lists are scanned in linear time', async t => {
   assert.equal(r.code, 0, r.stderr);
   assert.ok(Date.now() - started < 30000, `took ${Date.now() - started} ms`);
   assert.equal(fs.readFileSync(path.join(out, 'edges.tsv'), 'utf8'), 'from\tto\nE.cs\tB.cs\n');
+});
+
+test('Western text that also decodes as cp932 is read as Latin-1', async t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'copilot-depmap-cp1252-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  // A (c) sign in a Windows-1252 comment is a lone half-width katakana in cp932.
+  fs.writeFileSync(path.join(root, 'A.cs'), Buffer.concat([Buffer.from('// '), Buffer.from([0xa9]), Buffer.from(' 2008\nclass A { B b; }\n')]));
+  // Shift_JIS 日本です has kana, so it stays cp932.
+  fs.writeFileSync(path.join(root, 'B.cs'), Buffer.concat([Buffer.from('// '), Buffer.from([0x93, 0xfa, 0x96, 0x7b, 0x82, 0xc5, 0x82, 0xb7]), Buffer.from('\nclass B { }\n')]));
+  const out = path.join(root, 'out');
+  const r = await runProcess(python, ['-I', path.join(kitRoot, 'scripts/depmap_csharp.py'), '--root', root, '--out', out]);
+  assert.equal(r.code, 0, r.stderr);
+  assert.match(r.stderr, /decoded as latin-1: .*A\.cs/);
+  assert.match(r.stderr, /decoded as cp932: .*B\.cs/);
+  assert.equal(fs.readFileSync(path.join(out, 'edges.tsv'), 'utf8'), 'from\tto\nA.cs\tB.cs\n');
 });
 
 test('a mapper survives a file name that is not UTF-8', { skip: process.platform !== 'linux' && 'needs a byte-string file system' }, async t => {

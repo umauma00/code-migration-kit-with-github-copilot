@@ -74,6 +74,9 @@ forward_static_call_array is_subclass_of is_a register_shutdown_function registe
 spl_autoload_register set_error_handler set_exception_handler iterator_apply
 preg_replace_callback ob_start header_register_callback add_action add_filter
 add_shortcode""".split())
+# Existence checks that guard a fallback declaration (!function_exists('f')).
+GUARDS = {"function_exists": "function", "class_exists": "class", "interface_exists": "class",
+          "trait_exists": "class", "enum_exists": "class", "defined": "const"}
 SKIP_DIRS = {"vendor"}
 MARKERS = {"composer.json"}        # SKIP_DIRS count only beside it (or at --root)
 KEYWORDS = set("""abstract and array as break callable case catch class clone const continue declare
@@ -223,6 +226,8 @@ class FileInfo:
         self.strings = []
         self.callables = []     # names in string callables: ("function" | "class", name)
         self.dynamic = []
+        self.guarded = set()    # ("function" | "class" | "const", key) behind a !function_exists(...) guard
+        self.const_values = {}  # constant -> literal value of define('X', 'v')
 
 
 def lower(name):
@@ -332,6 +337,15 @@ def scan(rel, text):
                 info.dynamic.append(("class_alias(...)", "alias name computed at run time"))
         elif low == "define" and at(i + 1) == "(" and at(i + 2).startswith(STR):
             info.constants.append(string(at(i + 2)).lstrip("\\"))
+            if at(i + 3) == "," and at(i + 4).startswith(STR) and at(i + 5) == ")":
+                info.const_values[string(at(i + 2)).lstrip("\\")] = string(at(i + 4))
+        elif t == "!" and GUARDS.get(at(i + 1).lower().lstrip("\\")) and at(i + 2) == "(" \
+                and at(i + 3).startswith(STR) and at(i + 4) in {")", ","}:
+            # if (!function_exists('f')) { function f() ... }: a fallback
+            # for a declaration that may exist elsewhere.
+            kind = GUARDS[at(i + 1).lower().lstrip("\\")]
+            name = string(at(i + 3)).strip().lstrip("\\").replace("\\\\", "\\")
+            info.guarded.add((kind, name if kind == "const" else name.lower()))
         elif low in {"include", "include_once", "require", "require_once"}:
             j, parts = i + 1, []
             while j < n and at(j) not in {";"}:
@@ -386,8 +400,44 @@ def scan(rel, text):
     return info
 
 
-def resolve_include(src, parts, info, by_rel, by_tail, include_path=()):
-    """Edge targets for one include expression, or a reason it is dynamic."""
+def const_values_unique(values):
+    """(constant, value) for constants every define() gives the same
+    relative literal (define('WPINC', 'wp-includes')). An absolute path is a
+    deployment's, not the repository's: it stays an unknown prefix."""
+    for name, vals in values.items():
+        value = next(iter(vals))
+        if len(vals) == 1 and not re.match(r"^(?:[/\\]|[A-Za-z]:|\w+://)", value):
+            yield name, value
+
+
+def parse_vars(text):
+    """--include-var NAME=VALUE,...: values of variables ($NAME) and constants
+    (NAME) in include paths."""
+    out = {}
+    for item in (p for p in text.split(",") if p.strip()):
+        name, sep, value = item.partition("=")
+        if not sep or not name.strip():
+            raise SystemExit(f"--include-var: expected NAME=VALUE, got {item!r}")
+        out[name.strip().lstrip("$")] = value.strip()
+    return out
+
+
+def dirname_depth(toks, k):
+    """(number of nested dirname calls at toks[k], index of the __FILE__ /
+    __DIR__ they wrap), or (0, k)."""
+    j = k
+    while j < len(toks) and toks[j].lower() == "dirname":
+        j += 1
+    if j < len(toks) and toks[j].lower() in {"__file__", "__dir__"}:
+        return j - k, j
+    return 0, k
+
+
+def resolve_include(src, parts, info, by_rel, by_tail, include_path=(), variables=None):
+    """Edge targets for one include expression, or a reason it is dynamic.
+    variables: known values of $variables and constants (--include-var, and
+    constants every define() gives the same literal)."""
+    variables = variables or {}
     base, pieces, unknown_prefix = None, [], False
     k = 0
     toks = [p for p in parts if p not in {"(", ")"}]
@@ -397,7 +447,11 @@ def resolve_include(src, parts, info, by_rel, by_tail, include_path=()):
     while k < len(toks):
         t = toks[k]
         tl = t.lower()
-        if tl in {"directory_separator", "ds"}:
+        if t.startswith("$") and t[1:] in variables:
+            pieces.append(variables[t[1:]])
+        elif NAME_RE.fullmatch(t) and t in variables:
+            pieces.append(variables[t])
+        elif tl in {"directory_separator", "ds"}:
             pieces.append("/")      # DS is the usual define('DS', DIRECTORY_SEPARATOR)
         elif tl == "realpath":
             pass                    # realpath(x) names the same file as x
@@ -408,16 +462,18 @@ def resolve_include(src, parts, info, by_rel, by_tail, include_path=()):
             pieces.append(piece)
         elif tl == "__dir__":
             base = posixpath.dirname(src)
-        elif tl == "dirname" and k + 1 < len(toks) and toks[k + 1].lower() in {"__file__", "__dir__"}:
+        elif tl == "dirname" and dirname_depth(toks, k)[0]:
             # dirname(__FILE__) is the file's directory; dirname(__DIR__, 2)
-            # climbs two levels from it.
-            base = src if toks[k + 1].lower() == "__file__" else posixpath.dirname(src)
+            # climbs two levels from it, and so does dirname(dirname(__DIR__)).
+            outer, k = dirname_depth(toks, k)
+            base = src if toks[k].lower() == "__file__" else posixpath.dirname(src)
             levels = 1
-            if k + 3 < len(toks) and toks[k + 2] == "," and toks[k + 3].isdigit():
-                levels = int(toks[k + 3])
-            for _ in range(levels):
+            if k + 2 < len(toks) and toks[k + 1] == "," and toks[k + 2].isdigit():
+                levels = int(toks[k + 2])
+                k += 2
+            for _ in range(levels + outer - 1):
                 base = posixpath.dirname(base)
-            k += 4 if k + 2 < len(toks) and toks[k + 2] == "," else 2
+            k += 1
             continue
         elif t == ".":
             pass
@@ -480,13 +536,34 @@ def mapper(root, warnings, args):
     include_path = [p for p in path_list(args.include_path) if p != "."]
     autoload = composer_autoload(root, warnings)
     declared, functions, constants = {}, {}, {}
+    fallback = {"class": {}, "function": {}, "const": {}}   # key -> files with a guarded declaration
     for info in infos:
         for c in info.classes:
             declared.setdefault(c.lower(), set()).add(info.rel)
+            if ("class", c.lower()) in info.guarded:
+                fallback["class"].setdefault(c.lower(), set()).add(info.rel)
         for f in info.functions:
             functions.setdefault(f.lower(), set()).add(info.rel)
+            if ("function", f.lower()) in info.guarded:
+                fallback["function"].setdefault(f.lower(), set()).add(info.rel)
         for c in info.constants:
             constants.setdefault(c, set()).add(info.rel)
+            if ("const", c) in info.guarded:
+                fallback["const"].setdefault(c, set()).add(info.rel)
+    # A declaration behind !function_exists('f') (a polyfill, a theme's
+    # back-compat copy) is used only where no unguarded one exists: a call
+    # of f means the real f, and linking every fallback gives false cycles.
+    for kind, table in (("class", declared), ("function", functions), ("const", constants)):
+        for key, files in fallback[kind].items():
+            real = table[key] - files
+            if real:
+                table[key] = real
+    const_values = {}
+    for info in infos:
+        for name, value in info.const_values.items():
+            const_values.setdefault(name, set()).add(value)
+    include_vars = dict(const_values_unique(const_values))
+    include_vars.update(parse_vars(args.include_var))
 
     by_lower = {rel.lower(): rel for rel in rels}
     cache = {}
@@ -516,7 +593,7 @@ def mapper(root, warnings, args):
                     edges.add((src, t))
 
         for keyword, parts in info.includes:
-            hit, why = resolve_include(src, parts, info, by_rel, by_tail, include_path)
+            hit, why = resolve_include(src, parts, info, by_rel, by_tail, include_path, include_vars)
             if hit:
                 add(hit)
             if why:     # unresolved, or resolved to several candidates
@@ -615,4 +692,6 @@ def composer_autoload(root, warnings):
 
 if __name__ == "__main__":
     run("Map file dependencies of a PHP codebase from its source text.", mapper,
-        [("--include-path", "comma-separated directories (relative to --root) PHP's include_path lists")])
+        [("--include-path", "comma-separated directories (relative to --root) PHP's include_path lists"),
+         ("--include-var", "comma-separated NAME=VALUE pairs: values of $NAME variables and NAME constants "
+                           "in include paths (a directory relative to --root, an extension...)")])

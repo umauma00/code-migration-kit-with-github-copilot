@@ -1,0 +1,13 @@
+# migration order: one batch per line, dependencies first
+a/top.php
+a/b/c.php
+lib/real.php
+lib/compat.php
+app/caller.php
+wp-inc/http.php
+inc/main.php
+includes/funcs.php
+lib/consts.php
+plugins/x/http.php
+sub/page.php
+theme/functions.php

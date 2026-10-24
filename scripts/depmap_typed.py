@@ -35,7 +35,9 @@ class FileInfo:
         self.namespaces = set()     # namespaces the file declares types in ("" = global)
         self.decls = []             # (namespace, name) of declared types/members
         self.extensions = []        # (namespace, name) of members called as x.Name (C# extension methods, VB module members)
+        self.extension_receivers = {}   # C# extension fqn -> simple names of its receiver types (this T x)
         self.partial = set()        # FQNs declared partial in this file
+        self.nested = set()         # FQNs (namespace.Name) of types nested in another type of this file
         self.member_decls = set()   # FQNs in decls that are VB Module members, not types
         self.usings = set()         # imported namespaces (or types: Java on-demand of a type)
         self.blocks = {}            # C# namespace block context -> Directives written in it
@@ -46,6 +48,7 @@ class FileInfo:
         self.names = []             # (namespace written in, dotted name chain) mentioned in code
         self.attribute_names = []   # the names in names written as an attribute ([Foo])
         self.members = set()        # names written after "." (x.Name)
+        self.member_calls = set()   # C#: (receiver variable or "", name) of each x.Name
         self.strings = []           # string literal contents (reflection lookups)
         self.dynamic = []           # (reference, reason) the mapper could not resolve statically
         self.type_members = {}      # type fqn -> {member: [(type chain, is_element)]}
@@ -428,6 +431,11 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
         return scopes[key]
 
     edges, unresolved = set(), set()
+    ext_receivers = {}  # (extension fqn, file) -> receiver type simple names
+    for info in infos:
+        for fq, names in info.extension_receivers.items():
+            ext_receivers.setdefault((fq, info.rel), set()).update(names)
+    type_names = {fq.rpartition(".")[2] for fq in types}
 
     def add(src, targets):
         targets = set(targets)
@@ -447,18 +455,32 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
         for ns, name in info.decls:
             own.setdefault(info.rel, set()).add(join(ns, name))
 
+    # Types are keyed by namespace.Name, so a type nested in another
+    # (Outer.Sel) shares its key with a same-named one elsewhere. Where a
+    # name has a top-level declaration, a mention means that one.
+    nested_in = {}      # fqn -> files where it is nested
+    for info in infos:
+        for fq in info.nested:
+            nested_in.setdefault(fq, set()).add(info.rel)
+
+    def top_level(fq):
+        files = set(lookup(fq))
+        return (files - nested_in.get(fq, set())) or files
+
     def add_types(src, fqns):
         files = set()
         mine = own.get(src, ())
         for fq in fqns:
             if fq in mine and fq not in partial_types:
                 continue        # its own type; another copy is not a dependency
-            files.update(lookup(fq))
+            files.update(top_level(fq))
         add(src, files)
 
     # Non-partial types declared in several files that can see each other.
     member_decls = set().union(*(info.member_decls for info in infos)) if infos else set()
     for fq, files in sorted(types.items()):
+        # Nested types of the same name are different types, not copies.
+        files = files - nested_in.get(fq, set())
         if len(files) < 2 or fq in partial_types or fq in member_decls:
             continue
         for rel in sorted(files):
@@ -580,14 +602,6 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
         if attribute_suffix:
             for ctx, chain in info.attribute_names:
                 add_types(src, scope_of(info, ctx).attribute(chain))
-        # x.Name() may call an extension method of any namespace visible
-        # somewhere in the file.
-        visible = set(file_scope.visible)
-        for ctx in sorted(info.namespaces | set(info.blocks)):
-            visible |= scope_of(info, ctx).visible
-        for name in sorted(info.members):
-            for ns in sorted(visible):
-                add(src, extensions.get(join(ns, name), ()))
         for text in info.strings:
             name = text.split(",")[0].strip()
             name = name.lower() if fold else name
@@ -614,6 +628,60 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
             else:
                 _, enclosing, expr, _ = step
                 add_types(src, evaluate(scope, env, enclosing, expr)[1])
+        # x.Name() may call an extension method of any namespace visible
+        # somewhere in the file.
+        visible = set(file_scope.visible)
+        for ctx in sorted(info.namespaces | set(info.blocks)):
+            visible |= scope_of(info, ctx).visible
+        calls = info.member_calls or {("", name) for name in info.members}
+        receivers = {}      # receiver variable -> simple names of its types and their bases
+        own_types = sorted(info.type_members)
+        receiver_types = {}  # receiver -> fqns of its types
+        for head, _ in calls:
+            if head in {"this", "base"}:
+                known = set(own_types)
+            elif head in env:
+                known = {fq for fq, elem in env[head] if not elem}
+            else:       # a field or property of a type of this file (Response.WithHeader)
+                owner = next((t for t in own_types if has_member(t, head)), None) if head else None
+                known = {fq for fq, elem in member_types({(owner, False)}, head) if not elem} if owner else set()
+            receiver_types[head] = known
+            receivers[head] = {t.rpartition(".")[2] for fq in known for t in closure(fq)}
+        for head, name in sorted(calls):
+            for ns in sorted(visible):
+                fq = join(ns, name)
+                files = set(extensions.get(fq, ()))
+                if not files:
+                    continue
+                typed = {f for f in files if ext_receivers.get((fq, f))}
+                if receivers.get(head) and any(has_member(t, name) for fq in receiver_types[head]
+                                               for t in closure(fq)):
+                    continue        # the receiver's own member: C# calls it, not an extension
+                if not receivers.get(head) and src in typed:
+                    # n.WithCookie().WithCookie() in the file that declares
+                    # WithCookie(this Neg n): the receiver is not known, and
+                    # the file's own extension is taken for it, not one on
+                    # another repository type (a false cycle otherwise).
+                    mine = ext_receivers[(fq, src)]
+                    files -= {f for f in typed if ext_receivers[(fq, f)] & type_names
+                              and not ext_receivers[(fq, f)] & mine}
+                    typed &= files
+                if receivers.get(head):
+                    # negotiator.WithCookie() with negotiator a Negotiator:
+                    # not the WithCookie(this Response r) of another file.
+                    files -= {f for f in typed if ext_receivers[(fq, f)] & type_names
+                              and not ext_receivers[(fq, f)] & receivers[head]}
+                    typed &= files
+                ambiguous = sorted(f for f in typed if name in BCL_MEMBERS
+                                   and not ext_receivers[(fq, f)] & type_names)
+                if ambiguous:
+                    # x.Add() with an extension Add(this IDictionary<..> d)
+                    # in view: x's type is not known, and the framework type
+                    # has its own Add, which C# calls first. An edge to every
+                    # such extension made false cycles.
+                    unresolved.add((src, f".{name}()", "may call the extension method in " + ", ".join(
+                        ambiguous) + " or the receiver type's own member; the receiver type is not known"))
+                add(src, files - set(ambiguous))
         for ref, why in info.dynamic:
             unresolved.add((src, ref, why))
     return edges, unresolved
@@ -831,6 +899,24 @@ def balance_branches(code):
 
 TOKEN_RE = re.compile(r"@?[^\W\d]\w*|\S")
 CHAIN_RE = re.compile(r"(?:global::)?@?[^\W\d]\w*(?:\s*(?:\.|::)\s*@?[^\W\d]\w*)*")
+
+
+# Members of common framework types (object, string, collections,
+# dictionaries, LINQ, streams, StringBuilder). x.Name() with one of these
+# names usually calls that member: an extension method of the same name on
+# a framework type is only a candidate.
+BCL_MEMBERS = set("""Add AddRange Remove RemoveAt RemoveAll RemoveRange Clear Contains ContainsKey
+ContainsValue Insert InsertRange IndexOf LastIndexOf Find FindAll FindIndex Exists TrueForAll ForEach
+Sort Reverse ToArray ToList ToDictionary ToLookup ToHashSet CopyTo TryGetValue TryAdd GetValueOrDefault
+GetEnumerator Equals GetHashCode ToString GetType CompareTo Clone Dispose Close Flush Read Write
+ReadLine WriteLine ReadToEnd Seek Append AppendLine AppendFormat Replace Trim TrimStart TrimEnd
+Split Substring StartsWith EndsWith PadLeft PadRight ToUpper ToLower ToUpperInvariant
+ToLowerInvariant Format Join Concat Normalize IsNormalized Select SelectMany Where OrderBy
+OrderByDescending ThenBy ThenByDescending GroupBy First FirstOrDefault Last LastOrDefault Single
+SingleOrDefault Any All Count LongCount Sum Min Max Average Aggregate Distinct Skip Take SkipWhile
+TakeWhile Zip Cast OfType Union Intersect Except Concat DefaultIfEmpty ElementAt ElementAtOrDefault
+SequenceEqual AsEnumerable AsQueryable HasFlag GetValue SetValue Invoke BeginInvoke EndInvoke
+Wait ContinueWith Push Pop Peek Enqueue Dequeue""".split())
 
 
 def chains(code, keywords, fold=False):

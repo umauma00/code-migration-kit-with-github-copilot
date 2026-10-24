@@ -1,0 +1,2 @@
+file	reference	reason
+sub/page.php	include ( $root . 'includes/funcs.' . $ext )	include path computed at run time
