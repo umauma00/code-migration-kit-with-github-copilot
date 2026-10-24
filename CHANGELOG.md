@@ -117,8 +117,8 @@
   callables (a string in a callback position of `array_map`, `usort`,
   `call_user_func`, `add_action`... and `['Cls', 'm']` pairs, by plain or
   namespaced name) give edges to the function or class of that name, named arguments (`callback: 'f'`) included and `is_a` strings read as
-  class names, while a callback computed at run time (`$cb`, `'on_' . $x`,
-  `get_cb()`), `$f()` and an include missing at its `__DIR__` path are
+  class names, while a callback computed at run time (`$cb`, `"on_$x"`,
+  `'on_' . $x`, `get_cb()`, `[$class, 'm']`), `$f()` and an include missing at its `__DIR__` path are
   listed as unresolved; COBOL follows COPY, EXEC SQL INCLUDE, CALL 'X' (also with
   the literal on a later line) and EXEC CICS LINK/XCTL in fixed or free
   format, with `--copy-path` as the copybook search order. UTF-16/UTF-32 sources are read by their

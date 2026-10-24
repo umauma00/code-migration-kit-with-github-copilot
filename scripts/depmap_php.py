@@ -151,10 +151,26 @@ def php_holes(body):
     return "".join(out)
 
 
+def interpolates(body):
+    """Whether the body of a "..." string or heredoc holds a variable or a
+    {$...} hole (an escaped \\$ is text)."""
+    i, n = 0, len(body)
+    while i < n:
+        if body[i] == "\\":
+            i += 2
+            continue
+        if body[i] == "$" and i + 1 < n and (body[i + 1] == "{" or body[i + 1] == "_" or body[i + 1].isalpha()):
+            return True
+        if body.startswith("{$", i):
+            return True
+        i += 1
+    return False
+
+
 def php_code(text):
     """Code between PHP open and close tags, comments removed and each string
     replaced by a placeholder. Returns (code, strings, interpolated): the
-    indexes of the "..." strings and heredocs, whose $name is a variable.
+    indexes of the "..." strings and heredocs that hold a variable or a hole.
     The code inside their holes follows the placeholder."""
     out, strings, interpolated = [], [], set()
     i, n = 0, len(text)
@@ -207,7 +223,7 @@ def php_code(text):
                 buf.append(text[j])
                 j += 1
             strings.append("".join(buf))
-            if c == '"':
+            if c == '"' and interpolates(text[i + 1:j]):
                 interpolated.add(len(strings) - 1)
             holes = php_holes(text[i + 1:j]) if c == '"' else ""
             out.append(f"{STR}{len(strings) - 1}\x02" + holes + "\n" * text.count("\n", i, j))
@@ -222,7 +238,7 @@ def php_code(text):
                 body = text[i + m.end():end.start() if end else n]
                 strings.append(body)
                 holes = php_holes(body) if m.group(1) != "'" else ""     # not a nowdoc
-                if m.group(1) != "'":
+                if m.group(1) != "'" and interpolates(body):
                     interpolated.add(len(strings) - 1)
                 out.append(f"{STR}{len(strings) - 1}\x02" + holes + "\n" * body.count("\n"))
                 i = stop
@@ -239,7 +255,7 @@ class FileInfo:
         self.refs = []          # (namespace, name, is_call, uses)
         self.includes = []      # (keyword, expression parts)
         self.strings = []
-        self.interpolated = set()   # indexes of strings whose $name is a variable
+        self.interpolated = set()   # indexes of strings that hold a variable or {$...} hole
         self.callables = []     # names in string callables: ("function" | "class", name)
         self.dynamic = []
         self.guarded = set()    # ("function" | "class" | "const", key) behind a !function_exists(...) guard
@@ -397,9 +413,11 @@ def scan(rel, text):
     # String callables: the callback argument of a function that takes one
     # ('my_cb', or callback: 'my_cb'), and the class of a ['Cls', 'm'] /
     # array('Cls', 'm') pair. Other strings that only equal a name are not
-    # references. A callback the source does not name ($cb, 'on_' . $x,
-    # get_callback()), and $f(), are listed as dynamic.
-    for k, (t, _) in enumerate(toks):
+    # references. A callback the source does not name ($cb, "on_$x",
+    # 'on_' . $x, get_callback(), [$class, 'm']), and $f(), are listed as
+    # dynamic.
+    texts = [t for t, _ in toks]
+    for k, t in enumerate(texts):
         if t.startswith("$") and at(k + 1) == "(" and at(k - 1) not in {"->", "?->", "::"} \
                 and at(k - 1).lower() != "new":
             info.dynamic.append((f"{t}()", "function name computed at run time"))
@@ -417,7 +435,10 @@ def scan(rel, text):
             (positions, params), kind = CLASS_NAME_FUNCTIONS[func], "class"
         else:
             continue
-        for position, arg in enumerate(call_arguments(toks, k + 1)):
+        args = call_arguments(texts, k + 1)
+        if [[at(j) for j in arg] for arg in args] == [[".", ".", "."]]:
+            continue            # call_user_func(...): a closure of the function itself
+        for position, arg in enumerate(args):
             if len(arg) > 2 and NAME_RE.fullmatch(at(arg[0])) and at(arg[1]) == ":":
                 if at(arg[0]).lower() not in params:     # callback: 'f' (PHP 8 named argument)
                     continue
@@ -425,52 +446,85 @@ def scan(rel, text):
             elif position not in positions:
                 continue
             first = at(arg[0])
-            if len(arg) == 1 and first.startswith(STR):
+            if len(arg) == 1 and first.startswith(STR) and int(first[1:-1]) not in info.interpolated:
                 name = string(first).strip().lstrip("\\").replace("\\\\", "\\")
                 if BARE_NAME_RE.fullmatch(name):
                     info.callables.append((kind, name))
-            elif kind == "function" and not static_callable([at(j) for j in arg]):
-                text = "".join(f"'{string(at(j))}'" if at(j).startswith(STR) else " . " if at(j) == "." else at(j)
-                               for j in arg).replace(" .  .  . ", "...")
+            elif kind == "function" and not static_callable(texts, arg, info.interpolated):
+                if first.startswith(STR) and int(first[1:-1]) in info.interpolated:
+                    text = '"' + " ".join(string(first).split()) + '"'     # its hole code follows
+                else:
+                    text = ""
+                    for j in arg:
+                        piece = f"'{string(at(j))}'" if at(j).startswith(STR) else " . " if at(j) == "." else at(j)
+                        if text and (text[-1].isalnum() or text[-1] == "_") and (piece[0].isalnum() or piece[0] in "_$"):
+                            text += " "         # new Cls(), not newCls()
+                        text += piece
+                    text = text.replace(" .  .  . ", "...")
                 text = text if len(text) <= 60 else text[:57] + "..."
                 info.dynamic.append((f"{func}({text})", "callback computed at run time"))
     return info
 
 
-def call_arguments(toks, open_at):
-    """Token indices of each top-level argument of the call whose "(" is at
-    open_at (empty when the call is not closed within 2000 tokens)."""
+def call_arguments(texts, open_at):
+    """Token indices of each top-level argument of the call (or array) whose
+    "(" or "[" is at open_at. An argument list the file does not close keeps
+    the arguments read so far."""
     args, current, level = [], [], 0
-    for j in range(open_at + 1, min(len(toks), open_at + 2000)):
-        tok = toks[j][0]
+    for j in range(open_at + 1, len(texts)):
+        tok = texts[j]
         if tok in {"(", "[", "{"}:
             level += 1
         elif tok in {")", "]", "}"}:
             if level == 0:
-                return args + [current] if current else args
+                break
             level -= 1
         elif tok == "," and level == 0:
             args.append(current)
             current = []
             continue
+        elif tok == ";" and level == 0:
+            break               # never inside an argument list: the call is not closed
         current.append(j)
-    return []
+    return args + [current] if current else args
 
 
-def static_callable(arg):
-    """Whether a callback argument names its target in the source or needs no
-    file edge: a string ('Cls::m' strings are read as class names), a
-    closure, a [$obj, 'm'] / ['Cls', 'm'] pair, or a first-class callable
-    f(...) / Cls::m(...). Anything else ($cb, 'on_' . $x, get_cb()) is
-    computed at run time."""
-    if not arg:
+SELF_NAMES = {"self", "static", "parent"}
+
+
+def static_callable(texts, arg, interpolated):
+    """Whether a callback argument (token indices) names its target in the
+    source or needs no file edge: a plain string ('Cls::m' strings are read
+    as class names), null, a closure, a first-class callable f(...) /
+    Cls::m(...), or a pair whose class is fixed: [$this, 'm'],
+    array(&$this, 'm'), [__CLASS__, 'm'], ['Cls', 'm'], [Cls::class, 'm'],
+    [self::class, 'm']. Anything else
+    ($cb, "on_$x", 'on_' . $x, get_cb(), [$class, 'm']) is computed at run
+    time."""
+    toks = [texts[j] for j in arg]
+    if not toks:
         return True
-    first = arg[0].lower()
-    if len(arg) == 1 and arg[0].startswith(STR):
+    first = toks[0].lower()
+    if len(toks) == 1:
+        if toks[0].startswith(STR):
+            return int(toks[0][1:-1]) not in interpolated
+        return first == "null"
+    if first in {"function", "fn", "static"}:
         return True
-    if first in {"function", "fn", "static"} or first == "[" or (first == "array" and arg[1:2] == ["("]):
+    if len(toks) >= 6 and toks[-5:] == ["(", ".", ".", ".", ")"]:      # f(...)
         return True
-    return len(arg) >= 6 and arg[-5:] == ["(", ".", ".", ".", ")"]     # f(...)
+    opener = 0 if first == "[" else 1 if first == "array" and toks[1] == "(" else None
+    if opener is None:
+        return False
+    elements = call_arguments(texts, arg[opener])
+    if len(elements) != 2 or not elements[0]:
+        return False
+    head = [texts[j] for j in elements[0]]
+    if head in (["$this"], ["&", "$this"], ["__CLASS__"]):     # its own class (&$this in PHP 4 code)
+        return True
+    if len(head) == 1 and head[0].startswith(STR):
+        return int(head[0][1:-1]) not in interpolated
+    return len(head) == 3 and head[1] == "::" and head[2].lower() == "class" and NAME_RE.fullmatch(head[0]) is not None
 
 
 def const_values_unique(values):

@@ -1,4 +1,6 @@
 # migration order: one batch per line, dependencies first
+cb/known.php
+cb/dyn.php
 data/hooks.php
 data/main.php
 data/business.php
@@ -13,3 +15,5 @@ expr/others.php
 expr/main.php
 inc/app/main.php
 inc/unrelated/config.php
+long/handler.php	long/main.php
+short/handler.php	short/main.php

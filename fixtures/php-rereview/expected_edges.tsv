@@ -1,4 +1,5 @@
 from	to
+cb/dyn.php	cb/known.php
 data/business.php	data/main.php
 data/main.php	data/hooks.php
 dyn/main.php	dyn/inc.php
@@ -7,3 +8,7 @@ expr/main.php	expr/handler.php
 expr/main.php	expr/klass.php
 expr/main.php	expr/mapper.php
 expr/main.php	expr/others.php
+long/handler.php	long/main.php
+long/main.php	long/handler.php
+short/handler.php	short/main.php
+short/main.php	short/handler.php

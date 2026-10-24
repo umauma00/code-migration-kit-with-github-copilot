@@ -1,4 +1,11 @@
 file	reference	reason
+cb/dyn.php	add_action(array($skin,'feedback'))	callback computed at run time
+cb/dyn.php	call_user_func("h_$event")	callback computed at run time
+cb/dyn.php	call_user_func("handle_$event")	callback computed at run time
+cb/dyn.php	call_user_func("handle_{$event}")	callback computed at run time
+cb/dyn.php	call_user_func(...$args)	callback computed at run time
+cb/dyn.php	call_user_func([$class,'run'])	callback computed at run time
+cb/dyn.php	call_user_func(array($class,'run'))	callback computed at run time
 data/main.php	array_map($this->mapper)	callback computed at run time
 dyn/main.php	$cb()	function name computed at run time
 dyn/main.php	call_user_func($cb)	callback computed at run time
