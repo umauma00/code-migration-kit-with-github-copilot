@@ -5,7 +5,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { prepare } from './helpers.mjs';
 import { safePath, writeJSON } from '../lib/core.mjs';
-import { deniedRule, guardrailDecision, parseGuardrails, cliFolderTrust } from '../lib/guardrails.mjs';
+import { deniedRule, guardrailDecision, parseGuardrails, cliFolderTrust, interactiveDecision } from '../lib/guardrails.mjs';
 import { doctor } from '../scripts/run_migration.mjs';
 import { kitRoot } from '../scripts/install.mjs';
 
@@ -22,7 +22,7 @@ test('guardrail matching follows upstream deny prefixes across pipelines, wrappe
 });
 
 test('guardrails see the Windows forms of a denied command (PowerShell, cmd.exe, extensions, py launcher)', () => {
-  for (const command of ['npm.cmd test', '& "C:\\Program Files\\nodejs\\npm.cmd" test', 'npx.cmd tsc --noEmit', 'git.exe push',
+  for (const command of ['GIT push', 'Git.exe push', 'NPM test', 'POWERSHELL -c "git push"', 'npm.cmd test', '& "C:\\Program Files\\nodejs\\npm.cmd" test', 'npx.cmd tsc --noEmit', 'git.exe push',
     'cmd /c "git push"', 'cmd /c git push', 'cmd.exe /d /s /c "npm test"', 'Start-Process git -ArgumentList push',
     'Start-Process -FilePath git.exe -ArgumentList "push","origin"', '.\\gradlew.bat build', 'py -3 -m pytest', 'py -3.12 -m pytest -q',
     // Switches take no value, wherever they stand; values may be attached or abbreviated.
@@ -102,4 +102,46 @@ test('doctor fails when installed guardrails would be silently ignored in an unt
   trust([path.dirname(f.root)]);
   assert.deepEqual([(await check()).status, (await check()).ok], ['trusted', true]);
   assert.equal((await doctor(f.root, f.config)).checks.find(c => c.check === 'command guardrails').status, 'installed');
+});
+
+// Phase 01 on Windows: generating the review dependency map was refused as a
+// guardrails.json write because a read on the same line (Test-Path, a listing
+// of migration/*, Format-Table *) named the file or a pattern matching it.
+test('PowerShell reads beside a kit command are not guardrails writes; the refusal names the matched word', () => {
+  const f = prepare();
+  const decide = command => interactiveDecision({ toolName: 'run_in_terminal', toolArgs: { command }, cwd: f.root }, f.root);
+  const kit = 'C:\\Users\\me\\AppData\\Roaming\\Code\\agentPlugins\\code-migration-kit\\scripts';
+  const make = `node "${kit}\\make_review_dependencies.mjs" --source-root src --edges migration/depmap/edges.tsv`;
+  for (const command of [make, `${make}; Test-Path migration/guardrails.json`, `${make}; Get-Item migration/* | Select-Object Name`,
+    `Set-Location ${f.root}; ${make}; Get-ChildItem | Format-Table *`, `${make}; Get-ChildItem migration -Filter *.json | Select-Object Name, Length`,
+    `${make}; Select-String -Path migration/* -Pattern edges`, `${make}; findstr /S /N edges migration\\*`,
+    // PowerShell names are case-insensitive; a pipe into a writer with its own named target is checked on that target.
+    'Get-Content migration/guardrails.json', 'get-content migration/guardrails.json', 'GET-CONTENT migration/guardrails.json', 'GC migration/guardrails.json',
+    'Get-ChildItem migration/* | Out-File migration/file-list.txt',
+    // A pipe joins only the commands it connects: a listing of migration/ before ;, &&, || or a newline is not piped (review round 8).
+    'Get-ChildItem migration; Get-ChildItem temp | Remove-Item', 'Get-ChildItem migration && Get-ChildItem temp | Remove-Item',
+    'gci migration || gci temp | ri', 'Get-ChildItem migration\nGet-ChildItem temp | Remove-Item',
+    'Get-Content migration/guardrails.json; Get-ChildItem temp | ForEach-Object { $_.Name }'])
+    assert.equal(decide(command), null, command);
+  for (const command of ['Set-Content migration/guardrails.json "{}"', 'echo {} > migration/guardrails.json', 'Copy-Item x.json migration/guardrails.json',
+    'Remove-Item -Recurse migration', 'Get-ChildItem migration/* | Remove-Item', 'Get-ChildItem migration/* | ForEach-Object { $_.Delete() }',
+    'Test-Path migration/guardrails.json > migration/guardrails.json', 'sort -o migration/guardrails.json a.txt', 'cp a.json migration/*',
+    // A script block or a pipe into a command that takes its path from the pipeline can change what the reader lists.
+    'Get-ChildItem migration/* | Where-Object { Remove-Item -LiteralPath $_.FullName; $true }', 'Get-ChildItem migration/* | Set-Content -Value x',
+    'Get-ChildItem migration/* | iex', 'Get-ChildItem migration/* | Out-File migration/guardrails.json',
+    // PowerShell names in any letter case, and its aliases.
+    'remove-item -Recurse migration', 'REMOVE-ITEM -Recurse migration', 'Move-Item migration backup', 'move-item migration backup', 'mi migration backup',
+    'Rename-Item migration old', 'set-location migration; remove-item guardrails.json', 'SET-LOCATION migration; REMOVE-ITEM guardrails.json',
+    // A method call on what a reader returns, a listing of migration/ piped into a command that changes it, and -Param:value.
+    '(Get-Item migration/guardrails.json).Delete()', '(gi migration/guardrails.json).MoveTo(\'x\')', '(Get-ChildItem migration/*).Delete()',
+    'Write-Output (Get-Item migration/guardrails.json).Delete()', '[IO.File]::Delete(\'migration/guardrails.json\')',
+    'Get-ChildItem migration | Remove-Item', 'Get-ChildItem migration | del', 'Get-ChildItem -Path migration -Recurse | Remove-Item',
+    'gci migration | Where-Object Name -eq guardrails.json | Remove-Item', 'Get-ChildItem . -Recurse -Filter guardrails.json | ri', 'ls migration | xargs rm',
+    'Get-ChildItem temp; Get-ChildItem migration | Remove-Item', '(Get-ChildItem migration; Get-ChildItem temp) | Remove-Item',
+    'Set-Content -Path:migration/guardrails.json x', 'x | Out-File -FilePath:migration/guardrails.json', 'Remove-Item -Path:migration/guardrails.json']) {
+    const d = decide(command);
+    assert.equal(d?.decision, 'deny', command);
+    assert.match(d.reason, /Matched: `[^`]+`/, command);
+  }
+  assert.match(decide('cp a.json migration/*').reason, /Matched: `migration\/\*`/);
 });

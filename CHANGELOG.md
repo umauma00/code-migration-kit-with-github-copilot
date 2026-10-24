@@ -62,6 +62,73 @@
   the skills and prompt 01 point to it. Fixtures and expected outputs for
   each language are tested with `python -I`.
 
+# 0.3.2 — 2026-10-23
+
+- 2026-10-23 phase 01 on Windows: generating the review dependency map was
+  refused as a write to `migration/guardrails.json`. The hook took any
+  non-read command naming the file, or a pattern matching it, as a write, and
+  knew only POSIX readers, so `Test-Path migration/guardrails.json`,
+  `Get-Item migration/*` or `Format-Table *` after `Set-Location` on the same
+  line refused the whole line. PowerShell and cmd.exe readers and formatters
+  (`Test-Path`, `Get-ChildItem`, `Get-Content`, `Select-String`, `findstr`,
+  `Select-Object`, `Format-Table`...) now count as reads, in any letter case.
+  The exemption holds only when every command they pipe into is a reader or
+  writes to a target named in its own segment (`Out-File`, checked on that
+  target); a script block (`{ ... }`) or a pipe into `Remove-Item`,
+  `Set-Content` or `iex` voids it. The refusal names the word that
+  matched, and the `guardrails-write` guidance offers dropping it or splitting
+  the line when no change was meant. Command names compare in any letter case
+  everywhere in the hook, as Windows treats them: `remove-item -Recurse
+  migration`, `set-location migration; remove-item guardrails.json` and a deny
+  rule against `GIT push` or `NPM test` were missed before; `mi`, `Rename-Item`
+  and `ren` now count as moves. A method call on what a reader returns
+  (`(Get-Item migration/guardrails.json).Delete()`, `[IO.File]::Delete(...)`)
+  voids the exemption, a listing of `migration/` piped into a command that
+  changes what it receives (`Get-ChildItem migration | Remove-Item`,
+  `ls migration | xargs rm`) is refused, and `-Path:value` counts like
+  `-Path value`. Pipes are read per pipeline: a command after `;`, `&&`,
+  `||` or a newline is not piped from the one before it.
+
+- 2026-10-23 phase 00 on Windows stopped twice for no kit reason. The host's
+  own source check took a `/P` switch for a literal credential, then read
+  `guidance --message` as a second failure: an unknown message printed "This
+  step did not succeed / Unexpected error". `guidance --message` now heads its
+  output "What to do about this message" with a note that guidance itself
+  succeeded (`explained: true` in JSON), and a message the kit has no entry
+  for no longer claims an operation failed. A new `credential-candidate` rule
+  says the kit runs no secret scan and no phase stops on one, that a switch
+  alone (`set /P`, `xcopy /P`, `-p`) is not a credential, and offers the person
+  checking the line, continuing 00 without reading it, or moving a real value
+  out. Guidance never repeats a candidate message (Markdown or JSON), since it
+  may hold the value, and masks an assigned `password=`/`token:` value in any
+  other, as well as the value after a password switch (`-P`, `/P`, `/RP`).
+  Protection and classification are separate. A message that names a
+  credential, assigns a password, secret or token value, or has a value
+  after a password switch (any characters) is never repeated, and its words
+  are removed from every field a rule built from it (cause, choices,
+  commands). Values are found by syntax, not by how they look: an
+  assignment key in any case (`TOKEN=`), a quoted value, a short or
+  lowercase one, a key inside a longer name (`DB_PASSWORD=`, `MYSQL_PWD=`),
+  or a value attached to a SQL client's switch (`sqlcmd -Pvalue`,
+  `mysql -pvalue`). Rules are chosen on the message as given, but build their
+  text from captures of the protected message. A finding left after clean
+  phrases are cut out wins, however it is joined, and wins over another rule
+  (a worker's output carrying one); anything else left that names a
+  credential is unsure, never clean; a credential check that failed, lacked
+  access or was skipped gets `credential-incomplete` ("0 errors" and
+  「エラーなし」 are not failures), while a build or worker failure that only
+  names a password keeps its own rule. A clean phrase from a check that
+  crashed, ran in part, timed out, hit a limit or exited non-zero is
+  incomplete, not clean. A clean result
+  ("No credentials detected", "0 matches", "found no issues", "passed",
+  「検出されませんでした」「問題なし」) gets
+  `credential-clear`, which is informational: `actionRequired: false` in JSON
+  and a next step instead of choices in Markdown, so no question; Japanese
+  findings such as 「検知しました」「見つかりました」 are recognized. Prompt 00's
+  "Credentials in the source" says to stop reading a candidate line, keep
+  only its file and line number, and pass guidance a description, never the
+  tool's raw output: skipping the survey alone protects nothing.
+
 # 0.3.1 — 2026-10-23
 
 - 2026-10-23 every command line is checked against one spec per script

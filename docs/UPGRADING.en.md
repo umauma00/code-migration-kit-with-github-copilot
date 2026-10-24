@@ -9,6 +9,15 @@ Existing approvals and completion records are revoked once because the kit's fil
 1. Phase 01 can use bundled mappers for C#, Java, VB.NET, PHP and COBOL ([dependency mappers](DEPENDENCY-MAPPERS.en.md)). A project that uses its own tool for these languages (under `migration/tools/` or elsewhere) should compare it with the bundled mapper before switching. Switching changes the map and the dependency declaration, so phase 01's checks and approvals are redone.
 2. The new mappers also write `unresolved.tsv`. Review every row in phase 01's report.
 
+## 0.3.2 (phase 00 no longer stops on a credential suspicion or misread guidance)
+
+Existing approvals and completion records are revoked once because the kit's files (lib) change. Re-validate from judge. Completed outputs are kept; the re-run only reviews them again. A project still in phase 00 is not affected.
+
+1. `guidance --message` output starts with "What to do about this message" and says guidance itself succeeded; JSON carries `explained: true`.
+2. A message about a suspected credential gets its own guidance: the kit runs no secret scan and no phase stops on one, and a switch alone such as `set /P` is not a credential. Guidance does not repeat that message, Markdown or JSON, since it may hold the value. A clean result ("No credentials detected") gets guidance with no question.
+3. Prompt 00: stop reading a line that looks real, and report only its file and line number as unverified. Pass guidance a description without the value, never the tool's raw output.
+4. The guardrails.json write check treats PowerShell and cmd.exe readers (`Test-Path`, `Get-ChildItem`, `Select-String`, `findstr`...) as reads. A refusal names the word that matched.
+
 ## 0.3.1 (command lines checked; models chosen in one question)
 
 Existing approvals and completion records are revoked once because the kit's files (lib, scripts) change. Re-validate from judge. Completed outputs are kept; the re-run only reviews them again.
