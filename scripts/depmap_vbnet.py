@@ -59,7 +59,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # -I drops the script dir
-from depmap_common import find_files, read_source, run  # noqa: E402
+from depmap_common import EXTERNAL, find_files, read_source, run  # noqa: E402
 from depmap_projects import COMMENT_RE, QUOTED, attr_values, dotnet_projects, drop_not_compiled  # noqa: E402
 from depmap_typed import DOTNET_STANDARD, GLOBAL, PREDEFINED, TOKEN_RE, FileInfo, chains, is_ident, join, members, parse_expr, resolve, scan_or_none  # noqa: E402
 
@@ -409,6 +409,11 @@ def mapper(root, warnings, args):
         d = proj.parent.relative_to(root).as_posix()
         root_ns.setdefault("" if d == "." else d, (m.group(1).strip() if m else proj.stem).lower())
     infos, deep = [], set()
+    spelled = {}        # lower-cased namespace (and each prefix) -> as first written, for external.tsv
+    def spell(name):
+        segs = name.replace("[", "").replace("]", "").split(".")
+        for k in range(1, len(segs) + 1):
+            spelled.setdefault(".".join(segs[:k]).lower(), ".".join(segs[:k]))
     for path, rel in zip(files, rels):
         # A file linked into several projects is compiled under each one's
         # RootNamespace: it declares its types in every one of them.
@@ -417,6 +422,12 @@ def mapper(root, warnings, args):
             spaces = [next((root_ns[d] for d in sorted(root_ns, key=len, reverse=True)
                             if d == "" or rel.startswith(d + "/")), "")]
         text = read_source(path, warnings)
+        for line in text.splitlines():
+            m = IMPORTS_RE.match(line)
+            for clause in (m.group(1).split(",") if m else ()):
+                c = IMPORT_CLAUSE_RE.match(clause.strip())
+                if c:
+                    spell(c.group(2))
         info = scan_or_none(scan, rel, text, deep, spaces[0]) or FileInfo(rel)
         for space in spaces[1:]:
             other = scan_or_none(scan, rel, text, deep, space)
@@ -426,9 +437,14 @@ def mapper(root, warnings, args):
     # Project-level <Import Include> applies to the files of its projects only.
     for info in infos:
         for d in projects_of[info.rel]:
-            info.usings.update(name.lower() for name in attr_values(VBPROJ_IMPORT_RE, texts.get(d, "")) if name.strip())
+            for name in attr_values(VBPROJ_IMPORT_RE, texts.get(d, "")):
+                if name.strip():
+                    info.usings.add(name.strip().lower())
+                    spell(name.strip())
     skipped = drop_not_compiled(infos, not_compiled)
     edges, unresolved = resolve(infos, fold=True, visible_files=visible_files, standard=DOTNET_STANDARD)
+    # Names are matched case-insensitively; external.tsv shows them as written.
+    unresolved = {(a, spelled.get(r, r) if why.startswith(EXTERNAL) else r, why) for a, r, why in unresolved}
     return rels, edges, unresolved | skipped | deep
 
 

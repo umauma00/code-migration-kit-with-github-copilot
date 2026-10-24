@@ -55,7 +55,7 @@ C#・Java・VB.NET では、`using` や `import` はファイルではなく名�
 
 1. 5ファイル試行：全体を作る前に5ファイルで実行し、`edges.tsv` と `unresolved.tsv` をユーザーに見せる
 2. `unresolved.tsv` を全件確認する：外部ライブラリなら問題なし、リポジトリ内のファイルを指すべきものは `review-dependencies.json` に追記する
-3. `external.tsv` で自作ライブラリが無いか見る：C#・VB.NET・Java・PHP の解析器は、どのファイルも宣言していない名前空間・パッケージ（using/Imports/import、PHP の名前空間付きの名前）を、ライブラリごとに1行（名前空間、使っているファイル数、最初のファイル）で書きます。System・Microsoft・java.* などの標準ライブラリは載りません。Spring や log4net のような一般の外部ライブラリは載りますが、問題ありません。自作ライブラリなのにソースが `--root` の外にあると辺が出ないので、ここに出たら、そのソースも入る親ディレクトリを `--root` にして作り直します。ソースが無い（DLL・JAR だけ）なら、移行計画でそのライブラリをどう扱うか（一緒に移す・そのまま使う）をユーザーと決めます
+3. `external.tsv` で自作ライブラリが無いか見る：C#・VB.NET・Java・PHP の解析器は、どのファイルも宣言していない名前空間・パッケージ（using/Imports/import、PHP の名前空間付きの名前）を、名前空間ごとに1行（名前空間、使っているファイル数、最初のファイル）で書きます。親の名前空間も載るときは親の行にまとめます（`log4net.Config` は `log4net` の行）。兄弟の名前空間（`com.fasterxml.jackson.databind` と `com.fasterxml.jackson.core`）は別の行です。System・Microsoft・Windows・Mono、java・javax・jakarta・jdk・sun・com.sun・org.w3c・org.xml などの標準ライブラリは載りません（javax・jakarta は丸ごと外すので、`javax.inject` や `jakarta.persistence` も載りません）。VB.NET は最初に書かれた大文字小文字で載せます。Spring や log4net のような一般の外部ライブラリは載りますが、問題ありません。自作ライブラリなのにソースが `--root` の外にあると辺が出ないので、ここに出たら、そのソースも入る親ディレクトリを `--root` にして作り直します。ソースが無い（DLL・JAR だけ）なら、移行計画でそのライブラリをどう扱うか（一緒に移す・そのまま使う）をユーザーと決めます
 4. 除外ディレクトリ（各スクリプト冒頭のコメントに記載）が案件に合っているか確認する。ビルド出力（bin・obj・target・build・out）や vendor・packages は、`--root` 直下かビルドファイル（.csproj・pom.xml・composer.json など）の横にあるときだけ除外します。同じ名前のパッケージやフォルダは読みます。除外したディレクトリにソースがあれば警告（`WARN skipped ...`）が出ます。ディレクトリのシンボリックリンクはたどります（同じディレクトリが2つのパスで見えるときは両方のファイルとして読みます）。祖先を指すループだけは止めて `WARN symlink loop not followed` を出します
 5. 結果は `migration/depmap/report.md` にまとめる（対応構文、除外、未解決、監査結果）
 

@@ -60,7 +60,9 @@
   mapper) or another installed language, which mapper to start from, the
   fixture and the habits that keep it right. An imported namespace or
   package no file under `--root` declares (C#, VB.NET, Java, PHP; platform
-  libraries left out) is listed once per library in a new `external.tsv`, so an
+  namespaces such as System, java, javax and jakarta left out) is listed in a
+  new `external.tsv`, one row per namespace with child namespaces folded
+  into a listed parent, so an
   in-house library outside `--root` is not silently missed. Measured on
   NUnit, Tomcat and phpBB (50 random edges and 30 random files each): a
   type nested in another file's class no longer hides a using's type of the
@@ -116,7 +118,9 @@
   `realpath()` and a trailing `or die(...)` are understood), and string
   callables (a string in a callback position of `array_map`, `usort`,
   `call_user_func`, `add_action`... and `['Cls', 'm']` pairs, by plain or
-  namespaced name) give edges to the function or class of that name, named arguments (`callback: 'f'`) included and `is_a` strings read as
+  namespaced name) give edges to the function or class of that name (also the
+  last argument of `array_udiff`-style functions, `session_set_save_handler`,
+  the values of `preg_replace_callback_array` and WordPress activation hooks), named arguments (`callback: 'f'`) included and `is_a` strings read as
   class names, while a callback computed at run time (`$cb`, `"on_$x"`,
   `'on_' . $x`, `get_cb()`, `[$class, 'm']`), `$f()` and an include missing at its `__DIR__` path are
   listed as unresolved; COBOL follows COPY, EXEC SQL INCLUDE, CALL 'X' (also with

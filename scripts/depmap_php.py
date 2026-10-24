@@ -78,7 +78,14 @@ CALLBACK_FUNCTIONS = {
 forward_static_call_array register_shutdown_function register_tick_function spl_autoload_register
 set_error_handler set_exception_handler ob_start header_register_callback""".split(), (0,)),
     **dict.fromkeys("""array_filter array_walk array_walk_recursive array_reduce usort uasort uksort
-iterator_apply preg_replace_callback add_action add_filter add_shortcode""".split(), (1,)),
+iterator_apply preg_replace_callback add_action add_filter add_shortcode register_activation_hook
+register_deactivation_hook register_uninstall_hook""".split(), (1,)),
+    # The callback comes last: array_udiff($a, $b, 'cmp').
+    **dict.fromkeys("""array_udiff array_udiff_assoc array_uintersect array_uintersect_assoc
+array_diff_ukey array_diff_uassoc array_intersect_ukey array_intersect_uassoc""".split(), (-1,)),
+    "array_udiff_uassoc": (-1, -2), "array_uintersect_uassoc": (-1, -2),
+    "session_set_save_handler": (0, 1, 2, 3, 4, 5),
+    "preg_replace_callback_array": ("values", 0),   # ['/x/' => 'cb', ...]
 }
 CALLBACK_PARAM = "callback"     # the parameter's name in each of them (named arguments)
 # Functions whose string arguments name a class: positions and parameter names.
@@ -438,12 +445,25 @@ def scan(rel, text):
         args = call_arguments(texts, k + 1)
         if [[at(j) for j in arg] for arg in args] == [[".", ".", "."]]:
             continue            # call_user_func(...): a closure of the function itself
+        candidates = []
         for position, arg in enumerate(args):
             if len(arg) > 2 and NAME_RE.fullmatch(at(arg[0])) and at(arg[1]) == ":":
                 if at(arg[0]).lower() not in params:     # callback: 'f' (PHP 8 named argument)
                     continue
                 arg = arg[2:]
-            elif position not in positions:
+            elif position not in positions and position - len(args) not in positions:
+                continue
+            if positions[0] == "values" and arg and at(arg[0]) in {"[", "array"}:
+                # Each value of a pattern => callback array.
+                opener = arg[0] if at(arg[0]) == "[" else arg[1]
+                for element in call_arguments(texts, opener):
+                    arrow = next((n for n in range(len(element) - 1)
+                                  if at(element[n]) == "=" and at(element[n + 1]) == ">"), None)
+                    candidates.append(element[arrow + 2:] if arrow is not None else element)
+                continue
+            candidates.append(arg)
+        for arg in candidates:
+            if not arg:
                 continue
             first = at(arg[0])
             if len(arg) == 1 and first.startswith(STR) and int(first[1:-1]) not in info.interpolated:
@@ -498,7 +518,7 @@ def static_callable(texts, arg, interpolated):
     as class names), null, a closure, a first-class callable f(...) /
     Cls::m(...), or a pair whose class is fixed: [$this, 'm'],
     array(&$this, 'm'), [__CLASS__, 'm'], ['Cls', 'm'], [Cls::class, 'm'],
-    [self::class, 'm']. Anything else
+    [self::class, 'm'], [new Cls, 'm']. Anything else
     ($cb, "on_$x", 'on_' . $x, get_cb(), [$class, 'm']) is computed at run
     time."""
     toks = [texts[j] for j in arg]
@@ -509,7 +529,7 @@ def static_callable(texts, arg, interpolated):
         if toks[0].startswith(STR):
             return int(toks[0][1:-1]) not in interpolated
         return first == "null"
-    if first in {"function", "fn", "static"}:
+    if first in {"function", "fn"} or first == "static" and toks[1].lower() in {"function", "fn"}:
         return True
     if len(toks) >= 6 and toks[-5:] == ["(", ".", ".", ".", ")"]:      # f(...)
         return True
@@ -522,6 +542,8 @@ def static_callable(texts, arg, interpolated):
     head = [texts[j] for j in elements[0]]
     if head in (["$this"], ["&", "$this"], ["__CLASS__"]):     # its own class (&$this in PHP 4 code)
         return True
+    if head[0].lower() == "new" and len(head) > 1 and NAME_RE.fullmatch(head[1]) and head[1].lower() != "class":
+        return True             # [new Foo, 'm']: Foo is written
     if len(head) == 1 and head[0].startswith(STR):
         return int(head[0][1:-1]) not in interpolated
     return len(head) == 3 and head[1] == "::" and head[2].lower() == "class" and NAME_RE.fullmatch(head[0]) is not None

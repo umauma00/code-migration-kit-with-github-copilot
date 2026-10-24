@@ -10,5 +10,11 @@ expr/main.php	expr/mapper.php
 expr/main.php	expr/others.php
 long/handler.php	long/main.php
 long/main.php	long/handler.php
+more/main.php	more/cb_activate.php
+more/main.php	more/cb_arr.php
+more/main.php	more/cb_key.php
+more/main.php	more/cb_udiff.php
+more/main.php	more/cb_val.php
+more/main.php	more/foo.php
 short/handler.php	short/main.php
 short/main.php	short/handler.php
