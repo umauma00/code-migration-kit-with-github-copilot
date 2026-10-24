@@ -7,5 +7,6 @@ inc/main.php	wp-inc/http.php
 lib/compat.php	lib/real.php
 mw/index.php	mw/includes/Setup.php
 mw/maintenance/rebuild.php	mw/maintenance/doMaintenance.php
+mw/mix/a.php	mw/mix/lib.php
 sub/page.php	includes/funcs.php
 theme/functions.php	lib/real.php

@@ -147,9 +147,10 @@ def php_holes(body):
 
 def php_code(text):
     """Code between PHP open and close tags, comments removed and each string
-    replaced by a placeholder. Returns (code, strings). The code inside the
-    holes of a "..." string or heredoc follows its placeholder."""
-    out, strings = [], []
+    replaced by a placeholder. Returns (code, strings, interpolated): the
+    indexes of the "..." strings and heredocs, whose $name is a variable.
+    The code inside their holes follows the placeholder."""
+    out, strings, interpolated = [], [], set()
     i, n = 0, len(text)
     in_php = False
     while i < n:
@@ -200,6 +201,8 @@ def php_code(text):
                 buf.append(text[j])
                 j += 1
             strings.append("".join(buf))
+            if c == '"':
+                interpolated.add(len(strings) - 1)
             holes = php_holes(text[i + 1:j]) if c == '"' else ""
             out.append(f"{STR}{len(strings) - 1}\x02" + holes + "\n" * text.count("\n", i, j))
             i = j + 1
@@ -213,12 +216,14 @@ def php_code(text):
                 body = text[i + m.end():end.start() if end else n]
                 strings.append(body)
                 holes = php_holes(body) if m.group(1) != "'" else ""     # not a nowdoc
+                if m.group(1) != "'":
+                    interpolated.add(len(strings) - 1)
                 out.append(f"{STR}{len(strings) - 1}\x02" + holes + "\n" * body.count("\n"))
                 i = stop
                 continue
         out.append(c)
         i += 1
-    return "".join(out), strings
+    return "".join(out), strings, interpolated
 
 
 class FileInfo:
@@ -228,6 +233,7 @@ class FileInfo:
         self.refs = []          # (namespace, name, is_call, uses)
         self.includes = []      # (keyword, expression parts)
         self.strings = []
+        self.interpolated = set()   # indexes of strings whose $name is a variable
         self.callables = []     # names in string callables: ("function" | "class", name)
         self.dynamic = []
         self.guarded = set()    # ("function" | "class" | "const", key) behind a !function_exists(...) guard
@@ -241,7 +247,7 @@ def lower(name):
 
 def scan(rel, text):
     info = FileInfo(rel)
-    code, info.strings = php_code(text)
+    code, info.strings, info.interpolated = php_code(text)
     toks = [(m.group(0), m.start()) for m in re.finditer(
         r"\x01\d+\x02|" + NAME_RE.pattern + r"|\$[\w\x80-\uffff]+|->|\?->|::|\S", code)]
     ns = ""
@@ -437,7 +443,7 @@ def parse_vars(text):
 
 
 CONST_PATH = "\x00path:"   # key in include variables: a constant whose define() names a file
-INTERPOLATED_RE = re.compile(r"\{\$(\w+)\}|\$(\w+)")
+INTERPOLATED_RE = re.compile(r"\$(\w+)")
 
 
 def dirname_depth(toks, k):
@@ -478,9 +484,9 @@ def resolve_include(src, parts, info, by_rel, by_tail, include_path=(), variable
             pass                    # realpath(x) names the same file as x
         elif t.startswith(STR):
             piece = info.strings[int(t[1:-1])]
-            if "$" in piece:
-                # "$IP/includes/x.php" with --include-var IP=...
-                piece = INTERPOLATED_RE.sub(lambda m: variables.get(m.group(1) or m.group(2), m.group(0)), piece)
+            if "$" in piece and int(t[1:-1]) in info.interpolated:
+                # "$IP/includes/x.php" with --include-var IP=... ('$IP' is text)
+                piece = INTERPOLATED_RE.sub(lambda m: variables.get(m.group(1), m.group(0)), piece)
             if "$" in piece:
                 return None, "include path computed at run time"
             pieces.append(piece)
@@ -549,8 +555,13 @@ def mapper(root, warnings, args):
     rels, infos = [], []
     for path in files:
         rel = path.relative_to(root).as_posix()
-        if path.suffix.lower() in PHP_IF_TAGGED and b"<?php" not in path.read_bytes().lower():
-            continue
+        if path.suffix.lower() in PHP_IF_TAGGED:
+            try:
+                if b"<?php" not in path.read_bytes().lower():
+                    continue
+            except OSError as e:
+                warnings.append(f"not read: {rel}: {e.strerror}")
+                continue
         infos.append(scan(rel, read_source(path, warnings)))
         rels.append(rel)
     by_rel = set(rels)
@@ -593,7 +604,8 @@ def mapper(root, warnings, args):
     # A constant defined as a computable path (define('DO_MAINTENANCE',
     # dirname(__FILE__) . '/doMaintenance.php')) names that file wherever
     # it is included, if every define() of it names the same one.
-    const_paths = {}
+    # A literal define() of the same name elsewhere makes it ambiguous.
+    const_paths = {name: {None} for name in const_values}
     for info in infos:
         for name, value in info.const_exprs.items():
             hit, why = resolve_include(info.rel, value, info, by_rel, by_tail, include_path, include_vars)

@@ -14,6 +14,11 @@ mw/index.php
 mw/maintenance/Maintenance.php
 mw/maintenance/doMaintenance.php
 mw/maintenance/rebuild.php
+mw/mix/lib.php
+mw/mix/a.php
+mw/mix/b.php
+mw/mix/other.php
+mw/text.php
 plugins/x/http.php
 sub/page.php
 theme/functions.php
