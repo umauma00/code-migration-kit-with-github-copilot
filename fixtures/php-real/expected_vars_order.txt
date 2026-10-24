@@ -4,10 +4,16 @@ a/b/c.php
 lib/real.php
 lib/compat.php
 app/caller.php
+drupal/mymod.install
 wp-inc/http.php
 inc/main.php
 includes/funcs.php
 lib/consts.php
+mw/includes/Setup.php
+mw/index.php
+mw/maintenance/Maintenance.php
+mw/maintenance/doMaintenance.php
+mw/maintenance/rebuild.php
 plugins/x/http.php
 sub/page.php
 theme/functions.php

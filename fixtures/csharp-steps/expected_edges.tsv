@@ -20,6 +20,7 @@ AttrMore/Gen.cs	AttrMore/BarAttribute.cs
 AttrMore/Gen.cs	AttrMore/Foo.cs
 AttrMore/Lam.cs	AttrMore/Foo.cs
 AttrMore/Lam.cs	AttrMore/FooAttribute.cs
+DeclName/Schema.cs	DeclName/Mapping.cs
 ExtRecv/BagExt.cs	ExtRecv/S.cs
 ExtRecv/Derived.cs	ExtRecv/Neg.cs
 ExtRecv/Derived.cs	ExtRecv/RespExt.cs

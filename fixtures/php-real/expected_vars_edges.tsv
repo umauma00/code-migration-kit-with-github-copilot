@@ -2,7 +2,10 @@ from	to
 a/b/c.php	a/top.php
 app/caller.php	lib/compat.php
 app/caller.php	lib/real.php
+drupal/mymod.install	lib/real.php
 inc/main.php	wp-inc/http.php
 lib/compat.php	lib/real.php
+mw/index.php	mw/includes/Setup.php
+mw/maintenance/rebuild.php	mw/maintenance/doMaintenance.php
 sub/page.php	includes/funcs.php
 theme/functions.php	lib/real.php

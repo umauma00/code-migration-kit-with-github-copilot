@@ -37,7 +37,7 @@ class FileInfo:
         self.extensions = []        # (namespace, name) of members called as x.Name (C# extension methods, VB module members)
         self.extension_receivers = {}   # C# extension fqn -> simple names of its receiver types (this T x)
         self.partial = set()        # FQNs declared partial in this file
-        self.nested = set()         # FQNs (namespace.Name) of types nested in another type of this file
+        self.nested = {}            # namespace.Name -> namespace.Outer.Name of each type nested in another type of this file
         self.member_decls = set()   # FQNs in decls that are VB Module members, not types
         self.usings = set()         # imported namespaces (or types: Java on-demand of a type)
         self.blocks = {}            # C# namespace block context -> Directives written in it
@@ -77,6 +77,7 @@ def context_ns(ctx):
     return ctx.split(BLOCK, 1)[0]
 
 
+NESTED = "\x00"          # namespace.Name + NESTED + file: a nested type, as its own file sees it
 GLOBAL = "global::"     # a name qualified from the root namespace (C# global::, VB Global.)
 
 
@@ -181,6 +182,23 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
             extensions.setdefault(join(ns, name), set()).add(info.rel)
         for fqn in set(info.type_members) | set(info.type_bases):
             declared_in.setdefault(fqn, []).append(info)
+    # Types are keyed by namespace.Name (the scanners do not track nesting
+    # in references), so DescriptorImpl nested in twenty classes of one
+    # package shares one key. Each nested type also gets a key of its own
+    # file, which names inside that file mean (its members and members'
+    # types resolve there), and its qualified name Outer.Inner.
+    flat_types = {fq: set(files) for fq, files in types.items()}
+    canonical = {}      # own or qualified key -> (namespace.Name, declaring FileInfo)
+    own_nested = {}     # rel -> simple name -> own key
+    for info in infos:
+        for flat, qual in sorted(info.nested.items()):
+            key = flat + NESTED + info.rel
+            types[key] = {info.rel}
+            canonical[key] = (flat, info)
+            own_nested.setdefault(info.rel, {})[flat.rpartition(".")[2]] = key
+            if qual not in flat_types:
+                types.setdefault(qual, set()).add(info.rel)
+                canonical.setdefault(qual, (flat, info))
     global_usings = {dotted(u, fold) for u in global_usings}
     # A using inside a C# namespace block is relative to the enclosing
     # namespaces (using Models; inside namespace Acme.Web may mean
@@ -207,6 +225,13 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
 
     def lookup(fqn):
         return types.get(fqn, ())
+
+    def declaration(fqn):
+        """(key in the files' tables, the FileInfos declaring it)."""
+        if fqn in canonical:
+            flat, info = canonical[fqn]
+            return flat, [info]
+        return fqn, declared_in.get(fqn, ())
 
     def longest(segs):
         for i in range(len(segs), 0, -1):
@@ -307,6 +332,10 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
             any all count."""
             if name in self.cache:
                 return self.cache[name]
+            own = own_nested.get(self.info.rel, {}).get(name)
+            if own:             # a type nested in this file
+                self.cache[name] = {own}
+                return {own}
             found = set()
             if nested_lookup:
                 for level in self.levels:
@@ -435,7 +464,7 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
     for info in infos:
         for fq, names in info.extension_receivers.items():
             ext_receivers.setdefault((fq, info.rel), set()).update(names)
-    type_names = {fq.rpartition(".")[2] for fq in types}
+    type_names = {fq.rpartition(".")[2] for fq in flat_types}
 
     def add(src, targets):
         targets = set(targets)
@@ -478,7 +507,7 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
 
     # Non-partial types declared in several files that can see each other.
     member_decls = set().union(*(info.member_decls for info in infos)) if infos else set()
-    for fq, files in sorted(types.items()):
+    for fq, files in sorted(flat_types.items()):
         # Nested types of the same name are different types, not copies.
         files = files - nested_in.get(fq, set())
         if len(files) < 2 or fq in partial_types or fq in member_decls:
@@ -496,9 +525,10 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
     def members_of(fqn):
         if fqn not in member_cache:
             table = {}
-            for info in declared_in.get(fqn, ()):
-                scope = scope_of(info, info.type_ns.get(fqn, ""))
-                for name, chains in info.type_members.get(fqn, {}).items():
+            key, where = declaration(fqn)
+            for info in where:
+                scope = scope_of(info, info.type_ns.get(key, ""))
+                for name, chains in info.type_members.get(key, {}).items():
                     slot = table.setdefault(name, set())
                     for chain, elem in chains:
                         slot.update((fq, elem) for fq in scope.exact(chain.split(".")))
@@ -509,9 +539,10 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
         if fqn not in base_cache:
             base_cache[fqn] = set()
             found = set()
-            for info in declared_in.get(fqn, ()):
-                scope = scope_of(info, info.type_ns.get(fqn, ""))
-                for chain in info.type_bases.get(fqn, ()):
+            key, where = declaration(fqn)
+            for info in where:
+                scope = scope_of(info, info.type_ns.get(key, ""))
+                for chain in info.type_bases.get(key, ()):
                     found.update(scope.exact(chain.split(".")))
             base_cache[fqn] = found
         return base_cache[fqn]
@@ -609,10 +640,12 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
                 add(src, lookup(name))
         # Types reached through variables and member chains.
         env = {}
+        mine = {canonical[k][0]: k for k in own_nested.get(src, {}).values()}  # nested flat key -> own key
         for step in info.flow:
             scope = scope_of(info, step[-1])
             if step[0] == "bind":
                 _, var, enclosing, exprs, chains, foreach, _ = step
+                enclosing = [mine.get(t, t) for t in enclosing]
                 bound = set()
                 for chain, elem in chains:
                     bound.update((fq, elem) for fq in scope.exact(chain.split(".")))
@@ -627,6 +660,7 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
                     env.setdefault(var, set()).update((fq, elem) for fq, elem in bound)
             else:
                 _, enclosing, expr, _ = step
+                enclosing = [mine.get(t, t) for t in enclosing]
                 add_types(src, evaluate(scope, env, enclosing, expr)[1])
         # x.Name() may call an extension method of any namespace visible
         # somewhere in the file.

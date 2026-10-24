@@ -23,6 +23,8 @@ AttrMore/FooAttribute.cs
 AttrMore/Dtor.cs
 AttrMore/Gen.cs
 AttrMore/Lam.cs
+DeclName/Mapping.cs
+DeclName/Schema.cs
 ExtRecv/S.cs
 ExtRecv/BagExt.cs
 ExtRecv/Neg.cs

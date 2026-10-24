@@ -1,4 +1,7 @@
 # migration order: one batch per line, dependencies first
+Nested/p/Mailer.java
+Nested/p/Manager.java
+Nested/p/Shell.java
 core/src/main/java/c/Core.java
 my-lib/src/main/java/m/Lib.java
 app/src/main/java/a/App.java

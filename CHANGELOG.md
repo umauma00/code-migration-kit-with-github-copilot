@@ -44,7 +44,16 @@
   unguarded one exists; PHP include paths take `--include-var NAME=VALUE`,
   constants with one relative `define()` literal and nested
   `dirname(dirname(__FILE__))`; Windows-1252 text is no longer reported as
-  cp932, and a missing ProjectReference says it is missing. A
+  cp932, and a missing ProjectReference says it is missing. Checked again on
+  NHibernate 3.3.1, NUnit 2.6.0, Drupal 7.0, MediaWiki 1.16, Tomcat 7.0.0 and
+  Jenkins 1.416: a nested type's name means the nested type of its own file
+  (and `Outer.Inner` anywhere), so same-named nested classes such as Java's
+  `DescriptorImpl` are no longer duplicates or false edges; a name a C#
+  declaration introduces (`string Schema {`) is not a type reference; PHP
+  reads Drupal `.install`/`.test`/`.theme`/`.engine`/`.profile` files that
+  contain `<?php`, replaces `--include-var` values inside strings
+  (`"$IP/x.php"`) and uses `define()` constants whose value is a computable
+  path. A
   using or alias target inside a namespace block is relative to the
   enclosing namespaces, and once resolved is kept as a full name.
   VB.NET joins implicitly continued lines (a trailing comma, an open

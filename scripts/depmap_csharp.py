@@ -87,6 +87,48 @@ CSPROJ_USING_RE = re.compile(r"<Using\b" + ATTRS + r"/?>", re.IGNORECASE)
 CSPROJ_ATTR_RE = re.compile(r"\b(Include|Alias|Static)\s*=\s*" + QUOTED, re.IGNORECASE)
 
 
+# Words after which a name is a value, not a declaration (select x;, from
+# x in, return x;): query keywords and contextual words.
+VALUE_WORDS = set("""select where orderby group by into from in join on equals let ascending
+descending await yield nameof when and or not with is as return throw case goto else new typeof
+sizeof default checked unchecked""".split())
+
+
+def declared_name_at(code, start, end, name):
+    """Whether the name at code[start:end] is the name being declared in
+    string Schema { get; }, Foo bar = ..., void Run(...): a simple name right
+    after a type (an identifier, a predefined type, > ] ? or *) and before
+    { ; = ( , or ). Such a name is not a reference to a type of that name
+    (a property Schema is not the class Schema)."""
+    if "." in name or name.startswith(GLOBAL):
+        return False
+    k = end
+    while k < len(code) and code[k].isspace():
+        k += 1
+    if k >= len(code) or code[k] not in "{;=(,)":
+        return False
+    if code[k] == "=" and code[k + 1:k + 2] == "=":
+        return False        # Foo == x is a comparison
+    k = start - 1
+    while k >= 0 and code[k].isspace():
+        k -= 1
+    if k < 0:
+        return False
+    if code[k] == "]":
+        return True         # int[] Foo
+    if code[k] in ">?*":
+        # List<int> Foo, int? Foo, int* p: the type ends right at the mark;
+        # a > Foo, c ? Foo(x) : y and a * Foo(x) are expressions.
+        return k > 0 and not code[k - 1].isspace() and code[k - 1:k + 1] not in {"=>", "->"}
+    j = k
+    while j >= 0 and (code[j].isalnum() or code[j] in "_@"):
+        j -= 1
+    word = code[j + 1:k + 1].lstrip("@")
+    if not word or word[0].isdigit():
+        return False
+    return word not in VALUE_WORDS and (word in PREDEFINED or word not in KEYWORDS)
+
+
 def receiver_name(toks, j):
     """Simple name of the type at toks[j] (an extension method's receiver,
     after this and ref/in/scoped): string for string, List for
@@ -175,8 +217,8 @@ def scan(rel, text):
     blocks = 0
     file_ctx = None         # block context of a file-scoped namespace (namespace N;)
     contexts = [(0, "")]    # (offset, context from there on)
-    type_depths = []        # depth inside each enclosing type body
-    type_pending = False    # a type declaration whose body has not opened yet
+    type_depths = []        # (depth inside its body, name) of each enclosing type
+    type_pending = None     # name of a type declaration whose body has not opened yet
 
     def current():
         return ".".join(p for p in [file_ns] + [n for n, _, _ in stack] if p)
@@ -193,12 +235,12 @@ def scan(rel, text):
         if t == "{":
             depth += 1
             if type_pending:
-                type_depths.append(depth)
-                type_pending = False
+                type_depths.append((depth, type_pending))
+                type_pending = None
         elif t == ";":
-            type_pending = False    # record R(int X); has no body
+            type_pending = None     # record R(int X); has no body
         elif t == "}":
-            if type_depths and type_depths[-1] == depth:
+            if type_depths and type_depths[-1][0] == depth:
                 type_depths.pop()
             depth -= 1
             popped = False
@@ -280,8 +322,8 @@ def scan(rel, text):
                 info.namespaces.add(ns)
                 info.decls.append((ns, name))
                 if type_depths:     # nested: a type of its own, not a copy of a same-named one
-                    info.nested.add(f"{ns}.{name}" if ns else name)
-                type_pending = True
+                    info.nested[join(ns, name)] = join(ns, ".".join(n for _, n in type_depths) + "." + name)
+                type_pending = name
                 k = i - 1
                 while k >= 0 and toks[k][0] in KEYWORDS:
                     if toks[k][0] == "partial":
@@ -304,7 +346,8 @@ def scan(rel, text):
                 info.namespaces.add(ns)
                 info.decls.append((ns, toks[k][0].lstrip("@")))
                 if type_depths:
-                    info.nested.add(join(ns, toks[k][0].lstrip("@")))
+                    name = toks[k][0].lstrip("@")
+                    info.nested[join(ns, name)] = join(ns, ".".join(n for _, n in type_depths) + "." + name)
         elif t == "(" and i + 2 < len(toks) and toks[i + 1][0] == "this" and toks[i - 1][0] not in KEYWORDS \
                 and (toks[i + 2][0][0].isalpha() or toks[i + 2][0][0] == "_"):
             # Extension method: Name(this T x) or Name<T>(this T x).
@@ -360,9 +403,12 @@ def scan(rel, text):
     info.names, info.attribute_names = [], []
     brackets = Brackets(code)
     for pos, name in chains_at(code, KEYWORDS):
+        end = CHAIN_RE.match(code, pos).end()
+        if declared_name_at(code, pos, end, name):
+            continue
         ref = (contexts[bisect.bisect_right(offsets, pos) - 1][1], name)
         info.names.append(ref)
-        if attribute_name_at(code, pos, CHAIN_RE.match(code, pos).end(), brackets):
+        if attribute_name_at(code, pos, end, brackets):
             info.attribute_names.append(ref)
     info.member_calls = member_calls(code)
     info.members = {name for _, name in info.member_calls}

@@ -53,7 +53,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # -I drops the script dir
 from depmap_common import find_files, read_source, run  # noqa: E402
 from depmap_projects import java_modules  # noqa: E402
-from depmap_typed import FileInfo, TOKEN_RE, chains, flow_c_like, resolve, scan_or_none, strip_c_like  # noqa: E402
+from depmap_typed import FileInfo, TOKEN_RE, chains, flow_c_like, join, resolve, scan_or_none, strip_c_like  # noqa: E402
 
 EXTS = {".java"}
 SKIP_DIRS = {"target", "build", "out"}
@@ -85,14 +85,27 @@ def scan(rel, text):
             info.direct.add(name)
     body = IMPORT_RE.sub(lambda m: " " * len(m.group(0)), PACKAGE_RE.sub(lambda m: " " * len(m.group(0)), code))
     toks = TOKEN_RE.findall(body)
+    depth, type_depths, pending = 0, [], None      # type_depths: (depth inside its body, name) of each enclosing type
     for i, t in enumerate(toks):
         prev = toks[i - 1] if i else ";"
-        if t in {"class", "interface", "@interface", "enum", "record"} and prev != "." and i + 1 < len(toks):
+        if t == "{":
+            depth += 1
+            if pending:
+                type_depths.append((depth, pending))
+                pending = None
+        elif t == "}":
+            if type_depths and type_depths[-1][0] == depth:
+                type_depths.pop()
+            depth -= 1
+        elif t in {"class", "interface", "@interface", "enum", "record"} and prev != "." and i + 1 < len(toks):
             name = toks[i + 1]
             if name not in KEYWORDS and (name[0].isalpha() or name[0] in "_$"):
                 if t == "record" and (i + 2 >= len(toks) or toks[i + 2] not in {"(", "<"}):
                     continue  # "record" used as an identifier
                 info.decls.append((package, name))
+                if type_depths:     # nested (Outer.DescriptorImpl): not a copy of a same-named type
+                    info.nested[join(package, name)] = join(package, ".".join(n for _, n in type_depths) + "." + name)
+                pending = name
     info.names = [(package, name) for name in chains(body, KEYWORDS)]
     info.type_members, info.type_bases, info.flow, info.type_ns = flow_c_like(toks, KEYWORDS, "java", package)
     for m in REFLECTION_RE.finditer(body):

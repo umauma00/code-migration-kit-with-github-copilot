@@ -62,6 +62,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))  # -I drops the script 
 from depmap_common import find_files, path_list, read_source, run  # noqa: E402
 
 EXTS = {".php", ".inc", ".phtml", ".php3", ".php4", ".php5", ".module"}
+# Drupal's PHP files (.install, .test, .theme, .engine, .profile): mapped
+# when they open a <?php tag, since other projects use these extensions for
+# data.
+PHP_IF_TAGGED = {".install", ".test", ".theme", ".engine", ".profile"}
 # A function or class name in a string, maybe namespaced (App\Util\conv).
 BARE_NAME_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*(?:\\[A-Za-z_][A-Za-z0-9_]*)*")
 # Functions whose string arguments name a callback, class or function.
@@ -228,6 +232,7 @@ class FileInfo:
         self.dynamic = []
         self.guarded = set()    # ("function" | "class" | "const", key) behind a !function_exists(...) guard
         self.const_values = {}  # constant -> literal value of define('X', 'v')
+        self.const_exprs = {}   # constant -> value tokens of define('X', <expr>)
 
 
 def lower(name):
@@ -339,6 +344,15 @@ def scan(rel, text):
             info.constants.append(string(at(i + 2)).lstrip("\\"))
             if at(i + 3) == "," and at(i + 4).startswith(STR) and at(i + 5) == ")":
                 info.const_values[string(at(i + 2)).lstrip("\\")] = string(at(i + 4))
+            elif at(i + 3) == ",":
+                # define('X', dirname(__FILE__) . '/x.php'): an include of X
+                # is that path, resolved in this file.
+                j, level, value = i + 4, 0, []
+                while j < n and not (level == 0 and at(j) in {")", ","}):
+                    level += {"(": 1, ")": -1}.get(at(j), 0)
+                    value.append(at(j))
+                    j += 1
+                info.const_exprs[string(at(i + 2)).lstrip("\\")] = value
         elif t == "!" and GUARDS.get(at(i + 1).lower().lstrip("\\")) and at(i + 2) == "(" \
                 and at(i + 3).startswith(STR) and at(i + 4) in {")", ","}:
             # if (!function_exists('f')) { function f() ... }: a fallback
@@ -422,6 +436,10 @@ def parse_vars(text):
     return out
 
 
+CONST_PATH = "\x00path:"   # key in include variables: a constant whose define() names a file
+INTERPOLATED_RE = re.compile(r"\{\$(\w+)\}|\$(\w+)")
+
+
 def dirname_depth(toks, k):
     """(number of nested dirname calls at toks[k], index of the __FILE__ /
     __DIR__ they wrap), or (0, k)."""
@@ -438,6 +456,9 @@ def resolve_include(src, parts, info, by_rel, by_tail, include_path=(), variable
     variables: known values of $variables and constants (--include-var, and
     constants every define() gives the same literal)."""
     variables = variables or {}
+    bare = [p for p in parts if p not in {"(", ")"}]
+    if len(bare) == 1 and isinstance(variables.get(CONST_PATH + bare[0]), list):
+        return variables[CONST_PATH + bare[0]], None    # require_once(DO_MAINTENANCE)
     base, pieces, unknown_prefix = None, [], False
     k = 0
     toks = [p for p in parts if p not in {"(", ")"}]
@@ -457,6 +478,9 @@ def resolve_include(src, parts, info, by_rel, by_tail, include_path=(), variable
             pass                    # realpath(x) names the same file as x
         elif t.startswith(STR):
             piece = info.strings[int(t[1:-1])]
+            if "$" in piece:
+                # "$IP/includes/x.php" with --include-var IP=...
+                piece = INTERPOLATED_RE.sub(lambda m: variables.get(m.group(1) or m.group(2), m.group(0)), piece)
             if "$" in piece:
                 return None, "include path computed at run time"
             pieces.append(piece)
@@ -521,10 +545,12 @@ def resolve_include(src, parts, info, by_rel, by_tail, include_path=(), variable
 
 
 def mapper(root, warnings, args):
-    files = find_files(root, EXTS, SKIP_DIRS, MARKERS, warnings)
+    files = find_files(root, EXTS | PHP_IF_TAGGED, SKIP_DIRS, MARKERS, warnings)
     rels, infos = [], []
     for path in files:
         rel = path.relative_to(root).as_posix()
+        if path.suffix.lower() in PHP_IF_TAGGED and b"<?php" not in path.read_bytes().lower():
+            continue
         infos.append(scan(rel, read_source(path, warnings)))
         rels.append(rel)
     by_rel = set(rels)
@@ -564,6 +590,17 @@ def mapper(root, warnings, args):
             const_values.setdefault(name, set()).add(value)
     include_vars = dict(const_values_unique(const_values))
     include_vars.update(parse_vars(args.include_var))
+    # A constant defined as a computable path (define('DO_MAINTENANCE',
+    # dirname(__FILE__) . '/doMaintenance.php')) names that file wherever
+    # it is included, if every define() of it names the same one.
+    const_paths = {}
+    for info in infos:
+        for name, value in info.const_exprs.items():
+            hit, why = resolve_include(info.rel, value, info, by_rel, by_tail, include_path, include_vars)
+            const_paths.setdefault(name, set()).add(tuple(hit) if hit and not why and len(hit) == 1 else None)
+    for name, hits in const_paths.items():
+        if len(hits) == 1 and None not in hits:
+            include_vars[CONST_PATH + name] = list(next(iter(hits)))
 
     by_lower = {rel.lower(): rel for rel in rels}
     cache = {}

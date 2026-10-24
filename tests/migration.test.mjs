@@ -363,7 +363,7 @@ test('C#, Java, PHP, VB.NET and COBOL dependency fixtures produce their expected
     ['csharp', 'csharp-steps'],
     // Real-tree findings: guarded PHP fallbacks, define() literals and
     // --include-var in include paths, dirname(dirname(__FILE__)).
-    ['php', 'php-real'], ['php', 'php-real', 'expected_vars_', ['--include-var', 'root=,ext=php']],
+    ['php', 'php-real'], ['php', 'php-real', 'expected_vars_', ['--include-var', 'root=,ext=php,IP=mw']],
     ['php', 'php-relative', 'expected_', ['--include-path', 'lib']]];
   for (const [lang, name, prefix = 'expected_', options = []] of cases) {
     const out = path.join(root, `${name}-${prefix}`), fixture = path.join(kitRoot, 'fixtures', name);
