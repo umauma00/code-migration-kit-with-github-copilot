@@ -38,6 +38,9 @@ Nested/A.cs
 Nested/B.cs
 Nested/C.cs
 Nested/D.cs
+NestedVis/core/Fw.cs
+NestedVis/framework/Check.cs
+NestedVis/tests/T.cs
 Shadow/A.cs
 Shadow/Z.cs
 Shadow/U.cs

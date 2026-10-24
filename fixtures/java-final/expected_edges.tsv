@@ -1,6 +1,7 @@
 from	to
 Nested/p/Manager.java	Nested/p/Mailer.java
 Nested/p/Shell.java	Nested/p/Manager.java
+NestedVis/p/User.java	NestedVis/q/Util.java
 app/src/main/java/a/App.java	core/src/main/java/c/Core.java
 app/src/main/java/a/App.java	my-lib/src/main/java/m/Lib.java
 oneline/OneLine.java	oneline/Util.java

@@ -29,6 +29,7 @@ ExtRecv/NegExt.cs	ExtRecv/Neg.cs
 ExtRecv/RespExt.cs	ExtRecv/Neg.cs
 ExtRecv/RespExt.cs	ExtRecv/NegExt.cs
 Nested/D.cs	Nested/C.cs
+NestedVis/tests/T.cs	NestedVis/framework/Check.cs
 Shadow/U.cs	Shadow/A.cs
 Shadow/U.cs	Shadow/Z.cs
 TupleAlias/U.cs	TupleAlias/Cust.cs

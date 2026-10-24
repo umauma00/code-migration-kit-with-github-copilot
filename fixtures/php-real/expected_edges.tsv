@@ -5,6 +5,7 @@ app/caller.php	lib/real.php
 drupal/mymod.install	lib/real.php
 inc/main.php	wp-inc/http.php
 lib/compat.php	lib/real.php
+local/script_a.php	local/consts.php
 mw/maintenance/rebuild.php	mw/maintenance/doMaintenance.php
 mw/mix/a.php	mw/mix/lib.php
 theme/functions.php	lib/real.php

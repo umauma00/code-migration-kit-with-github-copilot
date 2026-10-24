@@ -59,7 +59,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # -I drops the script dir
-from depmap_common import EXTERNAL, find_files, path_list, read_source, run  # noqa: E402
+from depmap_common import EXTERNAL, find_files, path_list, reachable, read_source, run  # noqa: E402
 
 EXTS = {".php", ".inc", ".phtml", ".php3", ".php4", ".php5", ".module"}
 # Drupal's PHP files (.install, .test, .theme, .engine, .profile): mapped
@@ -639,19 +639,37 @@ def mapper(root, warnings, args):
         namespaces.update("\\".join(parts[:k]) for k in range(1, len(parts) + 1))
     external = {}       # namespace no file declares -> files that name a class in it
 
+    included = {info.rel: [] for info in infos}     # rel -> [(keyword, parts, hit, why)]
+    for info in infos:
+        for keyword, parts in info.includes:
+            hit, why = resolve_include(info.rel, parts, info, by_rel, by_tail, include_path, include_vars)
+            included[info.rel].append((keyword, parts, hit, why))
+    include_deps = {rel: {t for _, _, hit, _ in rows for t in hit or ()} for rel, rows in included.items()}
+    closures = {}
+
     edges, unresolved = set(), set()
     for info in infos:
         src = info.rel
 
         def add(targets):
+            """A function, class or constant reference. The file's own
+            declaration wins; of several declarations, the ones the file's
+            includes reach win (a define() copied into a develop/ script is
+            not where index.php gets ANONYMOUS); otherwise all count."""
+            targets = set(targets)
+            if src in targets:
+                return
+            if len(targets) > 1:
+                if src not in closures:
+                    closures[src] = reachable(src, include_deps)
+                targets = (targets & closures[src]) or targets
             for t in targets:
+                edges.add((src, t))
+
+        for keyword, parts, hit, why in included[src]:
+            for t in hit or ():
                 if t != src:
                     edges.add((src, t))
-
-        for keyword, parts in info.includes:
-            hit, why = resolve_include(src, parts, info, by_rel, by_tail, include_path, include_vars)
-            if hit:
-                add(hit)
             if why:     # unresolved, or resolved to several candidates
                 expr = " ".join("'" + info.strings[int(p[1:-1])] + "'" if p.startswith(STR) else p for p in parts)
                 unresolved.add((src, f"{keyword} {expr}", why))

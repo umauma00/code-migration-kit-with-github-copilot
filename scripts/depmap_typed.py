@@ -201,6 +201,7 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
     flat_types = {fq: set(files) for fq, files in types.items()}
     canonical = {}      # own or qualified key -> (namespace.Name, declaring FileInfo)
     own_nested = {}     # rel -> simple name -> own key
+    nested_only = set() # namespace.Name keys every declaration of which is nested
     for info in infos:
         for flat, qual in sorted(info.nested.items()):
             key = flat + NESTED + info.rel
@@ -210,6 +211,9 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
             if qual not in flat_types:
                 types.setdefault(qual, set()).add(info.rel)
                 canonical.setdefault(qual, (flat, info))
+    for fq, files in flat_types.items():
+        if all(fq in info.nested for info in infos if info.rel in files):
+            nested_only.add(fq)
     global_usings = {dotted(u, fold) for u in global_usings}
     # A using inside a C# namespace block is relative to the enclosing
     # namespaces (using Models; inside namespace Acme.Web may mean
@@ -347,22 +351,27 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
             if own:             # a type nested in this file
                 self.cache[name] = {own}
                 return {own}
-            found = set()
-            if nested_lookup:
-                for level in self.levels:
-                    if join(level.ns, name) in types:
-                        found = {join(level.ns, name)}
-                        break
-                    found = set(level.simple.get(name, ())) or {
-                        join(u, name) for u in level.imported if join(u, name) in types}
-                    if found:
-                        break
-            else:
-                found = set(self.simple.get(name, ())) or {
-                    join(ns, name) for ns in self.enclosing if join(ns, name) in types} or {
-                    join(u, name) for u in self.imported if join(u, name) in types}
+            # A type nested in another file's class (NUnit.Core.NUnitFramework.
+            # Assert) is not visible by its simple name: look past it, and
+            # take it only when nothing else has the name.
+            found = self.lookup_simple(name, lambda fq: fq in types and fq not in nested_only) \
+                or self.lookup_simple(name, lambda fq: fq in types)
             self.cache[name] = found
             return found
+
+        def lookup_simple(self, name, known):
+            if nested_lookup:
+                for level in self.levels:
+                    if known(join(level.ns, name)):
+                        return {join(level.ns, name)}
+                    found = {fq for fq in level.simple.get(name, ()) if known(fq) or fq not in types} or {
+                        join(u, name) for u in level.imported if known(join(u, name))}
+                    if found:
+                        return found
+                return set()
+            return {fq for fq in self.simple.get(name, ()) if known(fq) or fq not in types} or {
+                join(ns, name) for ns in self.enclosing if known(join(ns, name))} or {
+                join(u, name) for u in self.imported if known(join(u, name))}
 
         def unalias(self, segs):
             """segs with an alias expanded, unless a type or namespace of that
@@ -414,7 +423,9 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
                 fq = longest(segs)
                 return {fq} if fq else set()
             if nested_lookup:
-                found = self._stepwise(segs)
+                # A type nested in another file's class is not visible by
+                # its simple name (see simple_name).
+                found = self._stepwise(segs, True) or self._stepwise(segs, False)
             else:
                 segs, root = rooted(self.unalias(segs))
                 fq = longest(segs)
@@ -436,15 +447,17 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
                 found = self.exact([segs[0] + attribute_suffix])
             return found
 
-        def _stepwise(self, segs):
+        def _stepwise(self, segs, strict):
             """C#/VB: the first step (see simple_name) at which segs[0] means
-            something; the rest of the chain is nested types or members."""
+            something; the rest of the chain is nested types or members.
+            strict: skip a head that is only a type nested in a class."""
             def extend(fq):
                 return longest(fq.split(".") + segs[1:]) or fq
             for level in self.levels:
                 prefix = level.ns.split(".") if level.ns else []
                 fq = longest(prefix + segs)
-                if fq and fq.count(".") >= len(prefix):
+                if fq and fq.count(".") >= len(prefix) and not (
+                        strict and join(level.ns, segs[0]) in nested_only):
                     return {fq}
                 if join(level.ns, segs[0]) in namespaces:
                     continue        # a namespace of that name; its type may be further out
@@ -457,7 +470,8 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
                     if found:
                         return found
                 found = set(level.simple.get(segs[0], ())) or {
-                    join(u, segs[0]) for u in level.imported if join(u, segs[0]) in types}
+                    join(u, segs[0]) for u in level.imported
+                    if join(u, segs[0]) in types and not (strict and join(u, segs[0]) in nested_only)}
                 if found:
                     return {extend(fq) for fq in found}
             return set()

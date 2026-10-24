@@ -61,7 +61,12 @@
   fixture and the habits that keep it right. An imported namespace or
   package no file under `--root` declares (C#, VB.NET, Java, PHP; platform
   libraries left out) is listed once per library in a new `external.tsv`, so an
-  in-house library outside `--root` is not silently missed. A
+  in-house library outside `--root` is not silently missed. Measured on
+  NUnit, Tomcat and phpBB (50 random edges and 30 random files each): a
+  type nested in another file's class no longer hides a using's type of the
+  same name (NUnit's `Assert` was missed), and a PHP file's own
+  declaration, then the declarations its includes reach, win over copies
+  elsewhere. A
   using or alias target inside a namespace block is relative to the
   enclosing namespaces, and once resolved is kept as a full name.
   VB.NET joins implicitly continued lines (a trailing comma, an open

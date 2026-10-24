@@ -10,6 +10,9 @@ wp-inc/http.php
 inc/main.php
 includes/funcs.php
 lib/consts.php
+local/consts.php
+local/script_a.php
+local/script_b.php
 mw/includes/Setup.php
 mw/index.php
 mw/maintenance/Maintenance.php
