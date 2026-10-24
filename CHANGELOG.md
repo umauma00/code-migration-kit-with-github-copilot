@@ -43,8 +43,10 @@
   strings), and so do those in VB.NET `$"...{expr}..."`. A file name that is
   not UTF-8 is written with its original bytes, with a warning to rename
   it before `make_manifest.py`, which stops with a clear error on one.
-  `#if` branches that open a different number of braces no longer shift
-  the C# namespaces after them; a VB.NET line starting with `.` continues
+  `#if` branches that leave a brace open no longer shift the C# namespaces
+  after them; `using global::R;` in a namespace block (and an alias to
+  `global::X`) is never read as relative; enum members count for
+  `global using static`; a VB.NET line starting with `.` continues
   the previous one (outside With); PHP existence checks
   (`function_exists('f')`) are not references; COBOL keywords match whole
   words only (`ON-CALL`, `END-CALL`); a directory symlink loop is walked

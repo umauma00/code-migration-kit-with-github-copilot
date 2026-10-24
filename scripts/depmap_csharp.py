@@ -41,8 +41,8 @@ Known limits, listed in unresolved.tsv where the source shows them:
     `dynamic` and user-defined conversions are not followed. Audit these
     with the sample/diff CLI.
   - a local variable with a type's name gives an extra edge (conservative).
-  - every #if branch is mapped (when branches open a different number of
-    braces, only the first branch's braces count); source generators and
+  - every #if branch is mapped (when a branch leaves a brace open, only
+    the first branch's braces count); source generators and
     T4 output that is not checked in is invisible.
   - reflection with a computed name (Type.GetType(x), Activator.CreateInstance,
     Assembly.Load) is reported as unresolved.
@@ -69,7 +69,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # -I drops the script dir
 from depmap_common import find_files, read_source, run  # noqa: E402
 from depmap_projects import QUOTED, dotnet_projects, drop_not_compiled  # noqa: E402
-from depmap_typed import BLOCK, Directives, FileInfo, TOKEN_RE, chains_at, dotted, flow_c_like, members, resolve, strip_c_like  # noqa: E402
+from depmap_typed import BLOCK, GLOBAL, Directives, FileInfo, TOKEN_RE, chains_at, dotted, flow_c_like, members, resolve, strip_c_like  # noqa: E402
 
 EXTS = {".cs"}
 # Build output beside a project, NuGet's packages/ beside a solution (or at --root).
@@ -88,11 +88,13 @@ CSPROJ_ATTR_RE = re.compile(r"\b(Include|Alias|Static)\s*=\s*" + QUOTED, re.IGNO
 
 
 def read_dotted(toks, j):
-    """Dotted name starting at toks[j]; returns (name, next index)."""
-    parts = []
+    """Dotted name starting at toks[j]; returns (name, next index). A
+    global::-qualified name keeps the GLOBAL mark."""
+    parts, root = [], False
     while j < len(toks):
         t = toks[j][0]
         if t == "global" and j + 2 < len(toks) and toks[j + 1][0] == ":" and toks[j + 2][0] == ":":
+            root = not parts
             j += 3
             continue
         if not (t[0].isalpha() or t[0] in "_@"):
@@ -103,7 +105,14 @@ def read_dotted(toks, j):
             j += 1
             continue
         break
-    return ".".join(parts), j
+    name = ".".join(parts)
+    return (GLOBAL + name if root and name else name), j
+
+
+def unrooted(name):
+    """A directive's name without the GLOBAL mark (outside a namespace block
+    every using is from the root anyway)."""
+    return name[len(GLOBAL):] if name.startswith(GLOBAL) else name
 
 
 def scan(rel, text):
@@ -170,14 +179,15 @@ def scan(rel, text):
                     k = k2
                 elif static:
                     if prev == "global":
-                        global_static.append(name)
-                        info.direct.add(name)   # the declaring file names the type
+                        global_static.append(unrooted(name))
+                        info.direct.add(unrooted(name))     # the declaring file names the type
                     else:
-                        where.direct.add(name)
+                        # A block keeps global:: (its usings are otherwise relative).
+                        where.direct.add(name if block else unrooted(name))
                 elif prev == "global":
-                    globals_.append(name)
+                    globals_.append(unrooted(name))
                 else:
-                    where.usings.add(name)
+                    where.usings.add(name if block else unrooted(name))
                 while k < len(toks) and toks[k][0] != ";":
                     k += 1
                 blank.append((toks[i - (prev == "global")][1], toks[min(k, len(toks) - 1)][2]))

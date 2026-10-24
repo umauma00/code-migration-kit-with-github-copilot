@@ -4,9 +4,15 @@ B.cs
 Holder.cs
 Main.cs
 Nested.cs
+Rooted/Real.cs
+Rooted/Alias.cs
+Rooted/Main.cs
+Rooted/Shadow.cs
 Same.cs
+Statics/Colors.cs
 Statics/Util.cs
 Statics/Global.cs
 Statics/Helpers.cs
+Statics/Paint.cs
 Statics/Runner.cs
 User.cs

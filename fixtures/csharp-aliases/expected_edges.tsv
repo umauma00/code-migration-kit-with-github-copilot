@@ -3,9 +3,13 @@ Holder.cs	B.cs
 Main.cs	A.cs
 Main.cs	B.cs
 Nested.cs	A.cs
+Rooted/Alias.cs	Rooted/Real.cs
+Rooted/Main.cs	Rooted/Real.cs
 Same.cs	A.cs
 Same.cs	B.cs
+Statics/Global.cs	Statics/Colors.cs
 Statics/Global.cs	Statics/Util.cs
+Statics/Paint.cs	Statics/Colors.cs
 Statics/Runner.cs	Statics/Helpers.cs
 Statics/Runner.cs	Statics/Util.cs
 User.cs	B.cs

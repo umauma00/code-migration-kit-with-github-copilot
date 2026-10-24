@@ -139,6 +139,8 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
             outer = prefixes(context_ns(ctx))
 
             def absolute(name, known):
+                if name.startswith(GLOBAL):     # using global::R; never relative
+                    return name[len(GLOBAL):]
                 return next((join(p, name) for p in outer if join(p, name) in known), name)
             block.usings = {absolute(u, namespaces) for u in block.usings}
             block.direct = {absolute(d, types) for d in block.direct}
@@ -215,17 +217,17 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
             return found
 
         def unalias(self, segs):
+            """segs with an alias expanded; a global:: target keeps its GLOBAL mark."""
             if segs[0] in self.aliases:
-                return rooted(self.aliases[segs[0]].split(".") + segs[1:])[0]
+                return self.aliases[segs[0]].split(".") + segs[1:]
             return segs
 
         def exact(self, segs):
             """Types a dotted name denotes as a whole (no member suffix)."""
-            segs, root = rooted(segs)
+            segs, root = rooted(self.unalias(segs))
             if root:            # global::A.B: from the root namespace only
                 fq = ".".join(segs)
                 return {fq} if fq in types else set()
-            segs = self.unalias(segs)
             if len(segs) == 1:
                 return self.simple_name(segs[0])
             # Qualified: from the innermost enclosing namespace outward
@@ -248,11 +250,10 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
             return self.mention_cache[chain]
 
         def _mentioned(self, chain):
-            segs, root = rooted(chain.split("."))
+            segs, root = rooted(self.unalias(chain.split(".")))
             if root:
                 fq = longest(segs)
                 return {fq} if fq else set()
-            segs = self.unalias(segs)
             for ns in self.inner_first if nested_lookup else [""]:
                 fq = longest((ns.split(".") if ns else []) + segs)
                 if fq:
@@ -615,11 +616,12 @@ BRANCH_MARKS = {"if": "\x00", "elif": "\x01", "else": "\x01", "endif": "\x02"}
 
 
 def balance_branches(code):
-    """Every #if branch is mapped, but when the branches open and close a
-    different number of braces (#if X class A {  #else class A : B {
-    #endif), counting them all would shift every namespace after the
-    group. Then only the first branch's braces count; the others keep
-    their names, without braces. Removes the marks."""
+    """Every #if branch is mapped, but the branches are alternatives: when
+    one leaves a brace open (#if X class A {  #else class A : B {  #endif),
+    counting them all would shift every namespace after the group. Then
+    only the first branch's braces count; the others keep their names,
+    without braces. Groups whose branches each balance their own braces
+    are kept as written. Removes the marks."""
     if "\x00" not in code:
         return code.replace("\x01", " ").replace("\x02", " ")
     top, stack = [], []         # stack: branches of each open group
@@ -627,7 +629,7 @@ def balance_branches(code):
     def resolve(branches):
         texts = ["".join(b) for b in branches]
         deltas = {t.count("{") - t.count("}") for t in texts}
-        if len(deltas) > 1:
+        if len(texts) > 1 and deltas != {0}:
             texts = texts[:1] + [t.replace("{", " ").replace("}", " ") for t in texts[1:]]
         return " " + " ".join(texts)
 
@@ -861,6 +863,7 @@ def flow_c_like(toks, keywords, language, package=""):
     ns_stack, file_ns = [], package     # ns_stack: (name, depth, block number)
     blocks = 0
     type_stack = []         # (fqn, depth of its body)
+    enums = set()
     pending = None
 
     def namespace():
@@ -883,6 +886,10 @@ def flow_c_like(toks, keywords, language, package=""):
                 pending = None
             i += 1
             continue
+        # Enum members: { Red, Blue = 2 } (global using static Colors; Red).
+        if type_stack and type_stack[-1][0] in enums and depth == type_stack[-1][1] \
+                and prev in {"{", ","} and is_ident(t) and toks[i + 1:i + 2] and toks[i + 1] in {",", "}", "="}:
+            members[type_stack[-1][0]].setdefault(t.lstrip("@"), [])
         if t == "}":
             if type_stack and type_stack[-1][1] == depth:
                 type_stack.pop()
@@ -922,6 +929,8 @@ def flow_c_like(toks, keywords, language, package=""):
                 fqn = join(namespace(), toks[j].lstrip("@"))
                 pending = fqn
                 members.setdefault(fqn, {})
+                if t == "enum":
+                    enums.add(fqn)
                 type_ns.setdefault(fqn, context())
                 j += 1
                 if j < n and toks[j] == "<":
