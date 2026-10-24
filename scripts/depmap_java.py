@@ -63,8 +63,9 @@ double else enum extends final finally float for goto if implements import insta
 long native new package private protected public return short static strictfp super switch
 synchronized this throw throws transient try void volatile while var record sealed permits
 non-sealed yield true false null""".split())
-PACKAGE_RE = re.compile(r"^\s*package\s+([\w.\s]+?)\s*;", re.MULTILINE)
-IMPORT_RE = re.compile(r"^\s*import\s+(static\s+)?([\w.\s]+?)(\s*\.\s*\*)?\s*;", re.MULTILINE)
+# At a line start or after a ";" (package a; import b.C; on one line).
+PACKAGE_RE = re.compile(r"(?:^|(?<=;))\s*package\s+([\w.\s]+?)\s*;", re.MULTILINE)
+IMPORT_RE = re.compile(r"(?:^|(?<=;))\s*import\s+(static\s+)?([\w.\s]+?)(\s*\.\s*\*)?\s*;", re.MULTILINE)
 REFLECTION_RE = re.compile(r"\bClass\s*\.\s*forName\s*\(\s*((?:[^()]|\([^()]*\))+?)?\s*\)")
 
 

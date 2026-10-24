@@ -59,7 +59,8 @@
   ignore case; Gradle Kotlin `project(path = ":x")` and `projects.x`
   accessors are read. C# 14 `extension(...)` blocks, attributed enum
   members, VB.NET `Imports A, B` and PHP 7 classes named `Enum`, `Match` or
-  `From` are understood. Code nested past Python's recursion limit is
+  `From` are understood, and a Java import
+  on the same line as `package` is read. Code nested past Python's recursion limit is
   parsed on a larger stack instead of stopping the mapper. Lambda parameters, generic inference and overloads
   are not followed. PHP follows computable
   include paths and case-insensitive class/function names with namespaces

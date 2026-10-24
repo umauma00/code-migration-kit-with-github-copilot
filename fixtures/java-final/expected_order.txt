@@ -4,5 +4,7 @@ my-lib/src/main/java/m/Lib.java
 app/src/main/java/a/App.java
 dup/Copy1.java
 dup/Copy2.java
+oneline/Util.java
+oneline/OneLine.java
 other/src/main/java/c/Core.java
 other/src/main/java/m/Lib.java
