@@ -346,6 +346,8 @@ test('C#, Java, PHP, VB.NET and COBOL dependency fixtures produce their expected
     // Interpolation holes (C# and VB), VB auto-property followed by Settings,
     // PHP string callables only in callback positions.
     ['csharp', 'csharp-interp'], ['vbnet', 'vbnet-interp'],
+    // #if branches with unequal braces.
+    ['csharp', 'csharp-ifdef'],
     ['php', 'php-relative', 'expected_', ['--include-path', 'lib']]];
   for (const [lang, name, prefix = 'expected_', options = []] of cases) {
     const out = path.join(root, `${name}-${prefix}`), fixture = path.join(kitRoot, 'fixtures', name);
@@ -355,6 +357,20 @@ test('C#, Java, PHP, VB.NET and COBOL dependency fixtures produce their expected
     for (const file of ['edges.tsv', 'order.txt', 'cycles.txt', 'unresolved.tsv'])
       assert.equal(fs.readFileSync(path.join(out, file), 'utf8'), fs.readFileSync(path.join(fixture, `${prefix}${file}`), 'utf8'), `${name} ${prefix}${file}`);
   }
+});
+
+test('a directory symlink loop is walked once', { skip: process.platform === 'win32' && 'symlinks need privileges on Windows' }, async t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'copilot-depmap-loop-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  fs.mkdirSync(path.join(root, 'sub'));
+  fs.writeFileSync(path.join(root, 'sub', 'A.cs'), 'class A { }\n');
+  fs.writeFileSync(path.join(root, 'B.cs'), 'class B { A a; }\n');
+  fs.symlinkSync('..', path.join(root, 'sub', 'loop'));
+  const out = path.join(root, '..', `${path.basename(root)}-out`);
+  t.after(() => fs.rmSync(out, { recursive: true, force: true }));
+  const r = await runProcess(python, ['-I', path.join(kitRoot, 'scripts/depmap_csharp.py'), '--root', root, '--out', out]);
+  assert.equal(r.code, 0, r.stderr);
+  assert.match(r.stdout, /files=2 edges=1 /);
 });
 
 test('a mapper survives a file name that is not UTF-8', { skip: process.platform !== 'linux' && 'needs a byte-string file system' }, async t => {

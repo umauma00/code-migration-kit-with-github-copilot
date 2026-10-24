@@ -494,7 +494,8 @@ def strip_c_like(text, csharp=False):
     C# verbatim (@"..."), raw (\"\"\"...\"\"\") and interpolated ($"...{expr}...")
     strings are understood; an interpolation hole's expression is kept as code
     so the names it mentions still count. Java text blocks are raw strings.
-    C# preprocessor lines are dropped: every #if branch is mapped.
+    C# preprocessor lines are dropped: every #if branch is mapped (see
+    balance_branches for branches with unequal braces).
     """
     out, strings = [], []
 
@@ -510,6 +511,9 @@ def strip_c_like(text, csharp=False):
         c = text[i]
         if csharp and line_start and c == "#":
             j = text.find("\n", i)
+            word = re.match(r"#\s*(\w*)", text[i:i + 40]).group(1)
+            if word in BRANCH_MARKS:
+                out.append(BRANCH_MARKS[word])
             i = n if j < 0 else j
             continue
         if c in " \t":
@@ -602,7 +606,47 @@ def strip_c_like(text, csharp=False):
             continue
         out.append(c)
         i += 1
-    return "".join(out), strings
+    code = "".join(out)
+    return (balance_branches(code) if csharp else code), strings
+
+
+# #if / #elif / #else / #endif, marked in strip_c_like's output.
+BRANCH_MARKS = {"if": "\x00", "elif": "\x01", "else": "\x01", "endif": "\x02"}
+
+
+def balance_branches(code):
+    """Every #if branch is mapped, but when the branches open and close a
+    different number of braces (#if X class A {  #else class A : B {
+    #endif), counting them all would shift every namespace after the
+    group. Then only the first branch's braces count; the others keep
+    their names, without braces. Removes the marks."""
+    if "\x00" not in code:
+        return code.replace("\x01", " ").replace("\x02", " ")
+    top, stack = [], []         # stack: branches of each open group
+
+    def resolve(branches):
+        texts = ["".join(b) for b in branches]
+        deltas = {t.count("{") - t.count("}") for t in texts}
+        if len(deltas) > 1:
+            texts = texts[:1] + [t.replace("{", " ").replace("}", " ") for t in texts[1:]]
+        return " " + " ".join(texts)
+
+    for piece in re.split(r"([\x00-\x02])", code):
+        if piece == "\x00":
+            stack.append([[]])
+        elif piece == "\x01":
+            if stack:
+                stack[-1].append([])
+        elif piece == "\x02":
+            if stack:
+                done = resolve(stack.pop())
+                (stack[-1][-1] if stack else top).append(done)
+        else:
+            (stack[-1][-1] if stack else top).append(piece)
+    while stack:                # an #if without #endif
+        done = resolve(stack.pop())
+        (stack[-1][-1] if stack else top).append(done)
+    return "".join(top)
 
 
 TOKEN_RE = re.compile(r"@?[^\W\d]\w*|\S")

@@ -41,8 +41,9 @@ Known limits, listed in unresolved.tsv where the source shows them:
     `dynamic` and user-defined conversions are not followed. Audit these
     with the sample/diff CLI.
   - a local variable with a type's name gives an extra edge (conservative).
-  - every #if branch is mapped; source generators and T4 output that is not
-    checked in is invisible.
+  - every #if branch is mapped (when branches open a different number of
+    braces, only the first branch's braces count); source generators and
+    T4 output that is not checked in is invisible.
   - reflection with a computed name (Type.GetType(x), Activator.CreateInstance,
     Assembly.Load) is reported as unresolved.
 

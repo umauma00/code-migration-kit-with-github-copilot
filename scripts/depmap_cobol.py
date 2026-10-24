@@ -56,11 +56,13 @@ COPY_EXTS = {".cpy", ".copy", ".inc", ".cpb"}
 EXTS = PROGRAM_EXTS | COPY_EXTS
 SYSTEM_INCLUDES = {"sqlca", "sqlda", "oraca"}
 WORD = r"[A-Za-z0-9][A-Za-z0-9_-]*"
+# Keywords are matched only as whole COBOL words: ON-CALL, WS-COPY and
+# END-CALL are data names or scope terminators, not CALL or COPY.
 LITERAL = r"""(?:'([^']*)'|"([^"]*)")"""
-COPY_RE = re.compile(rf"\bCOPY\s+(?:{LITERAL}|({WORD}))(?:\s+(?:OF|IN)\s+(?:{LITERAL}|({WORD})))?", re.IGNORECASE)
-SQL_INCLUDE_RE = re.compile(rf"\bEXEC\s+SQL\s+INCLUDE\s+(?:{LITERAL}|({WORD}))", re.IGNORECASE)
-CALL_RE = re.compile(rf"\bCALL\s+(?:{LITERAL}|({WORD}))", re.IGNORECASE)
-CICS_RE = re.compile(rf"\bEXEC\s+CICS\s+(LINK|XCTL|START|LOAD)\b[^.]*?\bPROGRAM\s*\(\s*(?:{LITERAL}|({WORD}))\s*\)", re.IGNORECASE | re.DOTALL)
+COPY_RE = re.compile(rf"(?<![\w-])COPY\s+(?:{LITERAL}|({WORD}))(?:\s+(?:OF|IN)\s+(?:{LITERAL}|({WORD})))?", re.IGNORECASE)
+SQL_INCLUDE_RE = re.compile(rf"(?<![\w-])EXEC\s+SQL\s+INCLUDE\s+(?:{LITERAL}|({WORD}))", re.IGNORECASE)
+CALL_RE = re.compile(rf"(?<![\w-])CALL\s+(?:{LITERAL}|({WORD}))", re.IGNORECASE)
+CICS_RE = re.compile(rf"(?<![\w-])EXEC\s+CICS\s+(LINK|XCTL|START|LOAD)\b[^.]*?\bPROGRAM\s*\(\s*(?:{LITERAL}|({WORD}))\s*\)", re.IGNORECASE | re.DOTALL)
 PROGRAM_ID_RE = re.compile(rf"\bPROGRAM-ID\s*\.?\s*(?:{LITERAL}|({WORD}))", re.IGNORECASE)
 FREE_RE = re.compile(r">>\s*SOURCE\s+(?:FORMAT\s+)?(?:IS\s+)?FREE|\$\s*SET\s+SOURCEFORMAT\s*\(?\s*[\"']?FREE", re.IGNORECASE)
 FREE_START_RE = re.compile(r"^(?:IDENTIFICATION|ID|PROCEDURE|DATA|ENVIRONMENT)\s+DIVISION\b|^(?:0[1-9]|[1-4][0-9]|66|77|88)\s+[A-Za-z]", re.IGNORECASE)
@@ -97,7 +99,7 @@ def code_lines(text):
     return mask_literals("\n".join(out))
 
 
-OPERAND_RE = re.compile(r"(?:\bCALL|\bCOPY|\bINCLUDE|\bPROGRAM\s*\(|\bPROGRAM-ID\s*\.?|\bOF|\bIN|\bCANCEL)\s*$", re.IGNORECASE)
+OPERAND_RE = re.compile(r"(?:(?<![\w-])CALL|(?<![\w-])COPY|(?<![\w-])INCLUDE|\bPROGRAM\s*\(|\bPROGRAM-ID\s*\.?|(?<![\w-])OF|(?<![\w-])IN|(?<![\w-])CANCEL)\s*$", re.IGNORECASE)
 STRING_RE = re.compile(r"'[^'\n]*'|\"[^\"\n]*\"")
 
 

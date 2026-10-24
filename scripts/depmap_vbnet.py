@@ -104,6 +104,7 @@ def strip_vb(text):
     , ( { & + = or a dot. ":" outside strings splits statements."""
     lines, strings, buf = [], [], []
     depth = 0           # ( and { left open by the lines in buf
+    withs = 0           # open With blocks
     for raw in text.splitlines():
         out, i, n = [], 0, len(raw)
         while i < n:
@@ -175,7 +176,25 @@ def strip_vb(text):
         joined = " ".join(buf)
         buf, depth = [], 0
         # ":" separates statements (but not ":=" named arguments).
-        lines.extend(part for part in re.split(r":(?!=)", joined))
+        parts = re.split(r":(?!=)", joined)
+        # VB 14: a line that starts with "." continues the previous one
+        # (Dim r = F()  /  .Run()), except inside With, where .X is a member
+        # of the With object.
+        head = parts[0].strip().lower()
+        if head.startswith(".") and not withs:
+            k = len(lines) - 1
+            while k >= 0 and not lines[k].strip():
+                k -= 1
+            if k >= 0:
+                lines[k] = lines[k].rstrip() + " " + parts[0].strip()
+                parts = parts[1:]
+        for part in parts:
+            low = part.strip().lower()
+            if re.match(r"with\b", low):
+                withs += 1
+            elif re.match(r"end\s+with\b", low):
+                withs = max(0, withs - 1)
+        lines.extend(parts)
     if buf:
         lines.append(" ".join(buf))
     return lines, strings

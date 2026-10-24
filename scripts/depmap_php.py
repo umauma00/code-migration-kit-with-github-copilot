@@ -65,10 +65,12 @@ EXTS = {".php", ".inc", ".phtml", ".php3", ".php4", ".php5", ".module"}
 # A function or class name in a string, maybe namespaced (App\Util\conv).
 BARE_NAME_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*(?:\\[A-Za-z_][A-Za-z0-9_]*)*")
 # Functions whose string arguments name a callback, class or function.
+# Existence checks (function_exists, class_exists, is_callable...) are not
+# references: two polyfills guarded by function_exists('f') would else
+# depend on each other.
 CALLBACK_FUNCTIONS = set("""array_map array_filter array_walk array_walk_recursive array_reduce
 usort uasort uksort call_user_func call_user_func_array forward_static_call
-forward_static_call_array is_callable function_exists class_exists method_exists
-is_subclass_of is_a register_shutdown_function register_tick_function
+forward_static_call_array is_subclass_of is_a register_shutdown_function register_tick_function
 spl_autoload_register set_error_handler set_exception_handler iterator_apply
 preg_replace_callback ob_start header_register_callback add_action add_filter
 add_shortcode""".split())

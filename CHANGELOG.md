@@ -42,7 +42,13 @@
   every form (parenthesized ternaries, `global::`, `$"""` and `$$"""` raw
   strings), and so do those in VB.NET `$"...{expr}..."`. A file name that is
   not UTF-8 is written with its original bytes, with a warning to rename
-  it before `make_manifest.py`, which stops with a clear error on one. Lambda parameters, generic inference and overloads
+  it before `make_manifest.py`, which stops with a clear error on one.
+  `#if` branches that open a different number of braces no longer shift
+  the C# namespaces after them; a VB.NET line starting with `.` continues
+  the previous one (outside With); PHP existence checks
+  (`function_exists('f')`) are not references; COBOL keywords match whole
+  words only (`ON-CALL`, `END-CALL`); a directory symlink loop is walked
+  once. Lambda parameters, generic inference and overloads
   are not followed. PHP follows computable
   include paths and case-insensitive class/function names with namespaces
   and `use`, narrowed by composer.json autoload (PSR-4, PSR-0, classmap),

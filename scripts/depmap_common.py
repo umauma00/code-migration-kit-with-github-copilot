@@ -50,9 +50,14 @@ def find_files(root: Path, exts, skip_dirs=(), markers=(), warnings=None):
             return False
 
     out, skipped = [], []
+    seen = set()        # resolved directories: a symlink loop is walked once
 
     def walk(d, top):
         try:
+            real = d.resolve()
+            if real in seen:
+                return
+            seen.add(real)
             entries = sorted(d.iterdir())
         except OSError:
             return
