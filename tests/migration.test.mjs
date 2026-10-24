@@ -426,6 +426,20 @@ test('deeply nested code is parsed, not a crash', async t => {
   assert.equal(fs.readFileSync(path.join(out, 'edges.tsv'), 'utf8'), 'from\tto\nA.cs\tB.cs\n');
 });
 
+test('long comma lists are scanned in linear time', async t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'copilot-depmap-long-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  // 20000 enum members took minutes when each comma walked back to its bracket.
+  const members = Array.from({ length: 20000 }, (_, i) => `M${i}`);
+  fs.writeFileSync(path.join(root, 'E.cs'), `public enum E { ${members.join(',\n')} }\nclass C { B b; int[] a = { ${members.join(', ')} }; }\n`);
+  fs.writeFileSync(path.join(root, 'B.cs'), 'class B { }\n');
+  const out = path.join(root, 'out'), started = Date.now();
+  const r = await runProcess(python, ['-I', path.join(kitRoot, 'scripts/depmap_csharp.py'), '--root', root, '--out', out]);
+  assert.equal(r.code, 0, r.stderr);
+  assert.ok(Date.now() - started < 30000, `took ${Date.now() - started} ms`);
+  assert.equal(fs.readFileSync(path.join(out, 'edges.tsv'), 'utf8'), 'from\tto\nE.cs\tB.cs\n');
+});
+
 test('a mapper survives a file name that is not UTF-8', { skip: process.platform !== 'linux' && 'needs a byte-string file system' }, async t => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'copilot-depmap-bytes-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));

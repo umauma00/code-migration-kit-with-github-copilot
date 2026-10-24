@@ -34,7 +34,8 @@
   ProjectReference is read whatever its attribute order. A name in an
   attribute list (`[Foo]`, `[A.B.Required]`, `[return: Foo]`) counts both
   `Foo` and `FooAttribute`; elsewhere, collection expressions
-  (`F([Foo])`, `{ [Foo] }`) included, `Foo` does not mean `FooAttribute`. A
+  (`F([Foo])`, `{ [Foo] }`) included, `Foo` does not mean `FooAttribute`; the
+  types in a tuple alias (`using P = (A a, B b);`) count where it is written. A
   using or alias target inside a namespace block is relative to the
   enclosing namespaces, and once resolved is kept as a full name.
   VB.NET joins implicitly continued lines (a trailing comma, an open

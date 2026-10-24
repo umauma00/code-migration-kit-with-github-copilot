@@ -14,5 +14,13 @@ AttrExpr/Decl.cs	AttrExpr/Foo.cs
 AttrExpr/Decl.cs	AttrExpr/FooAttribute.cs
 AttrExpr/FooAttribute.cs	AttrExpr/Main.cs
 AttrExpr/Main.cs	AttrExpr/Foo.cs
+AttrMore/Dtor.cs	AttrMore/Foo.cs
+AttrMore/Dtor.cs	AttrMore/FooAttribute.cs
+AttrMore/Gen.cs	AttrMore/BarAttribute.cs
+AttrMore/Gen.cs	AttrMore/Foo.cs
+AttrMore/Lam.cs	AttrMore/Foo.cs
+AttrMore/Lam.cs	AttrMore/FooAttribute.cs
 Shadow/U.cs	Shadow/A.cs
 Shadow/U.cs	Shadow/Z.cs
+TupleAlias/U.cs	TupleAlias/Cust.cs
+TupleAlias/U.cs	TupleAlias/Tax.cs

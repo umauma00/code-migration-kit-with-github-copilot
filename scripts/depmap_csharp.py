@@ -181,7 +181,19 @@ def scan(rel, text):
                 where = block or info
                 if toks[k][0] == "=":
                     target, k2 = read_dotted(toks, k + 1)
-                    (global_aliases if prev == "global" else where.aliases)[name] = target
+                    if target and k2 < len(toks) and toks[k2][0] == ";":
+                        (global_aliases if prev == "global" else where.aliases)[name] = target
+                    else:
+                        # using P = (A a, B b); or = List<A>; or = A[];: the
+                        # names in the target count as mentions where the
+                        # alias is written (only "using P =" is blanked).
+                        if target and k2 < len(toks) and toks[k2][0] in {"<", "["}:
+                            (global_aliases if prev == "global" else where.aliases)[name] = target
+                        blank.append((toks[i - (prev == "global")][1], toks[k][2]))
+                        while k < len(toks) and toks[k][0] != ";":
+                            k += 1
+                        i = k + 1
+                        continue
                     k = k2
                 elif static:
                     if prev == "global":
@@ -279,10 +291,11 @@ def scan(rel, text):
     # Each name is resolved from the namespace it is written in.
     offsets = [o for o, _ in contexts]
     info.names, info.attribute_names = [], []
+    brackets = Brackets(code)
     for pos, name in chains_at(code, KEYWORDS):
         ref = (contexts[bisect.bisect_right(offsets, pos) - 1][1], name)
         info.names.append(ref)
-        if attribute_name_at(code, pos, CHAIN_RE.match(code, pos).end()):
+        if attribute_name_at(code, pos, CHAIN_RE.match(code, pos).end(), brackets):
             info.attribute_names.append(ref)
     info.members = members(code)
     info.type_members, info.type_bases, info.flow, info.type_ns = flow_c_like(
@@ -299,16 +312,45 @@ ATTRIBUTE_TARGETS = {"assembly", "module", "field", "event", "method", "param",
                      "property", "return", "type", "typevar"}
 
 
-def attribute_name_at(code, start, end):
+class Brackets:
+    """The bracket structure of code, computed once (linear): for each
+    offset the innermost open bracket around it, and each bracket's match."""
+
+    def __init__(self, code):
+        self.code = code
+        self.opens, self.inner, self.close = [], [], {}
+        stack = []
+        for k, c in enumerate(code):
+            if c in "([{":
+                stack.append(k)
+                self.opens.append(k)
+                self.inner.append(stack[-2] if len(stack) > 1 else -1)
+            elif c in ")]}" and stack:
+                self.close[stack.pop()] = k
+                self.opens.append(k)
+                self.inner.append(stack[-1] if stack else -1)
+        # inner[i]: the open bracket around the text just after opens[i].
+
+    def around(self, pos):
+        """Offset of the innermost bracket open at pos, or -1."""
+        i = bisect.bisect_right(self.opens, pos) - 1
+        if i < 0:
+            return -1
+        k = self.opens[i]
+        return k if self.code[k] in "([{" else self.inner[i]
+
+
+def attribute_name_at(code, start, end, brackets=None):
     """Whether the name at code[start:end] is an attribute's name: the head
-    of an item of a [...] attribute list (followed by "(", "," or "]"). A
-    [ counts as an attribute list where a declaration may begin and when
-    a declaration follows it, not after a value (a[Foo] is an indexer,
-    x = [Foo] and F([Foo]) collections)."""
+    of an item of a [...] attribute list (followed by "(", ",", "]" or a
+    type argument list). A [ counts as an attribute list where a
+    declaration may begin and when a declaration follows it, not after a
+    value (a[Foo] is an indexer, x = [Foo] and F([Foo]) collections)."""
+    brackets = brackets or Brackets(code)
     k = end
     while k < len(code) and code[k].isspace():
         k += 1
-    if k >= len(code) or code[k] not in "(,]":
+    if k >= len(code) or code[k] not in "(,]<":
         return False
     k = start - 1
     while k >= 0 and code[k].isspace():
@@ -324,53 +366,39 @@ def attribute_name_at(code, start, end):
             return False
         while k >= 0 and code[k].isspace():
             k -= 1
-    elif k >= 0 and code[k] == ",":     # [A, Foo]: back to the open [
-        depth = 0
-        while k > 0:
-            k -= 1
-            c = code[k]
-            if c in ")]}":
-                depth += 1
-            elif c in "([{":
-                if depth == 0:
-                    break
-                depth -= 1
-        else:
-            return False
+    elif k >= 0 and code[k] == ",":     # [A, Foo]: the open [ around it
+        k = brackets.around(k)
     if k < 0 or code[k] != "[":
         return False
     open_at = k
     k -= 1
     while k >= 0 and code[k].isspace():
         k -= 1
-    if k >= 0 and code[k] not in ";{}](<,":
-        return False
+    before = code[k] if k >= 0 else ";"
     # What follows the list tells a declaration from an expression: an
     # attribute list is followed by what it applies to ([Foo] class C,
-    # [Foo] int x, [Foo] T, [A][B], [Foo] () => 1) or ends the file
-    # ([assembly: Foo]). A collection expression or an initializer's
+    # [Foo] int x, [Foo] T, [A][B], [Foo] ~C(), [Foo] () => 1) or ends the
+    # file ([assembly: Foo]). A collection expression or an initializer's
     # index (F([Foo]), { [Foo] }, { [Foo] = 1 }) is followed by ")", ",",
     # "}", "=", ";" or an operator word.
-    depth, k = 0, open_at
-    while k < len(code):
-        if code[k] in "([{":
-            depth += 1
-        elif code[k] in ")]}":
-            depth -= 1
-            if depth == 0:
-                break
-        k += 1
-    else:
+    k = brackets.close.get(open_at)
+    if k is None:
         return False
     k += 1
     while k < len(code) and code[k].isspace():
         k += 1
     if k == len(code):
-        return True
+        return before in ";{}]"
+    if before in "=>":
+        # x = [Foo] (int a) => a: a lambda's attributes (a collection is
+        # never called).
+        return code[k] == "("
+    if before not in ";{}](<,":
+        return False
     m = WORD_RE.match(code, k)
     if m:
         return m.group(0) not in EXPRESSION_WORDS
-    return code[k] in "[(#"
+    return code[k] in "[(#~"
 
 
 WORD_RE = re.compile(r"@?[^\W\d]\w*")
