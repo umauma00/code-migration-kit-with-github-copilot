@@ -8,4 +8,5 @@ Classic/Legacy/Widget.cs	Classic/Widget.cs
 Classic/Panel.cs	Classic/Widget.cs
 Cond/Main.cs	Cond/Opt/O.cs
 Nest/Main.cs	Nest/Heavy.cs
+Nest/Main.cs	Nest/Late.cs
 Nest/Main.cs	Nest/Optional.cs

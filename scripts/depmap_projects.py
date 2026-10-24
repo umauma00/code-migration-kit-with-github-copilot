@@ -33,14 +33,15 @@ from depmap_common import find_files, nearest, reachable, read_source  # noqa: E
 
 QUOTED = r"""(?:"([^"]*)"|'([^']*)')"""     # an XML attribute value, either quote
 # Attributes of a tag; a quoted value may hold ">" (Condition="'$(A)' >= '1'").
-# A value never holds a raw "<", which keeps a broken quote from running on
-# through the rest of the file.
+# A value never holds a raw "<" (XML requires &lt;), which keeps a broken
+# quote from running on through the rest of the file.
 ATTRS = r"""((?:[^<>"']|"[^"<]*"|'[^'<]*')*?)"""
 # Update only changes metadata of items already listed, so it is not read.
 ITEM_ATTR_RE = re.compile(r"\b(Include|Remove|Exclude|Condition)\s*=\s*" + QUOTED, re.IGNORECASE)
 # Start, end and empty tags of the elements that can put a condition
-# around a <Compile> item, and the items themselves.
-TAG_RE = re.compile(r"<(/?)(ItemGroup|Choose|When|Otherwise|Compile)\b" + ATTRS + r"(/?)>", re.IGNORECASE)
+# around a <Compile> item, and the items themselves. Items in a <Target>
+# change only when that target runs, so they count as conditional.
+TAG_RE = re.compile(r"<(/?)(ItemGroup|Choose|When|Otherwise|Target|Compile)\b" + ATTRS + r"(/?)>", re.IGNORECASE)
 COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
 PROJECT_REF_RE = re.compile(r"<ProjectReference\b" + ATTRS + r"/?>", re.IGNORECASE)
 INCLUDE_ATTR_RE = re.compile(r"\bInclude\s*=\s*" + QUOTED, re.IGNORECASE)

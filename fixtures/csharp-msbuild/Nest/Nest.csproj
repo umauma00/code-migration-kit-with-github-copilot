@@ -15,4 +15,8 @@
       <ItemGroup><Compile Remove="Optional.cs" /></ItemGroup>
     </When>
   </Choose>
+  <!-- Items in a Target change only when it runs: Late.cs is kept. -->
+  <Target Name="Trim">
+    <ItemGroup><Compile Remove="Late.cs" /></ItemGroup>
+  </Target>
 </Project>
