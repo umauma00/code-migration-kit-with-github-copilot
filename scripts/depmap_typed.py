@@ -77,6 +77,11 @@ def context_ns(ctx):
     return ctx.split(BLOCK, 1)[0]
 
 
+# Top namespaces of the platform libraries: an import under one is never
+# reported as a possibly missing in-house library.
+DOTNET_STANDARD = ("System", "Microsoft", "Windows", "Mono", "Interop")
+JAVA_STANDARD = ("java", "javax", "jakarta", "jdk", "sun", "com.sun", "org.w3c", "org.xml",
+                 "org.ietf", "org.omg", "netscape")
 NESTED = "\x00"          # namespace.Name + NESTED + file: a nested type, as its own file sees it
 GLOBAL = "global::"     # a name qualified from the root namespace (C# global::, VB Global.)
 
@@ -154,7 +159,7 @@ def scan_or_none(scan, rel, text, rows, *args):
 
 
 def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
-            nested_lookup=True, visible_files=None):
+            nested_lookup=True, visible_files=None, standard=()):
     """Return (edges, unresolved) for the FileInfo list.
 
     Every reference carries the namespace it is written in, and is looked up
@@ -168,6 +173,10 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
     see (project references, build modules), or None when the file belongs
     to no project. When a name matches files both inside and outside that
     set, only those inside become edges.
+    standard: top namespaces of the platform library (System, java...). An
+    imported namespace the repository does not declare and that is not under
+    one is listed once in unresolved.tsv: it may be an in-house library whose
+    source is outside --root.
     """
     types = {}          # fqn -> set(rel)
     extensions = {}     # fqn of an extension method -> set(rel)
@@ -718,6 +727,49 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
                 add(src, files - set(ambiguous))
         for ref, why in info.dynamic:
             unresolved.add((src, ref, why))
+
+    # Imports of namespaces no file declares are external libraries. Those
+    # outside the platform library are listed, one row per namespace, so an
+    # in-house library left outside --root does not go unnoticed.
+    standard = {s.lower() for s in standard}
+    external = {}
+
+    def outside(name):
+        name = name[len(GLOBAL):] if name.startswith(GLOBAL) else name
+        if not name or name in namespaces or lookup(name):
+            return None
+        segs = name.split(".")
+        if any(".".join(segs[:k]).lower() in standard for k in range(1, len(segs) + 1)):
+            return None
+        return name
+
+    for info in infos:
+        blocks = list(info.blocks.values())
+        wanted = set(info.usings).union(*(b.usings for b in blocks))
+        for target in info.direct.union(*(b.direct for b in blocks)):
+            if not longest(target.split(".")):
+                wanted.add(target.rpartition(".")[0])     # import a.b.C -> package a.b
+        for target in list(info.aliases.values()) + [t for b in blocks for t in b.aliases.values()]:
+            bare = target[len(GLOBAL):] if target.startswith(GLOBAL) else target
+            if "." in bare and not lookup(bare) and bare.split("<")[0] == bare:
+                wanted.add(bare.rpartition(".")[0])
+        for name in wanted:
+            name = outside(name)
+            if name:
+                external.setdefault(name, set()).add(info.rel)
+    for name, files in external.items():
+        segs = name.split(".")
+        top = next((".".join(segs[:k]) for k in range(1, len(segs)) if ".".join(segs[:k]) in external), None)
+        if top:     # log4net.Config under log4net: one row for the library
+            external[top] |= files
+    for name, files in external.items():
+        segs = name.split(".")
+        if any(".".join(segs[:k]) in external for k in range(1, len(segs))):
+            continue
+        files = sorted(files)
+        unresolved.add((files[0], name, f"namespace no file under --root declares, imported by "
+                        f"{len(files)} file(s): an external library (if it is your own, put its "
+                        "source under --root)"))
     return edges, unresolved
 
 

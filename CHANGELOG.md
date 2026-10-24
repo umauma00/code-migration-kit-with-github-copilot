@@ -55,7 +55,13 @@
   (`"$IP/x.php"`) and uses `define()` constants whose value is a computable
   path. When a bundled mapper fails or cannot read a project's syntax, the
   docs, skill and prompt 01 say what to do: try its options, then fix a copy
-  under `migration/tools/depmap-<language>/` and report it. A
+  under `migration/tools/depmap-<language>/` and report it. A new
+  depmap-adapter skill guides writing an adapter: Python (copying a bundled
+  mapper) or another installed language, which mapper to start from, the
+  fixture and the habits that keep it right. An imported namespace or
+  package no file under `--root` declares (C#, VB.NET, Java, PHP; platform
+  libraries left out) is listed once per library in `unresolved.tsv`, so an
+  in-house library outside `--root` is not silently missed. A
   using or alias target inside a namespace block is relative to the
   enclosing namespaces, and once resolved is kept as a full name.
   VB.NET joins implicitly continued lines (a trailing comma, an open

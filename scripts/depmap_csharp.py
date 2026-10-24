@@ -69,7 +69,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # -I drops the script dir
 from depmap_common import find_files, read_source, run  # noqa: E402
 from depmap_projects import ATTRS, QUOTED, dotnet_projects, drop_not_compiled  # noqa: E402
-from depmap_typed import BLOCK, CHAIN_RE, GLOBAL, Directives, FileInfo, PREDEFINED, TOKEN_RE, chains_at, dotted, flow_c_like, join, resolve, scan_or_none, strip_c_like  # noqa: E402
+from depmap_typed import BLOCK, CHAIN_RE, DOTNET_STANDARD, GLOBAL, Directives, FileInfo, PREDEFINED, TOKEN_RE, chains_at, dotted, flow_c_like, join, resolve, scan_or_none, strip_c_like  # noqa: E402
 
 EXTS = {".cs"}
 # Build output beside a project, NuGet's packages/ beside a solution (or at --root).
@@ -572,7 +572,8 @@ def mapper(root, warnings, args):
                 if info.aliases.setdefault(name, target) != target:
                     info.alias_more.setdefault(name, set()).add(target)
     skipped = drop_not_compiled(infos, not_compiled)
-    edges, unresolved = resolve(infos, attribute_suffix="Attribute", visible_files=visible_files)
+    edges, unresolved = resolve(infos, attribute_suffix="Attribute", visible_files=visible_files,
+                                 standard=DOTNET_STANDARD)
     return rels, edges, unresolved | skipped | deep
 
 

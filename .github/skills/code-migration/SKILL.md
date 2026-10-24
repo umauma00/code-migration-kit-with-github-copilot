@@ -133,7 +133,8 @@ hand-write the graph. If a bundled mapper fails or cannot read the syntax, try
 its options first, then copy it (with the shared `depmap_*.py` it imports) to
 `migration/tools/depmap-<language>/`, fix the copy against a hand-written
 fixture, never `migration-kit/`, and report the error, the change and the
-output difference in `depmap/report.md`.
+output difference in `depmap/report.md`. Use the depmap-adapter skill to
+choose the implementation language and build the adapter.
 
 ## Keep the parent's context small
 

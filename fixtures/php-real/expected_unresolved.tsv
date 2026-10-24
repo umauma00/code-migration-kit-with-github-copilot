@@ -1,4 +1,5 @@
 file	reference	reason
+ext/use.php	MyLib	namespace no file under --root declares, used by 1 file(s): an external library (if it is your own, put its source under --root)
 mw/index.php	require_once ( '$IP/includes/Setup.php' )	include path computed at run time
 mw/text.php	require_once ( '$IP/includes/Setup.php' )	include path computed at run time
 sub/page.php	include ( $root . 'includes/funcs.' . $ext )	include path computed at run time

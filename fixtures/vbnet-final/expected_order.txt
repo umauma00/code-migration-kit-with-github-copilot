@@ -1,6 +1,7 @@
 # migration order: one batch per line, dependencies first
 Alpha.vb
 Beta.vb
+Ext/Main.vb
 Gamma.vb
 Helpers.vb
 Hidden.vb

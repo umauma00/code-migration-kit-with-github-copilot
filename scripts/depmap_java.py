@@ -53,7 +53,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # -I drops the script dir
 from depmap_common import find_files, read_source, run  # noqa: E402
 from depmap_projects import java_modules  # noqa: E402
-from depmap_typed import FileInfo, TOKEN_RE, chains, flow_c_like, join, resolve, scan_or_none, strip_c_like  # noqa: E402
+from depmap_typed import JAVA_STANDARD, FileInfo, TOKEN_RE, chains, flow_c_like, join, resolve, scan_or_none, strip_c_like  # noqa: E402
 
 EXTS = {".java"}
 SKIP_DIRS = {"target", "build", "out"}
@@ -122,7 +122,8 @@ def mapper(root, warnings, args):
         rel = path.relative_to(root).as_posix()
         infos.append(scan_or_none(scan, rel, read_source(path, warnings), deep) or FileInfo(rel))
         rels.append(rel)
-    edges, unresolved = resolve(infos, nested_lookup=False, visible_files=java_modules(root, rels, warnings))
+    edges, unresolved = resolve(infos, nested_lookup=False, visible_files=java_modules(root, rels, warnings),
+                                 standard=JAVA_STANDARD)
     return rels, edges, unresolved | deep
 
 

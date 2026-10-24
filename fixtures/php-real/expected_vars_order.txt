@@ -5,6 +5,7 @@ lib/real.php
 lib/compat.php
 app/caller.php
 drupal/mymod.install
+ext/use.php
 wp-inc/http.php
 inc/main.php
 includes/funcs.php

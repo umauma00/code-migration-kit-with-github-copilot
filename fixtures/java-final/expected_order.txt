@@ -1,4 +1,5 @@
 # migration order: one batch per line, dependencies first
+Ext/p/Use.java
 Nested/p/Mailer.java
 Nested/p/Manager.java
 Nested/p/Shell.java

@@ -632,6 +632,13 @@ def mapper(root, warnings, args):
                 cache[key] = files or by_path
         return cache[key]
 
+    # Namespaces some file declares something in (with their parents).
+    namespaces = set()
+    for name in list(declared) + list(functions) + [c.lower() for c in constants]:
+        parts = name.split("\\")[:-1]
+        namespaces.update("\\".join(parts[:k]) for k in range(1, len(parts) + 1))
+    external = {}       # namespace no file declares -> files that name a class in it
+
     edges, unresolved = set(), set()
     for info in infos:
         src = info.rel
@@ -651,9 +658,11 @@ def mapper(root, warnings, args):
         for ns, name, is_call, uses in info.refs:
             if name.startswith("\\"):
                 full = name[1:]
-                add(classes(full.lower()))
-                add(functions.get(full.lower(), ()))
-                add(constants.get(full, ()))
+                hits = classes(full.lower()) | functions.get(full.lower(), set()) | constants.get(full, set())
+                add(hits)
+                ns_name = full.rpartition("\\")[0]
+                if not hits and ns_name and ns_name.lower() not in namespaces:
+                    external.setdefault(ns_name, set()).add(src)
                 continue
             head, _, rest = name.partition("\\")
             uses = uses or {"class": {}, "function": {}, "const": {}}
@@ -680,6 +689,20 @@ def mapper(root, warnings, args):
             add(functions.get(name.lower(), ()) if kind == "function" else classes(name.lower()))
         for ref, why in info.dynamic:
             unresolved.add((src, ref, why))
+    # A namespace no file declares is an external library (vendor/ is not
+    # read). One row per library, so an in-house one left outside --root
+    # does not go unnoticed.
+    tops = {}
+    for name, files in external.items():
+        top = name.split("\\")[0]
+        tops.setdefault(top, (set(), set()))[0].add(name)
+        tops[top][1].update(files)
+    for top, (names, files) in sorted(tops.items()):
+        name = next(iter(names)) if len(names) == 1 else top
+        files = sorted(files)
+        unresolved.add((files[0], name, f"namespace no file under --root declares, used by "
+                        f"{len(files)} file(s): an external library (if it is your own, put its "
+                        "source under --root)"))
     return rels, edges, unresolved
 
 

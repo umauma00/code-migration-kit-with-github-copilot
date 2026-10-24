@@ -53,13 +53,13 @@ In C#, Java and VB.NET an import names a namespace, not a file, and types of the
 ## Checking a mapper's output
 
 1. Five-file trial: run on five files before the whole tree and show `edges.tsv` and `unresolved.tsv` to the user.
-2. Read every row of `unresolved.tsv`: external libraries are fine; anything that should point at a repository file goes into `review-dependencies.json`.
+2. Read every row of `unresolved.tsv`: external libraries are fine; anything that should point at a repository file goes into `review-dependencies.json`. A "namespace no file under --root declares" row is a namespace or package no file declares (a C#/VB.NET/Java using, Imports or import, a PHP namespaced name), one row per library (platform libraries such as System, Microsoft and java.* are left out). An in-house library whose source is outside `--root` gets no edges, so when one shows up here, map again with a `--root` that also holds its source.
 3. Check that the skipped directories (listed at the top of each script) suit the project. Build output (bin, obj, target, build, out), vendor and packages are skipped only at `--root` or beside a build file (.csproj, pom.xml, composer.json...); a package or folder with the same name is read. A skipped directory holding sources is printed as a warning (`WARN skipped ...`). Directory symlinks are followed (a directory seen under two paths is read under both); only a loop back to an ancestor is stopped, with `WARN symlink loop not followed`.
 4. Summarise supported syntax, exclusions, unresolved references and audit results in `migration/depmap/report.md`.
 
 ## Languages without a bundled mapper: write an adapter
 
-For a language with no bundled mapper (RPG, PL/I, Delphi, VB6, Perl...) or syntax the bundled one does not cover, the agent writes an **adapter** (a project-specific mapper). A dependency graph the agent guesses is not accepted.
+For a language with no bundled mapper (RPG, PL/I, Delphi, VB6, Perl...) or syntax the bundled one does not cover, the agent writes an **adapter** (a project-specific mapper). A dependency graph the agent guesses is not accepted. The **depmap-adapter skill** has the practical guide: choosing Python (copying a bundled mapper) or another language, which bundled mapper to start from, and how to build the fixture.
 
 ### Rules
 

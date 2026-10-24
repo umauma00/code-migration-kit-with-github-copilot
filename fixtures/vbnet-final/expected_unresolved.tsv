@@ -1,3 +1,4 @@
 file	reference	reason
+Ext/Main.vb	mylib.util	namespace no file under --root declares, imported by 1 file(s): an external library (if it is your own, put its source under --root)
 Helpers.vb	twice	also declared in Twice.vb; the copies are not linked to each other, files that name it get an edge to each
 Twice.vb	twice	also declared in Helpers.vb; the copies are not linked to each other, files that name it get an edge to each

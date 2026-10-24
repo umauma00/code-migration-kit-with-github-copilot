@@ -25,6 +25,7 @@ AttrMore/Gen.cs
 AttrMore/Lam.cs
 DeclName/Mapping.cs
 DeclName/Schema.cs
+Ext/Main.cs
 ExtRecv/S.cs
 ExtRecv/BagExt.cs
 ExtRecv/Neg.cs

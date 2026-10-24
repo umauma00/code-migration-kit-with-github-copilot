@@ -1,2 +1,5 @@
 file	reference	reason
+Ext/Main.cs	Acme.Logging	namespace no file under --root declares, imported by 1 file(s): an external library (if it is your own, put its source under --root)
+Ext/Main.cs	MyLib.Util	namespace no file under --root declares, imported by 1 file(s): an external library (if it is your own, put its source under --root)
+Ext/Main.cs	log4net	namespace no file under --root declares, imported by 1 file(s): an external library (if it is your own, put its source under --root)
 ExtRecv/U.cs	.Add()	may call the extension method in ExtRecv/DictExt.cs or the receiver type's own member; the receiver type is not known

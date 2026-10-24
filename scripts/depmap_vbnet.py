@@ -61,7 +61,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # -I drops the script dir
 from depmap_common import find_files, read_source, run  # noqa: E402
 from depmap_projects import QUOTED, attr_values, dotnet_projects, drop_not_compiled  # noqa: E402
-from depmap_typed import GLOBAL, PREDEFINED, TOKEN_RE, FileInfo, chains, is_ident, join, members, parse_expr, resolve, scan_or_none  # noqa: E402
+from depmap_typed import DOTNET_STANDARD, GLOBAL, PREDEFINED, TOKEN_RE, FileInfo, chains, is_ident, join, members, parse_expr, resolve, scan_or_none  # noqa: E402
 
 EXTS = {".vb"}
 # Build output and My Project beside a project, NuGet's packages/ beside a
@@ -420,7 +420,7 @@ def mapper(root, warnings, args):
         for d in projects_of[info.rel]:
             info.usings.update(name.lower() for name in attr_values(VBPROJ_IMPORT_RE, texts.get(d, "")) if name.strip())
     skipped = drop_not_compiled(infos, not_compiled)
-    edges, unresolved = resolve(infos, fold=True, visible_files=visible_files)
+    edges, unresolved = resolve(infos, fold=True, visible_files=visible_files, standard=DOTNET_STANDARD)
     return rels, edges, unresolved | skipped | deep
 
 
