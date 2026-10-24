@@ -32,12 +32,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))  # -I drops the script 
 from depmap_common import find_files, nearest, reachable, read_source  # noqa: E402
 
 QUOTED = r"""(?:"([^"]*)"|'([^']*)')"""     # an XML attribute value, either quote
-COMPILE_RE = re.compile(r"<Compile\b([^>]*?)/?>", re.IGNORECASE)
+# Attributes of a tag; a quoted value may hold ">" (Condition="'$(A)' >= '1'").
+ATTRS = r"""((?:[^>"']|"[^"]*"|'[^']*')*?)"""
+COMPILE_RE = re.compile(r"<Compile\b" + ATTRS + r"/?>", re.IGNORECASE)
 # Update only changes metadata of items already listed, so it is not read.
 ITEM_ATTR_RE = re.compile(r"\b(Include|Remove|Exclude|Condition)\s*=\s*" + QUOTED, re.IGNORECASE)
-CONDITIONAL_RE = re.compile(r"<(ItemGroup|When|Otherwise)\b([^>]*)>(.*?)</\1\s*>", re.IGNORECASE | re.DOTALL)
+CONDITIONAL_RE = re.compile(r"<(ItemGroup|When|Otherwise)\b" + ATTRS + r">(.*?)</\1\s*>", re.IGNORECASE | re.DOTALL)
 COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
-PROJECT_REF_RE = re.compile(r"<ProjectReference\b([^>]*?)/?>", re.IGNORECASE)
+PROJECT_REF_RE = re.compile(r"<ProjectReference\b" + ATTRS + r"/?>", re.IGNORECASE)
 INCLUDE_ATTR_RE = re.compile(r"\bInclude\s*=\s*" + QUOTED, re.IGNORECASE)
 NO_DEFAULT_RE = re.compile(r"<EnableDefaultCompileItems>\s*false\s*</EnableDefaultCompileItems>", re.IGNORECASE)
 SDK_RE = re.compile(r"<Project\s[^>]*\bSdk\s*=", re.IGNORECASE)

@@ -5,6 +5,9 @@ lib/use.php	lib/Enum.php
 lib/use.php	lib/From.php
 lib/use.php	lib/Match.php
 tpl/Legacy.php	tpl/alias.php
+tpl/Order.php	tpl/Shopper.php
 tpl/Report.php	tpl/Column.php
 tpl/Report.php	tpl/Limit.php
+tpl/UseOld.php	tpl/alias2.php
 tpl/alias.php	tpl/Report.php
+tpl/alias2.php	tpl/Column.php

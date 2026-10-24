@@ -1,0 +1,7 @@
+<Project ToolsVersion="4.0">
+  <ItemGroup>
+    <!-- A raw > inside the Condition value must not end the tag. -->
+    <Compile Condition="'$(Ver)' >= '2'" Include="Opt\*.cs" />
+    <Compile Include="Main.cs" />
+  </ItemGroup>
+</Project>

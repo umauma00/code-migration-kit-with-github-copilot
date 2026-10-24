@@ -6,3 +6,4 @@ App/Main.cs	lib/LibType.cs
 Classic/Legacy/Widget.cs	Classic/Panel.cs
 Classic/Legacy/Widget.cs	Classic/Widget.cs
 Classic/Panel.cs	Classic/Widget.cs
+Cond/Main.cs	Cond/Opt/O.cs

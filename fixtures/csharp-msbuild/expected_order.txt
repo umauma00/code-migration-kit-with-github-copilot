@@ -8,4 +8,6 @@ Classic/Widget.cs
 Classic/Panel.cs
 Classic/Legacy/Widget.cs
 Classic/Skip.cs
+Cond/Opt/O.cs
+Cond/Main.cs
 other/Copies.cs

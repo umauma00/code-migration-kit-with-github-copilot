@@ -90,21 +90,48 @@ NAME_RE = re.compile(r"\\?[A-Za-z_\x80-\uffff][\w\x80-\uffff]*(?:\\[A-Za-z_\x80-
 STR = "\x01"   # string placeholder: \x01<index>\x02 (never part of a name)
 
 
+def hole_end(text, i):
+    """text[i] is the { of a string hole; the index after its closing }.
+    Quoted literals inside the hole are skipped whole."""
+    level, n = 0, len(text)
+    while i < n:
+        c = text[i]
+        if c in "'\"":
+            j = i + 1
+            while j < n and text[j] != c:
+                j += 2 if text[j] == "\\" else 1
+            i = j + 1
+            continue
+        level += {"{": 1, "}": -1}.get(c, 0)
+        i += 1
+        if not level:
+            break
+    return i
+
+
 def php_holes(body):
     """Code inside the {$...} and ${...} holes of an interpolated string
-    ("...{$this->t(Hd::class)}..."), each wrapped in parentheses."""
+    ("...{$this->t(Hd::class)}..."), each wrapped in parentheses. Quoted
+    literals inside a hole are text ("{$a['Order']}" names no class), but
+    the holes of a "..." literal inside one are code again. ${name} is a
+    variable."""
     out, i, n = [], 0, len(body)
     while i < n:
         if body[i] == "\\":
             i += 2
             continue
         if body.startswith("{$", i) or body.startswith("${", i):
-            j, level = i + 2, 1
-            while j < n and level:
-                level += {"{": 1, "}": -1}.get(body[j], 0)
-                j += 1
+            j = hole_end(body, i if body[i] == "{" else i + 1)
             start = i + 1 if body[i] == "{" else i + 2
-            out.append(" (" + body[start:j - 1].replace("\n", " ") + ")")
+            code = body[start:j - 1]
+            if body[i] == "$":
+                # ${name} and ${name[...]} are the variable $name.
+                m = re.match(r"\s*[A-Za-z_]\w*\s*(?=\[|$)", code)
+                if m:
+                    code = code[m.end():]
+            code = re.sub(r"'(?:\\.|[^'\\])*'|\"((?:\\.|[^\"\\])*)\"",
+                          lambda m: " 0 " + (php_holes(m.group(1)) if m.group(1) else ""), code)
+            out.append(" (" + code.replace("\n", " ") + ")")
             i = j
             continue
         i += 1
@@ -152,12 +179,9 @@ def php_code(text):
         if c in "'\"":
             j, buf = i + 1, []
             while j < n and text[j] != c:
-                if c == '"' and text.startswith("{$", j):
+                if c == '"' and (text.startswith("{$", j) or text.startswith("${", j)):
                     # A hole may hold quotes of its own: "{$a["k"]}".
-                    k, level = j + 1, 1
-                    while k < n and level:
-                        level += {"{": 1, "}": -1}.get(text[k], 0)
-                        k += 1
+                    k = hole_end(text, j + 1 if text[j] == "$" else j)
                     buf.append(text[j:k])
                     j = k
                     continue
@@ -289,7 +313,7 @@ def scan(rel, text):
             info.constants.append(f"{ns}\\{at(i + 1)}".lstrip("\\"))
             i += 2
             continue
-        elif low == "class_alias" and at(i + 1) == "(" and prev not in {"->", "?->", "::"}:
+        elif low.lstrip("\\") == "class_alias" and at(i + 1) == "(" and prev not in {"->", "?->", "::"}:
             # class_alias(Orig::class, 'Old'): the alias is a class this
             # file declares, so extends Old reaches the original through it.
             j, level = i + 2, 0
@@ -297,6 +321,10 @@ def scan(rel, text):
                 level += {"(": 1, "[": 1, ")": -1, "]": -1}.get(at(j), 0)
                 j += 1
             alias = at(j + 1) if at(j) == "," else ""
+            if j == i + 3 and at(i + 2).startswith(STR):      # class_alias('Orig', ...)
+                name = string(at(i + 2)).strip().lstrip("\\").replace("\\\\", "\\")
+                if BARE_NAME_RE.fullmatch(name):
+                    info.callables.append(("class", name))
             if alias.startswith(STR) and at(j + 2) in {")", ","} and BARE_NAME_RE.fullmatch(
                     string(alias).strip().lstrip("\\").replace("\\\\", "\\")):
                 info.classes.append(string(alias).strip().lstrip("\\").replace("\\\\", "\\"))

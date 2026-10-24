@@ -12,4 +12,8 @@ tpl/Limit.php
 tpl/Report.php
 tpl/alias.php
 tpl/Legacy.php
+tpl/Shopper.php
+tpl/Order.php
 tpl/Plain.php
+tpl/alias2.php
+tpl/UseOld.php

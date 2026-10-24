@@ -68,7 +68,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # -I drops the script dir
 from depmap_common import find_files, read_source, run  # noqa: E402
-from depmap_projects import QUOTED, dotnet_projects, drop_not_compiled  # noqa: E402
+from depmap_projects import ATTRS, QUOTED, dotnet_projects, drop_not_compiled  # noqa: E402
 from depmap_typed import BLOCK, GLOBAL, Directives, FileInfo, TOKEN_RE, chains_at, dotted, flow_c_like, members, resolve, scan_or_none, strip_c_like  # noqa: E402
 
 EXTS = {".cs"}
@@ -83,7 +83,7 @@ stackalloc static string struct switch this throw true try typeof uint ulong unc
 ushort using virtual void volatile while var dynamic nameof await async yield when where get set
 init value add remove partial global record nint nuint not and or with""".split())
 REFLECTION_RE = re.compile(r"\b(Type\s*\.\s*GetType|Activator\s*\.\s*CreateInstance|Assembly\s*\.\s*Load\w*)\s*\(\s*((?:[^()]|\([^()]*\))+?)?\s*\)")
-CSPROJ_USING_RE = re.compile(r"<Using\b([^>]*?)/?>", re.IGNORECASE)
+CSPROJ_USING_RE = re.compile(r"<Using\b" + ATTRS + r"/?>", re.IGNORECASE)
 CSPROJ_ATTR_RE = re.compile(r"\b(Include|Alias|Static)\s*=\s*" + QUOTED, re.IGNORECASE)
 
 
