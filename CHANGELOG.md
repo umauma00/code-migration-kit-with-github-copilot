@@ -119,7 +119,9 @@
   callables (a string in a callback position of `array_map`, `usort`,
   `call_user_func`, `add_action`... and `['Cls', 'm']` pairs, by plain or
   namespaced name) give edges to the function or class of that name (also the
-  last argument of `array_udiff`-style functions, `session_set_save_handler`,
+  last argument of `array_udiff`-style functions, the nine
+  `session_set_save_handler` handlers, named arguments by each function's
+  parameter names, `['Cls', 'm',]` and `['Cls', $method]` pairs,
   the values of `preg_replace_callback_array` and WordPress activation hooks), named arguments (`callback: 'f'`) included and `is_a` strings read as
   class names, while a callback computed at run time (`$cb`, `"on_$x"`,
   `'on_' . $x`, `get_cb()`, `[$class, 'm']`), `$f()` and an include missing at its `__DIR__` path are

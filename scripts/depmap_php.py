@@ -74,23 +74,27 @@ BARE_NAME_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*(?:\\[A-Za-z_][A-Za-z0-9_]*)*"
 # class_exists, is_callable...) are not references: two polyfills guarded
 # by function_exists('f') would else depend on each other.
 CALLBACK_FUNCTIONS = {
+    # name: ((position, parameter name for a PHP 8 named argument), ...);
+    # a negative position counts from the end (array_udiff($a, $b, 'cmp')
+    # takes any number of arrays, so it has no named form).
     **dict.fromkeys("""array_map call_user_func call_user_func_array forward_static_call
 forward_static_call_array register_shutdown_function register_tick_function spl_autoload_register
-set_error_handler set_exception_handler ob_start header_register_callback""".split(), (0,)),
+set_error_handler set_exception_handler ob_start header_register_callback""".split(), ((0, "callback"),)),
     **dict.fromkeys("""array_filter array_walk array_walk_recursive array_reduce usort uasort uksort
 iterator_apply preg_replace_callback add_action add_filter add_shortcode register_activation_hook
-register_deactivation_hook register_uninstall_hook""".split(), (1,)),
-    # The callback comes last: array_udiff($a, $b, 'cmp').
+register_deactivation_hook register_uninstall_hook""".split(), ((1, "callback"),)),
     **dict.fromkeys("""array_udiff array_udiff_assoc array_uintersect array_uintersect_assoc
-array_diff_ukey array_diff_uassoc array_intersect_ukey array_intersect_uassoc""".split(), (-1,)),
-    "array_udiff_uassoc": (-1, -2), "array_uintersect_uassoc": (-1, -2),
-    "session_set_save_handler": (0, 1, 2, 3, 4, 5),
-    "preg_replace_callback_array": ("values", 0),   # ['/x/' => 'cb', ...]
+array_diff_ukey array_diff_uassoc array_intersect_ukey array_intersect_uassoc""".split(), ((-1, None),)),
+    "array_udiff_uassoc": ((-1, None), (-2, None)), "array_uintersect_uassoc": ((-1, None), (-2, None)),
+    # The nine handlers; the other form takes a handler object (and a bool).
+    "session_set_save_handler": tuple(enumerate(
+        "open close read write destroy gc create_sid validate_sid update_timestamp".split())),
 }
-CALLBACK_PARAM = "callback"     # the parameter's name in each of them (named arguments)
+# Arguments whose array values are callbacks: preg_replace_callback_array(['/x/' => 'cb']).
+CALLBACK_ARRAYS = {"preg_replace_callback_array": (0, "pattern")}
 # Functions whose string arguments name a class: positions and parameter names.
-CLASS_NAME_FUNCTIONS = {"is_subclass_of": ((0, 1), ("object_or_class", "class")),
-                        "is_a": ((0, 1), ("object_or_class", "class"))}
+CLASS_NAME_FUNCTIONS = {"is_subclass_of": ((0, "object_or_class"), (1, "class")),
+                        "is_a": ((0, "object_or_class"), (1, "class"))}
 # Existence checks that guard a fallback declaration (!function_exists('f')).
 GUARDS = {"function_exists": "function", "class_exists": "class", "interface_exists": "class",
           "trait_exists": "class", "enum_exists": "class", "defined": "const"}
@@ -430,6 +434,9 @@ def scan(rel, text):
             info.dynamic.append((f"{t}()", "function name computed at run time"))
         elif t.startswith(STR) and (at(k - 1) == "[" or (at(k - 1) == "(" and at(k - 2).lower() == "array")) \
                 and at(k + 1) == "," and at(k + 2).startswith(STR) and at(k + 3) in {"]", ")"}:
+            # Anywhere: a ['Cls', 'm'] pair stored for later. In a callback
+            # argument callable_targets also reads ['Cls', 'm',] (a two-string
+            # list with a trailing comma elsewhere is usually data).
             name = string(t).strip().lstrip("\\").replace("\\\\", "\\")
             if BARE_NAME_RE.fullmatch(name):
                 info.callables.append(("class", name))
@@ -437,24 +444,31 @@ def scan(rel, text):
         if at(k + 1) != "(" or at(k - 1) in {"->", "?->", "::"} or at(k - 1).lower() in {"function", "new"}:
             continue
         if func in CALLBACK_FUNCTIONS:
-            positions, params, kind = CALLBACK_FUNCTIONS[func], (CALLBACK_PARAM,), "function"
+            slots, kind = CALLBACK_FUNCTIONS[func], "function"
+        elif func in CALLBACK_ARRAYS:
+            slots, kind = (CALLBACK_ARRAYS[func],), "function"
         elif func in CLASS_NAME_FUNCTIONS:
-            (positions, params), kind = CLASS_NAME_FUNCTIONS[func], "class"
+            slots, kind = CLASS_NAME_FUNCTIONS[func], "class"
         else:
             continue
         args = call_arguments(texts, k + 1)
         if [[at(j) for j in arg] for arg in args] == [[".", ".", "."]]:
             continue            # call_user_func(...): a closure of the function itself
+        if func == "session_set_save_handler" and len(args) <= 2:
+            slots = ((0, "sessionhandler"),)    # session_set_save_handler($handler, true)
         candidates = []
         for position, arg in enumerate(args):
             if len(arg) > 2 and NAME_RE.fullmatch(at(arg[0])) and at(arg[1]) == ":":
-                if at(arg[0]).lower() not in params:     # callback: 'f' (PHP 8 named argument)
+                if at(arg[0]).lower() not in {name for _, name in slots}:   # callback: 'f'
                     continue
                 arg = arg[2:]
-            elif position not in positions and position - len(args) not in positions:
+            elif not any(position == p or position - len(args) == p for p, _ in slots):
                 continue
-            if positions[0] == "values" and arg and at(arg[0]) in {"[", "array"}:
+            if func in CALLBACK_ARRAYS:
                 # Each value of a pattern => callback array.
+                if not arg or at(arg[0]) not in {"[", "array"}:
+                    candidates.append(arg)
+                    continue
                 opener = arg[0] if at(arg[0]) == "[" else arg[1]
                 for element in call_arguments(texts, opener):
                     arrow = next((n for n in range(len(element) - 1)
@@ -466,23 +480,28 @@ def scan(rel, text):
             if not arg:
                 continue
             first = at(arg[0])
-            if len(arg) == 1 and first.startswith(STR) and int(first[1:-1]) not in info.interpolated:
-                name = string(first).strip().lstrip("\\").replace("\\\\", "\\")
-                if BARE_NAME_RE.fullmatch(name):
-                    info.callables.append((kind, name))
-            elif kind == "function" and not static_callable(texts, arg, info.interpolated):
-                if first.startswith(STR) and int(first[1:-1]) in info.interpolated:
-                    text = '"' + " ".join(string(first).split()) + '"'     # its hole code follows
-                else:
-                    text = ""
-                    for j in arg:
-                        piece = f"'{string(at(j))}'" if at(j).startswith(STR) else " . " if at(j) == "." else at(j)
-                        if text and (text[-1].isalnum() or text[-1] == "_") and (piece[0].isalnum() or piece[0] in "_$"):
-                            text += " "         # new Cls(), not newCls()
-                        text += piece
-                    text = text.replace(" .  .  . ", "...")
-                text = text if len(text) <= 60 else text[:57] + "..."
-                info.dynamic.append((f"{func}({text})", "callback computed at run time"))
+            if kind == "class":
+                if len(arg) == 1 and first.startswith(STR) and int(first[1:-1]) not in info.interpolated:
+                    name = string(first).strip().lstrip("\\").replace("\\\\", "\\")
+                    if BARE_NAME_RE.fullmatch(name):
+                        info.callables.append(("class", name))
+                continue
+            targets = callable_targets(texts, arg, info.interpolated, string)
+            if targets is not None:
+                info.callables.extend(targets)
+                continue
+            if first.startswith(STR) and int(first[1:-1]) in info.interpolated:
+                text = '"' + " ".join(string(first).split()) + '"'     # its hole code follows
+            else:
+                text = ""
+                for j in arg:
+                    piece = f"'{string(at(j))}'" if at(j).startswith(STR) else " . " if at(j) == "." else at(j)
+                    if text and (text[-1].isalnum() or text[-1] == "_") and (piece[0].isalnum() or piece[0] in "_$"):
+                        text += " "         # new Cls(), not newCls()
+                    text += piece
+                text = text.replace(" .  .  . ", "...")
+            text = text if len(text) <= 60 else text[:57] + "..."
+            info.dynamic.append((f"{func}({text})", "callback computed at run time"))
     return info
 
 
@@ -512,41 +531,60 @@ def call_arguments(texts, open_at):
 SELF_NAMES = {"self", "static", "parent"}
 
 
-def static_callable(texts, arg, interpolated):
-    """Whether a callback argument (token indices) names its target in the
-    source or needs no file edge: a plain string ('Cls::m' strings are read
-    as class names), null, a closure, a first-class callable f(...) /
-    Cls::m(...), or a pair whose class is fixed: [$this, 'm'],
-    array(&$this, 'm'), [__CLASS__, 'm'], ['Cls', 'm'], [Cls::class, 'm'],
-    [self::class, 'm'], [new Cls, 'm']. Anything else
-    ($cb, "on_$x", 'on_' . $x, get_cb(), [$class, 'm']) is computed at run
-    time."""
+def callable_targets(texts, arg, interpolated, string):
+    """What a callback argument (token indices) names: a list of ("function"
+    | "class", name) to link (empty when the target needs no edge or the
+    rest of the code names it), or None when it is computed at run time.
+
+    Static: a plain string ('f'; 'Cls::m' strings are read as class names
+    elsewhere), null, a closure, a first-class callable f(...) /
+    Cls::m(...), an invokable new Cls, and a pair whose class is fixed:
+    ['Cls', 'm'], ['Cls', $method], [Cls::class, 'm'], [$this, 'm'],
+    array(&$this, 'm'), [__CLASS__, 'm'], [self::class, 'm'], [new Cls, 'm'],
+    with or without a trailing comma. Anything else ($cb, "on_$x",
+    'on_' . $x, get_cb(), [$class, 'm']) is computed at run time."""
     toks = [texts[j] for j in arg]
     if not toks:
-        return True
+        return []
+
+    def plain(tok):     # the name in a string without variables, or None
+        if not tok.startswith(STR) or int(tok[1:-1]) in interpolated:
+            return None
+        return string(tok).strip().lstrip("\\").replace("\\\\", "\\")
+
     first = toks[0].lower()
     if len(toks) == 1:
         if toks[0].startswith(STR):
-            return int(toks[0][1:-1]) not in interpolated
-        return first == "null"
+            name = plain(toks[0])
+            if name is None:
+                return None
+            return [("function", name)] if BARE_NAME_RE.fullmatch(name) else []
+        return [] if first == "null" else None
     if first in {"function", "fn"} or first == "static" and toks[1].lower() in {"function", "fn"}:
-        return True
+        return []
     if len(toks) >= 6 and toks[-5:] == ["(", ".", ".", ".", ")"]:      # f(...)
-        return True
+        return []
+    if first == "new" and NAME_RE.fullmatch(toks[1]) and toks[1].lower() != "class":
+        return []               # an invokable object: new Foo names Foo
     opener = 0 if first == "[" else 1 if first == "array" and toks[1] == "(" else None
     if opener is None:
-        return False
+        return None
     elements = call_arguments(texts, arg[opener])
     if len(elements) != 2 or not elements[0]:
-        return False
+        return None
     head = [texts[j] for j in elements[0]]
     if head in (["$this"], ["&", "$this"], ["__CLASS__"]):     # its own class (&$this in PHP 4 code)
-        return True
+        return []
     if head[0].lower() == "new" and len(head) > 1 and NAME_RE.fullmatch(head[1]) and head[1].lower() != "class":
-        return True             # [new Foo, 'm']: Foo is written
+        return []               # [new Foo, 'm']: Foo is written
     if len(head) == 1 and head[0].startswith(STR):
-        return int(head[0][1:-1]) not in interpolated
-    return len(head) == 3 and head[1] == "::" and head[2].lower() == "class" and NAME_RE.fullmatch(head[0]) is not None
+        name = plain(head[0])
+        if name is None:
+            return None
+        return [("class", name)] if BARE_NAME_RE.fullmatch(name) else []
+    if len(head) == 3 and head[1] == "::" and head[2].lower() == "class" and NAME_RE.fullmatch(head[0]):
+        return []               # Cls::class is a reference of its own
+    return None
 
 
 def const_values_unique(values):
@@ -841,15 +879,18 @@ def mapper(root, warnings, args):
         for ref, why in info.dynamic:
             unresolved.add((src, ref, why))
     # A namespace no file declares is an external library (vendor/ is not
-    # read). One row per library, so an in-house one left outside --root
-    # does not go unnoticed.
-    tops = {}
+    # read): one row per namespace, a child folded into a listed parent
+    # (Acme\Billing\Model into Acme\Billing), siblings apart, so an in-house
+    # one left outside --root does not go unnoticed.
     for name, files in external.items():
-        top = name.split("\\")[0]
-        tops.setdefault(top, (set(), set()))[0].add(name)
-        tops[top][1].update(files)
-    for top, (names, files) in sorted(tops.items()):
-        name = next(iter(names)) if len(names) == 1 else top
+        segs = name.split("\\")
+        top = next(("\\".join(segs[:k]) for k in range(1, len(segs)) if "\\".join(segs[:k]) in external), None)
+        if top:
+            external[top] |= files
+    for name, files in sorted(external.items()):
+        segs = name.split("\\")
+        if any("\\".join(segs[:k]) in external for k in range(1, len(segs))):
+            continue
         files = sorted(files)
         unresolved.add((files[0], name, EXTERNAL + str(len(files))))
     return rels, edges, unresolved
