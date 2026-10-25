@@ -1,0 +1,1 @@
+namespace Right { class Model {} }

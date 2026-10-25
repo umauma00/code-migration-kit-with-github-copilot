@@ -1,0 +1,3 @@
+file	reference	reason
+dup/Copy1.java	d.Same	also declared in dup/Copy2.java; the copies are not linked to each other, files that name it get an edge to each
+dup/Copy2.java	d.Same	also declared in dup/Copy1.java; the copies are not linked to each other, files that name it get an edge to each

@@ -1,0 +1,6 @@
+from	to
+index.php	helper.php
+index.php	lib/tool.php
+sub/page.php	helper.php
+sub/page.php	part.php
+sub/page.php	sub/part.php

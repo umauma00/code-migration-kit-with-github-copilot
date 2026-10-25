@@ -1,0 +1,4 @@
+namespace	files	first_file
+Acme.Logging	1	Ext/Main.cs
+MyLib.Util	1	Ext/Main.cs
+log4net	1	Ext/Main.cs

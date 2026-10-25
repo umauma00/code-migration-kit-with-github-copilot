@@ -1,0 +1,8 @@
+# migration order: one batch per line, dependencies first
+helper.php
+lib/tool.php
+index.php
+lib/helper.php
+part.php
+sub/part.php
+sub/page.php

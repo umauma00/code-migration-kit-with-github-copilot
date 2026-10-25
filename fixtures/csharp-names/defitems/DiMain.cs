@@ -1,0 +1,1 @@
+class DiMain { DiModel m; }

@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The same file imported under two conditions: the second import is read
+       even though the first one is skipped in Release. -->
+  <Import Project="shared.props" Condition="'$(Configuration)' == 'Debug'" />
+  <ItemGroup><Using Remove="CiE" /></ItemGroup>
+  <Import Project="shared.props" Condition="'$(Configuration)' == 'Release'" />
+</Project>

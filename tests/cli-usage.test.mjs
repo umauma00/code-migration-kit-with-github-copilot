@@ -238,3 +238,14 @@ test('a phase list may have spaces after its commas, as phase complete reads it'
   assert.doesNotThrow(() => parseCommandLine(['phase', 'complete', '00,00b,01', '--note', 'ok'], specs.run_migration));
   assert.throws(() => parseCommandLine(['phase', 'complete', '00, 0x', '--note', 'ok'], specs.run_migration), /must be one of .*not 0x/);
 });
+
+test('every option a bundled Python mapper accepts is in its spec', async () => {
+  const { spawnSync } = await import('node:child_process');
+  const { python } = await import('./helpers.mjs');
+  for (const [name, spec] of Object.entries(specs).filter(([n]) => /^depmap_/.test(n) && specs[n].script.endsWith('.py'))) {
+    const r = spawnSync(python, ['-I', path.join(kitRoot, 'scripts', spec.script), '--help'], { encoding: 'utf8' });
+    assert.equal(r.status, 0, `${spec.script} --help: ${r.stderr}`);
+    const accepted = [...new Set(r.stdout.match(/--[a-z][a-z-]*/g))].filter(o => o !== '--help').map(o => o.slice(2)).sort();
+    assert.deepEqual(Object.keys(spec.options).sort(), accepted, name);
+  }
+});

@@ -1,0 +1,2 @@
+Class Maybe
+End Class

@@ -54,7 +54,7 @@ invalidated (review again from 00b).
 |---|---|---|
 | 00b | `source-spec/contracts.md` | Per file: public interface, inputs/outputs, errors and edge cases, **with cited source lines**; write "unknown" where the source cannot decide |
 | 00b | `judge-report.md` | Contract summary, basis of inference, unverified scope |
-| 01 | `depmap/`, `manifest.tsv`, `review-dependencies.json`, `depmap/report.md` | Generated mechanically by the bundled parsers, never guessed |
+| 01 | `depmap/`, `manifest.tsv`, `review-dependencies.json`, `depmap/report.md` | Generated mechanically by the bundled parsers, never guessed. They read source only and never run the original. For a language without one, [write an adapter](DEPENDENCY-MAPPERS.en.md) |
 | 02 | `RULEBOOK.md`, `inventory.tsv`, `gap-report.md` | Decide policy from how the source actually behaves; undecidable sites stay UNKNOWN in the inventory with the most conservative translation and a TODO(port) |
 
 On large repositories, draft the contracts by scope with `survey run --kind

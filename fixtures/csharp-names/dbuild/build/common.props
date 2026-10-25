@@ -1,0 +1,3 @@
+<Project>
+  <ItemGroup><Using Include="DbCommon.Ns" /></ItemGroup>
+</Project>

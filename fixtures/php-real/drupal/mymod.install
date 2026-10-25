@@ -1,0 +1,3 @@
+<?php
+// Drupal .install files are PHP.
+function mymod_install() { core_fn(); }

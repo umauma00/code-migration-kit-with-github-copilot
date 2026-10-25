@@ -1,0 +1,1 @@
+namespace CondLib { class Boot { } }

@@ -1,0 +1,1 @@
+<Project><ItemGroup><Compile Include="A.cs" /><Compile Include="..\CondShared\X.cs" Condition="'$(Configuration)'=='Debug'" /></ItemGroup></Project>

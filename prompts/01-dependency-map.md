@@ -24,8 +24,14 @@ repository as cwd and all migration artifact paths relative to it.
 Use a deterministic dependency parser for the actual source ecosystem. Preserve
 `edges.tsv`, `order.txt`, `cycles.txt` under `migration/depmap/`. Review unresolved
 imports and generated/vendor exclusions. Check cycles at file AND target package
-level. The Python, JS/TS and C/C++ scripts are starter implementations; unsupported
-syntax needs an adapter, not an agent's guessed graph.
+level. Bundled mappers cover Python, JS/TS, C/C++, C#, Java, VB.NET, PHP and COBOL
+(see [dependency mappers](../docs/DEPENDENCY-MAPPERS.md)); they read source text
+only and never build or run the original. Review their `unresolved.tsv`. Another
+language or unsupported syntax needs an adapter written under
+`migration/tools/depmap-<language>/` by that document's rules, not an agent's
+guessed graph. When a bundled mapper fails or falls short, follow that
+document's "When a bundled mapper fails" steps: fix a copy there, never
+`migration-kit/`, and record it in `depmap/report.md`.
 
 Draft `migration/RULEBOOK.md` with the user. Decide all ambiguous mappings once:
 architecture, null/exception/number semantics, library choices, names, imports,

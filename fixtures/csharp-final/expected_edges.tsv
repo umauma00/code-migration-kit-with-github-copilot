@@ -1,0 +1,14 @@
+from	to
+Dup/Use.cs	Dup/One.cs
+Dup/Use.cs	Dup/Two.cs
+Ext/Use.cs	Ext/StrExt.cs
+FileScoped/Main.cs	FileScoped/Real.cs
+Flow/Factory.cs	Flow/Model.cs
+Flow/Main.cs	Flow/Factory.cs
+Flow/Main.cs	Flow/Model.cs
+Lookup/Main.cs	Lookup/Real.cs
+RelAlias/Main.cs	RelAlias/Real.cs
+Statics/Globals.cs	Statics/Mode.cs
+Statics/Globals.cs	Statics/Outer.cs
+Statics/Use.cs	Statics/Mode.cs
+Statics/Use.cs	Statics/Outer.cs

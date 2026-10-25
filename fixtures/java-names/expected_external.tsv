@@ -1,0 +1,16 @@
+namespace	files	first_file
+com.acme.ann	1	com/x/U.java
+com.acme.base	1	com/x/U.java
+com.acme.billing	1	com/x/U.java
+com.acme.err	1	com/x/U.java
+com.acme.ex	1	annot/Lists.java
+com.acme.ex2	1	annot/Lists.java
+com.acme.gb	1	annot/Lists.java
+com.acme.ia	1	annot/Lists.java
+com.acme.ib	1	annot/Lists.java
+com.acme.ifc	1	com/x/U.java
+com.acme.lb	1	annot/Lists.java
+com.acme.li	1	annot/Lists.java
+com.acme.li2	1	annot/Lists.java
+com.acme.made	1	com/x/U.java
+com.acme.orders	1	com/x/U.java

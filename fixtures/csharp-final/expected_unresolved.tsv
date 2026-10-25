@@ -1,0 +1,3 @@
+file	reference	reason
+Dup/One.cs	D.Dup	also declared in Dup/Two.cs; the copies are not linked to each other, files that name it get an edge to each
+Dup/Two.cs	D.Dup	also declared in Dup/One.cs; the copies are not linked to each other, files that name it get an edge to each

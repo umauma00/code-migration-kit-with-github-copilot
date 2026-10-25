@@ -1,0 +1,45 @@
+# migration order: one batch per line, dependencies first
+cb/known.php
+cb/dyn.php
+data/hooks.php
+data/main.php
+data/business.php
+dyn/inc.php
+dyn/main.php
+expr/boot.php
+expr/data_names.php
+expr/handler.php
+expr/klass.php
+expr/mapper.php
+expr/others.php
+expr/main.php
+extns/main.php
+inc/app/main.php
+inc/unrelated/config.php
+long/handler.php	long/main.php
+more/cb_activate.php
+more/cb_arr.php
+more/cb_key.php
+more/cb_udiff.php
+more/cb_val.php
+more/foo.php
+more/main.php
+named/handler.php
+named/n_close.php
+named/n_create_sid.php
+named/n_destroy.php
+named/n_gc.php
+named/n_open.php
+named/n_read.php
+named/n_transform.php
+named/n_update_timestamp.php
+named/n_validate_sid.php
+named/n_write.php
+named/named.php
+named/object.php
+named/positional.php
+pairs/comma.php	pairs/worker.php
+pairs/oldcomma.php
+pairs/plain.php
+pairs/varmeth.php
+short/handler.php	short/main.php

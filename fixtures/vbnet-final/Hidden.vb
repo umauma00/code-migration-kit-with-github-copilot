@@ -1,0 +1,2 @@
+Class Hidden
+End Class

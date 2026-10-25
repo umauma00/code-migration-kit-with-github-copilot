@@ -1,0 +1,6 @@
+# migration order: one batch per line, dependencies first
+SUBA.cbl
+FLAGS.cbl
+MAIN.cbl
+PIC.cpy
+SUBB.cbl

@@ -1,0 +1,16 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. DYN.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+           COPY DYNPGM.
+       01  WS-NEXT PIC X(8).
+       01  WS-MSG  PIC X(20) VALUE "CALL 'D9'".
+       PROCEDURE DIVISION.
+           MOVE 'D1' TO WS-NEXT WS-OTHER
+           CALL WS-NEXT
+           MOVE "D2" TO WS-NEXT.
+           CALL WS-NEXT.
+           CALL CP-PGM.
+           EXEC CICS LINK PROGRAM(WS-OTHER) END-EXEC.
+           CALL WS-NONE.
+           DISPLAY WS-MSG.

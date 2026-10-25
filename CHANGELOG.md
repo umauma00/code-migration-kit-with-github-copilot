@@ -1,3 +1,214 @@
+# 0.4.0 — 2026-10-23
+
+- 2026-10-23 dependency mappers for C#, Java, VB.NET, PHP and COBOL
+  (`scripts/depmap_csharp.py`, `depmap_java.py`, `depmap_vbnet.py`,
+  `depmap_php.py`, `depmap_cobol.py`). Only Python, JS/TS and C/C++ had one,
+  so for a C# source an agent wrote and ran its own .NET tool, which read as
+  if it ran the original. The new mappers use the Python standard library
+  only, read source text only and keep the edges/order/cycles contract; they
+  also write `unresolved.tsv` (dynamic includes and CALLs, reflection with a
+  computed name, imports of undeclared repository types). C#, Java and
+  VB.NET resolve type names through namespaces, imports, aliases, global
+  usings (.cs/.csproj/.vbproj), extension methods, VB module members and
+  partial types, in the language's lookup order (innermost namespace first,
+  with the usings of each namespace declaration at its own step;
+  Java single-type import, own package, then `pkg.*`). Types whose name is
+  never written are followed through declared types: member and return
+  types, base types, parameters, typed and `var` locals, foreach variables,
+  indexers and generic element types (`var x = f(); x.M().N()` reaches every
+  type on the way). `.csproj`/`.vbproj` ProjectReference and Maven/Gradle
+  module dependencies narrow a name declared in several projects to the
+  referenced ones, and files a .NET project does not compile declare
+  nothing. Every name is resolved from the namespace block it is written in
+  (a file with two blocks no longer merges them, and the output no longer
+  depends on the hash seed), `global::`/`Global.` names from the root only,
+  and global using aliases and project imports apply to their own project's
+  files. A using alias or using static inside a namespace block applies to
+  that block and the blocks nested in it only. `global using static` (and
+  `<Using Static="true">`) gives an edge from each file of the project that
+  names a member of the type. `<Compile Include/Remove>` values are item
+  lists (`a.cs;b.cs`); `*` and `?` stay within one directory and `**` spans
+  any depth; attributes may use either quote. A file left out only under a
+  Condition keeps its declarations and is listed in `unresolved.tsv`.
+  MSBuild paths are matched without case, as on Windows, and a
+  ProjectReference is read whatever its attribute order. A name in an
+  attribute list (`[Foo]`, `[A.B.Required]`, `[return: Foo]`) counts both
+  `Foo` and `FooAttribute`; elsewhere, collection expressions
+  (`F([Foo])`, `{ [Foo] }`) included, `Foo` does not mean `FooAttribute`; the
+  types in a tuple alias (`using P = (A a, B b);`) count where it is written. Checked on old open
+  source trees (Nancy, ShareX, Umbraco 7, WordPress, phpBB 3.0): C# extension
+  methods are narrowed by receiver type (static calls such as `string.Join`
+  do not count; `x.Add()` on a framework type with an unknown receiver is
+  listed in `unresolved.tsv`); nested types are not reported as duplicates;
+  a PHP declaration behind `!function_exists('f')` is used only when no
+  unguarded one exists; PHP include paths take `--include-var NAME=VALUE`,
+  constants with one relative `define()` literal and nested
+  `dirname(dirname(__FILE__))`; Windows-1252 text is no longer reported as
+  cp932, and a missing ProjectReference says it is missing. Checked again on
+  NHibernate 3.3.1, NUnit 2.6.0, Drupal 7.0, MediaWiki 1.16, Tomcat 7.0.0 and
+  Jenkins 1.416: a nested type's name means the nested type of its own file
+  (and `Outer.Inner` anywhere), so same-named nested classes such as Java's
+  `DescriptorImpl` are no longer duplicates or false edges; a name a C#
+  declaration introduces (`string Schema {`) is not a type reference; PHP
+  reads Drupal `.install`/`.test`/`.theme`/`.engine`/`.profile` files that
+  contain `<?php`, replaces `--include-var` values inside strings
+  (`"$IP/x.php"`) and uses `define()` constants whose value is a computable
+  path. When a bundled mapper fails or cannot read a project's syntax, the
+  docs, skill and prompt 01 say what to do: try its options, then fix a copy
+  under `migration/tools/depmap-<language>/` and report it. A new
+  depmap-adapter skill guides writing an adapter: Python (copying a bundled
+  mapper) or another installed language, which mapper to start from, the
+  fixture and the habits that keep it right. An imported namespace or
+  package no file under `--root` declares (C#, VB.NET, Java, PHP; platform
+  namespaces such as System, java, javax and jakarta left out) is listed in a
+  new `external.tsv`, one row per namespace with child namespaces folded
+  into a listed parent, so an
+  in-house library outside `--root` is not silently missed. A full name
+  written where a type stands (`Acme.Billing.Invoice inv;`, `new`, every
+  type of a base list, `where` constraint or Java extends/implements/throws
+  list, an attribute or annotation) counts as an import; Java rows are
+  always packages (`import static a.b.Util.*` gives `a.b`); PHP rows come
+  from the names code writes (`use Acme\Billing;` with `Billing\Invoice`
+  gives `Acme\Billing`), match case-insensitively and leave out PHP's own
+  `Random`, `Dom`, `Pdo` and similar namespaces. Measured on
+  NUnit, Tomcat and phpBB (50 random edges and 30 random files each): a
+  type nested in another file's class no longer hides a using's type of the
+  same name (NUnit's `Assert` was missed), and a PHP file's own
+  declaration, then the declarations its includes reach, win over copies
+  elsewhere. A
+  using or alias target inside a namespace block is relative to the
+  enclosing namespaces, and once resolved is kept as a full name.
+  VB.NET joins implicitly continued lines (a trailing comma, an open
+  parenthesis). Build-output and third-party directories (bin, obj,
+  target, build, out, vendor, packages) are skipped only at `--root` or
+  beside a build file, so a Java package named `build` is mapped, and each
+  skipped directory holding sources is printed as a warning; `generated`
+  directories are mapped. Names inside C# interpolation holes count in
+  every form (parenthesized ternaries, `global::`, `$"""` and `$$"""` raw
+  strings), and so do those in VB.NET `$"...{expr}..."`. A file name that is
+  not UTF-8 is written with its original bytes, with a warning to rename
+  it before `make_manifest.py`, which stops with a clear error on one.
+  `#if` branches that leave a brace open no longer shift the C# namespaces
+  after them; `using global::R;` in a namespace block (and an alias to
+  `global::X`) is never read as relative; enum members count for
+  `global using static`; a VB.NET line starting with `.` continues
+  the previous one (outside With); PHP existence checks
+  (`function_exists('f')`) are not references; COBOL keywords match whole
+  words only (`ON-CALL`, `END-CALL`); directory symlinks are followed
+  and only a loop back to an ancestor is stopped. A type declared without
+  `partial` in two files is no longer linked to its copy (a false cycle);
+  users get an edge to each and the copies are listed in `unresolved.tsv`.
+  MSBuild Include/Remove apply in document order, an Include's `Exclude`
+  applies to that item (`Update` is not read), an item that uses a
+  property (`$(Gen)`) is treated like a Condition, a file linked in from
+  another directory belongs to every project that compiles it (its global
+  usings, references and VB RootNamespace apply), a conditional
+  `EnableDefaultCompileItems` keeps the default files as "maybe", a ProjectReference must name an existing
+  project file (case ignored) or is warned about, Maven dependencies match
+  by groupId:artifactId, global usings of a file the build leaves out apply
+  nowhere, an alias whose `<Using>` items give several targets keeps each, project-file comments are not read, and a shared file linked in
+  only under a Condition is listed; Gradle Kotlin `project(path = ":x")` and `projects.x`
+  accessors are read. C# 14 `extension(...)` blocks, attributed enum
+  members, VB.NET `Imports A, B` and PHP 7 classes named `Enum`, `Match` or
+  `From` are understood; a Java import on the same line as `package` is
+  read; PHP `{$...}` holes in strings and heredocs are code, and a
+  `class_alias` alias is a class of its file. Code nested past Python's
+  recursion limit is parsed on a larger stack instead of stopping the
+  mapper. Lambda parameters, generic inference and overloads
+  are not followed; a VB.NET type nested in a class is its own type.
+  Enum members and the names Java and VB.NET fields, properties and
+  methods declare, VB.NET parameters and locals, and enum members (also
+  siblings named in a value, `Both = Order | Customer`, or in Java
+  constant arguments) are not type references (`enum EntityType {
+  Customer, Order }` made a false cycle); a Java annotation on a constant
+  (`@a.b.Ann A`) still is. `<Using Include="A;B">` is an item list,
+  `<Alias>`/`<Static>` may be child elements (one under a Condition is applied, with a warning, and every `<Alias>` of a `<Using>` applies, an empty one as a plain using), and a `<Using>` holding a
+  property (`$(NS).A`) is warned about and listed as unresolved (so is a VB `<Import>` with one); `Imports Global.X` and an Imports
+  continued over lines are read; a PHP include inside an expression
+  (`if (!include_once 'x.php') {`) ends at its own parenthesis, and
+  `namespace\f()` is the current namespace's function, never an import or
+  a global one (and goes to `external.tsv` when it is not under `--root`), an imported function never falls back to a global one,
+  and an include expression also ends at `or`; COBOL reads a `*>` inside a
+  literal as text, tab-indented fixed format, and CICS HANDLE ABEND,
+  RELEASE and ENABLE PROGRAM.
+  .NET projects are read with the nearest Directory.Build.props and
+  Directory.Build.targets, and the files imported by a path under `--root`
+  (a `<Using>` there was lost, and Nancy's shared `ProjectReference` to its
+  core project was not seen); `<Using Remove>` and VB `<Import Remove>`
+  apply; VB `<Import Include="A;B">` is split and read in any attribute
+  order (it gave one bogus namespace and lost every name of A and B), and
+  the type arguments of a VB generic alias (`Imports L = List(Of X)`) count;
+  a COBOL `CALL WS-PGM` gets edges to the literals `WS-PGM` is given
+  (`VALUE 'SUB1'`, `MOVE 'SUB1' TO WS-PGM`), and stays listed.
+  An `<Import>` under a Condition (or a conditional ImportGroup) keeps it
+  for what the imported file adds or removes (a Release-only
+  `<Compile Remove>` dropped Model.cs outright); `File`, `Path`, `Math` and
+  the other static class names are a static call only when no variable,
+  parameter or member of that name is in view (`Thing File` lost its
+  extension edge); a PHP constant with several `define()` values, in one
+  file's if/else too, gives an include through it an edge to each value's
+  file, and the include stays listed (the last one used to win), unless
+  a `define()` of it is not a literal; `Math.Max()` still names no member of
+  a project-wide `using static` type; `Condition="Exists('x.props')"` on the
+  import of x.props holds; `<Using Remove>` ignores case; a file imported
+  first under a Condition is read again at a later import; VB RootNamespace
+  comes from the project with `Directory.Build.props` and imports in place
+  (the last unconditional value, plus any conditional one after it);
+  `\define()` is a `define()` and `const A = 1, B = 2;` declares each name;
+  names a `const` or enum `case` declares are not class references;
+  `<RootNamespace />` is the empty namespace and an empty
+  `<EnableDefaultCompileItems />` leaves the SDK default on; PHP names are
+  looked up by position (`f()` a function, `Foo::`/`new Foo` a class, `FOO` a
+  constant), so `date()` or `DEBUG` no longer link the classes `Date` and
+  `Debug`; a later use of a parameter, local or member spelled like a type
+  (`message.Length`, `Category == "food"`, also a member another partial part
+  or a base type declares) is not that type, while a type position still is
+  (`Customer? Customer`, `Wrapper<int>`, tuples, `is not T`, VB `CType`/
+  `DirectCast`/`TryCast`, `TypeOf x Is T`, `(Of T)`), and a parameter or
+  local is in view in its own procedure only; type flow reads `x as T`,
+  `(T)x.M()`, C# `new` members and Java wildcards (`Job<?, ?>`); PHP attributes with arguments
+  (`#[Route('/home')]`) name their class; a VB class with
+  `Partial` on one part only (WinForms designer files) links every part; C#
+  `Result` and `Result<T>` are different types (`Result<(int, string)>` has
+  one type argument, and a partial `Result<T>` is not a part of `Result`; VB
+  `Result(Of T)` is told from `Result` too); PHP return and union types are
+  classes even beside a same-named constant; VB6/VBA (not `Visual Basic 2010`) get no VB.NET mapper
+  command and a mapper that reads no file warns; `depmap_php.py --include-var`
+  is in the CLI spec.
+  PHP follows computable
+  include paths and case-insensitive class/function names with namespaces
+  and `use`, narrowed by composer.json autoload (PSR-4, PSR-0, classmap),
+  with `--include-path` (an explicit `./` or `../` include never uses it:
+  it is looked up next to the including file and at `--root`, and is listed
+  as unresolved when those differ; `DIRECTORY_SEPARATOR`, `DS`,
+  `realpath()` and a trailing `or die(...)` are understood), and string
+  callables (a string in a callback position of `array_map`, `usort`,
+  `call_user_func`, `add_action`... and `['Cls', 'm']` pairs, by plain or
+  namespaced name) give edges to the function or class of that name (also the
+  last argument of `array_udiff`-style functions, the nine
+  `session_set_save_handler` handlers, named arguments by each function's
+  parameter names, `['Cls', 'm',]` and `['Cls', $method]` pairs,
+  the values of `preg_replace_callback_array`, `mb_ereg_replace_callback`,
+  the `xml_set_*_handler` functions and WordPress activation hooks;
+  `stream_wrapper_register` and `new ReflectionClass`/`ReflectionMethod`
+  strings are class names; the lists are closed), named arguments (`callback: 'f'`) included and `is_a` strings read as
+  class names, while a callback computed at run time (`$cb`, `"on_$x"`,
+  `'on_' . $x`, `get_cb()`, `[$class, 'm']`), `$f()` and an include missing at its `__DIR__` path are
+  listed as unresolved; COBOL follows COPY, EXEC SQL INCLUDE, CALL 'X' (also with
+  the literal on a later line) and EXEC CICS LINK/XCTL/START/LOAD in fixed or free
+  format, with `--copy-path` as the copybook search order. UTF-16/UTF-32 sources are read by their
+  byte order mark; other non-UTF-8 sources are read as cp932, then Latin-1,
+  with a warning, and a file with NUL bytes that is not UTF-16 is listed as
+  not analysed. `source-spec check` suggests the mapper for
+  these languages. [Dependency mappers](docs/DEPENDENCY-MAPPERS.md) lists
+  them and says how to write an adapter for any other language (static only,
+  under `migration/tools/`, same output files, hand-written fixture first);
+  the skills and prompt 01 point to it. Fixtures and expected outputs for
+  each language are tested with `python -I`. A "Scope and known limits" section says which
+  reports are fixed (missed edges, false cycles, crashes, doc mismatches,
+  regressions) and which are recorded limits (MSBuild evaluation, type
+  inference, names decided at run time, extra edges).
+
 # 0.3.2 — 2026-10-23
 
 - 2026-10-23 phase 01 on Windows: generating the review dependency map was

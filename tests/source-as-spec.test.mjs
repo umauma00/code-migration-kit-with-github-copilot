@@ -79,6 +79,22 @@ test('source-spec init previews, then switches an existing runtime project and d
   assert.match(readiness.commands.reviewDependencies, /--depmap-root src /);
 });
 
+test('source-as-spec suggests the bundled mapper for each legacy language, C# before C', t => {
+  const root = project(t);
+  initSourceSpec(root, loadConfig(root), { apply: true });
+  const config = loadConfig(root);
+  const command = language => sourceSpecReadiness(root, { ...config, sourceLanguage: language }).commands.dependencyMap;
+  for (const [language, script] of [['C#', 'csharp'], ['csharp', 'csharp'], ['Java', 'java'], ['PHP', 'php'], ['VB.NET', 'vbnet'], ['COBOL', 'cobol'], ['C', 'c'], ['C++', 'c'], ['JavaScript', 'ts']])
+    assert.match(command(language), new RegExp(`depmap_${script}\\.(?:py|mjs) --root src `), language);
+  assert.match(command('RPG'), /No bundled parser for RPG; write a deterministic adapter under migration\/tools\/ \(docs\/DEPENDENCY-MAPPERS\.md\)/);
+  // VB6 and VBA are not VB.NET: depmap_vbnet.py reads .vb only and would map nothing.
+  for (const language of ['VB6', 'VBA', 'Visual Basic 6', 'Visual Basic 6.0', 'Visual Basic for Applications'])
+    assert.match(command(language), /^No bundled parser for /, language);
+  // Visual Studio years name VB.NET: Visual Basic 2010 is not Visual Basic 2.
+  for (const language of ['Visual Basic', 'Visual Basic .NET', 'Visual Basic 2008', 'Visual Basic 2010', 'Visual Basic 2022'])
+    assert.match(command(language), /depmap_vbnet\.py --root src /, language);
+});
+
 test('one user OK records 00b-02 together; unfilled contracts and gaps stop with guidance', async t => {
   const root = project(t, { preparationProfile: 'source-as-spec' });
   let config = loadConfig(root);

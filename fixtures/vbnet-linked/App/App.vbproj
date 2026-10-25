@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><RootNamespace>Shop</RootNamespace></PropertyGroup>
+  <!-- Money.vb is compiled here too, so it declares Shop.Money. -->
+  <ItemGroup><Compile Include="..\Lib\Money.vb" /></ItemGroup>
+</Project>

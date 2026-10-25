@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ImportGroup Condition="'$(Configuration)' == 'Release'"><Import Project="remove.props" /></ImportGroup>
+  <ItemGroup><Using Include="Lib2" /></ItemGroup>
+</Project>

@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <Using Include="Cond2Lib.Model">
+      <Alias Condition="'$(Configuration)' == 'Debug'">DA</Alias>
+      <Alias Condition="'$(Configuration)' == 'Release'">RA</Alias>
+    </Using>
+    <Using Include="Cond2Lib.Other">
+      <Alias Condition="'$(Configuration)' == 'Release'">SA</Alias>
+      <Alias Condition="'$(Configuration)' == 'Debug'">TA</Alias>
+    </Using>
+  </ItemGroup>
+</Project>

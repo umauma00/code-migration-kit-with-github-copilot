@@ -325,6 +325,213 @@ test('workflow invalid CLI result fails closed and never marks a unit complete',
   assert.equal(receipt(f).status, 'blocked');
 });
 
+test('C#, Java, PHP, VB.NET and COBOL dependency fixtures produce their expected outputs', async t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'copilot-depmap-legacy-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  // [mapper, fixture, prefix of the expected files, extra options]
+  const cases = [['csharp', 'csharp'], ['java', 'java'], ['php', 'php'], ['vbnet', 'vbnet'], ['cobol', 'cobol'],
+    ['csharp', 'csharp-projects'], ['java', 'java-modules'], ['php', 'php-composer', 'expected_', ['--include-path', 'lib/inc']],
+    ['cobol', 'cobol', 'expected_copy_path_', ['--copy-path', 'SHARED,copy']],
+    // Review regressions: per-namespace scope, global::, global using aliases,
+    // MSBuild item lists and conditions, ./ includes versus include_path;
+    // aliases per namespace block, global using static, single-quoted
+    // attributes, MSBuild * within one directory.
+    ['csharp', 'csharp-scopes'], ['csharp', 'csharp-items'], ['vbnet', 'vbnet-items'], ['csharp', 'csharp-aliases'],
+    // Build-output directories only beside a build file, case-insensitive
+    // MSBuild paths, ProjectReference attribute order, qualified attributes,
+    // relative using in a block, VB implicit continuation, PHP DS/realpath/
+    // or die and string callables, COBOL CALL across lines.
+    ['csharp', 'csharp-review'], ['java', 'java-packages'], ['vbnet', 'vbnet-continuation'],
+    ['php', 'php-includes'], ['cobol', 'cobol-call-newline'],
+    // Interpolation holes (C# and VB), VB auto-property followed by Settings,
+    // PHP string callables only in callback positions.
+    ['csharp', 'csharp-interp'], ['vbnet', 'vbnet-interp'],
+    // #if branches with unequal braces.
+    ['csharp', 'csharp-ifdef'],
+    // Final pass: duplicate non-partial types, attributed enum members, C# 14
+    // extension blocks, MSBuild items in document order, $(Prop) items,
+    // linked files, ProjectReference case; VB Imports lists; Gradle Kotlin
+    // project(path = ...) and projects.x; PHP 7 class Enum/Match/From and
+    // dotted file names; a Java import on the package line; MSBuild Exclude;
+    // PHP string holes and class_alias.
+    ['csharp', 'csharp-final'], ['csharp', 'csharp-msbuild'], ['vbnet', 'vbnet-final'],
+    ['java', 'java-final'], ['php', 'php-final'],
+    // A file linked into several projects belongs to each (VB RootNamespace too).
+    ['vbnet', 'vbnet-linked'],
+    // using static does not bring the type's own name; [Foo] as an attribute counts Foo and FooAttribute,
+    // Foo elsewhere (collection expressions too) only Foo; an alias target is a full name in type flow too.
+    ['csharp', 'csharp-steps'],
+    // Real-tree findings: guarded PHP fallbacks, define() literals and
+    // --include-var in include paths, dirname(dirname(__FILE__)).
+    ['php', 'php-real'], ['php', 'php-real', 'expected_vars_', ['--include-var', 'root=,ext=php,IP=mw']],
+    ['php', 'php-relative', 'expected_', ['--include-path', 'lib']],
+    // Re-review: global usings of a removed file, <Using> in an XML comment,
+    // a shared file linked only under a Condition, UTF-16 and binary sources;
+    // Maven groupId:artifactId; PHP callback positions and named arguments,
+    // dynamic callbacks (variables, concatenation, calls) and a missing
+    // __DIR__ include; <Using> aliases under Conditions; VB.NET nested types and a commented-out
+    // RootNamespace. The *-names fixtures: enum members and members named
+    // like types, full names written inline (external.tsv), <Using> lists
+    // and child metadata, Imports Global., an include inside an
+    // expression, namespace\f(), PHP external spelling and more callback
+    // tables; cobol-format: *> inside a literal, tabs, CICS HANDLE ABEND.
+    ['csharp', 'csharp-rereview'], ['java', 'java-rereview'], ['php', 'php-rereview'], ['vbnet', 'vbnet-rereview'],
+    ['csharp', 'csharp-names'], ['java', 'java-names'], ['vbnet', 'vbnet-names'], ['php', 'php-names'], ['cobol', 'cobol-format']];
+  for (const [lang, name, prefix = 'expected_', options = []] of cases) {
+    const out = path.join(root, `${name}-${prefix}`), fixture = path.join(kitRoot, 'fixtures', name);
+    // -I: the mapper must find its shared modules without the script directory on sys.path.
+    const r = await runProcess(python, ['-I', path.join(kitRoot, `scripts/depmap_${lang}.py`), '--root', fixture, '--out', out, ...options]);
+    assert.equal(r.code, 0, r.stderr);
+    for (const file of ['edges.tsv', 'order.txt', 'cycles.txt', 'unresolved.tsv'])
+      assert.equal(fs.readFileSync(path.join(out, file), 'utf8'), fs.readFileSync(path.join(fixture, `${prefix}${file}`), 'utf8'), `${name} ${prefix}${file}`);
+    // Libraries no file declares go to external.tsv, never to unresolved.tsv.
+    const external = path.join(fixture, `${prefix}external.tsv`);
+    assert.equal(fs.readFileSync(path.join(out, 'external.tsv'), 'utf8'),
+      fs.existsSync(external) ? fs.readFileSync(external, 'utf8') : 'namespace\tfiles\tfirst_file\n', `${name} ${prefix}external.tsv`);
+  }
+});
+
+test('a directory symlink loop is walked once', { skip: process.platform === 'win32' && 'symlinks need privileges on Windows' }, async t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'copilot-depmap-loop-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  fs.mkdirSync(path.join(root, 'sub'));
+  fs.writeFileSync(path.join(root, 'sub', 'A.cs'), 'class A { }\n');
+  fs.writeFileSync(path.join(root, 'B.cs'), 'class B { A a; }\n');
+  fs.symlinkSync('..', path.join(root, 'sub', 'loop'));
+  const out = path.join(root, '..', `${path.basename(root)}-out`);
+  t.after(() => fs.rmSync(out, { recursive: true, force: true }));
+  const r = await runProcess(python, ['-I', path.join(kitRoot, 'scripts/depmap_csharp.py'), '--root', root, '--out', out]);
+  assert.equal(r.code, 0, r.stderr);
+  assert.match(r.stdout, /files=2 edges=1 /);
+  assert.match(r.stderr, /symlink loop not followed: sub\/loop\//);
+});
+
+test('a missing ProjectReference, a conditional alias and an unread Maven groupId are warned about', async t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'copilot-depmap-refs-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const csharp = await runProcess(python, ['-I', path.join(kitRoot, 'scripts/depmap_csharp.py'),
+    '--root', path.join(kitRoot, 'fixtures/csharp-rereview'), '--out', path.join(root, 'cs')]);
+  assert.equal(csharp.code, 0, csharp.stderr);
+  assert.match(csharp.stderr, /ProjectReference \.\.\\Lib\\Missing\.csproj is not found under --root \(RefName\/Lib\/Lib\.csproj is the project file there\)/);
+  assert.match(csharp.stderr, /CondAlias: global alias Model has 2 targets \(CA\.Model, CB\.Model\)/);
+  const tree = path.join(root, 'maven');
+  for (const [dir, group] of [['a', 'one'], ['b', 'two']]) {
+    fs.mkdirSync(path.join(tree, dir), { recursive: true });
+    fs.writeFileSync(path.join(tree, dir, 'pom.xml'), `<project><groupId>${group}</groupId><artifactId>core</artifactId></project>\n`);
+  }
+  fs.mkdirSync(path.join(tree, 'app'));
+  fs.writeFileSync(path.join(tree, 'app', 'pom.xml'), '<project><artifactId>app</artifactId><dependencies><dependency>'
+    + '<groupId>${core.group}</groupId><artifactId>core</artifactId></dependency></dependencies></project>\n');
+  const java = await runProcess(python, ['-I', path.join(kitRoot, 'scripts/depmap_java.py'), '--root', tree, '--out', path.join(root, 'java')]);
+  assert.equal(java.code, 0, java.stderr);
+  assert.match(java.stderr, /app\/pom\.xml: dependency \$\{core\.group\}:core matches 2 modules \(a, b\)/);
+});
+
+test('a directory symlink that is not a loop is read under its own path', { skip: process.platform === 'win32' && 'symlinks need privileges on Windows' }, async t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'copilot-depmap-link-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  fs.mkdirSync(path.join(root, 'sub'));
+  fs.writeFileSync(path.join(root, 'sub', 'A.cs'), 'class A { }\n');
+  fs.writeFileSync(path.join(root, 'B.cs'), 'class B { A a; }\n');
+  fs.symlinkSync('sub', path.join(root, 'alias'));
+  const out = path.join(root, '..', `${path.basename(root)}-out`);
+  t.after(() => fs.rmSync(out, { recursive: true, force: true }));
+  const r = await runProcess(python, ['-I', path.join(kitRoot, 'scripts/depmap_csharp.py'), '--root', root, '--out', out]);
+  assert.equal(r.code, 0, r.stderr);
+  // alias/A.cs and sub/A.cs are both files of the tree; B.cs gets an edge to each.
+  assert.match(r.stdout, /files=3 edges=2 /);
+});
+
+test('a project tag with a raw < in an attribute value is warned about', async t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'copilot-depmap-lt-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  // MSBuild cannot load it either (it needs &lt;); the condition is lost, so say so.
+  fs.writeFileSync(path.join(root, 'P.csproj'), '<Project ToolsVersion="4.0">\n<ItemGroup Condition="$(A) < 2">\n<Compile Include="A.cs" />\n</ItemGroup>\n</Project>\n');
+  fs.writeFileSync(path.join(root, 'A.cs'), 'class A { }\n');
+  const out = path.join(root, 'out');
+  const r = await runProcess(python, ['-I', path.join(kitRoot, 'scripts/depmap_csharp.py'), '--root', root, '--out', out]);
+  assert.equal(r.code, 0, r.stderr);
+  assert.match(r.stderr, /P\.csproj: tags not read at line 2 \(a raw < in an attribute value\?/);
+});
+
+test('deeply nested code is parsed, not a crash', async t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'copilot-depmap-deep-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const n = 3000;
+  fs.writeFileSync(path.join(root, 'A.cs'), `class A { void M() { var x = ${'('.repeat(n)}new B()${')'.repeat(n)}; var y = new List<${'List<'.repeat(n)}int${'>'.repeat(n)}>(); } }\n`);
+  fs.writeFileSync(path.join(root, 'B.cs'), 'class B { }\n');
+  const out = path.join(root, 'out');
+  const r = await runProcess(python, ['-I', path.join(kitRoot, 'scripts/depmap_csharp.py'), '--root', root, '--out', out]);
+  assert.equal(r.code, 0, r.stderr);
+  assert.equal(fs.readFileSync(path.join(out, 'edges.tsv'), 'utf8'), 'from\tto\nA.cs\tB.cs\n');
+});
+
+test('long comma lists are scanned in linear time', async t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'copilot-depmap-long-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  // 20000 enum members took minutes when each comma walked back to its bracket.
+  const members = Array.from({ length: 20000 }, (_, i) => `M${i}`);
+  fs.writeFileSync(path.join(root, 'E.cs'), `public enum E { ${members.join(',\n')} }\nclass C { B b; int[] a = { ${members.join(', ')} }; }\n`);
+  fs.writeFileSync(path.join(root, 'B.cs'), 'class B { }\n');
+  const out = path.join(root, 'out'), started = Date.now();
+  const r = await runProcess(python, ['-I', path.join(kitRoot, 'scripts/depmap_csharp.py'), '--root', root, '--out', out]);
+  assert.equal(r.code, 0, r.stderr);
+  assert.ok(Date.now() - started < 30000, `took ${Date.now() - started} ms`);
+  assert.equal(fs.readFileSync(path.join(out, 'edges.tsv'), 'utf8'), 'from\tto\nE.cs\tB.cs\n');
+});
+
+test('Western text that also decodes as cp932 is read as Latin-1', async t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'copilot-depmap-cp1252-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  // A (c) sign in a Windows-1252 comment is a lone half-width katakana in cp932.
+  fs.writeFileSync(path.join(root, 'A.cs'), Buffer.concat([Buffer.from('// '), Buffer.from([0xa9]), Buffer.from(' 2008\nclass A { B b; }\n')]));
+  // Shift_JIS 日本です has kana, so it stays cp932.
+  fs.writeFileSync(path.join(root, 'B.cs'), Buffer.concat([Buffer.from('// '), Buffer.from([0x93, 0xfa, 0x96, 0x7b, 0x82, 0xc5, 0x82, 0xb7]), Buffer.from('\nclass B { }\n')]));
+  const out = path.join(root, 'out');
+  const r = await runProcess(python, ['-I', path.join(kitRoot, 'scripts/depmap_csharp.py'), '--root', root, '--out', out]);
+  assert.equal(r.code, 0, r.stderr);
+  assert.match(r.stderr, /decoded as latin-1: .*A\.cs/);
+  assert.match(r.stderr, /decoded as cp932: .*B\.cs/);
+  assert.equal(fs.readFileSync(path.join(out, 'edges.tsv'), 'utf8'), 'from\tto\nA.cs\tB.cs\n');
+});
+
+test('a mapper survives a file name that is not UTF-8', { skip: process.platform !== 'linux' && 'needs a byte-string file system' }, async t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'copilot-depmap-bytes-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const src = path.join(root, 'src');
+  fs.mkdirSync(src);
+  // 商品.cbl in Shift_JIS, as an unpacked legacy archive leaves it on Linux.
+  const name = Buffer.concat([Buffer.from(src + '/'), Buffer.from([0x8f, 0xa4, 0x95, 0x69]), Buffer.from('.cbl')]);
+  fs.writeFileSync(name, '       IDENTIFICATION DIVISION.\n       PROGRAM-ID. SHOHIN.\n');
+  fs.writeFileSync(path.join(src, 'main.cbl'), "       IDENTIFICATION DIVISION.\n       PROGRAM-ID. MAIN.\n       PROCEDURE DIVISION.\n           CALL 'SHOHIN'.\n");
+  const out = path.join(root, 'out');
+  const r = await runProcess(python, ['-I', path.join(kitRoot, 'scripts/depmap_cobol.py'), '--root', src, '--out', out]);
+  assert.equal(r.code, 0, r.stderr);
+  assert.match(r.stderr, /file name is not UTF-8/);
+  // The edge keeps the original bytes, so the path still opens.
+  const edges = fs.readFileSync(path.join(out, 'edges.tsv'));
+  assert.ok(edges.includes(Buffer.concat([Buffer.from('main.cbl\t'), Buffer.from([0x8f, 0xa4, 0x95, 0x69])])), edges.toString('latin1'));
+});
+
+test('typed-language mappers give the same output under every hash seed', async t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'copilot-depmap-seed-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  // Set iteration order follows PYTHONHASHSEED; the output must not. (No -I:
+  // it would ignore PYTHONHASHSEED.)
+  for (const [lang, name] of [['csharp', 'csharp-scopes'], ['csharp', 'csharp-aliases'], ['csharp', 'csharp-review'], ['vbnet', 'vbnet-items'], ['csharp', 'csharp'],
+    ['csharp', 'csharp-final'], ['csharp', 'csharp-msbuild'], ['vbnet', 'vbnet-final']]) {
+    const fixture = path.join(kitRoot, 'fixtures', name);
+    for (const seed of ['0', '1', '2', '3']) {
+      const out = path.join(root, `${name}-${seed}`);
+      const r = await runProcess(python, [path.join(kitRoot, `scripts/depmap_${lang}.py`), '--root', fixture, '--out', out],
+        { env: { ...process.env, PYTHONHASHSEED: seed } });
+      assert.equal(r.code, 0, r.stderr);
+      for (const file of ['edges.tsv', 'order.txt', 'unresolved.tsv'])
+        assert.equal(fs.readFileSync(path.join(out, file), 'utf8'), fs.readFileSync(path.join(fixture, `expected_${file}`), 'utf8'), `${name} seed ${seed} ${file}`);
+    }
+  }
+});
+
 test('original Python, C and TS dependency fixtures retain byte-for-byte outputs', async t => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'copilot-depmap-test-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));

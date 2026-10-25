@@ -1,0 +1,2 @@
+Class DebugOnly
+End Class

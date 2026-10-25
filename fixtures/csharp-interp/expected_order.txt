@@ -1,0 +1,10 @@
+# migration order: one batch per line, dependencies first
+Alpha.cs
+Beta.cs
+Delta.cs
+Eps.cs
+Gamma.cs
+Item.cs
+M.cs
+Zed.cs
+Use.cs

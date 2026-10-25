@@ -1,0 +1,7 @@
+from	to
+Global.cs	Lib/Widget.cs
+Main.cs	A.cs
+Main.cs	B.cs
+Main.cs	Extra.cs
+Rooted.cs	Real.cs
+UsesAlias.cs	Lib/Widget.cs

@@ -1,0 +1,21 @@
+# migration order: one batch per line, dependencies first
+annot/Ann.java
+annot/Customer.java
+annot/Order.java
+annot/mark/Mark.java
+annot/K.java
+annot/mark/Mark1.java
+annot/K1.java
+annot/Lists.java
+annot/User.java
+com/x/U.java
+shop/Ann.java
+shop/Customer.java
+shop/EntityType.java
+shop/Holder.java
+shop/Kind2.java
+shop/Kind3.java
+shop/Order.java
+wild/WReport.java
+wild/WJob.java
+wild/WCommand.java

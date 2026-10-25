@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- No default items and no Compile items here: an import the mapper
+       does not read may list them, so the files are "maybe". -->
+  <PropertyGroup><EnableDefaultItems>false</EnableDefaultItems></PropertyGroup>
+</Project>

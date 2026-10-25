@@ -1,0 +1,9 @@
+# migration order: one batch per line, dependencies first
+A.vb
+B.vb
+Casing.vb
+M.vb
+Proj/InProj.vb
+U.vb
+UseProj.vb
+V.vb

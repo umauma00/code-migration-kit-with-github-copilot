@@ -1,0 +1,1 @@
+class TMain { TA a; }

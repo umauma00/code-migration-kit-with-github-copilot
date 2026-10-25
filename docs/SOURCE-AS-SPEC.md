@@ -49,7 +49,7 @@ node migration-kit/scripts/run_migration.mjs source-spec init --apply  # ユー�
 |---|---|---|
 | 00b | `source-spec/contracts.md` | 各ファイルの公開インターフェース・入出力・エラー・境界条件を、**ソースの行番号付き**で記入。ソースから判断できないものは「不明」と書く |
 | 00b | `judge-report.md` | 契約の要約、推定の根拠、未検証の範囲 |
-| 01 | `depmap/`、`manifest.tsv`、`review-dependencies.json`、`depmap/report.md` | 同梱の解析器で機械的に生成（推測しない） |
+| 01 | `depmap/`、`manifest.tsv`、`review-dependencies.json`、`depmap/report.md` | 同梱の解析器で機械的に生成（推測しない）。ソースを読むだけで元のアプリは実行しない。同梱版のない言語は[アダプタを自作](DEPENDENCY-MAPPERS.md) |
 | 02 | `RULEBOOK.md`、`inventory.tsv`、`gap-report.md` | ソースの実際の使われ方から方針を決める。判断できない箇所はinventoryにUNKNOWNとして残し、最も保守的な訳とTODO(port)を指定 |
 
 大きなリポジトリでは、契約メモを親が全ファイル読んで書く代わりに `survey run --kind contracts` → `survey merge --kind contracts` で範囲ごとに作れます（[準備工程の調査](SURVEYS.md)）。

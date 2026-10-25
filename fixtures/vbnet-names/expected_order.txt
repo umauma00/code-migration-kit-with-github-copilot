@@ -1,0 +1,43 @@
+# migration order: one batch per line, dependencies first
+Customer.vb
+EntityType.vb
+Later.vb
+Order.vb
+Params.vb
+U.vb
+arity/ArResult.vb
+arity/ArResultOfT.More.vb	arity/ArResultOfT.vb
+arity/ArSvc.vb
+arity/ArSvc2.vb
+casts/CsCustomer.vb
+casts/CsLine.vb
+casts/CsOrder.vb
+casts/CsTag.vb
+casts/CsForm.vb
+designer/DsgForm.Designer.vb	designer/DsgForm.vb
+imp/AT.vb
+imp/BT.vb
+imp/CT.vb
+imp/DT.vb
+imp/ET.vb
+imp/GoneT.vb
+imp/ImpMain.vb
+partmem/PmBase.vb
+partmem/PmDerived.vb
+partmem/PmProduct.Logic.vb	partmem/PmProduct.vb
+partmem/PmCategory.vb
+procvars/PvInvoice.vb
+procvars/PvOrder.vb
+procvars/PvSvc.vb
+proj/InProj.vb
+rns/App/RnsModel.vb
+rns/Two/TwoC.vb
+rns/Two/TwoT.vb
+rns/App/RnsMain.vb
+rns/Two/TwoF.vb
+rns2/Rns2Marker.vb
+rns2/Rns2Model.vb
+rns2/Rns2Main.vb
+shadow/ShLogger.vb
+shadow/ShMessage.vb
+shadow/ShUser.vb
