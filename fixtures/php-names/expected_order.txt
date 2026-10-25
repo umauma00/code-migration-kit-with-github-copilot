@@ -7,6 +7,10 @@ cb/cb1.php
 cb/en.php
 cb/st.php
 cb/a.php
+consts/consts.php
+consts/defs.php
+consts/inc/pclib.php
+consts/use.php
 defs/a/boot.php
 defs/b/boot.php
 defs/c/boot.php

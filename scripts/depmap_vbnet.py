@@ -82,9 +82,36 @@ DIM_RE = re.compile(r"^\s*(?:(?:dim|static|const|using|private|public|friend|pro
 FOREACH_RE = re.compile(r"^\s*for\s+each\s+([a-z_]\w*)(?:\s+as\s+([\w.]+(?:\s*\(\s*of\s+[^)]*\))?))?\s+in\s+(.+)$")
 IMPORTS_RE = re.compile(r"^\s*imports\s+(.+?)\s*$", re.IGNORECASE)
 IMPORT_CLAUSE_RE = re.compile(r"^(?:([\w\[\]]+)\s*=\s*)?([\w.\[\]]+)$")
-ROOT_NS_RE = re.compile(r"<RootNamespace>\s*([^<]*?)\s*</RootNamespace>", re.IGNORECASE)
+ROOT_NS_RE = re.compile(r"<RootNamespace\b" + ATTRS + r">\s*([^<]*?)\s*</RootNamespace\s*>", re.IGNORECASE)
 VBPROJ_IMPORT_RE = re.compile(r"<Import\b" + ATTRS + r"/?>", re.IGNORECASE)
 VBPROJ_ATTR_RE = re.compile(r"\b(Include|Remove|Condition)\s*=\s*" + QUOTED, re.IGNORECASE)
+
+
+def root_namespaces(text, stem, warnings, where):
+    """RootNamespace candidates of a project, from its text with
+    Directory.Build.props and imports expanded: the last value set outside
+    a Condition (the project name if none), and every value set under a
+    Condition after it, which is not evaluated (its types are declared under
+    each, with a warning). $(MSBuildProjectName) is the project name; another
+    property is not evaluated and leaves the project name, with a warning."""
+    spans = conditional_spans(text)
+    current, conditional = stem, []
+    for m in ROOT_NS_RE.finditer(text):
+        value = m.group(2).strip()
+        value = re.sub(r"\$\(\s*MSBuildProjectName\s*\)", stem, value, flags=re.IGNORECASE)
+        if "$(" in value:
+            warnings.append(f"{where}: <RootNamespace>{value}</RootNamespace> uses an MSBuild property that is not "
+                            f"evaluated; {stem} is used")
+            value = stem
+        if re.search(r"\bCondition\s*=", m.group(1), re.IGNORECASE) or any(a <= m.start() < b for a, b in spans):
+            conditional.append(value)
+        else:
+            current, conditional = value, []
+    written = list({v.lower(): v for v in reversed([current] + conditional)}.values())[::-1]
+    if len(written) > 1:
+        warnings.append(f"{where}: RootNamespace is set under a Condition that is not evaluated; "
+                        f"types are declared under each of {', '.join(v or '(none)' for v in written)}")
+    return [v.lower() for v in written]
 
 
 def top_level_split(text):
@@ -484,11 +511,13 @@ def mapper(root, warnings, args):
     files = find_files(root, EXTS, SKIP_DIRS, warnings=warnings)
     rels = [path.relative_to(root).as_posix() for path in files]
     visible_files, not_compiled, projects_of, texts = dotnet_projects(root, rels, ".vbproj", warnings)
-    root_ns = {}
+    root_ns = {}        # project dir -> RootNamespace candidates
     for proj in find_files(root, {".vbproj"}, SKIP_DIRS):
-        m = ROOT_NS_RE.search(COMMENT_RE.sub("", read_source(proj, warnings)))
         d = proj.parent.relative_to(root).as_posix()
-        root_ns.setdefault("" if d == "." else d, (m.group(1).strip() if m else proj.stem).lower())
+        d = "" if d == "." else d
+        if d not in root_ns:
+            text = texts[d] if d in texts else COMMENT_RE.sub("", read_source(proj, warnings))
+            root_ns[d] = root_namespaces(text, proj.stem, warnings, d or ".")
     infos, deep = [], set()
     spelled = {}        # lower-cased namespace (and each prefix) -> as first written, for external.tsv
     def spell(name):
@@ -498,17 +527,17 @@ def mapper(root, warnings, args):
     for path, rel in zip(files, rels):
         # A file linked into several projects is compiled under each one's
         # RootNamespace: it declares its types in every one of them.
-        spaces = sorted({root_ns[d] for d in projects_of[rel] if d in root_ns})
+        spaces = sorted({space for d in projects_of[rel] if d in root_ns for space in root_ns[d]})
         if not spaces:
-            spaces = [next((root_ns[d] for d in sorted(root_ns, key=len, reverse=True)
-                            if d == "" or rel.startswith(d + "/")), "")]
+            spaces = next((root_ns[d] for d in sorted(root_ns, key=len, reverse=True)
+                           if d == "" or rel.startswith(d + "/")), [""])
         text = read_source(path, warnings)
         # Logical lines, without comments: Imports Acme.Billing ' note, and
         # every dotted name (a full name written inline).
         for line in strip_vb(text)[0]:
             m = IMPORTS_RE.match(line)
-            for clause in (m.group(1).split(",") if m else ()):
-                c = IMPORT_CLAUSE_RE.match(re.sub(r"\s+", "", clause))
+            for clause in (top_level_split(m.group(1)) if m else ()):
+                c = IMPORT_CLAUSE_RE.match(re.sub(r"\s+", "", clause.partition("(")[0]))
                 if c:
                     spell(re.sub(r"(?i)^global\.", "", c.group(2)))
             for name in chains(line, ()):

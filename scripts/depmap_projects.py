@@ -145,13 +145,13 @@ def compile_items(text):
     return items
 
 
-CONTAINER_RE = re.compile(r"<(/?)(ItemGroup|ImportGroup|Choose|When|Otherwise|Target)\b" + ATTRS + r"(/?)>", re.IGNORECASE)
+CONTAINER_RE = re.compile(r"<(/?)(ItemGroup|ImportGroup|PropertyGroup|Choose|When|Otherwise|Target)\b" + ATTRS + r"(/?)>", re.IGNORECASE)
 
 
 def conditional_spans(text):
-    """(start, end) of every ItemGroup or ImportGroup with a Condition,
-    Choose branch and Target of text: an item or import inside one is
-    conditional."""
+    """(start, end) of every ItemGroup, ImportGroup or PropertyGroup with a
+    Condition, Choose branch and Target of text: an item, import or
+    property inside one is conditional."""
     spans, stack = [], []
     for m in CONTAINER_RE.finditer(text):
         closing, name, attr_text, empty = m.group(1), m.group(2).lower(), m.group(3), m.group(4)
@@ -163,7 +163,7 @@ def conditional_spans(text):
                 if open_name == name:
                     break
         elif not empty:
-            cond = name not in {"itemgroup", "importgroup"} or re.search(r"\bCondition\s*=", attr_text, re.IGNORECASE)
+            cond = name not in {"itemgroup", "importgroup", "propertygroup"} or re.search(r"\bCondition\s*=", attr_text, re.IGNORECASE)
             stack.append((name, m.start(), bool(cond)))
     spans += [(start, len(text)) for _, start, cond in stack if cond]
     return spans
@@ -250,14 +250,20 @@ def directory_build(root, d, name):
         d = posixpath.dirname(d)
 
 
-def with_imports(root, rel, text, warnings, seen=None):
+def with_imports(root, rel, text, warnings, seen=None, chain=(), under_condition=False):
     """text with each <Import Project="..."> of a file under root put in
     its place (paths relative to the importing file, as MSBuild takes
     them). An import of the next Directory.Build.props/.targets above
     (GetPathOfFileAbove) is followed too; other imports that use a
-    property are not read."""
-    seen = set() if seen is None else seen
-    seen.add(rel.lower())
+    property are not read.
+
+    MSBuild ignores a second import of a file it has already imported. seen
+    maps a file to "yes" once an import of it held for sure, or "maybe"
+    when every import of it so far was under an unevaluated Condition:
+    then a later import of it may be the one that is read, so it is read
+    again, as conditional. chain stops an import loop."""
+    seen = {} if seen is None else seen
+    chain = chain + (rel.lower(),)
     here = posixpath.dirname(rel)
     spans = conditional_spans(text)
 
@@ -273,19 +279,24 @@ def with_imports(root, rel, text, warnings, seen=None):
                 break
         if target is None and "$(" not in value:
             target = msbuild_path(here, value)
-        if target is None or target.lower() in seen or not (root / target).is_file():
+        key = target.lower() if target else None
+        if target is None or key in chain or seen.get(key) == "yes" or not (root / target).is_file():
             return m.group(0)
-        body = with_imports(root, target, COMMENT_RE.sub("", read_source(root / target, warnings)), warnings, seen)
         conditions = attr_values(CONDITION_ATTR_RE, m.group(1))
         # Condition="Exists('x.props')" on the import of x.props holds: the
         # file is there.
         exists = conditions and re.fullmatch(r"\s*Exists\s*\(\s*'([^']*)'\s*\)\s*", conditions[0], re.IGNORECASE)
         if exists and exists.group(1).strip() == value:
             conditions = []
-        if conditions or any(a <= m.start() < b for a, b in spans):
-            # An import under a Condition (its own, an ImportGroup's, a
-            # Choose branch's) keeps it: what it adds or removes is
-            # conditional, as if written in a <When>.
+        # An import under a Condition (its own, an ImportGroup's, a Choose
+        # branch's, an importing file's), or one an earlier conditional
+        # import may already have read, is conditional: what it adds or
+        # removes is read as if written in a <When>.
+        local = bool(conditions) or any(a <= m.start() < b for a, b in spans) or seen.get(key) == "maybe"
+        seen[key] = "maybe" if local or under_condition else "yes"
+        body = with_imports(root, target, COMMENT_RE.sub("", read_source(root / target, warnings)), warnings,
+                            seen, chain, under_condition or local)
+        if local:
             body = f"<Choose><When Condition=\"'$(Imported)' != ''\">{body}</When></Choose>"
         return body
     return IMPORT_PROJECT_RE.sub(expand, text)
@@ -295,14 +306,15 @@ def project_text(root, d, proj_rel, text, warnings):
     """The project file's text as MSBuild reads it: the nearest
     Directory.Build.props before it and Directory.Build.targets after it,
     and the files they and it import by a path under root."""
-    seen = set()
+    seen = {}
     parts = []
     for name, own in ((DIRECTORY_BUILD[0], None), (None, text), (DIRECTORY_BUILD[1], None)):
         if own is not None:
             parts.append(with_imports(root, proj_rel, COMMENT_RE.sub("", own), warnings, seen))
             continue
         rel = directory_build(root, d, name)
-        if rel and rel.lower() not in seen:
+        if rel and seen.get(rel.lower()) != "yes":
+            seen[rel.lower()] = "yes"
             parts.append(with_imports(root, rel, COMMENT_RE.sub("", read_source(root / rel, warnings)), warnings, seen))
     return "\n".join(parts)
 

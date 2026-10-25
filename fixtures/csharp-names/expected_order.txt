@@ -11,6 +11,8 @@ cimp/C/Main.cs
 cimp/C/Model.cs
 cimp/D/DMain.cs
 cimp/D/Gone.cs
+cimp/E/Lib/EModel.cs
+cimp/E/EMain.cs
 cond/Boot.cs
 cond/Model.cs
 cond/Util.cs

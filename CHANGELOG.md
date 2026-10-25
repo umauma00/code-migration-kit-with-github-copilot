@@ -150,7 +150,11 @@
   file, and the include stays listed (the last one used to win), unless
   a `define()` of it is not a literal; `Math.Max()` still names no member of
   a project-wide `using static` type; `Condition="Exists('x.props')"` on the
-  import of x.props holds; `<Using Remove>` ignores case.
+  import of x.props holds; `<Using Remove>` ignores case; a file imported
+  first under a Condition is read again at a later import; VB RootNamespace
+  comes from the project with `Directory.Build.props` and imports in place
+  (the last unconditional value, plus any conditional one after it);
+  `\define()` is a `define()` and `const A = 1, B = 2;` declares each name.
   PHP follows computable
   include paths and case-insensitive class/function names with namespaces
   and `use`, narrowed by composer.json autoload (PSR-4, PSR-0, classmap),
@@ -180,7 +184,10 @@
   them and says how to write an adapter for any other language (static only,
   under `migration/tools/`, same output files, hand-written fixture first);
   the skills and prompt 01 point to it. Fixtures and expected outputs for
-  each language are tested with `python -I`.
+  each language are tested with `python -I`. A "Scope and known limits" section says which
+  reports are fixed (missed edges, false cycles, crashes, doc mismatches,
+  regressions) and which are recorded limits (MSBuild evaluation, type
+  inference, names decided at run time, extra edges).
 
 # 0.3.2 — 2026-10-23
 

@@ -378,7 +378,14 @@ def scan(rel, text):
             i += 3
             continue
         elif low == "const" and not class_depth and NAME_RE.fullmatch(at(i + 1)):
+            # const A = 1, B = 2; declares every name of the list.
             info.constants.append(f"{ns}\\{at(i + 1)}".lstrip("\\"))
+            j, level = i + 2, 0
+            while j < n and at(j) != ";" and not (level == 0 and at(j) in {"{", "}"}):
+                level += {"(": 1, "[": 1, ")": -1, "]": -1}.get(at(j), 0)
+                if level == 0 and at(j) == "," and NAME_RE.fullmatch(at(j + 1)) and at(j + 2) == "=":
+                    info.constants.append(f"{ns}\\{at(j + 1)}".lstrip("\\"))
+                j += 1
             i += 2
             continue
         elif low.lstrip("\\") == "class_alias" and at(i + 1) == "(" and prev not in {"->", "?->", "::"}:
@@ -398,7 +405,9 @@ def scan(rel, text):
                 info.classes.append(string(alias).strip().lstrip("\\").replace("\\\\", "\\"))
             else:
                 info.dynamic.append(("class_alias(...)", "alias name computed at run time"))
-        elif low == "define" and at(i + 1) == "(" and at(i + 2).startswith(STR):
+        elif low.lstrip("\\") == "define" and at(i + 1) == "(" and at(i + 2).startswith(STR) \
+                and prev not in {"->", "?->", "::", "function"}:
+            # define('X', ...) and \define('X', ...) alike.
             info.constants.append(string(at(i + 2)).lstrip("\\"))
             if at(i + 3) == "," and at(i + 4).startswith(STR) and at(i + 5) == ")":
                 # Every define() of the file counts: if/else branches may

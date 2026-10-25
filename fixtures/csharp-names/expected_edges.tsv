@@ -3,6 +3,7 @@ bases/Local.cs	bases/Repo.cs
 cimp/A/Main.cs	cimp/A/Model.cs
 cimp/B/Main.cs	cimp/B/Model.cs
 cimp/B/Main.cs	cimp/L2.cs
+cimp/E/EMain.cs	cimp/E/Lib/EModel.cs
 cond/CMain.cs	cond/Model.cs
 cond/CMain.cs	cond/Util.cs
 cond/Model.cs	cond/Boot.cs
