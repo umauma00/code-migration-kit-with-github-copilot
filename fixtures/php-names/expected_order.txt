@@ -30,3 +30,7 @@ nsrel/app.php
 nsrel/global.php
 nsrel/other.php
 nsrel/main.php
+nsrel2/boot.php
+nsrel2/full.php
+nsrel2/local.php
+nsrel2/main.php

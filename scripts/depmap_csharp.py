@@ -553,23 +553,28 @@ def csproj_usings(text):
     usings, aliases, static, computed, conditional = [], {}, [], [], []
     for m in CSPROJ_USING_RE.finditer(text):
         attrs = {k.lower(): a or b for k, a, b in CSPROJ_ATTR_RE.findall(m.group(1))}
+        # Every value the item can take: an attribute and each child element
+        # (Debug's and Release's Alias both stay).
+        metas = {key: [attrs[key]] for key in ("alias", "static") if key in attrs}
         if not m.group(2):
             end = CSPROJ_USING_END_RE.search(text, m.end())
             for key, meta_attrs, value in CSPROJ_META_RE.findall(text[m.end():end.start() if end else m.end()]):
                 # A Condition on the metadata is not evaluated: the alias
                 # (or static) is taken, as an item under a Condition is.
-                attrs.setdefault(key.lower(), value)
+                metas.setdefault(key.lower(), []).append(value)
                 if re.search(r"\bCondition\s*=", meta_attrs, re.IGNORECASE):
                     conditional.append(f"{key} {value} of {attrs.get('include', '').strip()}")
-        alias = attrs.get("alias", "").strip()
+        alias_names = list(dict.fromkeys(a.strip() for a in metas.get("alias", ()) if a.strip()))
+        is_static = any(v.strip().lower() == "true" for v in metas.get("static", ()))
         for name in (n.strip() for n in attrs.get("include", "").split(";")):
             if not name:
                 continue
             if "$(" in name or "@(" in name or "%(" in name:
                 computed.append(name)
-            elif alias:
-                aliases.setdefault(alias, []).append(name)
-            elif attrs.get("static", "").strip().lower() == "true":
+            elif alias_names:
+                for alias in alias_names:
+                    aliases.setdefault(alias, []).append(name)
+            elif is_static:
                 static.append(name)
             else:
                 usings.append(name)

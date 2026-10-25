@@ -913,6 +913,8 @@ def mapper(root, warnings, args):
                 found = [classes(full.lower()), functions.get(full.lower(), ()), constants.get(full, ())]
                 for hits in found:
                     add(hits)
+                if not any(found):      # as \App\Billing\Invoice would be
+                    outside(full)
                 continue
             if imported:
                 used.add(uses["class"][head.lower()])
