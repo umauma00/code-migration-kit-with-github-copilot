@@ -309,7 +309,7 @@ npm run demo
 
 The `migration-kit/` copied into a project is a runtime package without tests or the demo. There, `npm run check` diagnoses configuration, profiles and tracked inputs; `npm test` / `npm run demo` are for the distribution source.
 
-The demo replaces worker responses with prepared code and really runs the Python/Node comparison and build. It is not a benchmark of model output quality. Details are in [TESTING.en.md](docs/TESTING.en.md).
+The demo replaces worker responses with prepared code and really runs the Python/Node comparison and build. It is not a benchmark of model output quality. Details are in [TESTING.en.md](docs/TESTING.en.md). To compare quality with real models before folding workers together, see [REVIEW-BENCHMARK.en.md](docs/REVIEW-BENCHMARK.en.md).
 
 - The operating rules are language-neutral, but this is not a universal translator that prepares dependency mapping, builds and equivalence checks for every language automatically.
 - Large real projects, very large single files, units that rewrite several files as one and automatic redesign are untested or unsupported.

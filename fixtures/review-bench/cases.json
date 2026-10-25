@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "about": "Seeded review and fix cases on fixtures/mini (docs/REVIEW-BENCHMARK.md). Each case file replaces the unit's target. Anchors are path:line; a finding citing an anchor within one line, or matching the pattern, counts as catching the defect. Control cases have no defects: every finding on them is a false finding.",
+  "cases": [
+    {
+      "id": "math-trunc", "target": "ported/math_ops.mjs", "file": "cases/math-trunc.mjs", "check": "checks/math_ops.mjs",
+      "defects": [{ "id": "trunc", "kind": "semantics", "anchors": ["ported/math_ops.mjs:3", "src/math_ops.py:4"], "pattern": "trunc|toward zero|floor",
+        "message": "Quotient truncates toward zero; Python // floors, so divide(-7, 2) returns -3 instead of -4", "evidence": "src/math_ops.py:4 uses a // b; ported/math_ops.mjs:3 uses Math.trunc", "rule": "Fixture rules: preserve floor division; inventory src/math_ops.py negative division" }]
+    },
+    {
+      "id": "math-remainder", "target": "ported/math_ops.mjs", "file": "cases/math-remainder.mjs", "check": "checks/math_ops.mjs",
+      "defects": [{ "id": "remainder", "kind": "semantics", "anchors": ["ported/math_ops.mjs:4", "src/math_ops.py:4"], "pattern": "remainder|modulo|a % b",
+        "message": "Remainder uses JavaScript %, whose sign follows the dividend; Python % follows the divisor, so divide(-7, 2) returns remainder -1 instead of 1", "evidence": "src/math_ops.py:4 returns a % b with Python semantics; ported/math_ops.mjs:4 returns a % b", "rule": "Fixture rules: preserve remainder signs" }]
+    },
+    {
+      "id": "math-zero", "target": "ported/math_ops.mjs", "file": "cases/math-zero.mjs", "check": "checks/math_ops.mjs",
+      "defects": [{ "id": "zero", "kind": "semantics", "anchors": ["ported/math_ops.mjs:1", "ported/math_ops.mjs:2", "src/math_ops.py:2", "src/math_ops.py:3"], "pattern": "zero|Infinity|NaN",
+        "message": "Division by zero no longer raises; divide(1, 0) returns Infinity/NaN instead of throwing 'division by zero'", "evidence": "src/math_ops.py:2-3 raise ValueError(\"division by zero\") when b == 0; ported/math_ops.mjs has no such check", "rule": "Fixture rules: preserve zero-division errors" }]
+    },
+    {
+      "id": "math-double", "target": "ported/math_ops.mjs", "file": "cases/math-double.mjs", "check": "checks/math_ops.mjs",
+      "defects": [
+        { "id": "trunc", "kind": "semantics", "anchors": ["ported/math_ops.mjs:2", "src/math_ops.py:4"], "pattern": "trunc|toward zero|floor",
+          "message": "Quotient truncates toward zero; Python // floors, so divide(-7, 2) returns -3 instead of -4", "evidence": "src/math_ops.py:4 uses a // b; ported/math_ops.mjs:2 uses Math.trunc", "rule": "Fixture rules: preserve floor division" },
+        { "id": "zero", "kind": "semantics", "anchors": ["ported/math_ops.mjs:1", "src/math_ops.py:2", "src/math_ops.py:3"], "pattern": "zero|Infinity|NaN",
+          "message": "Division by zero no longer raises; divide(1, 0) returns Infinity/NaN instead of throwing 'division by zero'", "evidence": "src/math_ops.py:2-3 raise ValueError(\"division by zero\") when b == 0; ported/math_ops.mjs has no such check", "rule": "Fixture rules: preserve zero-division errors" }
+      ]
+    },
+    {
+      "id": "text-length", "target": "ported/text_ops.mjs", "file": "cases/text-length.mjs", "check": "checks/text_ops.mjs",
+      "defects": [{ "id": "length", "kind": "semantics", "anchors": ["ported/text_ops.mjs:2", "src/text_ops.py:2"], "pattern": "code.?point|UTF-16|surrogate|astral|\\.length",
+        "message": "name.length counts UTF-16 code units; Python len counts code points, so an emoji counts as 2 instead of 1", "evidence": "src/text_ops.py:2 returns len(name); ported/text_ops.mjs:2 returns name.length", "rule": "Fixture rules: Unicode code-point lengths; inventory src/text_ops.py" }]
+    },
+    {
+      "id": "text-trailer", "target": "ported/text_ops.mjs", "file": "cases/text-trailer.mjs", "check": "checks/text_ops.mjs",
+      "defects": [{ "id": "trailer", "kind": "rules", "anchors": ["ported/text_ops.mjs:3", "ported/text_ops.mjs:4"], "pattern": "PORT STATUS|trailer",
+        "message": "The file does not end with a PORT STATUS comment", "evidence": "ported/text_ops.mjs ends after the function at line 3 with no PORT STATUS line", "rule": "Fixture rules: end each file with a PORT STATUS comment" }]
+    },
+    {
+      "id": "main-import", "target": "ported/main.mjs", "file": "cases/main-import.mjs", "check": "checks/main.mjs",
+      "defects": [{ "id": "import", "kind": "rules", "anchors": ["ported/main.mjs:2"], "pattern": "math_ops\\.js\\b|\\.mjs",
+        "message": "Imports './math_ops.js'; the rulebook requires .mjs imports and the ported module is math_ops.mjs", "evidence": "ported/main.mjs:2 imports from './math_ops.js'", "rule": "Fixture rules: keep one-to-one filenames; use .mjs imports" }]
+    },
+    { "id": "control-math", "target": "ported/math_ops.mjs", "file": "cases/control-math.mjs", "check": "checks/math_ops.mjs", "defects": [] },
+    { "id": "control-text", "target": "ported/text_ops.mjs", "file": "cases/control-text.mjs", "check": "checks/text_ops.mjs", "defects": [] }
+  ]
+}

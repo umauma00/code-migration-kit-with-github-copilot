@@ -210,7 +210,9 @@ const reviewLenses = {
 };
 export function agentPrompt({ role, unit, extra = {}, reviewInput, frozenInput, reviewMode = 'frozen', reviewFocus }) {
   const contracts = {
-    implementer: 'Return {"schemaVersion":1,"kind":"implementation","target":"PATH","content":"COMPLETE TARGET FILE","summary":"reason"}. Translate faithfully; preserve source behavior. Return code, do not write files.',
+    // Only the fold benchmark (lib/bench.mjs) hands the implementer findings;
+    // the translation loop never does, so its implementer prompt is unchanged.
+    implementer: `Return {"schemaVersion":1,"kind":"implementation","target":"PATH","content":"COMPLETE TARGET FILE","summary":"reason"}. Translate faithfully; preserve source behavior. Return code, do not write files.${Array.isArray(extra.confirmedFindings) ? ' The target exists: apply ONLY extra.confirmedFindings to it and preserve all other behavior.' : ''}`,
     fixer: 'Return {"schemaVersion":1,"kind":"implementation","target":"PATH","content":"COMPLETE FIXED FILE","summary":"changes"}. Apply ONLY confirmed findings; preserve all other behavior. Return code, do not write files.',
     ...Object.fromEntries(Object.entries(reviewLenses).map(([reviewer, lens]) => [reviewer, reviewFocus === 'shared'
       ? `Check ${lens} first, then ${reviewLenses[reviewer === 'reviewer-rules' ? 'reviewer-semantics' : 'reviewer-rules']}. You are one of two independent full reviewers: report every defect either check finds.`

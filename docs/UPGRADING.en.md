@@ -1,6 +1,13 @@
-# Upgrading (0.3.2 and earlier releases)
+# Upgrading (0.5.0 and earlier releases)
 
 [日本語](UPGRADING.md) | English
+
+## 0.5.0 (benchmark for folding workers)
+
+Existing approvals and completion records are revoked once because the kit's files (lib, scripts) change. Re-validate from judge. Completed outputs are kept.
+
+1. New `scripts/review_benchmark.mjs` compares two reviewers with one, and the fixer with the implementer, on seeded cases. See [REVIEW-BENCHMARK.en.md](REVIEW-BENCHMARK.en.md). Run it from the kit checkout, not in a migration target.
+2. The translation loop is unchanged.
 
 ## 0.3.2 (phase 00 no longer stops on a credential suspicion or misread guidance)
 
