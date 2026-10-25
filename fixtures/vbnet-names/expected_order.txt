@@ -1,0 +1,5 @@
+# migration order: one batch per line, dependencies first
+Customer.vb
+EntityType.vb
+Order.vb
+U.vb

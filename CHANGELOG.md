@@ -63,7 +63,13 @@
   namespaces such as System, java, javax and jakarta left out) is listed in a
   new `external.tsv`, one row per namespace with child namespaces folded
   into a listed parent, so an
-  in-house library outside `--root` is not silently missed. Measured on
+  in-house library outside `--root` is not silently missed. A full name
+  written where a type stands (`Acme.Billing.Invoice inv;`, `new`, a base
+  type, an attribute or annotation) counts as an import; Java rows are
+  always packages (`import static a.b.Util.*` gives `a.b`); PHP rows come
+  from the names code writes (`use Acme\Billing;` with `Billing\Invoice`
+  gives `Acme\Billing`), match case-insensitively and leave out PHP's own
+  `Random`, `Dom`, `Pdo` and similar namespaces. Measured on
   NUnit, Tomcat and phpBB (50 random edges and 30 random files each): a
   type nested in another file's class no longer hides a using's type of the
   same name (NUnit's `Assert` was missed), and a PHP file's own
@@ -109,6 +115,16 @@
   recursion limit is parsed on a larger stack instead of stopping the
   mapper. Lambda parameters, generic inference and overloads
   are not followed; a VB.NET type nested in a class is its own type.
+  Enum members and the names Java and VB.NET fields, properties and
+  methods declare are not type references (`enum EntityType { Customer,
+  Order }` made a false cycle). `<Using Include="A;B">` is an item list,
+  `<Alias>`/`<Static>` may be child elements, and a `<Using>` holding a
+  property (`$(NS).A`) is warned about; `Imports Global.X` and an Imports
+  continued over lines are read; a PHP include inside an expression
+  (`if (!include_once 'x.php') {`) ends at its own parenthesis, and
+  `namespace\f()` is a name, not a declaration; COBOL reads a `*>` inside a
+  literal as text, tab-indented fixed format, and CICS HANDLE ABEND,
+  RELEASE and ENABLE PROGRAM.
   PHP follows computable
   include paths and case-insensitive class/function names with namespaces
   and `use`, narrowed by composer.json autoload (PSR-4, PSR-0, classmap),
@@ -122,11 +138,14 @@
   last argument of `array_udiff`-style functions, the nine
   `session_set_save_handler` handlers, named arguments by each function's
   parameter names, `['Cls', 'm',]` and `['Cls', $method]` pairs,
-  the values of `preg_replace_callback_array` and WordPress activation hooks), named arguments (`callback: 'f'`) included and `is_a` strings read as
+  the values of `preg_replace_callback_array`, `mb_ereg_replace_callback`,
+  the `xml_set_*_handler` functions and WordPress activation hooks;
+  `stream_wrapper_register` and `new ReflectionClass`/`ReflectionMethod`
+  strings are class names; the lists are closed), named arguments (`callback: 'f'`) included and `is_a` strings read as
   class names, while a callback computed at run time (`$cb`, `"on_$x"`,
   `'on_' . $x`, `get_cb()`, `[$class, 'm']`), `$f()` and an include missing at its `__DIR__` path are
   listed as unresolved; COBOL follows COPY, EXEC SQL INCLUDE, CALL 'X' (also with
-  the literal on a later line) and EXEC CICS LINK/XCTL in fixed or free
+  the literal on a later line) and EXEC CICS LINK/XCTL/START/LOAD in fixed or free
   format, with `--copy-path` as the copybook search order. UTF-16/UTF-32 sources are read by their
   byte order mark; other non-UTF-8 sources are read as cp932, then Latin-1,
   with a warning, and a file with NUL bytes that is not UTF-16 is listed as

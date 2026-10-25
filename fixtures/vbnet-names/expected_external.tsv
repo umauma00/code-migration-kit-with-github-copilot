@@ -1,0 +1,6 @@
+namespace	files	first_file
+Acme.Base	1	U.vb
+Acme.Billing	1	U.vb
+Acme.Made	1	U.vb
+Acme.Orders	1	U.vb
+Acme.Sales	1	U.vb

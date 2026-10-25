@@ -49,6 +49,7 @@ class FileInfo:
         self.project_static = set() # C# global using static of another file: an edge only where a member is used
         self.names = []             # (namespace written in, dotted name chain) mentioned in code
         self.attribute_names = []   # the names in names written as an attribute ([Foo])
+        self.type_chains = []       # (namespace written in, dotted chain) written where only a type can stand
         self.members = set()        # names written after "." (x.Name)
         self.member_calls = set()   # C#: (receiver variable or "", name) of each x.Name
         self.strings = []           # string literal contents (reflection lookups)
@@ -759,12 +760,44 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
             return None
         return name
 
+    def package_of(name):
+        """Java: the package part of an imported or written name (the
+        lower-case segments before the first type: com.acme.Util.Inner ->
+        com.acme). C#/VB: the name itself."""
+        if nested_lookup:
+            return name
+        segs = name.split(".")
+        k = next((i for i, seg in enumerate(segs) if seg[:1].isupper()), len(segs))
+        return ".".join(segs[:k])
+
     for info in infos:
         blocks = list(info.blocks.values())
-        wanted = set(info.usings).union(*(b.usings for b in blocks))
+        wanted = {package_of(u) for u in set(info.usings).union(*(b.usings for b in blocks))}
         for target in info.direct.union(*(b.direct for b in blocks)):
             if not longest(target.split(".")):
-                wanted.add(target.rpartition(".")[0])     # import a.b.C -> package a.b
+                wanted.add(package_of(target.rpartition(".")[0]))     # import a.b.C -> package a.b
+        # A full name written inline (Acme.Billing.Invoice inv;) names its
+        # namespace as an import does. Only names standing where a type
+        # must are read, so a.b.c on a variable is not taken for one.
+        # C#/VB: the namespace part needs two segments (or global::), as
+        # Outer.Inner may be a nested type of a platform class. Java: the
+        # lower-case segments before the first type.
+        for ctx, chain in info.type_chains:
+            if scope_of(info, ctx).mentioned(chain):
+                continue
+            segs, root = rooted(chain.split("."))
+            if segs[0] in scope_of(info, ctx).aliases:
+                continue
+            if nested_lookup:
+                ns = segs[:-1]
+                if len(ns) < (1 if root else 2) or (not root and any(
+                        p and join(p, segs[0]) in namespaces for p in prefixes(context_ns(ctx)))):
+                    continue        # relative to a namespace of the repository
+                wanted.add(".".join(ns))
+            else:
+                ns = package_of(".".join(segs))
+                if ns and ns != ".".join(segs):
+                    wanted.add(ns)
         for target in list(info.aliases.values()) + [t for b in blocks for t in b.aliases.values()]:
             bare = target[len(GLOBAL):] if target.startswith(GLOBAL) else target
             if "." in bare and not lookup(bare) and bare.split("<")[0] == bare:
@@ -995,6 +1028,87 @@ def balance_branches(code):
         done = resolve(stack.pop())
         (stack[-1][-1] if stack else top).append(done)
     return "".join(top)
+
+
+def type_written_at(code, start, end, before, declared=None):
+    """Whether the dotted chain at code[start:end] stands where only a type
+    can: after one of the words in before (new, extends, As, "typeof(",
+    "@"), or, when declared (the words that may follow a value) is given,
+    right before the name a declaration introduces (Acme.Billing.Invoice
+    inv). code is in the case the words are given in."""
+    if code[start] == "@" and "@" in before:     # Java @a.b.Ann (the chain starts at @)
+        return True
+    k = start - 1
+    while k >= 0 and code[k].isspace():
+        k -= 1
+    if k >= 0 and code[k] == "(":
+        j = k - 1
+        while j >= 0 and code[j].isspace():
+            j -= 1
+        w = j
+        while w >= 0 and (code[w].isalnum() or code[w] == "_"):
+            w -= 1
+        if code[w + 1:j + 1] + "(" in before:
+            return True
+    elif k >= 0 and (code[k].isalnum() or code[k] == "_"):
+        w = k
+        while w >= 0 and (code[w].isalnum() or code[w] == "_"):
+            w -= 1
+        if (w < 0 or code[w] != ".") and code[w + 1:k + 1] in before:
+            return True
+    elif k >= 0 and code[k] in before:
+        return True
+    if declared is None:
+        return False
+    k = end
+    while k < len(code) and code[k].isspace():
+        k += 1
+    if code[k:k + 1] == "[":        # Acme.Billing.Invoice[] all
+        j = k + 1
+        while j < len(code) and code[j] in " \t\r\n,":
+            j += 1
+        if code[j:j + 1] != "]":
+            return False
+        k = j + 1
+        while k < len(code) and code[k].isspace():
+            k += 1
+    m = re.compile(r"[^\W\d]\w*").match(code, k)
+    return bool(m) and m.group(0) not in declared
+
+
+def enum_member_offsets(toks):
+    """Start offsets of the member names in enum bodies (enum Kind { Customer,
+    Order = 2 }): declarations, not references to the types Customer and
+    Order. toks: (text, start, end). Java constants end at the first ";" of
+    the body; a name after = or inside ( ) is an expression."""
+    out = set()
+    i, n = 0, len(toks)
+    while i < n:
+        if toks[i][0] != "enum" or (i and toks[i - 1][0] == "."):
+            i += 1
+            continue
+        j = i + 1
+        while j < n and toks[j][0] not in {"{", ";"}:
+            j += 1
+        if j >= n or toks[j][0] != "{":
+            i = j
+            continue
+        depth, k = 0, j
+        while k < n:
+            t = toks[k][0]
+            if t in {"{", "(", "["}:
+                depth += 1
+            elif t in {"}", ")", "]"}:
+                depth -= 1
+                if depth == 0:
+                    break
+            elif depth == 1 and t == ";":
+                break           # Java: the constants end, members follow
+            elif depth == 1 and toks[k - 1][0] in {"{", ",", "]"} and (t[0].isalpha() or t[0] in "_@"):
+                out.add(toks[k][1])
+            k += 1
+        i = k + 1
+    return out
 
 
 TOKEN_RE = re.compile(r"@?[^\W\d]\w*|\S")

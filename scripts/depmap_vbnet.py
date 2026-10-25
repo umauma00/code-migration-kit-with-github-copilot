@@ -61,7 +61,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # -I drops the script dir
 from depmap_common import EXTERNAL, find_files, read_source, run  # noqa: E402
 from depmap_projects import COMMENT_RE, QUOTED, attr_values, dotnet_projects, drop_not_compiled  # noqa: E402
-from depmap_typed import DOTNET_STANDARD, GLOBAL, PREDEFINED, TOKEN_RE, FileInfo, chains, is_ident, join, members, parse_expr, resolve, scan_or_none  # noqa: E402
+from depmap_typed import DOTNET_STANDARD, GLOBAL, PREDEFINED, TOKEN_RE, CHAIN_RE, FileInfo, chains, chains_at, is_ident, join, members, parse_expr, resolve, scan_or_none, type_written_at  # noqa: E402
 
 EXTS = {".vb"}
 # Build output and My Project beside a project, NuGet's packages/ beside a
@@ -85,6 +85,8 @@ IMPORT_CLAUSE_RE = re.compile(r"^(?:([\w\[\]]+)\s*=\s*)?([\w.\[\]]+)$")
 ROOT_NS_RE = re.compile(r"<RootNamespace>\s*([^<]*?)\s*</RootNamespace>", re.IGNORECASE)
 VBPROJ_IMPORT_RE = re.compile(r"<Import\s+Include\s*=\s*" + QUOTED, re.IGNORECASE)
 REFLECTION_RE = re.compile(r"\b(createobject|activator\s*\.\s*createinstance|type\s*\.\s*gettype|assembly\s*\.\s*load\w*)\s*\(\s*((?:[^()]|\([^()]*\))+?)?\s*\)", re.IGNORECASE)
+# Words before a name that make it a type (As Acme.Billing.Invoice).
+TYPE_BEFORE = {"as", "new", "inherits", "implements", "of", "gettype("}
 KEYWORDS = set("""addhandler addressof alias and andalso as boolean byref byte byval call case catch cbool
 cbyte cchar cdate cdbl cdec char cint class clng cobj const continue csbyte cshort csng cstr ctype
 cuint culng cushort date decimal declare default delegate dim directcast do double each else elseif
@@ -298,10 +300,12 @@ def scan(rel, text, root_ns=""):
             # Imports A, B = C.D: one clause per comma. XML namespace
             # imports (<xmlns:...>) name no type and are skipped.
             for clause in m.group(1).split(","):
-                c = IMPORT_CLAUSE_RE.match(clause.strip())
+                c = IMPORT_CLAUSE_RE.match(re.sub(r"\s+", "", clause))
                 if not c:
                     continue
                 alias, target = c.group(1), c.group(2).replace("[", "").replace("]", "")
+                if target.startswith("global."):    # Imports Global.Core: Core from the root
+                    target = target[len("global."):]
                 if alias:
                     info.aliases[alias.replace("[", "").replace("]", "")] = target
                 else:
@@ -335,6 +339,13 @@ def scan(rel, text, root_ns=""):
             declare(m.group(1).replace("[", "").replace("]", ""))
             body.append((ns(), line[m.end(1):]))
             continue
+        if stack and stack[-1][0] == "enum":
+            # An enum member (Customer, Order = 2) is declared, not a type reference.
+            m = re.match(r"^(\s*(?:<[^>]*>\s*)?)([\w\[\]]+)", line)
+            if m:
+                line = line[:m.start(2)] + " " * (m.end(2) - m.start(2)) + line[m.end(2):]
+            body.append((ns(), line))
+            continue
         in_type = stack and stack[-1][0] in {"class", "module", "structure", "interface"}
         if in_type:
             owner = join(ns(), stack[-1][1])
@@ -348,6 +359,8 @@ def scan(rel, text, root_ns=""):
             declared = m and (m.group(1) or re.match(r"^\s*(?:<[^>]*>\s*)?(?:public|friend|private|protected|const|dim|shared|readonly)\b", low))
             if declared:
                 name = m.group(2).replace("[", "").replace("]", "")
+                # The declared name (Property Customer As Integer) is not a type reference.
+                line = line[:m.start(2)] + " " * (m.end(2) - m.start(2)) + line[m.end(2):]
                 kind = (m.group(1) or "").split()[0] if m.group(1) else ""
                 if name not in KEYWORDS:
                     typ = MEMBER_TYPE_RE.search(low[m.end(2):])
@@ -376,7 +389,12 @@ def scan(rel, text, root_ns=""):
         info.namespaces.add(root_ns)
     code = "\n".join(line for _, line in body).lower()
     # Each name is resolved from the namespace block it is written in.
-    info.names = [(ctx, name) for ctx, line in body for name in chains(line.lower(), KEYWORDS, fold=True)]
+    for ctx, line in body:
+        low = line.lower()
+        for pos, name in chains_at(low, KEYWORDS, fold=True):
+            info.names.append((ctx, name))
+            if "." in name and type_written_at(low, pos, CHAIN_RE.match(low, pos).end(), TYPE_BEFORE):
+                info.type_chains.append((ctx, name))
     info.members = members(code)
     for m in REFLECTION_RE.finditer(code):
         arg = (m.group(2) or "").strip()
@@ -422,12 +440,17 @@ def mapper(root, warnings, args):
             spaces = [next((root_ns[d] for d in sorted(root_ns, key=len, reverse=True)
                             if d == "" or rel.startswith(d + "/")), "")]
         text = read_source(path, warnings)
-        for line in text.splitlines():
+        # Logical lines, without comments: Imports Acme.Billing ' note, and
+        # every dotted name (a full name written inline).
+        for line in strip_vb(text)[0]:
             m = IMPORTS_RE.match(line)
             for clause in (m.group(1).split(",") if m else ()):
-                c = IMPORT_CLAUSE_RE.match(clause.strip())
+                c = IMPORT_CLAUSE_RE.match(re.sub(r"\s+", "", clause))
                 if c:
-                    spell(c.group(2))
+                    spell(re.sub(r"(?i)^global\.", "", c.group(2)))
+            for name in chains(line, ()):
+                if "." in name:
+                    spell(re.sub(r"(?i)^global(?:::|\.)", "", name))
         info = scan_or_none(scan, rel, text, deep, spaces[0]) or FileInfo(rel)
         for space in spaces[1:]:
             other = scan_or_none(scan, rel, text, deep, space)

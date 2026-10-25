@@ -81,10 +81,14 @@ CALLBACK_FUNCTIONS = {
 forward_static_call_array register_shutdown_function register_tick_function spl_autoload_register
 set_error_handler set_exception_handler ob_start header_register_callback""".split(), ((0, "callback"),)),
     **dict.fromkeys("""array_filter array_walk array_walk_recursive array_reduce usort uasort uksort
-iterator_apply preg_replace_callback add_action add_filter add_shortcode register_activation_hook
+iterator_apply preg_replace_callback mb_ereg_replace_callback mb_eregi_replace_callback
+xml_set_character_data_handler xml_set_default_handler xml_set_processing_instruction_handler
+xml_set_unparsed_entity_decl_handler xml_set_notation_decl_handler xml_set_external_entity_ref_handler
+xml_set_start_namespace_decl_handler xml_set_end_namespace_decl_handler add_action add_filter add_shortcode register_activation_hook
 register_deactivation_hook register_uninstall_hook""".split(), ((1, "callback"),)),
     **dict.fromkeys("""array_udiff array_udiff_assoc array_uintersect array_uintersect_assoc
 array_diff_ukey array_diff_uassoc array_intersect_ukey array_intersect_uassoc""".split(), ((-1, None),)),
+    "xml_set_element_handler": ((1, "start_handler"), (2, "end_handler")),
     "array_udiff_uassoc": ((-1, None), (-2, None)), "array_uintersect_uassoc": ((-1, None), (-2, None)),
     # The nine handlers; the other form takes a handler object (and a bool).
     "session_set_save_handler": tuple(enumerate(
@@ -94,7 +98,15 @@ array_diff_ukey array_diff_uassoc array_intersect_ukey array_intersect_uassoc"""
 CALLBACK_ARRAYS = {"preg_replace_callback_array": (0, "pattern")}
 # Functions whose string arguments name a class: positions and parameter names.
 CLASS_NAME_FUNCTIONS = {"is_subclass_of": ((0, "object_or_class"), (1, "class")),
-                        "is_a": ((0, "object_or_class"), (1, "class"))}
+                        "is_a": ((0, "object_or_class"), (1, "class")),
+                        "stream_wrapper_register": ((1, "class"),), "stream_register_wrapper": ((1, "class"),)}
+# Classes whose constructor takes a class name (new ReflectionClass('Cls'),
+# new ReflectionMethod('Cls::m')).
+CLASS_NAME_CONSTRUCTORS = {"reflectionclass": ((0, "objectorclass"),), "reflectionenum": ((0, "objectorclass"),),
+                           "reflectionmethod": ((0, "objectormethod"),), "reflectionproperty": ((0, "class"),),
+                           "reflectionclassconstant": ((0, "class"),)}
+# These lists are closed: a callback or class name passed to any other
+# function is not read (see docs/DEPENDENCY-MAPPERS.md).
 # Existence checks that guard a fallback declaration (!function_exists('f')).
 GUARDS = {"function_exists": "function", "class_exists": "class", "interface_exists": "class",
           "trait_exists": "class", "enum_exists": "class", "defined": "const"}
@@ -110,6 +122,10 @@ self parent true false null int float bool string void mixed never object iterab
 # class Match before 8.0, From never reserved). Away from their keyword
 # use (enum Name, match (...), yield from) they are names.
 SOFT = {"enum", "match", "from"}
+# Top namespaces of PHP's own classes (Random\Randomizer, Dom\HTMLDocument,
+# Pdo\Sqlite, BcMath\Number, Uri\Rfc3986\Uri) and common extensions: never
+# listed in external.tsv.
+PHP_STANDARD = {"random", "dom", "pdo", "bcmath", "uri", "ffi", "ds", "parallel"}
 NAME_RE = re.compile(r"\\?[A-Za-z_\x80-\uffff][\w\x80-\uffff]*(?:\\[A-Za-z_\x80-\uffff][\w\x80-\uffff]*)*")
 STR = "\x01"   # string placeholder: \x01<index>\x02 (never part of a name)
 
@@ -305,7 +321,9 @@ def scan(rel, text):
             depth -= 1
             if class_depth and class_depth[-1] == depth:
                 class_depth.pop()
-        elif low == "namespace" and prev not in {"\\"} and (NAME_RE.fullmatch(at(i + 1)) or at(i + 1) == "{"):
+        elif low == "namespace" and prev not in {"\\"} and not at(i + 1).startswith("\\") \
+                and (NAME_RE.fullmatch(at(i + 1)) or at(i + 1) == "{"):
+            # namespace\f() is a name relative to the current namespace, not a declaration.
             if at(i + 1) == "{":
                 ns = ""
             else:
@@ -400,9 +418,22 @@ def scan(rel, text):
             name = string(at(i + 3)).strip().lstrip("\\").replace("\\\\", "\\")
             info.guarded.add((kind, name if kind == "const" else name.lower()))
         elif low in {"include", "include_once", "require", "require_once"}:
-            j, parts = i + 1, []
-            while j < n and at(j) not in {";"}:
-                parts.append(at(j))
+            # The path expression ends at the ; or at the bracket, comma or
+            # brace that closes what holds it: if (!include_once('a.php')) {
+            # f(); } leaves f() to be read as code.
+            j, parts, level = i + 1, [], 0
+            while j < n:
+                tok = at(j)
+                if tok in {"(", "["}:
+                    level += 1
+                elif tok in {")", "]"}:
+                    if level == 0:
+                        break
+                    level -= 1
+                elif tok == ";" or (level == 0 and (tok in {",", "{", "}", "=", "!", "<", ">", "?", ":", "&", "|"}
+                                                    or tok.lower() in {"and", "xor"})):
+                    break
+                parts.append(tok)
                 j += 1
             info.includes.append((low, parts))
             i = j
@@ -441,9 +472,13 @@ def scan(rel, text):
             if BARE_NAME_RE.fullmatch(name):
                 info.callables.append(("class", name))
         func = t.lower().lstrip("\\")
-        if at(k + 1) != "(" or at(k - 1) in {"->", "?->", "::"} or at(k - 1).lower() in {"function", "new"}:
+        if at(k + 1) != "(" or at(k - 1) in {"->", "?->", "::"} or at(k - 1).lower() == "function":
             continue
-        if func in CALLBACK_FUNCTIONS:
+        if at(k - 1).lower() == "new":
+            if func not in CLASS_NAME_CONSTRUCTORS:
+                continue
+            slots, kind = CLASS_NAME_CONSTRUCTORS[func], "class"
+        elif func in CALLBACK_FUNCTIONS:
             slots, kind = CALLBACK_FUNCTIONS[func], "function"
         elif func in CALLBACK_ARRAYS:
             slots, kind = (CALLBACK_ARRAYS[func],), "function"
@@ -466,7 +501,7 @@ def scan(rel, text):
                 continue
             if func in CALLBACK_ARRAYS:
                 # Each value of a pattern => callback array.
-                if not arg or at(arg[0]) not in {"[", "array"}:
+                if not arg or at(arg[0]).lower() not in {"[", "array"}:
                     candidates.append(arg)
                     continue
                 opener = arg[0] if at(arg[0]) == "[" else arg[1]
@@ -482,7 +517,7 @@ def scan(rel, text):
             first = at(arg[0])
             if kind == "class":
                 if len(arg) == 1 and first.startswith(STR) and int(first[1:-1]) not in info.interpolated:
-                    name = string(first).strip().lstrip("\\").replace("\\\\", "\\")
+                    name = string(first).strip().lstrip("\\").replace("\\\\", "\\").split("::")[0]
                     if BARE_NAME_RE.fullmatch(name):
                         info.callables.append(("class", name))
                 continue
@@ -559,7 +594,7 @@ def callable_targets(texts, arg, interpolated, string):
             if name is None:
                 return None
             return [("function", name)] if BARE_NAME_RE.fullmatch(name) else []
-        return [] if first == "null" else None
+        return [] if first in {"null", "false"} else None
     if first in {"function", "fn"} or first == "static" and toks[1].lower() in {"function", "fn"}:
         return []
     if len(toks) >= 6 and toks[-5:] == ["(", ".", ".", ".", ")"]:      # f(...)
@@ -573,7 +608,7 @@ def callable_targets(texts, arg, interpolated, string):
     if len(elements) != 2 or not elements[0]:
         return None
     head = [texts[j] for j in elements[0]]
-    if head in (["$this"], ["&", "$this"], ["__CLASS__"]):     # its own class (&$this in PHP 4 code)
+    if head in (["$this"], ["&", "$this"]) or len(head) == 1 and head[0].upper() == "__CLASS__":     # its own class (&$this in PHP 4 code)
         return []
     if head[0].lower() == "new" and len(head) > 1 and NAME_RE.fullmatch(head[1]) and head[1].lower() != "class":
         return []               # [new Foo, 'm']: Foo is written
@@ -844,30 +879,63 @@ def mapper(root, warnings, args):
             if why:     # unresolved, or resolved to several candidates
                 expr = " ".join("'" + info.strings[int(p[1:-1])] + "'" if p.startswith(STR) else p for p in parts)
                 unresolved.add((src, f"{keyword} {expr}", why))
+        def outside(full):
+            """full names nothing the repository declares: its namespace
+            (if not declared either, nor the platform's) is external."""
+            ns_name = full.rpartition("\\")[0]
+            if ns_name and ns_name.lower() not in namespaces \
+                    and ns_name.split("\\")[0].lower() not in PHP_STANDARD:
+                external.setdefault(ns_name.lower(), (ns_name, set()))[1].add(src)
+
+        used, unused = set(), []     # use targets code names; use targets that resolve to nothing
         for ns, name, is_call, uses in info.refs:
             if name.startswith("\\"):
                 full = name[1:]
                 hits = classes(full.lower()) | functions.get(full.lower(), set()) | constants.get(full, set())
                 add(hits)
-                ns_name = full.rpartition("\\")[0]
-                if not hits and ns_name and ns_name.lower() not in namespaces:
-                    external.setdefault(ns_name, set()).add(src)
+                # A use statement may import a namespace (use Acme\Billing;)
+                # or a class: the names written with it tell (below). One
+                # no code uses (a docblock's @var) is taken as a class.
+                if not hits:
+                    if uses is None:
+                        unused.append(full)
+                    else:
+                        outside(full)
                 continue
             head, _, rest = name.partition("\\")
             uses = uses or {"class": {}, "function": {}, "const": {}}
-            if head.lower() in uses["class"]:
+            imported = head.lower() in uses["class"]
+            if head.lower() == "namespace" and rest:    # namespace\f(): relative to the current namespace
+                name, head, imported = rest, rest.partition("\\")[0], False
+                rest = rest.partition("\\")[2]
+                full = f"{ns}\\{name}".lstrip("\\")
+            elif imported:
+                used.add(uses["class"][head.lower()])
                 full = uses["class"][head.lower()] + ("\\" + rest if rest else "")
             else:
                 full = f"{ns}\\{name}".lstrip("\\")
-            add(classes(full.lower()))
+            found = [classes(full.lower())]
             if not rest:
                 fn = uses["function"].get(name.lower())
-                add(functions.get((fn or full).lower(), ()) or functions.get(name.lower(), ()))
                 cn = uses["const"].get(name)
-                add(constants.get(cn or full, ()) or constants.get(name, ()))
+                found += [functions.get((fn or full).lower(), ()) or functions.get(name.lower(), ()),
+                          constants.get(cn or full, ()) or constants.get(name, ())]
+                used.update(n for n in (fn, cn) if n)
+                if not any(found) and (fn or cn):
+                    outside(fn or cn)
             else:
-                add(functions.get(full.lower(), ()))
-                add(constants.get(full, ()))
+                found += [functions.get(full.lower(), ()), constants.get(full, ())]
+            for hits in found:      # each kind on its own: the file's own declaration wins per kind
+                add(hits)
+            hits = any(found)
+            # A qualified or imported name (Acme\Billing\Invoice, or Invoice
+            # after use Acme\Billing\Invoice) that resolves to nothing; an
+            # unqualified one may be a global built-in.
+            if not hits and (rest or imported):
+                outside(full)
+        for full in unused:
+            if full not in used:
+                outside(full)
         for s in info.strings:
             name = s.strip().lstrip("\\").split("::")[0].replace("\\\\", "\\")
             if "\\" in name or "::" in s:
@@ -882,13 +950,14 @@ def mapper(root, warnings, args):
     # read): one row per namespace, a child folded into a listed parent
     # (Acme\Billing\Model into Acme\Billing), siblings apart, so an in-house
     # one left outside --root does not go unnoticed.
-    for name, files in external.items():
-        segs = name.split("\\")
+    # Namespaces are case-insensitive: keyed lower-case, shown as first written.
+    for key, (_, files) in external.items():
+        segs = key.split("\\")
         top = next(("\\".join(segs[:k]) for k in range(1, len(segs)) if "\\".join(segs[:k]) in external), None)
         if top:
-            external[top] |= files
-    for name, files in sorted(external.items()):
-        segs = name.split("\\")
+            external[top][1].update(files)
+    for key, (name, files) in sorted(external.items()):
+        segs = key.split("\\")
         if any("\\".join(segs[:k]) in external for k in range(1, len(segs))):
             continue
         files = sorted(files)

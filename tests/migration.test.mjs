@@ -370,8 +370,13 @@ test('C#, Java, PHP, VB.NET and COBOL dependency fixtures produce their expected
     // Maven groupId:artifactId; PHP callback positions and named arguments,
     // dynamic callbacks (variables, concatenation, calls) and a missing
     // __DIR__ include; <Using> aliases under Conditions; VB.NET nested types and a commented-out
-    // RootNamespace.
-    ['csharp', 'csharp-rereview'], ['java', 'java-rereview'], ['php', 'php-rereview'], ['vbnet', 'vbnet-rereview']];
+    // RootNamespace. The *-names fixtures: enum members and members named
+    // like types, full names written inline (external.tsv), <Using> lists
+    // and child metadata, Imports Global., an include inside an
+    // expression, namespace\f(), PHP external spelling and more callback
+    // tables; cobol-format: *> inside a literal, tabs, CICS HANDLE ABEND.
+    ['csharp', 'csharp-rereview'], ['java', 'java-rereview'], ['php', 'php-rereview'], ['vbnet', 'vbnet-rereview'],
+    ['csharp', 'csharp-names'], ['java', 'java-names'], ['vbnet', 'vbnet-names'], ['php', 'php-names'], ['cobol', 'cobol-format']];
   for (const [lang, name, prefix = 'expected_', options = []] of cases) {
     const out = path.join(root, `${name}-${prefix}`), fixture = path.join(kitRoot, 'fixtures', name);
     // -I: the mapper must find its shared modules without the script directory on sys.path.

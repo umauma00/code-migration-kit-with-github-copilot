@@ -23,8 +23,9 @@ LIB.
 
 Fixed format (sequence area in columns 1-6, indicator in column 7, code in
 8-72) is assumed unless the file says >>SOURCE FORMAT FREE / $SET
-SOURCEFORMAT"FREE", or its lines visibly start in column 1. Comment lines
-(* or / in column 7, *> anywhere) are ignored.
+SOURCEFORMAT"FREE", or its lines visibly start in column 1. A tab advances
+to the next multiple of 8 columns. Comment lines (* or / in column 7, *>
+anywhere outside a literal) are ignored.
 
 Known limits, listed in unresolved.tsv:
   - CALL identifier and PROGRAM(identifier) are dynamic: the program name is
@@ -62,7 +63,7 @@ LITERAL = r"""(?:'([^']*)'|"([^"]*)")"""
 COPY_RE = re.compile(rf"(?<![\w-])COPY\s+(?:{LITERAL}|({WORD}))(?:\s+(?:OF|IN)\s+(?:{LITERAL}|({WORD})))?", re.IGNORECASE)
 SQL_INCLUDE_RE = re.compile(rf"(?<![\w-])EXEC\s+SQL\s+INCLUDE\s+(?:{LITERAL}|({WORD}))", re.IGNORECASE)
 CALL_RE = re.compile(rf"(?<![\w-])CALL\s+(?:{LITERAL}|({WORD}))", re.IGNORECASE)
-CICS_RE = re.compile(rf"(?<![\w-])EXEC\s+CICS\s+(LINK|XCTL|START|LOAD)\b[^.]*?\bPROGRAM\s*\(\s*(?:{LITERAL}|({WORD}))\s*\)", re.IGNORECASE | re.DOTALL)
+CICS_RE = re.compile(rf"(?<![\w-])EXEC\s+CICS\s+(LINK|XCTL|START|LOAD|RELEASE|ENABLE|HANDLE\s+ABEND)\b[^.]*?\bPROGRAM\s*\(\s*(?:{LITERAL}|({WORD}))\s*\)", re.IGNORECASE | re.DOTALL)
 PROGRAM_ID_RE = re.compile(rf"\bPROGRAM-ID\s*\.?\s*(?:{LITERAL}|({WORD}))", re.IGNORECASE)
 FREE_RE = re.compile(r">>\s*SOURCE\s+(?:FORMAT\s+)?(?:IS\s+)?FREE|\$\s*SET\s+SOURCEFORMAT\s*\(?\s*[\"']?FREE", re.IGNORECASE)
 FREE_START_RE = re.compile(r"^(?:IDENTIFICATION|ID|PROCEDURE|DATA|ENVIRONMENT)\s+DIVISION\b|^(?:0[1-9]|[1-4][0-9]|66|77|88)\s+[A-Za-z]", re.IGNORECASE)
@@ -70,7 +71,9 @@ FREE_START_RE = re.compile(r"^(?:IDENTIFICATION|ID|PROCEDURE|DATA|ENVIRONMENT)\s
 
 def code_lines(text):
     """Source text without sequence area, indicator column and comments."""
-    lines = text.splitlines()
+    # A tab moves to the next multiple of 8 columns, as editors of fixed
+    # format show it (a leading tab puts the code in Area A).
+    lines = [line.expandtabs(8) for line in text.splitlines()]
     free = bool(FREE_RE.search(text)) or any(FREE_START_RE.match(line) for line in lines)
     out = []
     for line in lines:
@@ -92,11 +95,23 @@ def code_lines(text):
                 elif out:
                     out[-1] = out[-1].rstrip() + " " + cont
                 continue
-        cut = body.find("*>")
-        if cut >= 0:
-            body = body[:cut]
-        out.append(body)
+        out.append(body[:comment_start(body)])
     return mask_literals("\n".join(out))
+
+
+def comment_start(body):
+    """Where a floating *> comment starts in body (len(body) if none). A
+    *> inside a literal (DISPLAY '*>') is text."""
+    quote = None
+    for i, c in enumerate(body):
+        if quote:
+            if c == quote:
+                quote = None
+        elif c in "'\"":
+            quote = c
+        elif body.startswith("*>", i):
+            return i
+    return len(body)
 
 
 OPERAND_RE = re.compile(r"(?:(?<![\w-])CALL|(?<![\w-])COPY|(?<![\w-])INCLUDE|\bPROGRAM\s*\(|\bPROGRAM-ID\s*\.?|(?<![\w-])OF|(?<![\w-])IN|(?<![\w-])CANCEL)\s*$", re.IGNORECASE)
@@ -203,7 +218,7 @@ def mapper(root, warnings, args):
             else:
                 unresolved.add((src, f"CALL '{literal.strip()}'", why))
         for m in CICS_RE.finditer(text):
-            verb = m.group(1).upper()
+            verb = " ".join(m.group(1).upper().split())
             literal = m.group(2) if m.group(2) is not None else m.group(3)
             if literal is None:
                 unresolved.add((src, f"EXEC CICS {verb} PROGRAM({m.group(4)})", "program name held in a data item"))

@@ -1,0 +1,22 @@
+# migration order: one batch per line, dependencies first
+cb/Refl.php
+cb/Refm.php
+cb/Refn.php
+cb/Wrap.php
+cb/cb1.php
+cb/en.php
+cb/st.php
+cb/a.php
+ext/f.php
+ext/a.php
+ext/h.php
+ext/b.php
+inc-expr/c3.php
+inc-expr/f2.php
+inc-expr/inc/t1.php
+inc-expr/inc/t2.php
+inc-expr/inc/t3.php
+inc-expr/inc/t4.php
+inc-expr/inc/t5.php
+inc-expr/inc/t6.php
+inc-expr/main.php

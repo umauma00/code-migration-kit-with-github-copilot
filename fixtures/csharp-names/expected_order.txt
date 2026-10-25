@@ -1,0 +1,8 @@
+# migration order: one batch per line, dependencies first
+inline/U.cs
+proj/lib/L.cs
+proj/V.cs
+proj/W.cs
+shop/Customer.cs
+shop/EntityType.cs
+shop/Order.cs

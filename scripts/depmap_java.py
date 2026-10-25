@@ -53,7 +53,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # -I drops the script dir
 from depmap_common import find_files, read_source, run  # noqa: E402
 from depmap_projects import java_modules  # noqa: E402
-from depmap_typed import JAVA_STANDARD, FileInfo, TOKEN_RE, chains, flow_c_like, join, resolve, scan_or_none, strip_c_like  # noqa: E402
+from depmap_typed import CHAIN_RE, JAVA_STANDARD, FileInfo, TOKEN_RE, chains_at, enum_member_offsets, flow_c_like, join, resolve, scan_or_none, strip_c_like, type_written_at  # noqa: E402
 
 EXTS = {".java"}
 SKIP_DIRS = {"target", "build", "out"}
@@ -66,6 +66,46 @@ non-sealed yield true false null""".split())
 # At a line start or after a ";" (package a; import b.C; on one line).
 PACKAGE_RE = re.compile(r"(?:^|(?<=;))\s*package\s+([\w.\s]+?)\s*;", re.MULTILINE)
 IMPORT_RE = re.compile(r"(?:^|(?<=;))\s*import\s+(static\s+)?([\w.\s]+?)(\s*\.\s*\*)?\s*;", re.MULTILINE)
+# Words after which a name is a value or a type, not a declared name.
+VALUE_WORDS = {"return", "new", "throw", "case", "else", "instanceof", "yield", "assert", "extends",
+               "implements", "throws", "permits", "import", "package", "default"}
+# Words and marks before a name that make it a type (new a.b.C(), @a.b.Ann).
+TYPE_BEFORE = {"new", "extends", "implements", "throws", "instanceof", "@"}
+PRIMITIVES = {"boolean", "byte", "char", "short", "int", "long", "float", "double", "void", "var"}
+
+
+def declared_name_at(code, start, end, name):
+    """Whether the name at code[start:end] is the name a field, method,
+    variable or parameter declaration introduces (int Customer;, void
+    Order() {, List<X> items =): a simple name right after a type and before
+    ; = ( , or ). It is not a reference to a type of that name."""
+    if "." in name:
+        return False
+    k = end
+    while k < len(code) and code[k].isspace():
+        k += 1
+    if k >= len(code) or code[k] not in ";=(,)":
+        return False
+    if code[k] == "=" and code[k + 1:k + 2] == "=":
+        return False        # Foo == x is a comparison
+    k = start - 1
+    while k >= 0 and code[k].isspace():
+        k -= 1
+    if k < 0:
+        return False
+    if code[k] == "]":
+        return True         # int[] Foo
+    if code[k] == ">":
+        return k > 0 and not code[k - 1].isspace() and code[k - 1] != "-"    # List<X> Foo, not a > Foo or ->
+    j = k
+    while j >= 0 and (code[j].isalnum() or code[j] in "_$"):
+        j -= 1
+    word = code[j + 1:k + 1]
+    if not word or word[0].isdigit() or (j >= 0 and code[j] == "@"):
+        return False        # @Ann Foo(...): an annotation, not a type before a name
+    return word not in VALUE_WORDS and (word in PRIMITIVES or word not in KEYWORDS)
+
+
 REFLECTION_RE = re.compile(r"\bClass\s*\.\s*forName\s*\(\s*((?:[^()]|\([^()]*\))+?)?\s*\)")
 
 
@@ -106,7 +146,14 @@ def scan(rel, text):
                 if type_depths:     # nested (Outer.DescriptorImpl): not a copy of a same-named type
                     info.nested[join(package, name)] = join(package, ".".join(n for _, n in type_depths) + "." + name)
                 pending = name
-    info.names = [(package, name) for name in chains(body, KEYWORDS)]
+    enum_members = enum_member_offsets([(m.group(0), m.start(), m.end()) for m in TOKEN_RE.finditer(body)])
+    for pos, name in chains_at(body, KEYWORDS):
+        end = CHAIN_RE.match(body, pos).end()
+        if pos in enum_members or declared_name_at(body, pos, end, name):
+            continue
+        info.names.append((package, name))
+        if "." in name and type_written_at(body, pos, end, TYPE_BEFORE, KEYWORDS):
+            info.type_chains.append((package, name))
     info.type_members, info.type_bases, info.flow, info.type_ns = flow_c_like(toks, KEYWORDS, "java", package)
     for m in REFLECTION_RE.finditer(body):
         arg = (m.group(1) or "").strip()
