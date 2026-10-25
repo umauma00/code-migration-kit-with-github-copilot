@@ -6,6 +6,9 @@ cb/a.php	cb/Wrap.php
 cb/a.php	cb/cb1.php
 cb/a.php	cb/en.php
 cb/a.php	cb/st.php
+cdecl/Config.php	cdecl/Values.php
+cdecl/Mode.php	cdecl/W.php
+cdecl/W.php	cdecl/Holder.php
 consts/use.php	consts/consts.php
 consts/use.php	consts/defs.php
 consts/use.php	consts/inc/pclib.php

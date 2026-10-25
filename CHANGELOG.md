@@ -154,7 +154,10 @@
   first under a Condition is read again at a later import; VB RootNamespace
   comes from the project with `Directory.Build.props` and imports in place
   (the last unconditional value, plus any conditional one after it);
-  `\define()` is a `define()` and `const A = 1, B = 2;` declares each name.
+  `\define()` is a `define()` and `const A = 1, B = 2;` declares each name;
+  names a `const` or enum `case` declares are not class references;
+  `<RootNamespace />` is the empty namespace and an empty
+  `<EnableDefaultCompileItems />` leaves the SDK default on.
   PHP follows computable
   include paths and case-insensitive class/function names with namespaces
   and `use`, narrowed by composer.json autoload (PSR-4, PSR-0, classmap),

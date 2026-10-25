@@ -7,6 +7,12 @@ cb/cb1.php
 cb/en.php
 cb/st.php
 cb/a.php
+cdecl/Values.php
+cdecl/Config.php
+cdecl/Holder.php
+cdecl/Kind.php
+cdecl/W.php
+cdecl/Mode.php
 consts/consts.php
 consts/defs.php
 consts/inc/pclib.php

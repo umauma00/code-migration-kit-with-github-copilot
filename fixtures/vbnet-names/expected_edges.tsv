@@ -8,3 +8,5 @@ imp/ImpMain.vb	imp/ET.vb
 rns/App/RnsMain.vb	rns/App/RnsModel.vb
 rns/App/RnsMain.vb	rns/Two/TwoC.vb
 rns/App/RnsMain.vb	rns/Two/TwoT.vb
+rns2/Rns2Main.vb	rns2/Rns2Marker.vb
+rns2/Rns2Main.vb	rns2/Rns2Model.vb

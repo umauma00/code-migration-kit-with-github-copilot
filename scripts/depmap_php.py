@@ -304,6 +304,8 @@ def scan(rel, text):
     uses = {"class": {}, "function": {}, "const": {}}   # alias -> fqn
     class_depth = []    # brace depth at which each open class body started
     depth = 0
+    declared_at = set()     # token positions of constant names a const or enum case declares
+    enum_depths = set()     # class_depth entries that are enum bodies
     i, n = 0, len(toks)
 
     def at(k):
@@ -321,7 +323,7 @@ def scan(rel, text):
         elif t == "}":
             depth -= 1
             if class_depth and class_depth[-1] == depth:
-                class_depth.pop()
+                enum_depths.discard(class_depth.pop())
         elif low == "namespace" and prev not in {"\\"} and not at(i + 1).startswith("\\") \
                 and (NAME_RE.fullmatch(at(i + 1)) or at(i + 1) == "{"):
             # namespace\f() is a name relative to the current namespace, not a declaration.
@@ -367,6 +369,8 @@ def scan(rel, text):
             info.classes.append(f"{ns}\\{name}".lstrip("\\"))
             # The body starts at the next "{" at this depth.
             class_depth.append(depth)
+            if low == "enum":
+                enum_depths.add(depth)
             i += 2
             continue
         elif low == "function" and NAME_RE.fullmatch(at(i + 1)) and at(i + 2) == "(" and not class_depth:
@@ -377,17 +381,24 @@ def scan(rel, text):
             info.functions.append(f"{ns}\\{at(i + 2)}".lstrip("\\"))
             i += 3
             continue
-        elif low == "const" and not class_depth and NAME_RE.fullmatch(at(i + 1)):
-            # const A = 1, B = 2; declares every name of the list.
-            info.constants.append(f"{ns}\\{at(i + 1)}".lstrip("\\"))
-            j, level = i + 2, 0
+        elif low == "case" and class_depth and class_depth[-1] in enum_depths and depth == class_depth[-1] + 1 \
+                and NAME_RE.fullmatch(at(i + 1)) and at(i + 2) in {";", "="}:
+            # enum Mode { case Widget; case Gadget = 2; }: case names are
+            # declarations, not class references.
+            declared_at.add(i + 1)
+        elif low == "const" and prev.lower() != "use" and NAME_RE.fullmatch(at(i + 1)):
+            # const A = 1, B = 2; declares every name of the list (a class
+            # constant list too, and a typed one: const string A = 'a').
+            # The names are declarations, not references; the values are
+            # read as code.
+            j, level = i + 1, 0
             while j < n and at(j) != ";" and not (level == 0 and at(j) in {"{", "}"}):
                 level += {"(": 1, "[": 1, ")": -1, "]": -1}.get(at(j), 0)
-                if level == 0 and at(j) == "," and NAME_RE.fullmatch(at(j + 1)) and at(j + 2) == "=":
-                    info.constants.append(f"{ns}\\{at(j + 1)}".lstrip("\\"))
+                if level == 0 and NAME_RE.fullmatch(at(j)) and at(j + 1) == "=" and at(j - 1) != "\\":
+                    declared_at.add(j)
+                    if not class_depth:
+                        info.constants.append(f"{ns}\\{at(j)}".lstrip("\\"))
                 j += 1
-            i += 2
-            continue
         elif low.lstrip("\\") == "class_alias" and at(i + 1) == "(" and prev not in {"->", "?->", "::"}:
             # class_alias(Orig::class, 'Old'): the alias is a class this
             # file declares, so extends Old reaches the original through it.
@@ -462,7 +473,7 @@ def scan(rel, text):
         elif NAME_RE.fullmatch(t) and prev not in {"->", "?->", "::"} and (low not in KEYWORDS or (
                 low in SOFT and not (low == "match" and at(i + 1) == "(" and prev.lower() != "new")
                 and not (low == "from" and prev.lower() == "yield"))):
-            if not (prev.lower() in {"function", "const"} and not t.startswith("\\")):
+            if not (prev.lower() in {"function", "const"} and not t.startswith("\\")) and i not in declared_at:
                 info.refs.append((ns, t, at(i + 1) == "(", uses))
         i += 1
     # String callables: the callback argument of a function that takes one

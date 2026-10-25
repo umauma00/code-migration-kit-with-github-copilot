@@ -38,6 +38,8 @@ dbuild/lib/KeptT.cs
 dbuild/lib/RootT.cs
 dbuild/lib/SrcT.cs
 dbuild/src/App/DbMain.cs
+defitems/DiModel.cs
+defitems/DiMain.cs
 extname/Thing.cs
 extname/E1.cs
 extname/E2.cs

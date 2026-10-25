@@ -82,7 +82,7 @@ DIM_RE = re.compile(r"^\s*(?:(?:dim|static|const|using|private|public|friend|pro
 FOREACH_RE = re.compile(r"^\s*for\s+each\s+([a-z_]\w*)(?:\s+as\s+([\w.]+(?:\s*\(\s*of\s+[^)]*\))?))?\s+in\s+(.+)$")
 IMPORTS_RE = re.compile(r"^\s*imports\s+(.+?)\s*$", re.IGNORECASE)
 IMPORT_CLAUSE_RE = re.compile(r"^(?:([\w\[\]]+)\s*=\s*)?([\w.\[\]]+)$")
-ROOT_NS_RE = re.compile(r"<RootNamespace\b" + ATTRS + r">\s*([^<]*?)\s*</RootNamespace\s*>", re.IGNORECASE)
+ROOT_NS_RE = re.compile(r"<RootNamespace\b" + ATTRS + r"(?:/>|>\s*([^<]*?)\s*</RootNamespace\s*>)", re.IGNORECASE)
 VBPROJ_IMPORT_RE = re.compile(r"<Import\b" + ATTRS + r"/?>", re.IGNORECASE)
 VBPROJ_ATTR_RE = re.compile(r"\b(Include|Remove|Condition)\s*=\s*" + QUOTED, re.IGNORECASE)
 
@@ -97,7 +97,7 @@ def root_namespaces(text, stem, warnings, where):
     spans = conditional_spans(text)
     current, conditional = stem, []
     for m in ROOT_NS_RE.finditer(text):
-        value = m.group(2).strip()
+        value = (m.group(2) or "").strip()      # <RootNamespace /> is the empty namespace
         value = re.sub(r"\$\(\s*MSBuildProjectName\s*\)", stem, value, flags=re.IGNORECASE)
         if "$(" in value:
             warnings.append(f"{where}: <RootNamespace>{value}</RootNamespace> uses an MSBuild property that is not "

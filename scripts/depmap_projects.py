@@ -99,10 +99,12 @@ def default_items(text):
                 cond = name != "propertygroup" or re.search(r"\bCondition\s*=", attr_text, re.IGNORECASE)
                 stack.append((name, bool(cond)))
             continue
-        if closing or value is None:
+        if closing or (value is None and not empty):
             continue
-        value = value.strip().lower()
-        new = True if value == "true" else False if value == "false" else "maybe"
+        # An empty value (<EnableDefaultCompileItems />) is unset: the SDK
+        # then turns it on.
+        value = (value or "").strip().lower()
+        new = True if value in {"true", ""} else False if value == "false" else "maybe"
         conditional = re.search(r"\bCondition\s*=", attr_text, re.IGNORECASE) or any(c for _, c in stack)
         if not conditional:
             state[name] = new
