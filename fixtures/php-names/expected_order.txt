@@ -13,6 +13,13 @@ defs/c/boot.php
 defs/expr.php
 defs/main.php
 defs/one.php
+defs2/a/boot.php
+defs2/b/boot.php
+defs2/c/boot.php
+defs2/da.php
+defs2/db.php
+defs2/dc.php
+defs2/main.php
 ext/f.php
 ext/a.php
 ext/h.php

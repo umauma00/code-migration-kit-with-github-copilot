@@ -1,0 +1,1 @@
+class StatW { OtherT o; }

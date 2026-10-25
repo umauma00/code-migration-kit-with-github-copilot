@@ -9,6 +9,8 @@ cimp/L2.cs
 cimp/B/Main.cs
 cimp/C/Main.cs
 cimp/C/Model.cs
+cimp/D/DMain.cs
+cimp/D/Gone.cs
 cond/Boot.cs
 cond/Model.cs
 cond/Util.cs
@@ -54,3 +56,8 @@ shop/Customer.cs
 shop/EntityType.cs
 shop/Flags.cs
 shop/Order.cs
+stat/OtherT.cs
+stat/StatU.cs
+stat/Util.cs
+stat/StatV.cs
+stat/StatW.cs

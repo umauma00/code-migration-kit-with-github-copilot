@@ -233,6 +233,7 @@ def glob_match(rel, pattern):
 
 
 IMPORT_PROJECT_RE = re.compile(r"<Import\b" + ATTRS + r"/?>", re.IGNORECASE)
+CONDITION_ATTR_RE = re.compile(r"\bCondition\s*=\s*" + QUOTED, re.IGNORECASE)
 PROJECT_ATTR_RE = re.compile(r"\bProject\s*=\s*" + QUOTED, re.IGNORECASE)
 DIRECTORY_BUILD = ("Directory.Build.props", "Directory.Build.targets")
 
@@ -275,7 +276,13 @@ def with_imports(root, rel, text, warnings, seen=None):
         if target is None or target.lower() in seen or not (root / target).is_file():
             return m.group(0)
         body = with_imports(root, target, COMMENT_RE.sub("", read_source(root / target, warnings)), warnings, seen)
-        if re.search(r"\bCondition\s*=", m.group(1), re.IGNORECASE) or any(a <= m.start() < b for a, b in spans):
+        conditions = attr_values(CONDITION_ATTR_RE, m.group(1))
+        # Condition="Exists('x.props')" on the import of x.props holds: the
+        # file is there.
+        exists = conditions and re.fullmatch(r"\s*Exists\s*\(\s*'([^']*)'\s*\)\s*", conditions[0], re.IGNORECASE)
+        if exists and exists.group(1).strip() == value:
+            conditions = []
+        if conditions or any(a <= m.start() < b for a, b in spans):
             # An import under a Condition (its own, an ImportGroup's, a
             # Choose branch's) keeps it: what it adds or removes is
             # conditional, as if written in a <When>.

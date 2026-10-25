@@ -147,7 +147,10 @@
   parameter or member of that name is in view (`Thing File` lost its
   extension edge); a PHP constant with several `define()` values, in one
   file's if/else too, gives an include through it an edge to each value's
-  file, and the include stays listed (the last one used to win).
+  file, and the include stays listed (the last one used to win), unless
+  a `define()` of it is not a literal; `Math.Max()` still names no member of
+  a project-wide `using static` type; `Condition="Exists('x.props')"` on the
+  import of x.props holds; `<Using Remove>` ignores case.
   PHP follows computable
   include paths and case-insensitive class/function names with namespaces
   and `use`, narrowed by composer.json autoload (PSR-4, PSR-0, classmap),

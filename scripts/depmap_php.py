@@ -828,8 +828,11 @@ def mapper(root, warnings, args):
     # (if ($env) define('BASE', 'a'); else define('BASE', 'b');), or several
     # computable paths, may be any of them: an include through it gets an
     # edge to each, and stays listed.
+    # A define() whose value is not a literal (define('BASE', $dir)) may give
+    # any value: such a constant keeps the include unresolved as before.
+    computed = {name for info in infos for name in info.const_exprs}
     choices = {name: [("var", v) for v in sorted(vals)] for name, vals in const_values.items()
-               if 1 < len(vals) <= 8 and name not in include_vars
+               if 1 < len(vals) <= 8 and name not in include_vars and name not in computed
                and not any(re.match(r"^(?:[/\\]|[A-Za-z]:|\w+://)", v) for v in vals)}
     for name, hits in const_paths.items():
         paths = [h for h in hits if h is not None]

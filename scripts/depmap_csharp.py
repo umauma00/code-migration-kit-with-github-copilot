@@ -435,7 +435,9 @@ def scan(rel, text):
             info.type_chains.append(ref)
     info.member_calls = member_calls(code)
     info.static_receivers = {head for head, _ in info.member_calls if head in STATIC_RECEIVERS}
-    info.members = {name for _, name in info.member_calls}
+    # Members a project-wide using static may supply: Math.Max() names
+    # Math's Max, not one of a using static type.
+    info.members = {name for head, name in info.member_calls if head not in STATIC_RECEIVERS}
     info.type_members, info.type_bases, info.flow, info.type_ns = flow_c_like(
         [t for t, _, _ in toks], KEYWORDS, "csharp")
     for m in REFLECTION_RE.finditer(code):
@@ -567,10 +569,11 @@ def csproj_usings(text):
                 conditional.append(f"<Using Remove=\"{';'.join(sorted(names))}\"> is under a Condition that is not evaluated; "
                                    "it is not applied, so the using stays")
                 continue
-            usings[:] = [n for n in usings if n not in names]
-            static[:] = [n for n in static if n not in names]
+            names = {n.lower() for n in names}     # item identity ignores case
+            usings[:] = [n for n in usings if n.lower() not in names]
+            static[:] = [n for n in static if n.lower() not in names]
             for alias in list(aliases):
-                aliases[alias] = [n for n in aliases[alias] if n not in names]
+                aliases[alias] = [n for n in aliases[alias] if n.lower() not in names]
                 if not aliases[alias]:
                     del aliases[alias]
             continue
