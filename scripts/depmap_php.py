@@ -214,6 +214,24 @@ def ref_kind(prev, nxt, after):
     return "any"
 
 
+def attribute_name_at(toks, i):
+    """Whether toks[i] (text, offset pairs) names an attribute's class:
+    #[Route('/home')], #[A(1), \\App\\B(path: '/x')]. Its "(" holds
+    constructor arguments, not a function call's."""
+    level = 0
+    for k in range(i - 1, -1, -1):
+        tok = toks[k][0]
+        if tok in {")", "]"}:
+            level += 1
+        elif tok in {"(", "["}:
+            if level == 0:
+                return tok == "[" and k > 0 and toks[k - 1][0] == "#"
+            level -= 1
+        elif level == 0 and tok != "," and not NAME_RE.fullmatch(tok):
+            return False
+    return False
+
+
 def php_code(text):
     """Code between PHP open and close tags, comments removed and each string
     replaced by a placeholder. Returns (code, strings, interpolated): the
@@ -493,7 +511,8 @@ def scan(rel, text):
                 low in SOFT and not (low == "match" and at(i + 1) == "(" and prev.lower() != "new")
                 and not (low == "from" and prev.lower() == "yield"))):
             if not (prev.lower() in {"function", "const"} and not t.startswith("\\")) and i not in declared_at:
-                info.refs.append((ns, t, ref_kind(prev, at(i + 1), at(i + 2)), uses))
+                kind = "class" if prev in {"[", ","} and attribute_name_at(toks, i) else ref_kind(prev, at(i + 1), at(i + 2))
+                info.refs.append((ns, t, kind, uses))
         i += 1
     # String callables: the callback argument of a function that takes one
     # ('my_cb', or callback: 'my_cb'), and the class of a ['Cls', 'm'] /

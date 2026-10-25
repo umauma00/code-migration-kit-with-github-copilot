@@ -1,4 +1,7 @@
 from	to
+attrs/AtHome.php	attrs/AtCache.php
+attrs/AtHome.php	attrs/AtGuard.php
+attrs/AtHome.php	attrs/AtRoute.php
 cb/a.php	cb/Refl.php
 cb/a.php	cb/Refm.php
 cb/a.php	cb/Refn.php

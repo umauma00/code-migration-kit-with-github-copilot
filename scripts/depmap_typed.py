@@ -51,6 +51,10 @@ class FileInfo:
         self.project_static = set() # C# global using static of another file: an edge only where a member is used
         self.names = []             # (namespace written in, dotted name chain) mentioned in code
         self.attribute_names = []   # the names in names written as an attribute ([Foo])
+        # A name in names written only as a value inside types (Category ==
+        # "food"): -> those types' keys. A member of that name in another
+        # part of a partial type or in a base type hides the type.
+        self.member_like = {}
         self.type_chains = []       # (namespace written in, dotted chain) written where only a type can stand
         self.members = set()        # names written after "." (x.Name)
         self.member_calls = set()   # C#: (receiver variable or "", name) of each x.Name
@@ -690,7 +694,11 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
         for u in sorted(usings):
             if lookup(u):  # Java on-demand import of a type's members, C# using of a type
                 add(src, lookup(u))
+        mine = {canonical[k][0]: k for k in own_nested.get(src, {}).values()}  # nested flat key -> own key
         for ctx, chain in info.names:
+            owners = info.member_like.get((ctx, chain))
+            if owners and all(has_member(mine.get(key, key), chain.split(".")[0]) for key in sorted(owners)):
+                continue
             add_types(src, scope_of(info, ctx).mentioned(chain), written_name=True)
         if attribute_suffix:
             for ctx, chain in info.attribute_names:
@@ -701,9 +709,18 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
             if "." in name and lookup(name):
                 add(src, lookup(name))
         # Types reached through variables and member chains.
-        env = {}
-        mine = {canonical[k][0]: k for k in own_nested.get(src, {}).values()}  # nested flat key -> own key
+        env, saved = {}, []
+        seen_vars = {}      # every variable of the file -> its types
         for step in info.flow:
+            # A procedure's parameters and locals are its own: Dim order As
+            # String in Sub A does not hide the class Order in Sub B.
+            if step[0] == "enter":
+                saved.append({var: set(types) for var, types in env.items()})
+                continue
+            if step[0] == "leave":
+                if saved:
+                    env = saved.pop()
+                continue
             scope = scope_of(info, step[-1])
             if step[0] == "bind":
                 _, var, enclosing, exprs, chains, foreach, _ = step
@@ -712,7 +729,7 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
                 for chain, elem in chains:
                     bound.update((fq, elem) for fq in scope.exact(chain.split(".")))
                 for expr in exprs:
-                    final, passed = evaluate(scope, env, enclosing, expr)
+                    final, passed = evaluate(scope, Variables(env, seen_vars), enclosing, expr)
                     add_types(src, passed)
                     if foreach:     # the loop variable is an element
                         elems = {(fq, False) for fq, elem in final if elem}
@@ -722,15 +739,17 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
                 # (message As String) is still a variable: message.Length is
                 # not the class Message.
                 env.setdefault(var, set()).update((fq, elem) for fq, elem in bound)
+                seen_vars.setdefault(var, set()).update(bound)
             else:
                 _, enclosing, expr, _ = step
                 enclosing = [mine.get(t, t) for t in enclosing]
-                add_types(src, evaluate(scope, env, enclosing, expr)[1])
+                add_types(src, evaluate(scope, Variables(env, seen_vars), enclosing, expr)[1])
         # x.Name() may call an extension method of any namespace visible
         # somewhere in the file.
         visible = set(file_scope.visible)
         for ctx in sorted(info.namespaces | set(info.blocks)):
             visible |= scope_of(info, ctx).visible
+        env = seen_vars
         calls = info.member_calls or {("", name) for name in info.members}
         receivers = {}      # receiver variable -> simple names of its types and their bases
         own_types = sorted(info.type_members)
@@ -924,10 +943,12 @@ def strip_c_like(text, csharp=False):
 
     def hole_code(hole):
         """A hole's expression as code: its own literals are blanked (so
-        $"{(n == 1 ? "Item" : "Items")}" names no type), nested holes kept."""
+        $"{(n == 1 ? "Item" : "Items")}" names no type), nested holes kept.
+        Doubled parentheses keep $"{Category}: {Name}" from reading as the
+        cast (Category)(Name)."""
         code, inner = strip_c_like(hole_expr(hole), csharp)
         strings.extend(inner)
-        return " (" + code + ") "
+        return " ((" + code + ")) "
     i, n = 0, len(text)
     line_start = True
     while i < n:
@@ -1292,6 +1313,26 @@ def is_ident(tok):
 MAX_GENERIC_DEPTH = 64     # deeper <...> is not read as a type (parsing it is quadratic)
 
 
+class Variables:
+    """The variables in view (env), helped by those of the file's other
+    procedures: when one in view has no known type, or a name is not in
+    view (an inherited field typed by a type parameter, protected P
+    project), a same-named variable of known type elsewhere in the file
+    usually has that type. A variable of unknown type in another procedure
+    (Dim order As String in another Sub) does not hide a type of that name."""
+
+    def __init__(self, env, others):
+        self.env, self.others = env, others
+
+    def __contains__(self, name):
+        return name in self.env or bool(self.others.get(name))
+
+    def __getitem__(self, name):
+        if self.env.get(name):
+            return self.env[name]
+        return self.others.get(name) or self.env[name]
+
+
 def parse_type(toks, i, keywords, depth=0):
     """Type expression at toks[i]: (chains, end) or None. chains holds
     (dotted name, is_element) for the type and its generic arguments."""
@@ -1317,7 +1358,12 @@ def parse_type(toks, i, keywords, depth=0):
     if j < n and toks[j] == "<":
         k = j + 1
         while True:
-            inner = parse_type(toks, k, keywords, depth + 1)
+            if toks[k:k + 1] == ["?"] and toks[k + 1:k + 2] in ([","], [">"]):
+                inner = ([], k + 1)     # Java wildcard: Project<?, ?>
+            else:
+                if toks[k:k + 1] == ["?"] and toks[k + 1:k + 2] in (["extends"], ["super"]):
+                    k += 2              # List<? extends Item>
+                inner = parse_type(toks, k, keywords, depth + 1)
             if inner is None:
                 return None
             chains += [(c, True) for c, _ in inner[0]]
@@ -1433,7 +1479,9 @@ def flow_c_like(toks, keywords, language, package=""):
       members: {type fqn: {member: [(chain, is_element)]}}
       bases:   {type fqn: [chain]}
       flow:    [("bind", var, enclosing, exprs, chains, foreach, context)
-                | ("use", enclosing, expr, context)], in source order
+                | ("use", enclosing, expr, context)
+                | ("enter",) | ("leave",)], in source order; enter and leave
+               bracket a member's parameters and body
       type_ns: {type fqn: context the type is declared in}
     A context is the namespace, or for C# code inside a namespace block,
     the namespace and the block's number (BLOCK), counted as scan counts them.
@@ -1459,23 +1507,38 @@ def flow_c_like(toks, keywords, language, package=""):
     def enclosing():
         return [fqn for fqn, _ in reversed(type_stack)]
 
+    proc = None     # None, "params" (a member's parameter list or initializer) or its body depth
     i = 0
     while i < n:
         t = toks[i]
         prev = toks[i - 1] if i else ";"
+        at_body = type_stack and depth == type_stack[-1][1] and paren == 0 and type_stack[-1][0] not in enums
         if t == "{":
+            if at_body and not pending and proc in {None, "params"}:
+                if proc is None:
+                    flow.append(("enter",))
+                proc = depth + 1    # a method, accessor or initializer body
             depth += 1
             if pending:
                 type_stack.append((pending, depth))
                 pending = None
             i += 1
             continue
+        if at_body and proc is None and t in {"(", "="} and not pending:
+            flow.append(("enter",))
+            proc = "params"
+        elif at_body and proc == "params" and t == ";":
+            flow.append(("leave",))
+            proc = None
         # Enum members: { Red, [Description("b")] Blue = 2 } (global using
         # static Colors; Red).
         if type_stack and type_stack[-1][0] in enums and depth == type_stack[-1][1] \
                 and prev in {"{", ",", "]"} and is_ident(t) and toks[i + 1:i + 2] and toks[i + 1] in {",", "}", "="}:
             members[type_stack[-1][0]].setdefault(t.lstrip("@"), [])
         if t == "}":
+            if proc == depth or (proc == "params" and type_stack and type_stack[-1][1] == depth):
+                flow.append(("leave",))
+                proc = None
             if type_stack and type_stack[-1][1] == depth:
                 type_stack.pop()
             depth -= 1
@@ -1553,15 +1616,26 @@ def flow_c_like(toks, keywords, language, package=""):
             if k < n and toks[k] == "await":
                 k += 1
             parsed = parse_expr(toks, k, keywords) if k < n else None
-            if parsed:
+            # var c = x as IContent; var s = (ISessionFactory)conf.Build(): the type written
+            cast = parse_type(toks, k + 1, keywords) if k + 1 < n and toks[k] == "(" else None
+            if cast and not (cast[1] + 1 < n and toks[cast[1]] == ")"
+                             and (is_ident(toks[cast[1] + 1]) or toks[cast[1] + 1] in {"(", "this", "base", "new"})):
+                cast = None
+            if not cast and parsed and parsed[1] < n and toks[parsed[1]] == "as":
+                cast = parse_type(toks, parsed[1] + 1, keywords)
+            if cast and toks[i + 2] == "=":
+                flow.append(("bind", name, enclosing(), [], cast[0], False, context()))
+            elif parsed:
                 flow.append(("bind", name, enclosing(), [parsed[0]], [], toks[i + 2] != "=", context()))
             i += 2
             continue
         # The name after global:: was read with the global (as a root-qualified name).
         after_global = i >= 3 and prev == ":" and toks[i - 2] == ":" and toks[i - 3] == "global"
         # Declarations: Type name followed by = ; , ) ( { => : in
+        # new IScopeUnitOfWork GetUnitOfWork(); in a type body: the new modifier
+        modifier_new = prev == "new" and type_stack and depth == type_stack[-1][1] and paren == 0
         if (is_ident(t) and t not in keywords or t in PREDEFINED or global_at(toks, i)) \
-                and prev not in {".", "new"} and not after_global:
+                and (prev not in {".", "new"} or modifier_new) and not after_global:
             parsed = parse_type(toks, i, keywords)
             if parsed and parsed[1] < n - 1:
                 chains, j = parsed

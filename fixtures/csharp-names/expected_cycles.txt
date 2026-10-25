@@ -1,2 +1,3 @@
-# strongly connected components > 1 file: 1
+# strongly connected components > 1 file: 2
 arity/ArResult.cs	arity/ArResultOfT.cs
+partmem/PmProduct.Logic.cs	partmem/PmProduct.cs

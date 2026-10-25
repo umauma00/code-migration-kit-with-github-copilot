@@ -1,2 +1,3 @@
-# strongly connected components > 1 file: 1
+# strongly connected components > 1 file: 2
 designer/DsgForm.Designer.vb	designer/DsgForm.vb
+partmem/PmProduct.Logic.vb	partmem/PmProduct.vb

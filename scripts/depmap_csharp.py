@@ -40,7 +40,6 @@ Known limits, listed in unresolved.tsv where the source shows them:
   - lambda parameters, generic method type inference, overload resolution,
     `dynamic` and user-defined conversions are not followed. Audit these
     with the sample/diff CLI.
-  - a local variable with a type's name gives an extra edge (conservative).
   - every #if branch is mapped (when a branch leaves a brace open, only
     the first branch's braces count); source generators and
     T4 output that is not checked in is invisible.
@@ -237,6 +236,7 @@ def scan(rel, text):
     contexts = [(0, "")]    # (offset, context from there on)
     type_depths = []        # (depth inside its body, name) of each enclosing type
     type_pending = None     # name of a type declaration whose body has not opened yet
+    type_spans = []         # (body start, body end, type key as flow_c_like gives it)
 
     def current():
         return ".".join(p for p in [file_ns] + [n for n, _, _ in stack] if p)
@@ -254,12 +254,14 @@ def scan(rel, text):
             depth += 1
             if type_pending:
                 type_depths.append((depth, type_pending))
+                type_spans.append([start, len(code), join(current(), type_pending)])
                 type_pending = None
         elif t == ";":
             type_pending = None     # record R(int X); has no body
         elif t == "}":
             if type_depths and type_depths[-1][0] == depth:
                 type_depths.pop()
+                next(span for span in reversed(type_spans) if span[1] == len(code))[1] = start
             depth -= 1
             popped = False
             while stack and stack[-1][1] >= depth:
@@ -427,6 +429,7 @@ def scan(rel, text):
     chains = [(pos, name, CHAIN_RE.match(code, pos).end()) for pos, name in chains_at(code, KEYWORDS)]
     declared = {pos for pos, name, end in chains if declared_name_at(code, pos, end, name)}
     scopes = variable_scopes(code, brackets, [(pos, name) for pos, name, _ in chains if pos in declared])
+    type_refs, owner_refs = set(), {}
     for pos, name, end in chains:
         if pos in enum_members or pos in declared:
             continue
@@ -439,20 +442,26 @@ def scan(rel, text):
         if not (CTOR_RE.search(code[max(0, pos - 40):pos]) and re.match(r"\s*\(", code[end:end + 50])):
             info.written_arity.setdefault(segs[-1], set()).add(type_args_at(code, end))
         head = name.split(".")[0]
-        if head in scopes and any(a < pos < b for a, b in scopes[head]) and not (
-                pos in base_items or attribute_name_at(code, pos, end, brackets) or cast_or_type_arg_at(code, pos, end)
-                or type_written_at(code, pos, end, TYPE_BEFORE, KEYWORDS | QUERY_WORDS)):
+        owner = innermost_type(type_spans, pos) if not name.startswith(GLOBAL) else None
+        typed = owner is None or pos in base_items or attribute_name_at(code, pos, end, brackets) \
+            or shadowed_type_at(code, pos, end, brackets)
+        if not typed and head in scopes and any(a < pos < b for a, b in scopes[head]):
             # Category == "food" in a class with a property Category, or
             # status++ after int status: C# takes the member, parameter or
             # local of that name before a type.
             continue
         ref = (contexts[bisect.bisect_right(offsets, pos) - 1][1], name)
+        if typed:
+            type_refs.add(ref)
+        else:   # maybe a member another part of a partial type or a base type declares
+            owner_refs.setdefault(ref, set()).add(owner)
         info.names.append(ref)
         if attribute_name_at(code, pos, end, brackets):
             info.attribute_names.append(ref)
             info.type_chains.append(ref)
         elif "." in name and (pos in base_items or type_written_at(code, pos, end, TYPE_BEFORE, KEYWORDS | QUERY_WORDS)):
             info.type_chains.append(ref)
+    info.member_like = {ref: owners for ref, owners in owner_refs.items() if ref not in type_refs}
     info.member_calls = member_calls(code)
     info.static_receivers = {head for head, _ in info.member_calls if head in STATIC_RECEIVERS}
     # Members a project-wide using static may supply: Math.Max() names
@@ -482,7 +491,7 @@ def type_args_at(code, k):
         k += 1
     if code[k:k + 1] != "<":
         return 0
-    depth, commas = 0, 0
+    depth, inner, commas = 0, 0, 0
     for j in range(k, min(len(code), k + 2000)):
         c = code[j]
         if c == "<":
@@ -491,11 +500,18 @@ def type_args_at(code, k):
             depth -= 1
             if depth == 0:
                 return commas + 1
-        elif c == "," and depth == 1:
+        elif c in "([":     # Result<(int Id, string Name)>, Result<int[,]>: one
+            inner += 1
+        elif c in ")]":
+            inner -= 1
+        elif c == "," and depth == 1 and inner == 0:
             commas += 1
         elif c in ";{}=":
             break
     return 0
+
+
+BODY_START_RE = re.compile(r"\{|=>|;")
 
 
 def variable_scopes(code, brackets, declarations):
@@ -511,10 +527,10 @@ def variable_scopes(code, brackets, declarations):
             scopes.setdefault(name, []).append((o, brackets.close.get(o, len(code))))
         elif code[o] == "(":
             k = brackets.close.get(o, len(code)) + 1
-            hits = [h for h in (code.find("{", k), code.find("=>", k), code.find(";", k)) if h >= 0]
-            if not hits:
+            m = BODY_START_RE.search(code, k)
+            if not m:
                 continue
-            k = min(hits)
+            k = m.start()
             if code[k] == "{":
                 scopes.setdefault(name, []).append((k, brackets.close.get(k, len(code))))
             elif code[k] == "=":
@@ -522,17 +538,142 @@ def variable_scopes(code, brackets, declarations):
     return scopes
 
 
-def cast_or_type_arg_at(code, start, end):
-    """(Category)x, List<Category>, Dictionary<int, Category>: a type."""
+def innermost_type(spans, pos):
+    """The key of the innermost type whose body holds pos, or None."""
+    found = None
+    for start, end, key in spans:
+        if start < pos < end:
+            found = key     # spans are in source order: a nested body comes later
+    return found
+
+
+# Words after which "(" opens a cast or a tuple, not a call or a statement's
+# condition: return (Category)x; but if (Enabled) and Log(Category).
+OPEN_PAREN_WORDS = {"return", "await", "throw", "in", "case", "else", "yield", "select", "where",
+                    "when", "from", "let", "on", "equals", "by", "is", "as", "and", "or", "not"}
+# Where a member named like a type still names the type (shadowed_type_at).
+SHADOW_TYPE_BEFORE = TYPE_BEFORE | {"not", "or", "and", "operator"}
+SUFFIX_RE = re.compile(r"\s*(?:\?(?=\s*\[[\s,]*\])|\?(?![.?\[])|\*|\[[\s,]*\])")
+TYPE_ARG_CHARS = set("_.,?[]()@:* \t\r\n")
+
+
+def skip_space(code, k):
+    while k < len(code) and code[k].isspace():
+        k += 1
+    return k
+
+
+def type_args_end(code, k):
+    """Offset after the <...> type argument list starting at code[k], or -1
+    when the "<" is not one (a < b, i < Count && n > 0)."""
+    depth, paren = 0, 0
+    for j in range(k, min(len(code), k + 2000)):
+        c = code[j]
+        if c == "<":
+            depth += 1
+        elif c == ">":
+            depth -= 1
+            if depth == 0:
+                return j + 1 if paren == 0 else -1
+        elif c == "(":
+            paren += 1
+        elif c == ")":
+            paren -= 1
+            if paren < 0:
+                return -1
+        elif not (c.isalnum() or c in TYPE_ARG_CHARS):
+            return -1
+    return -1
+
+
+def in_type_args(code, pos):
+    """Whether pos lies inside a type argument list: Dictionary<int, Category>,
+    Func<(Category, int)>, but not Log(Name, Category) or Foo(a < b, Category)."""
+    depth = 0
+    for k in range(pos - 1, max(-1, pos - 2000), -1):
+        c = code[k]
+        if c in ">)":
+            depth += 1
+        elif c in "<(":
+            if depth == 0 and c == "<":
+                w = k - 1
+                while w >= 0 and code[w].isspace():
+                    w -= 1
+                e = type_args_end(code, k) if w >= 0 and (code[w].isalnum() or code[w] == "_") else -1
+                # F(a < b, c > 2): comparisons, as C# reads them.
+                return e > pos and not re.match(r"\s*[\d\"'!-]", code[e:e + 20])
+            depth = max(0, depth - 1) if c == "<" or depth else depth
+        elif not (c.isalnum() or c in TYPE_ARG_CHARS):
+            return False
+    return False
+
+
+def opens_group(code, o):
+    """Whether the "(" at code[o] starts a cast or tuple: not a call (Log(),
+    a[0](), f()()) nor an if/while/switch condition."""
+    w = o - 1
+    while w >= 0 and code[w].isspace():
+        w -= 1
+    if w < 0:
+        return True
+    if code[w] in ")]":
+        return False
+    if not (code[w].isalnum() or code[w] == "_"):
+        return True
+    v = w
+    while v >= 0 and (code[v].isalnum() or code[v] == "_"):
+        v -= 1
+    return code[v + 1:w + 1] in OPEN_PAREN_WORDS and code[v:v + 1] != "."
+
+
+def shadowed_type_at(code, start, end, brackets):
+    """Whether a name a member, parameter or local of the same name hides
+    still names the type: where only a type is written. List<Category>,
+    (Category)x, (Category, int) pair, Customer? Customer, Wrapper<int> w,
+    Wrapper<int>.Default, T?[] all, is not T, operator T(...)."""
     k = start - 1
     while k >= 0 and code[k].isspace():
         k -= 1
-    if k >= 0 and code[k] in "<,":
+    before = code[k] if k >= 0 else ""
+    if before in "<," and in_type_args(code, start):
         return True
-    j = end
-    while j < len(code) and code[j].isspace():
-        j += 1
-    return k >= 0 and code[k] == "(" and code[j:j + 1] == ")" and re.match(r"\)\s*[\w@(]", code[j:]) is not None
+    j = skip_space(code, end)
+    generic = code[j:j + 1] == "<" and type_args_end(code, j) > 0
+    if generic:
+        j = type_args_end(code, j)
+    while True:
+        m = SUFFIX_RE.match(code, j)
+        if not m:
+            break
+        j = m.end()
+    j = skip_space(code, j)
+    after = code[j:j + 1]
+    if generic and after != "(":
+        return True     # Wrapper<int> w, Wrapper<int>.Default, typeof(Wrapper<int>)
+    o = brackets.around(start)
+    if before in "(," and o >= 0 and code[o] == "(" and opens_group(code, o):
+        c = brackets.close.get(o, -1)
+        if c < 0:
+            return False
+        e = c + 1
+        while True:
+            m = SUFFIX_RE.match(code, e)
+            if not m:
+                break
+            e = m.end()
+        e = skip_space(code, e)
+        if before == "(" and after == ")" and j == c and re.match(r"[\w@(]", code[e:e + 1]):
+            return True     # (Category)x, (Category?)null
+        if after in ",)" or re.match(r"[^\W\d]", after):
+            m = re.compile(r"@?[^\W\d]\w*").match(code, e)
+            if m and m.group(0) not in KEYWORDS | QUERY_WORDS:
+                return True     # (Category, int) pair
+    if j > end:
+        m = re.compile(r"@?[^\W\d]\w*").match(code, j)
+        if m and m.group(0) not in KEYWORDS | QUERY_WORDS and \
+                re.match(r"\s*(?:[{;=,)(]|=>)", code[m.end():m.end() + 40]):
+            return True     # Customer? Customer { get; set; }, T?[] all;
+    return type_written_at(code, start, end, SHADOW_TYPE_BEFORE, KEYWORDS | QUERY_WORDS)
 
 
 class Brackets:

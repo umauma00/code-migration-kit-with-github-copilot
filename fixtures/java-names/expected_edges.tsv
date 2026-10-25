@@ -8,3 +8,6 @@ annot/Lists.java	annot/mark/Mark.java
 annot/User.java	annot/K.java
 shop/Kind3.java	shop/Ann.java
 shop/Order.java	shop/EntityType.java
+wild/WCommand.java	wild/WJob.java
+wild/WCommand.java	wild/WReport.java
+wild/WJob.java	wild/WReport.java

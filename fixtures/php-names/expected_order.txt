@@ -1,4 +1,8 @@
 # migration order: one batch per line, dependencies first
+attrs/AtCache.php
+attrs/AtGuard.php
+attrs/AtRoute.php
+attrs/AtHome.php
 cb/Refl.php
 cb/Refm.php
 cb/Refn.php

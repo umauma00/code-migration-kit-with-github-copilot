@@ -90,7 +90,8 @@ test('source-as-spec suggests the bundled mapper for each legacy language, C# be
   // VB6 and VBA are not VB.NET: depmap_vbnet.py reads .vb only and would map nothing.
   for (const language of ['VB6', 'VBA', 'Visual Basic 6', 'Visual Basic 6.0', 'Visual Basic for Applications'])
     assert.match(command(language), /^No bundled parser for /, language);
-  for (const language of ['Visual Basic', 'Visual Basic .NET'])
+  // Visual Studio years name VB.NET: Visual Basic 2010 is not Visual Basic 2.
+  for (const language of ['Visual Basic', 'Visual Basic .NET', 'Visual Basic 2008', 'Visual Basic 2010', 'Visual Basic 2022'])
     assert.match(command(language), /depmap_vbnet\.py --root src /, language);
 });
 

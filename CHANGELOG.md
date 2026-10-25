@@ -161,9 +161,16 @@
   looked up by position (`f()` a function, `Foo::`/`new Foo` a class, `FOO` a
   constant), so `date()` or `DEBUG` no longer link the classes `Date` and
   `Debug`; a later use of a parameter, local or member spelled like a type
-  (`message.Length`, `Category == "food"`) is not that type; a VB class with
+  (`message.Length`, `Category == "food"`, also a member another partial part
+  or a base type declares) is not that type, while a type position still is
+  (`Customer? Customer`, `Wrapper<int>`, tuples, `is not T`, VB `CType`/
+  `DirectCast`/`TryCast`, `TypeOf x Is T`, `(Of T)`), and a parameter or
+  local is in view in its own procedure only; type flow reads `x as T`,
+  `(T)x.M()`, C# `new` members and Java wildcards (`Job<?, ?>`); PHP attributes with arguments
+  (`#[Route('/home')]`) name their class; a VB class with
   `Partial` on one part only (WinForms designer files) links every part; C#
-  `Result` and `Result<T>` are different types; VB6/VBA get no VB.NET mapper
+  `Result` and `Result<T>` are different types (`Result<(int, string)>` has
+  one type argument); VB6/VBA (not `Visual Basic 2010`) get no VB.NET mapper
   command and a mapper that reads no file warns; `depmap_php.py --include-var`
   is in the CLI spec.
   PHP follows computable

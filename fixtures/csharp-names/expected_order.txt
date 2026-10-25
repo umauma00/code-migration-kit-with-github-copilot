@@ -56,8 +56,23 @@ extname/M2.cs
 extname/M3.cs
 extname/M4.cs
 extname/M5.cs
+flowtypes/FtEvents.cs
+flowtypes/FtKey.cs
+flowtypes/FtItem.cs
+flowtypes/FtUnit.cs
+flowtypes/FtProvider.cs
+flowtypes/FtTag.cs
+flowtypes/FtTagged.cs
+flowtypes/FtService.cs
 inline/U.cs
 inline/U2.cs
+partmem/PmBase.cs
+partmem/PmDerived.cs
+partmem/PmProduct.Logic.cs	partmem/PmProduct.cs
+partmem/PmCategory.cs
+procvars/PvInvoice.cs
+procvars/PvOrder.cs
+procvars/PvSvc.cs
 proj/lib/L.cs
 proj/V.cs
 proj/W.cs
@@ -66,6 +81,14 @@ shadow/ShCategory.cs
 shadow/ShStatus.cs
 shadow/ShValidator.cs
 shadow/ShReal.cs
+shape/SpProduct.cs
+shape/SpCategory.cs
+shape/SpCustomer.cs
+shape/SpLine.cs
+shape/SpStatus.cs
+shape/SpTag.cs
+shape/SpWrapper.cs
+shape/SpOrder.cs
 shop/Customer.cs
 shop/EntityType.cs
 shop/Flags.cs
@@ -75,3 +98,6 @@ stat/StatU.cs
 stat/Util.cs
 stat/StatV.cs
 stat/StatW.cs
+tuplearity/TaResult.cs
+tuplearity/TaResultOfT.cs
+tuplearity/TaSvc.cs

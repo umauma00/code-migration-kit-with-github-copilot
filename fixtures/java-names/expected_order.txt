@@ -16,3 +16,6 @@ shop/Holder.java
 shop/Kind2.java
 shop/Kind3.java
 shop/Order.java
+wild/WReport.java
+wild/WJob.java
+wild/WCommand.java

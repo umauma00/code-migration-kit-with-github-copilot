@@ -36,7 +36,6 @@ applies to the files of its own project.
 Known limits, listed in unresolved.tsv where the source shows them:
   - With blocks, lambdas, late binding on Object and overload resolution
     are not followed. Audit these with the sample/diff CLI.
-  - a local name equal to a type or module member gives an extra edge.
   - CreateObject/Activator/Type.GetType with a computed name is unresolved.
   - every #If branch is mapped. VB6 (.bas/.cls/.frm) is a different
     language and is not read.
@@ -150,9 +149,24 @@ REFLECTION_RE = re.compile(r"\b(createobject|activator\s*\.\s*createinstance|typ
 # A bare name in an enum member's value: maybe a sibling member.
 SIBLING_RE = re.compile(r"(?<![\w.])\[?[A-Za-z_]\w*\]?(?![\w\[\]]|\s*\.)")
 # The name a declaration introduces: x As T, x() As T, Dim x, Const x.
-DECLARED_RE = re.compile(r"(?:^|(?<=[\s(,]))\[?([a-z_]\w*)\]?(?:\s*\(\s*\))?\??\s+as\b|\b(?:dim|const|static)\s+\[?([a-z_]\w*)")
+# For Each x In, For i = 1 To, Using r = New Reader() too.
+DECLARED_RE = re.compile(r"(?:^|(?<=[\s(,]))\[?([a-z_]\w*)\]?(?:\s*\(\s*\))?\??\s+as\b"
+                         r"|\b(?:dim|const|static|using|for\s+each|for)\s+\[?([a-z_]\w*)")
 # A lambda's parameter list: Sub(order), Function(a, b As Integer).
 LAMBDA_RE = re.compile(r"(?<![\w.])(?:sub|function)\s*\(([^()]*)\)")
+
+
+def declared_names(low):
+    """The variables a line declares (DECLARED_RE)."""
+    return [name for name in (m.group(1) or m.group(2) for m in DECLARED_RE.finditer(low)) if name not in KEYWORDS]
+
+
+def lambda_params(low):
+    """A line's lambda parameters (Sub(order) total += order): in view on
+    that line only."""
+    found = [re.sub(r"^(?:byval|byref)\s+", "", p.strip()).split()[0].strip("[]")
+             for m in LAMBDA_RE.finditer(low) for p in m.group(1).split(",") if p.strip()]
+    return {name for name in found if name not in KEYWORDS}
 # Words before a name that make it a type (As Acme.Billing.Invoice).
 TYPE_BEFORE = {"as", "new", "inherits", "implements", "of", "gettype("}
 KEYWORDS = set("""addhandler addressof alias and andalso as boolean byref byte byval call case catch cbool
@@ -359,6 +373,15 @@ def scan(rel, text, root_ns=""):
             name, typ, value = m.group(1), m.group(2), m.group(3)
             expr = vb_expr(value)
             info.flow.append(("bind", name, enclosing(), [expr] if expr else [], vb_type(typ) if typ else [], True, ns()))
+        # Catch ex As T, For i = 0 To, Function(order) order.Total: variables
+        # of their own (order.Total is not the class Order's).
+        for name in declared_names(low):
+            info.flow.append(("bind", name, enclosing(), [], [], False, ns()))
+        lambdas = sorted(lambda_params(low))
+        if lambdas:
+            info.flow.append(("enter",))
+            for name in lambdas:
+                info.flow.append(("bind", name, enclosing(), [], [], False, ns()))
         toks = TOKEN_RE.findall(low)
         for i, t in enumerate(toks):
             if i and toks[i - 1] == ".":
@@ -367,12 +390,15 @@ def scan(rel, text, root_ns=""):
                 parsed = parse_expr(toks, i, KEYWORDS)
                 if parsed and (parsed[0][2] or parsed[0][0] == "new"):
                     info.flow.append(("use", enclosing(), parsed[0], ns()))
+        if lambdas:
+            info.flow.append(("leave",))
 
     for idx, line in enumerate(lines):
         low = line.lower()
         if member:
             if re.match(rf"^\s*end\s+{member}\b", low):
                 member = None
+                info.flow.append(("leave",))
             else:
                 body_line(low)
             body.append((ns(), line))
@@ -474,6 +500,7 @@ def scan(rel, text, root_ns=""):
                 abstract = re.search(r"\bmustoverride\b", low[:m.start(2)]) or stack[-1][0] == "interface"
                 if kind in {"sub", "function", "operator"} and not abstract:
                     member = kind
+                    info.flow.append(("enter",))
                     bind_params(low)
                 elif kind == "property" and not abstract:
                     # An auto-implemented property has no Get/Set block.
@@ -481,6 +508,7 @@ def scan(rel, text, root_ns=""):
                     nxt = re.sub(r"^(?:<[^>]*>\s*)?(?:(?:public|private|friend|protected)\s+)*", "", nxt)
                     if re.match(r"(?:get|set)\b", nxt):     # not Settings As ...
                         member = "property"
+                        info.flow.append(("enter",))
                         bind_params(low)
                 elif not kind:
                     # A field initializer: Private _x As New Foo(), Dim y = Bar.Create()
@@ -498,43 +526,84 @@ def scan(rel, text, root_ns=""):
     local_names = {}    # procedure number -> names declared in it
     for (ctx, line), (types, proc) in zip(body, scopes):
         low = line.lower()
-        found = [m.group(1) or m.group(2) for m in DECLARED_RE.finditer(low)]
-        # Lambda parameters: Sub(order) total += order, Function(x) x.Id
-        found += [re.sub(r"^(?:byval|byref)\s+", "", p.strip()).split()[0].strip("[]")
-                  for m in LAMBDA_RE.finditer(low) for p in m.group(1).split(",") if p.strip()]
-        for name in found:
+        for name in declared_names(low):
             if proc is None:
                 type_member_names.setdefault(types, set()).add(name)
             else:
                 local_names.setdefault(proc, set()).add(name)
 
-    def shadowed(head, types, proc):
-        if head in local_names.get(proc, ()):
+    def shadowed(head, types, proc, lambdas=()):
+        if head in local_names.get(proc, ()) or head in lambdas:
             return True
         return any(head in type_member_names.get(types[:k], ()) for k in range(len(types), 0, -1)
                    if types[k - 1][0] != "namespace")
 
     # Each name is resolved from the namespace block it is written in.
+    type_refs, owner_refs = set(), {}
     for (ctx, line), (types, proc) in zip(body, scopes):
         low = line.lower()
         declared = {m.start(1) if m.group(1) else m.start(2) for m in DECLARED_RE.finditer(low)}
+        lambdas = lambda_params(low)
         for pos, name in chains_at(low, KEYWORDS, fold=True):
             if pos in declared and "." not in name:
                 continue
             if "." not in name and re.match(r"\s*:=", low[pos + len(name):]):
                 continue        # Create(order:=1): a named argument, not a type
-            before = re.search(r"([\w(]+)\s*$", low[:pos])
-            if shadowed(name.split(".")[0], types, proc) and not (before and before.group(1) in TYPE_BEFORE):
+            typed = type_place_at(low, pos)
+            if shadowed(name.split(".")[0], types, proc, lambdas) and not typed:
                 continue
+            owner = next((n for kind, n in reversed(types) if kind != "namespace"), None)
+            if typed or owner is None or name.startswith("global."):
+                type_refs.add((ctx, name))
+            else:   # maybe a member another part of a Partial type or a base type declares
+                owner_refs.setdefault((ctx, name), set()).add(join(ctx, owner))
             info.names.append((ctx, name))
             if "." in name and type_written_at(low, pos, CHAIN_RE.match(low, pos).end(), TYPE_BEFORE):
                 info.type_chains.append((ctx, name))
+    info.member_like = {ref: owners for ref, owners in owner_refs.items() if ref not in type_refs}
     info.members = members(code)
     for m in REFLECTION_RE.finditer(code):
         arg = (m.group(2) or "").strip()
         if not arg.startswith('""'):
             info.dynamic.append((f"{m.group(1)}({arg})", "late binding or reflection with a computed name"))
     return info
+
+
+# Conversions whose second argument is a type: DirectCast(x, Customer).
+CAST_FUNCS = {"ctype", "directcast", "trycast"}
+
+
+def type_place_at(low, pos):
+    """Whether the name at low[pos] stands where VB takes only a type, so a
+    variable or member of that name does not hide it: As T, New T,
+    GetType(T), List(Of T), Dictionary(Of K, T), CType(x, T),
+    DirectCast/TryCast(x, T), TypeOf x Is T."""
+    head = low[:pos].rstrip()
+    if re.fullmatch(r"\s*<\s*(?:(?:assembly|module)\s*:)?(?:[^<>]*,)?\s*", head):
+        return True     # <Category> Public Property ..., <A(1), Category>: an attribute
+    m = re.search(r"(\w+)\s*(\()?$", head)
+    if m and (m.group(1) + (m.group(2) or "") in TYPE_BEFORE):
+        return True
+    if re.search(r"\btypeof\b(?:(?!\btypeof\b).)*\bis(?:not)?$", head):
+        return True
+    if not head.endswith(","):
+        return False
+    # The open "(" the comma belongs to: (Of K, T) or CType(x, T).
+    depth, commas = 0, 0
+    for k in range(len(head) - 1, -1, -1):
+        c = head[k]
+        if c == ")":
+            depth += 1
+        elif c == "(":
+            if depth == 0:
+                if re.match(r"\(\s*of\b", head[k:]):
+                    return True
+                word = re.search(r"(\w+)\s*$", head[:k])
+                return bool(word) and word.group(1) in CAST_FUNCS and commas == 1
+            depth -= 1
+        elif c == "," and depth == 0:
+            commas += 1
+    return False
 
 
 def merge_info(info, other):
