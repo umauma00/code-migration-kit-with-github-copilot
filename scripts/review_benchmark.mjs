@@ -9,7 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { prepare } from '../tests/helpers.mjs';
 import { loadConfig, safePath, writeJSON, stamp } from '../lib/core.mjs';
-import { loadCases, benchPlan, runBenchmark, benchMarker } from '../lib/bench.mjs';
+import { loadCases, benchPlan, runBenchmark, benchMarker, answerLeaks } from '../lib/bench.mjs';
 import { parseCommandLine, specs, usageText } from '../lib/cli.mjs';
 import { createCopilotAdapter } from './copilot_adapter.mjs';
 
@@ -35,9 +35,13 @@ try {
     // Workers read this root with view/grep/glob. Leave out what names the
     // seeded defects or holds correct code: the benchmark's own docs and code,
     // and the fixture judge's mutant and cases. The benchmark runs from the kit.
-    for (const name of ['migration-kit/docs/REVIEW-BENCHMARK.md', 'migration-kit/docs/REVIEW-BENCHMARK.en.md', 'migration-kit/lib/bench.mjs', 'migration-kit/scripts/review_benchmark.mjs', 'tests']) {
+    // Past review and validation records quote fixture code too.
+    for (const name of ['migration-kit/docs/REVIEW-BENCHMARK.md', 'migration-kit/docs/REVIEW-BENCHMARK.en.md', 'migration-kit/lib/bench.mjs', 'migration-kit/scripts/review_benchmark.mjs',
+      'migration-kit/docs/reviews', 'migration-kit/docs/validation', 'migration-kit/docs/plans', 'tests']) {
       fs.rmSync(safePath(root, name), { recursive: true, force: true });
     }
+    const leaks = answerLeaks(root);
+    if (leaks.length) throw new Error(`Correct fixture code is still readable in the root: ${leaks.join(', ')}`);
     writeJSON(safePath(root, benchMarker), { schemaVersion: 1, kind: 'review-benchmark-root', createdAt: stamp() });
     console.log(JSON.stringify({ root, models: config.models, next: `Choose models per role if they differ (migration/config.json models), then: node scripts/review_benchmark.mjs plan --root ${root}` }, null, 2));
   } else {

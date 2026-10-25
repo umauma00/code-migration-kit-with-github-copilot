@@ -37,7 +37,7 @@ Model calls use quota and may cost money. The cases use the three files of `fixt
    node scripts/review_benchmark.mjs setup --target /tmp/review-bench --model MODEL_ID
    ```
 
-   Setup leaves this benchmark's docs and code, and the fixture judge's mutant, out of the root workers read, so the answers are not visible to them. Every role gets that model; edit `models` and `reasoningEfforts` in
+   Workers can read the root, so setup leaves out this benchmark's docs and code, the fixture judge's mutant, and past review and validation records (`docs/reviews`, `docs/validation`, `docs/plans`), and fails if a line of the correct code is still there. CHANGELOG and other docs still say the benchmark exists. Every role gets that model; edit `models` and `reasoningEfforts` in
    `/tmp/review-bench/migration/config.json` to differ per role. Setup sets
    `reviewFocus: "shared"` so a single reviewer covers both lenses.
 
@@ -62,7 +62,7 @@ Model calls use quota and may cost money. The cases use the three files of `fixt
    Results go to `review-bench-results/<time>/` in the temp directory (printed when the run ends), never inside the root, which workers can read; `--out` moves them. A root setup did not make, or one with a file at a case's target, stops the run before anything is written. The output holds `report.md`
    (tables and the cases that changed), `summary.json`, `results.jsonl` (every
    finding, its match and tokens per run) and `fixes/`. If the first call fails
-   (login, model ID), the run stops without measuring anything: calls in flight are aborted and no new ones start.
+   Three failures before any call works (login, model ID) stop the run without measuring anything: calls in flight are aborted and no new ones start. A single malformed answer is recorded as a failed run and the run goes on.
 
 ## Cases and matching
 
@@ -80,7 +80,9 @@ Model calls use quota and may cost money. The cases use the three files of `fixt
 - A finding catches a defect when it cites the defect's exact line as
   `path:line`, or matches the defect's `pattern`. One finding counts for one
   defect at most: a cited line decides first, and a finding whose words alone
-  match several defects counts for none (recorded as `ambiguous`). Matching
+  match several defects counts for none (recorded as `ambiguous`); one finding naming both trunc and zero division counts for one. Patterns are
+  narrow: a finding with no line that only says "no check for b being 0" may
+  not count, so miss rates can come out high, equally for both variants. Matching
   is mechanical: audit the findings in `results.jsonl` before deciding.
 - The fix comparison hands both variants the same correct findings, so review
   variance stays out of it. Fixed files are judged by the checks in

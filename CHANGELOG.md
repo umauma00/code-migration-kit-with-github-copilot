@@ -10,7 +10,7 @@
   "[Building agents: When to fold subagents into your main agent loop](https://claude.com/ja/resources/articles/building-agents-when-to-fold-subagents-into-your-main-agent-loop)"
   (2026-10-22): measure first, fold one worker at a time, keep it separate
   if the score drops. `run` refuses a `--max-calls` below the planned bound
-  and stops if the first call fails. The translation loop is unchanged; the
+  and stops when three calls fail before any works. The translation loop is unchanged; the
   implementer is told to apply findings only when the benchmark hands it
   `confirmedFindings`, which the loop never does. 0.4.0 is reserved for the
   dependency-mapper change still in progress on another branch.

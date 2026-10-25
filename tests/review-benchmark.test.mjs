@@ -9,7 +9,8 @@ import path from 'node:path';
 import { prepare, mini } from './helpers.mjs';
 import { safePath, writeJSON, atomicWrite } from '../lib/core.mjs';
 import { runProcess } from '../lib/process.mjs';
-import { benchDir, loadCases, benchPlan, catches, creditedDefect, runBenchmark, benchMarker } from '../lib/bench.mjs';
+import { benchDir, loadCases, benchPlan, catches, creditedDefect, runBenchmark, benchMarker, answerLeaks } from '../lib/bench.mjs';
+import { kitRoot } from '../scripts/install.mjs';
 import { agentPrompt } from '../scripts/copilot_adapter.mjs';
 
 function bench(t) {
@@ -83,6 +84,23 @@ test('a finding about one seeded defect is not credited to its neighbor', () => 
   // On the remainder case, a finding on the floor line is not the remainder defect.
   const [remainder] = loadCases().find(c => c.id === 'math-remainder').defects;
   assert.ok(!catches({ message: 'quotient looks fine', evidence: 'ported/math_ops.mjs:3' }, remainder));
+  // The original's line 4 holds both // and %: citing it credits neither by line.
+  const [trunc1] = loadCases(undefined, 'math-trunc')[0].defects;
+  assert.ok(!catches({ message: 'sign looks wrong', evidence: 'src/math_ops.py:4' }, trunc1));
+  assert.ok(!catches({ message: 'Math.floor differs from //', evidence: 'src/math_ops.py:4' }, remainder));
+});
+
+test('setup leaves no correct fixture code where workers can read it', async t => {
+  const root = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'bench-setup-')), 'root');
+  t.after(() => fs.rmSync(path.dirname(root), { recursive: true, force: true }));
+  const run = await runProcess(process.execPath, [path.join(kitRoot, 'scripts/review_benchmark.mjs'), 'setup', '--target', root, '--model', 'test-double'], { cwd: kitRoot, timeoutMs: 60000 });
+  assert.equal(run.code, 0, run.stderr);
+  assert.deepEqual(answerLeaks(root), []);
+  assert.ok(fs.existsSync(path.join(root, benchMarker)));
+  assert.ok(!fs.existsSync(path.join(root, 'migration-kit/docs/REVIEW-BENCHMARK.md')));
+  // The check itself finds a leak.
+  fs.writeFileSync(path.join(root, 'migration/leak.md'), 'const quotient = Math.floor(a / b);\n');
+  assert.deepEqual(answerLeaks(root), ['migration/leak.md']);
 });
 
 test('the plan bounds calls, and run refuses a lower --max-calls before any call', async t => {
@@ -131,7 +149,7 @@ test('review and fix variants are scored per case, and changed cases are listed'
 test('a first call that fails stops the run instead of scoring a miss', async t => {
   const f = bench(t);
   const failing = async () => { throw new Error('not logged in'); };
-  await assert.rejects(runBenchmark(f.root, f.config, failing, { cases: loadCases(), runs: 1, out: f.out, maxCalls: 1000 }), /First .* call failed; nothing was measured: not logged in/);
+  await assert.rejects(runBenchmark(f.root, f.config, failing, { cases: loadCases(), runs: 1, out: f.out, maxCalls: 1000 }), /First 3 calls failed; nothing was measured: not logged in/);
 });
 
 test('run refuses a root setup did not make, a target already present, and output inside the root', async t => {
@@ -142,6 +160,12 @@ test('run refuses a root setup did not make, a target already present, and outpu
   assert.equal(fs.readFileSync(safePath(f.root, 'ported/math_ops.mjs'), 'utf8'), 'export const real = 1;\n');
   fs.rmSync(safePath(f.root, 'ported/math_ops.mjs'));
   await assert.rejects(run({ out: path.join(f.root, 'results') }), /outside the benchmark root/);
+  // Through a symlinked parent too.
+  const link = path.join(path.dirname(f.out), 'link');
+  fs.mkdirSync(safePath(f.root, 'sub'));
+  fs.symlinkSync(safePath(f.root, 'sub'), link, 'junction');
+  await assert.rejects(run({ out: path.join(link, 'results') }), /outside the benchmark root/);
+  assert.ok(!fs.existsSync(safePath(f.root, 'sub/results')));
   fs.rmSync(safePath(f.root, benchMarker));
   await assert.rejects(run(), /Not a benchmark root/);
   assert.deepEqual(calls, []);
@@ -165,6 +189,19 @@ test('after a failure no further jobs start, and the seeded target is removed', 
   // Two jobs at most were in flight, two reviewers each.
   assert.ok(n <= 4, `calls after failure: ${n}`);
   assert.ok(!fs.existsSync(safePath(f.root, 'ported/math_ops.mjs')));
+});
+
+test('one malformed first answer is a failed run, not a stop', async t => {
+  const f = bench(t), base = adapter();
+  let first = true;
+  const once = async options => {
+    if (first) { first = false; throw new Error('Invalid review JSON'); }
+    return base(options);
+  };
+  f.config.concurrency = 1;
+  const s = await runBenchmark(f.root, f.config, once, { cases: loadCases(undefined, 'control-math'), runs: 2, part: 'review', out: f.out, maxCalls: 100 });
+  assert.equal(s.review.dual.failed, 1);
+  assert.equal(s.review.dual.runs + s.review.single.runs, 3);
 });
 
 test('a reviewer failure after other successes counts both calls of that run', async t => {

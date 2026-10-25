@@ -1,15 +1,15 @@
 {
   "schemaVersion": 1,
-  "about": "Seeded review and fix cases on fixtures/mini (docs/REVIEW-BENCHMARK.md). Each case file replaces the unit's target. Anchors are exact path:line citations; a finding citing an anchor, or matching the pattern, counts as catching the defect, and each finding is credited to one defect at most. Control cases have no defects: every finding on them is a false finding.",
+  "about": "Seeded review and fix cases on fixtures/mini (docs/REVIEW-BENCHMARK.md). Each case file replaces the unit's target. Anchors are exact path:line citations of lines that hold only that defect (src/math_ops.py:4 holds both // and %, so it is no anchor); a finding citing an anchor, or matching the pattern, counts as catching the defect, and each finding is credited to one defect at most. Control cases have no defects: every finding on them is a false finding.",
   "cases": [
     {
       "id": "math-trunc", "target": "ported/math_ops.mjs", "file": "cases/math-trunc.mjs", "check": "checks/math_ops.mjs",
-      "defects": [{ "id": "trunc", "kind": "semantics", "anchors": ["ported/math_ops.mjs:3", "src/math_ops.py:4"], "pattern": "Math\\.trunc|truncat|toward zero",
+      "defects": [{ "id": "trunc", "kind": "semantics", "anchors": ["ported/math_ops.mjs:3"], "pattern": "Math\\.trunc|truncat|toward zero",
         "message": "Quotient truncates toward zero; Python // floors, so divide(-7, 2) returns -3 instead of -4", "evidence": "src/math_ops.py:4 uses a // b; ported/math_ops.mjs:3 uses Math.trunc", "rule": "Fixture rules: preserve floor division; inventory src/math_ops.py negative division" }]
     },
     {
       "id": "math-remainder", "target": "ported/math_ops.mjs", "file": "cases/math-remainder.mjs", "check": "checks/math_ops.mjs",
-      "defects": [{ "id": "remainder", "kind": "semantics", "anchors": ["ported/math_ops.mjs:4", "src/math_ops.py:4"], "pattern": "remainder|modulo|a % b",
+      "defects": [{ "id": "remainder", "kind": "semantics", "anchors": ["ported/math_ops.mjs:4"], "pattern": "remainder|modulo|a % b",
         "message": "Remainder uses JavaScript %, whose sign follows the dividend; Python % follows the divisor, so divide(-7, 2) returns remainder -1 instead of 1", "evidence": "src/math_ops.py:4 returns a % b with Python semantics; ported/math_ops.mjs:4 returns a % b", "rule": "Fixture rules: preserve remainder signs" }]
     },
     {
@@ -20,7 +20,7 @@
     {
       "id": "math-double", "target": "ported/math_ops.mjs", "file": "cases/math-double.mjs", "check": "checks/math_ops.mjs",
       "defects": [
-        { "id": "trunc", "kind": "semantics", "anchors": ["ported/math_ops.mjs:2", "src/math_ops.py:4"], "pattern": "Math\\.trunc|truncat|toward zero",
+        { "id": "trunc", "kind": "semantics", "anchors": ["ported/math_ops.mjs:2"], "pattern": "Math\\.trunc|truncat|toward zero",
           "message": "Quotient truncates toward zero; Python // floors, so divide(-7, 2) returns -3 instead of -4", "evidence": "src/math_ops.py:4 uses a // b; ported/math_ops.mjs:2 uses Math.trunc", "rule": "Fixture rules: preserve floor division" },
         { "id": "zero", "kind": "semantics", "anchors": ["ported/math_ops.mjs:1", "src/math_ops.py:2", "src/math_ops.py:3"], "pattern": "division by zero|divide by zero|zero.?division|ZeroDivision|ValueError|b === 0|b == 0|Infinity|NaN",
           "message": "Division by zero no longer raises; divide(1, 0) returns Infinity/NaN instead of throwing 'division by zero'", "evidence": "src/math_ops.py:2-3 raise ValueError(\"division by zero\") when b == 0; ported/math_ops.mjs has no such check", "rule": "Fixture rules: preserve zero-division errors" }

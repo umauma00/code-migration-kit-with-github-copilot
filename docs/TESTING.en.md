@@ -4,7 +4,7 @@
 
 ## 2026-10-25 Benchmark for folding workers
 
-- `tests/review-benchmark.test.mjs`: with canned workers, checks the miss-rate, false-finding and fix pass-rate totals, the list of changed cases, refusal below the call bound, the stop when the first call fails, and that seeded cases fail their checks while controls pass.
+- `tests/review-benchmark.test.mjs`: with canned workers, checks the miss-rate, false-finding and fix pass-rate totals, the list of changed cases, refusal below the call bound, the stop when three calls fail before any works, refusal of output inside the root (also through a symlink), and that setup leaves no correct fixture code in the root, and that seeded cases fail their checks while controls pass.
 - No comparison with real models has run yet. See [REVIEW-BENCHMARK.en.md](REVIEW-BENCHMARK.en.md).
 
 ## 2026-10-17 CLI version tracking, guardrails, tool-assisted review, diagnostics, language
