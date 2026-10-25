@@ -1,1 +1,3 @@
 file	reference	reason
+defs/expr.php	include P	P has several define() values; an edge to each file they name
+defs/main.php	include BASE . '/boot.php'	BASE has several define() values; an edge to each file they name

@@ -145,12 +145,13 @@ def compile_items(text):
     return items
 
 
-CONTAINER_RE = re.compile(r"<(/?)(ItemGroup|Choose|When|Otherwise|Target)\b" + ATTRS + r"(/?)>", re.IGNORECASE)
+CONTAINER_RE = re.compile(r"<(/?)(ItemGroup|ImportGroup|Choose|When|Otherwise|Target)\b" + ATTRS + r"(/?)>", re.IGNORECASE)
 
 
 def conditional_spans(text):
-    """(start, end) of every ItemGroup with a Condition, Choose branch and
-    Target of text: an item inside one is conditional."""
+    """(start, end) of every ItemGroup or ImportGroup with a Condition,
+    Choose branch and Target of text: an item or import inside one is
+    conditional."""
     spans, stack = [], []
     for m in CONTAINER_RE.finditer(text):
         closing, name, attr_text, empty = m.group(1), m.group(2).lower(), m.group(3), m.group(4)
@@ -162,7 +163,7 @@ def conditional_spans(text):
                 if open_name == name:
                     break
         elif not empty:
-            cond = name != "itemgroup" or re.search(r"\bCondition\s*=", attr_text, re.IGNORECASE)
+            cond = name not in {"itemgroup", "importgroup"} or re.search(r"\bCondition\s*=", attr_text, re.IGNORECASE)
             stack.append((name, m.start(), bool(cond)))
     spans += [(start, len(text)) for _, start, cond in stack if cond]
     return spans
@@ -257,6 +258,7 @@ def with_imports(root, rel, text, warnings, seen=None):
     seen = set() if seen is None else seen
     seen.add(rel.lower())
     here = posixpath.dirname(rel)
+    spans = conditional_spans(text)
 
     def expand(m):
         values = attr_values(PROJECT_ATTR_RE, m.group(1))
@@ -272,7 +274,13 @@ def with_imports(root, rel, text, warnings, seen=None):
             target = msbuild_path(here, value)
         if target is None or target.lower() in seen or not (root / target).is_file():
             return m.group(0)
-        return with_imports(root, target, COMMENT_RE.sub("", read_source(root / target, warnings)), warnings, seen)
+        body = with_imports(root, target, COMMENT_RE.sub("", read_source(root / target, warnings)), warnings, seen)
+        if re.search(r"\bCondition\s*=", m.group(1), re.IGNORECASE) or any(a <= m.start() < b for a, b in spans):
+            # An import under a Condition (its own, an ImportGroup's, a
+            # Choose branch's) keeps it: what it adds or removes is
+            # conditional, as if written in a <When>.
+            body = f"<Choose><When Condition=\"'$(Imported)' != ''\">{body}</When></Choose>"
+        return body
     return IMPORT_PROJECT_RE.sub(expand, text)
 
 

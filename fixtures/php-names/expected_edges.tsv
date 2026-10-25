@@ -6,6 +6,11 @@ cb/a.php	cb/Wrap.php
 cb/a.php	cb/cb1.php
 cb/a.php	cb/en.php
 cb/a.php	cb/st.php
+defs/expr.php	defs/a/boot.php
+defs/expr.php	defs/b/boot.php
+defs/main.php	defs/a/boot.php
+defs/main.php	defs/b/boot.php
+defs/one.php	defs/c/boot.php
 ext/a.php	ext/f.php
 ext/b.php	ext/h.php
 inc-expr/main.php	inc-expr/c3.php

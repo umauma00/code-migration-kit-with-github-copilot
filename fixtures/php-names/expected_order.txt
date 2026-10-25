@@ -7,6 +7,12 @@ cb/cb1.php
 cb/en.php
 cb/st.php
 cb/a.php
+defs/a/boot.php
+defs/b/boot.php
+defs/c/boot.php
+defs/expr.php
+defs/main.php
+defs/one.php
 ext/f.php
 ext/a.php
 ext/h.php

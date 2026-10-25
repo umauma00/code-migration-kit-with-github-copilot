@@ -52,6 +52,7 @@ and unresolved.tsv (file, reference, reason).
 Test: python3 scripts/depmap_php.py --root fixtures/php --out /tmp/depmap-php && diff /tmp/depmap-php/edges.tsv fixtures/php/expected_edges.tsv
 """
 
+import itertools
 import json
 import posixpath
 import re
@@ -286,8 +287,8 @@ class FileInfo:
         self.callables = []     # names in string callables: ("function" | "class", name)
         self.dynamic = []
         self.guarded = set()    # ("function" | "class" | "const", key) behind a !function_exists(...) guard
-        self.const_values = {}  # constant -> literal value of define('X', 'v')
-        self.const_exprs = {}   # constant -> value tokens of define('X', <expr>)
+        self.const_values = {}  # constant -> literal values of its define('X', 'v') calls
+        self.const_exprs = {}   # constant -> value tokens of each define('X', <expr>)
 
 
 def lower(name):
@@ -400,7 +401,9 @@ def scan(rel, text):
         elif low == "define" and at(i + 1) == "(" and at(i + 2).startswith(STR):
             info.constants.append(string(at(i + 2)).lstrip("\\"))
             if at(i + 3) == "," and at(i + 4).startswith(STR) and at(i + 5) == ")":
-                info.const_values[string(at(i + 2)).lstrip("\\")] = string(at(i + 4))
+                # Every define() of the file counts: if/else branches may
+                # give the same constant different values.
+                info.const_values.setdefault(string(at(i + 2)).lstrip("\\"), set()).add(string(at(i + 4)))
             elif at(i + 3) == ",":
                 # define('X', dirname(__FILE__) . '/x.php'): an include of X
                 # is that path, resolved in this file.
@@ -409,7 +412,7 @@ def scan(rel, text):
                     level += {"(": 1, ")": -1}.get(at(j), 0)
                     value.append(at(j))
                     j += 1
-                info.const_exprs[string(at(i + 2)).lstrip("\\")] = value
+                info.const_exprs.setdefault(string(at(i + 2)).lstrip("\\"), []).append(value)
         elif t == "!" and GUARDS.get(at(i + 1).lower().lstrip("\\")) and at(i + 2) == "(" \
                 and at(i + 3).startswith(STR) and at(i + 4) in {")", ","}:
             # if (!function_exists('f')) { function f() ... }: a fallback
@@ -804,8 +807,8 @@ def mapper(root, warnings, args):
                 table[key] = real
     const_values = {}
     for info in infos:
-        for name, value in info.const_values.items():
-            const_values.setdefault(name, set()).add(value)
+        for name, values in info.const_values.items():
+            const_values.setdefault(name, set()).update(values)
     include_vars = dict(const_values_unique(const_values))
     include_vars.update(parse_vars(args.include_var))
     # A constant defined as a computable path (define('DO_MAINTENANCE',
@@ -814,12 +817,42 @@ def mapper(root, warnings, args):
     # A literal define() of the same name elsewhere makes it ambiguous.
     const_paths = {name: {None} for name in const_values}
     for info in infos:
-        for name, value in info.const_exprs.items():
-            hit, why = resolve_include(info.rel, value, info, by_rel, by_tail, include_path, include_vars)
-            const_paths.setdefault(name, set()).add(tuple(hit) if hit and not why and len(hit) == 1 else None)
+        for name, exprs in info.const_exprs.items():
+            for value in exprs:
+                hit, why = resolve_include(info.rel, value, info, by_rel, by_tail, include_path, include_vars)
+                const_paths.setdefault(name, set()).add(tuple(hit) if hit and not why and len(hit) == 1 else None)
     for name, hits in const_paths.items():
         if len(hits) == 1 and None not in hits:
             include_vars[CONST_PATH + name] = list(next(iter(hits)))
+    # A constant whose define() calls give it several relative literals
+    # (if ($env) define('BASE', 'a'); else define('BASE', 'b');), or several
+    # computable paths, may be any of them: an include through it gets an
+    # edge to each, and stays listed.
+    choices = {name: [("var", v) for v in sorted(vals)] for name, vals in const_values.items()
+               if 1 < len(vals) <= 8 and name not in include_vars
+               and not any(re.match(r"^(?:[/\\]|[A-Za-z]:|\w+://)", v) for v in vals)}
+    for name, hits in const_paths.items():
+        paths = [h for h in hits if h is not None]
+        if len(paths) > 1 and None not in hits and CONST_PATH + name not in include_vars and name not in choices:
+            choices[name] = [("path", list(h)) for h in sorted(paths)]
+
+    def resolve_choices(info, parts):
+        """Files an include through constants with several values reaches,
+        over every combination of their values (None if none applies)."""
+        names = sorted({p for p in parts if p in choices})
+        if not names or len(names) > 3:
+            return None
+        found = set()
+        for combo in itertools.product(*(choices[n] for n in names)):
+            variables = dict(include_vars)
+            for n, (kind, v) in zip(names, combo):
+                variables[n if kind == "var" else CONST_PATH + n] = v
+            hit, why = resolve_include(info.rel, parts, info, by_rel, by_tail, include_path, variables)
+            if hit and not why:
+                found.update(hit)
+        if not found:
+            return None
+        return sorted(found), f"{', '.join(names)} has several define() values; an edge to each file they name"
 
     by_lower = {rel.lower(): rel for rel in rels}
     cache = {}
@@ -850,6 +883,8 @@ def mapper(root, warnings, args):
     for info in infos:
         for keyword, parts in info.includes:
             hit, why = resolve_include(info.rel, parts, info, by_rel, by_tail, include_path, include_vars)
+            if why:
+                hit, why = resolve_choices(info, parts) or (hit, why)
             included[info.rel].append((keyword, parts, hit, why))
     include_deps = {rel: {t for _, _, hit, _ in rows for t in hit or ()} for rel, rows in included.items()}
     closures = {}

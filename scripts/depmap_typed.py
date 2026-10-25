@@ -52,6 +52,7 @@ class FileInfo:
         self.type_chains = []       # (namespace written in, dotted chain) written where only a type can stand
         self.members = set()        # names written after "." (x.Name)
         self.member_calls = set()   # C#: (receiver variable or "", name) of each x.Name
+        self.static_receivers = set()  # C#: receivers named like a static class (File, Math)
         self.strings = []           # string literal contents (reflection lookups)
         self.dynamic = []           # (reference, reason) the mapper could not resolve statically
         self.type_members = {}      # type fqn -> {member: [(type chain, is_element)]}
@@ -714,6 +715,8 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
             receiver_types[head] = known
             receivers[head] = {t.rpartition(".")[2] for fq in known for t in closure(fq)}
         for head, name in sorted(calls):
+            if head in info.static_receivers and head not in env and not receiver_types[head]:
+                continue    # File.Exists(): the static class, not a value of that name
             for ns in sorted(visible):
                 fq = join(ns, name)
                 files = set(extensions.get(fq, ()))

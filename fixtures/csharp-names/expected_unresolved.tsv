@@ -1,2 +1,5 @@
 file	reference	reason
+cimp/A/Model.cs	(whole file)	compiled by cimp/A/A.csproj only under a Condition, MSBuild property or import that is not evaluated; its declarations are kept
+cimp/B/Model.cs	(whole file)	compiled by cimp/B/B.csproj only under a Condition, MSBuild property or import that is not evaluated; its declarations are kept
+cimp/C/Model.cs	(whole file)	not compiled by cimp/C/C.csproj; its declarations are ignored
 proj/P.csproj	<Using Include="$(NS).Z">	MSBuild property not evaluated; the names it imports may be missing

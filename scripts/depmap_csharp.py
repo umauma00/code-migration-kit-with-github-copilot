@@ -178,9 +178,11 @@ MEMBER_CALL_RE = re.compile(r"(@?[^\W\d]\w*)?\s*\.\s*@?([^\W\d]\w*)")
 def member_calls(code):
     """(receiver, name) of every name written after a dot: receiver is the
     variable before the dot (x in x.Name) or "" when the receiver is an
-    expression. A dot after a predefined type or a static-only class
-    (string.Join, Math.Min) is a static call, never an extension method
-    call, and is left out."""
+    expression. A dot after a predefined type (string.Join) is a static
+    call, never an extension method call, and is left out. A static-only
+    class name (Math.Min, File.Exists) is kept: it is a static call only
+    when no variable, parameter or member of that name is in view
+    (void M(Thing File) { File.Save(); }), which the type flow decides."""
     out = set()
     for m in MEMBER_CALL_RE.finditer(code):
         head = m.group(1)
@@ -189,7 +191,7 @@ def member_calls(code):
             k -= 1
         if head and k >= 0 and code[k] in ".)]":
             head = None         # a.Math.Min: Math is a member, not the class
-        if head and (head in PREDEFINED or head in STATIC_RECEIVERS):
+        if head and head in PREDEFINED:
             continue
         out.add(((head or "").lstrip("@"), m.group(2)))
     return out
@@ -432,6 +434,7 @@ def scan(rel, text):
         elif "." in name and (pos in base_items or type_written_at(code, pos, end, TYPE_BEFORE, KEYWORDS | QUERY_WORDS)):
             info.type_chains.append(ref)
     info.member_calls = member_calls(code)
+    info.static_receivers = {head for head, _ in info.member_calls if head in STATIC_RECEIVERS}
     info.members = {name for _, name in info.member_calls}
     info.type_members, info.type_bases, info.flow, info.type_ns = flow_c_like(
         [t for t, _, _ in toks], KEYWORDS, "csharp")

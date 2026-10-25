@@ -140,6 +140,14 @@
   the type arguments of a VB generic alias (`Imports L = List(Of X)`) count;
   a COBOL `CALL WS-PGM` gets edges to the literals `WS-PGM` is given
   (`VALUE 'SUB1'`, `MOVE 'SUB1' TO WS-PGM`), and stays listed.
+  An `<Import>` under a Condition (or a conditional ImportGroup) keeps it
+  for what the imported file adds or removes (a Release-only
+  `<Compile Remove>` dropped Model.cs outright); `File`, `Path`, `Math` and
+  the other static class names are a static call only when no variable,
+  parameter or member of that name is in view (`Thing File` lost its
+  extension edge); a PHP constant with several `define()` values, in one
+  file's if/else too, gives an include through it an edge to each value's
+  file, and the include stays listed (the last one used to win).
   PHP follows computable
   include paths and case-insensitive class/function names with namespaces
   and `use`, narrowed by composer.json autoload (PSR-4, PSR-0, classmap),

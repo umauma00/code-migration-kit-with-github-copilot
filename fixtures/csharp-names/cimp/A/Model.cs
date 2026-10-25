@@ -1,0 +1,1 @@
+namespace CiA { class Model { } }
