@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Default items are off only in Release: Part.cs may be compiled. -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(Configuration)' == 'Release'">
+    <Compile Include="Main.cs" />
+  </ItemGroup>
+</Project>

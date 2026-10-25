@@ -1,0 +1,7 @@
+# migration order: one batch per line, dependencies first
+Core/Customer.cs
+Old/Customer.cs
+Old/Unused.cs
+Web/Helper.cs
+Web/Legacy/OldPage.cs
+Web/Page.cs

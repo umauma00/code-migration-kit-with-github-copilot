@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><EnableDefaultCompileItems>false</EnableDefaultCompileItems></PropertyGroup>
+  <!-- Empty again: the SDK turns the default items back on. -->
+  <PropertyGroup><EnableDefaultCompileItems /></PropertyGroup>
+</Project>

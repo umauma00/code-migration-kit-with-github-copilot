@@ -1,0 +1,9 @@
+<project>
+  <groupId>com.acme</groupId>
+  <artifactId>parent</artifactId>
+  <modules>
+    <module>app</module>
+    <module>core</module>
+    <module>legacy</module>
+  </modules>
+</project>

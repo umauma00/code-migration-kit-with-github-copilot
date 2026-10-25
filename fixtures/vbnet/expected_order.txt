@@ -1,0 +1,14 @@
+# migration order: one batch per line, dependencies first
+Core/Billing/Stamp.vb
+App/CheckoutBase.vb
+Core/Billing/Note.vb
+Core/Billing/InvoiceLine.vb
+Core/Billing/Receipt.vb
+Core/Billing/Invoice.vb
+Core/Billing/Factory.vb
+App/Checkout.vb
+Common/Formatter.vb
+Core/Invoice.vb
+Core/Customer.vb	Core/Order.Designer.vb	Core/Order.vb
+Core/TaxModule.vb
+App/MainForm.vb

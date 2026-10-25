@@ -1,0 +1,7 @@
+# migration order: one batch per line, dependencies first
+core/src/main/java/com/acme/util/Util.java
+app/src/main/java/com/acme/app/App.java
+gradle/lib/src/main/java/com/g/tool/Tool.java
+gradle/old/src/main/java/com/g/tool/Tool.java
+gradle/svc/src/main/java/com/g/svc/Service.java
+legacy/src/main/java/com/acme/util/Util.java

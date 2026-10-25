@@ -1,0 +1,20 @@
+# migration order: one batch per line, dependencies first
+CommentUsing/Right.cs
+CommentUsing/Use.cs
+CommentUsing/Wrong.cs
+CondAlias/A.cs
+CondAlias/B.cs
+CondAlias/Main.cs
+CondApp/A.cs
+CondShared/X.cs
+RefName/Lib/M.cs
+RefName/App/U.cs
+RemovedGlobals/Wrong.cs
+RemovedGlobals/AGlobals.cs
+RemovedGlobals/Right.cs
+RemovedGlobals/Use.cs
+RemovedGlobals/ZGlobals.cs
+Utf16/Bin.cs
+Utf16/Model.cs
+Utf16/NoBom.cs
+Utf16/Use.cs

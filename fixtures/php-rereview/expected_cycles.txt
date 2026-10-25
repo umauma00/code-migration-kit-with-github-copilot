@@ -1,0 +1,4 @@
+# strongly connected components > 1 file: 3
+long/handler.php	long/main.php
+pairs/comma.php	pairs/worker.php
+short/handler.php	short/main.php

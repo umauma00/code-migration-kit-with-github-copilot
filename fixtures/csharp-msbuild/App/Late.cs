@@ -1,0 +1,1 @@
+namespace App { class LateType { } }

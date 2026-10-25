@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <Using Include="DbGone.Ns" />
+    <Using Include="DbKept.Ns" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,1 @@
+<project><groupId>app</groupId><artifactId>app</artifactId><version>1</version><dependencies><dependency><groupId>right</groupId><artifactId>core</artifactId><version>1</version></dependency></dependencies></project>

@@ -55,8 +55,16 @@ def main():
             sys.exit(1)
         subs.append((old, new))
 
+    try:
+        order = args.order.read_text(encoding="utf-8")
+    except UnicodeDecodeError as e:
+        print(f"ERROR: {args.order} is not UTF-8 (byte {e.start}). A source file name that is "
+              "not UTF-8 (a Shift_JIS name unpacked on Linux, for example) cannot go into the "
+              "manifest: rename those files to UTF-8 (the dependency mapper listed them as "
+              "warnings) and run the mapper again.", file=sys.stderr)
+        sys.exit(1)
     rows = []
-    for line in args.order.read_text(encoding="utf-8").splitlines():
+    for line in order.splitlines():
         if not line.strip() or line.lstrip().startswith("#"):
             continue
         for source in line.split("\t"):

@@ -1,0 +1,4 @@
+<Project>
+  <ItemGroup><Using Remove="DbGone.Ns" /></ItemGroup>
+  <ItemGroup Condition="'$(Configuration)' == 'Debug'"><Using Remove="DbKept.Ns" /></ItemGroup>
+</Project>

@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <Using Include="Cond3Lib.A">
+      <Alias Condition="'$(Configuration)' == 'Release'"></Alias>
+      <Alias Condition="'$(Configuration)' == 'Debug'">LA</Alias>
+    </Using>
+    <Using Include="Cond3Lib.B">
+      <Alias Condition="'$(Configuration)' == 'Debug'">LB</Alias>
+      <Alias Condition="'$(Configuration)' == 'Release'" />
+    </Using>
+    <Using Include="Cond3Lib.C">
+      <Alias Condition="'$(Configuration)' == 'Debug'">LC</Alias>
+    </Using>
+  </ItemGroup>
+</Project>

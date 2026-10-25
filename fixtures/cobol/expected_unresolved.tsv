@@ -1,0 +1,4 @@
+file	reference	reason
+src/ORDMAIN.cbl	CALL 'CBLTDLI'	called program not found under --root
+src/ORDMAIN.cbl	CALL WS-PROG	program name held in a data item (dynamic CALL); edges to the programs it is given: TAXCALC
+src/ORDMAIN.cbl	COPY MISSING	copybook not found under --root

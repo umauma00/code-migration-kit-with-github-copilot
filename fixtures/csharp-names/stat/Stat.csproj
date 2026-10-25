@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <Using Include="StatLib.Util" Static="true" />
+    <Using Include="StatLib.Other" />
+    <Using Remove="statlib.other" />
+  </ItemGroup>
+</Project>

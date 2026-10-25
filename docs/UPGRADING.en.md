@@ -8,7 +8,14 @@ Existing approvals and completion records are revoked once because the kit's fil
 
 1. New `scripts/review_benchmark.mjs` compares two reviewers with one, and the fixer with the implementer, on seeded cases. See [REVIEW-BENCHMARK.en.md](REVIEW-BENCHMARK.en.md). Run it from the kit checkout, not in a migration target.
 2. The translation loop is unchanged.
-3. 0.4.0 is reserved for the dependency-mapper change (in progress on another branch), so this release is 0.5.0.
+3. This release also includes the dependency mappers added in 0.4.0. When upgrading from 0.3.2 or earlier, also follow the 0.4.0 instructions below.
+
+## 0.4.0 (dependency mappers for C#, Java, VB.NET, PHP and COBOL)
+
+Existing approvals and completion records are revoked once because the kit's files (lib, scripts) change. Re-validate from judge. Completed outputs are kept; the re-run only reviews them again.
+
+1. Phase 01 can use bundled mappers for C#, Java, VB.NET, PHP and COBOL ([dependency mappers](DEPENDENCY-MAPPERS.en.md)). A project that uses its own tool for these languages (under `migration/tools/` or elsewhere) should compare it with the bundled mapper before switching. Switching changes the map and the dependency declaration, so phase 01's checks and approvals are redone.
+2. The new mappers also write `unresolved.tsv`. Review every row in phase 01's report.
 
 ## 0.3.2 (phase 00 no longer stops on a credential suspicion or misread guidance)
 

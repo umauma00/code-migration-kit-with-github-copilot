@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <Using Include="CondLib.Model">
+      <Alias Condition="'$(Configuration)' == 'Debug'">M</Alias>
+    </Using>
+    <Using Include="CondLib.Util">
+      <Static Condition="'$(Configuration)' == 'Debug'">true</Static>
+    </Using>
+  </ItemGroup>
+</Project>

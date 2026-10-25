@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Thing.cs is left out by its own project but compiled here, under
+       this project's global usings. -->
+  <ItemGroup><Compile Include="..\Shared2\Thing.cs" /></ItemGroup>
+</Project>

@@ -1,0 +1,3 @@
+<Project>
+  <ItemGroup><Using Include="DbRoot.Ns" /></ItemGroup>
+</Project>

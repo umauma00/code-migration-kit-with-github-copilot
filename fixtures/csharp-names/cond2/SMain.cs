@@ -1,0 +1,1 @@
+class SMain { SA a; }

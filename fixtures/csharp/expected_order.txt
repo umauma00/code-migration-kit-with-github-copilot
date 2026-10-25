@@ -1,0 +1,19 @@
+# migration order: one batch per line, dependencies first
+Core/Billing/Stamp.cs
+App/CheckoutBase.cs
+Core/Billing/Entry.cs
+Core/Billing/Note.cs
+Core/Billing/InvoiceLine.cs
+Core/Billing/Receipt.cs
+Core/Billing/Invoice.cs
+Core/Billing/Factory.cs
+Core/Billing/Ledger.cs
+App/Checkout.cs
+Core/AuditedAttribute.cs
+Core/StringExtensions.cs
+Core/Order.Totals.cs	Core/Order.cs	Core/OrderLine.cs
+Util/Formatter.cs
+Data/Legacy.cs
+Data/Repos/OrderRepository.cs
+Util/MathHelpers.cs
+App/Program.cs

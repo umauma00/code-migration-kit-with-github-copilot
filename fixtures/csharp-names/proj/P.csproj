@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <Using Include="System;Lib" />
+    <Using Include="Lib.A;Lib.B" Alias="X" />
+    <Using Include="Meta.M"><Alias>Y</Alias></Using>
+    <Using Include="$(NS).Z" Alias="Q" />
+  </ItemGroup>
+</Project>
