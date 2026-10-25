@@ -1,7 +1,9 @@
 # migration order: one batch per line, dependencies first
 com/x/U.java
+shop/Ann.java
 shop/Customer.java
 shop/EntityType.java
 shop/Holder.java
 shop/Kind2.java
+shop/Kind3.java
 shop/Order.java

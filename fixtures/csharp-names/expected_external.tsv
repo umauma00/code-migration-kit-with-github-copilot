@@ -1,6 +1,5 @@
 namespace	files	first_file
-Acme.Billing	1	inline/U.cs
-Acme.Marks	1	inline/U.cs
-Acme.Orders	1	inline/U.cs
+Acme	2	inline/U.cs
 Foo.Bar	1	inline/U.cs
+Net.Foo	1	inline/U2.cs
 Zed	1	inline/U.cs

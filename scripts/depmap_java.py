@@ -146,7 +146,7 @@ def scan(rel, text):
                 if type_depths:     # nested (Outer.DescriptorImpl): not a copy of a same-named type
                     info.nested[join(package, name)] = join(package, ".".join(n for _, n in type_depths) + "." + name)
                 pending = name
-    enum_members = enum_member_offsets([(m.group(0), m.start(), m.end()) for m in TOKEN_RE.finditer(body)])
+    enum_members = enum_member_offsets([(m.group(0), m.start(), m.end()) for m in TOKEN_RE.finditer(body)], java=True)
     for pos, name in chains_at(body, KEYWORDS):
         end = CHAIN_RE.match(body, pos).end()
         if pos in enum_members or declared_name_at(body, pos, end, name):

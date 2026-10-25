@@ -1,1 +1,2 @@
 file	reference	reason
+proj/P.vbproj	<Import Include="$(NS).Acme">	MSBuild property not evaluated; the names it imports may be missing

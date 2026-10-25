@@ -274,6 +274,7 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
 
         def __init__(self, ns, usings, aliases, direct, more=None):
             self.ns = ns
+            self.usings = set(usings)
             self.imported = sorted(u for u in usings if u in namespaces)
             self.aliases = aliases
             self.more = more or {}  # alias -> further targets
@@ -798,7 +799,8 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
                 if len(ns) < (1 if root else 2) or (not root and any(
                         p and join(p, segs[0]) in namespaces for p in prefixes(context_ns(ctx)))):
                     continue        # relative to a namespace of the repository
-                if not root and segs[0].lower() in PLATFORM_CHILDREN:
+                if not root and segs[0].lower() in PLATFORM_CHILDREN and any(
+                        u.lower() == "system" for level in scope_of(info, ctx).levels for u in level.usings):
                     continue        # Collections.Generic.List after Imports System (VB)
                 wanted.add(".".join(ns))
             else:
@@ -1083,13 +1085,14 @@ def type_written_at(code, start, end, before, declared=None):
     return bool(m) and m.group(0) not in declared
 
 
-def enum_member_offsets(toks):
+def enum_member_offsets(toks, java=False):
     """Start offsets of the member names in enum bodies (enum Kind { Customer,
     Order = 2 }): declarations, not references to the types Customer and
     Order. toks: (text, start, end). Java constants end at the first ";" of
     the body; a name after = or inside ( ) is an expression, except a bare
-    name of a sibling member (Both = Order | Customer).
-    A constant after an annotation (@Ann(x) A) is a member too."""
+    name of a sibling member (Both = Order | Customer; Java: also in a
+    constant's arguments, Bar(Gadget)). A Java annotation on a constant
+    (@Ann A, @Ann(x) A) is a reference, and the constant after it a member."""
     out = set()
     i, n = 0, len(toks)
     while i < n:
@@ -1103,22 +1106,28 @@ def enum_member_offsets(toks):
             i = j
             continue
         depth, k = 0, j
-        names, values = set(), []
+        names, values, openers = set(), [], []
         while k < n:
             t = toks[k][0]
             if t in {"{", "(", "["}:
                 depth += 1
+                openers.append(t)
             elif t in {"}", ")", "]"}:
                 depth -= 1
+                openers.pop()
                 if depth == 0:
                     break
             elif depth == 1 and t == ";":
                 break           # Java: the constants end, members follow
-            elif depth == 1 and (t[0].isalpha() or t[0] in "_@"):
-                if toks[k - 1][0] in {"{", ",", "]", ")"}:
+            elif depth == 1 and java and t[0] == "@" and k + 1 < n and (
+                    toks[k + 1][0] == "(" or toks[k + 1][0][0].isalpha() or toks[k + 1][0][0] in "_@"):
+                pass            # @Ann before a constant: a reference
+            elif (depth == 1 or java and depth == 2 and openers[-1] == "(") and (t[0].isalpha() or t[0] in "_@"):
+                prev = toks[k - 1][0]
+                if depth == 1 and (prev in {"{", ",", "]", ")"} or (java and prev[0] == "@" and len(prev) > 1)):
                     out.add(toks[k][1])
                     names.add(t.lstrip("@"))
-                elif toks[k - 1][0] != "." and (k + 1 >= n or toks[k + 1][0] != "."):
+                elif prev != "." and (k + 1 >= n or toks[k + 1][0] != "."):
                     values.append(k)
             k += 1
         out.update(toks[v][1] for v in values if toks[v][0].lstrip("@") in names)

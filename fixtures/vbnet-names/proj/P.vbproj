@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><RootNamespace>Proj</RootNamespace></PropertyGroup>
+  <ItemGroup><Import Include="$(NS).Acme" /></ItemGroup>
+</Project>

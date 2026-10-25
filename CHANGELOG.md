@@ -117,10 +117,12 @@
   are not followed; a VB.NET type nested in a class is its own type.
   Enum members and the names Java and VB.NET fields, properties and
   methods declare, VB.NET parameters and locals, and enum members (also
-  siblings named in a value, `Both = Order | Customer`) are not type
-  references (`enum EntityType { Customer, Order }` made a false cycle). `<Using Include="A;B">` is an item list,
+  siblings named in a value, `Both = Order | Customer`, or in Java
+  constant arguments) are not type references (`enum EntityType {
+  Customer, Order }` made a false cycle); a Java annotation on a constant
+  still is. `<Using Include="A;B">` is an item list,
   `<Alias>`/`<Static>` may be child elements, and a `<Using>` holding a
-  property (`$(NS).A`) is warned about and listed as unresolved; `Imports Global.X` and an Imports
+  property (`$(NS).A`) is warned about and listed as unresolved (so is a VB `<Import>` with one); `Imports Global.X` and an Imports
   continued over lines are read; a PHP include inside an expression
   (`if (!include_once 'x.php') {`) ends at its own parenthesis, and
   `namespace\f()` is a name, not a declaration; COBOL reads a `*>` inside a

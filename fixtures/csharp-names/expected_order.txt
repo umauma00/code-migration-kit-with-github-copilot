@@ -1,5 +1,6 @@
 # migration order: one batch per line, dependencies first
 inline/U.cs
+inline/U2.cs
 proj/lib/L.cs
 proj/V.cs
 proj/W.cs

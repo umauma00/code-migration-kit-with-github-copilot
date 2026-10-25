@@ -328,6 +328,14 @@ def scan(rel, text, root_ns=""):
         if m:
             kind, name = m.group(1), m.group(2).replace("[", "").replace("]", "")
             enum_members = set()
+            if kind == "enum":
+                # All member names first: a value may name a later sibling.
+                for later in lines[idx + 1:]:
+                    if END_RE.match(later.lower()):
+                        break
+                    e = re.match(r"^\s*(?:<[^>]*>\s*)?([\w\[\]]+)", later)
+                    if e:
+                        enum_members.add(e.group(1).replace("[", "").replace("]", "").lower())
             if kind == "namespace":
                 stack.append((kind, name))
                 info.namespaces.add(ns())
@@ -473,17 +481,30 @@ def mapper(root, warnings, args):
                 merge_info(info, other)
         infos.append(info)
     # Project-level <Import Include> applies to the files of its projects only.
+    computed = set()        # (project dir, Include holding an MSBuild property)
     for info in infos:
         for d in projects_of[info.rel]:
             for name in attr_values(VBPROJ_IMPORT_RE, texts.get(d, "")):
-                if name.strip():
+                if "$(" in name or "@(" in name or "%(" in name:
+                    computed.add((d, name.strip()))
+                elif name.strip():
                     info.usings.add(name.strip().lower())
                     spell(name.strip())
+    computed_rows = set()
+    project_file = {}
+    for proj in find_files(root, {".vbproj"}, SKIP_DIRS):
+        rel = proj.relative_to(root).as_posix()
+        project_file.setdefault(rel.rpartition("/")[0], rel)
+    for d, name in sorted(computed):
+        warnings.append(f"{d or '.'}: <Import Include=\"{name}\"> uses an MSBuild property that is not evaluated; "
+                        "it is not applied, so names it would import may be missing")
+        computed_rows.add((project_file.get(d, d or "."), f'<Import Include="{name}">',
+                           "MSBuild property not evaluated; the names it imports may be missing"))
     skipped = drop_not_compiled(infos, not_compiled)
     edges, unresolved = resolve(infos, fold=True, visible_files=visible_files, standard=DOTNET_STANDARD)
     # Names are matched case-insensitively; external.tsv shows them as written.
     unresolved = {(a, spelled.get(r, r) if why.startswith(EXTERNAL) else r, why) for a, r, why in unresolved}
-    return rels, edges, unresolved | skipped | deep
+    return rels, edges, unresolved | skipped | deep | computed_rows
 
 
 if __name__ == "__main__":
