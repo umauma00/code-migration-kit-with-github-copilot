@@ -5,4 +5,5 @@ proj/V.cs
 proj/W.cs
 shop/Customer.cs
 shop/EntityType.cs
+shop/Flags.cs
 shop/Order.cs

@@ -85,6 +85,10 @@ IMPORT_CLAUSE_RE = re.compile(r"^(?:([\w\[\]]+)\s*=\s*)?([\w.\[\]]+)$")
 ROOT_NS_RE = re.compile(r"<RootNamespace>\s*([^<]*?)\s*</RootNamespace>", re.IGNORECASE)
 VBPROJ_IMPORT_RE = re.compile(r"<Import\s+Include\s*=\s*" + QUOTED, re.IGNORECASE)
 REFLECTION_RE = re.compile(r"\b(createobject|activator\s*\.\s*createinstance|type\s*\.\s*gettype|assembly\s*\.\s*load\w*)\s*\(\s*((?:[^()]|\([^()]*\))+?)?\s*\)", re.IGNORECASE)
+# A bare name in an enum member's value: maybe a sibling member.
+SIBLING_RE = re.compile(r"(?<![\w.])\[?[A-Za-z_]\w*\]?(?![\w\[\]]|\s*\.)")
+# The name a declaration introduces: x As T, x() As T, Dim x, Const x.
+DECLARED_RE = re.compile(r"(?:^|(?<=[\s(,]))\[?([a-z_]\w*)\]?(?:\s*\(\s*\))?\??\s+as\b|\b(?:dim|const|static)\s+\[?([a-z_]\w*)")
 # Words before a name that make it a type (As Acme.Billing.Invoice).
 TYPE_BEFORE = {"as", "new", "inherits", "implements", "of", "gettype("}
 KEYWORDS = set("""addhandler addressof alias and andalso as boolean byref byte byval call case catch cbool
@@ -237,6 +241,7 @@ def scan(rel, text, root_ns=""):
     stack = []      # (kind, name) of open Namespace/Class/Module... blocks
     body = []
     member = None   # "sub"/"function"/"property"/"operator" body being read
+    enum_members = set()    # member names of the enum being read
     lines = [line for line in lines if line.strip()]
 
     def ns():
@@ -322,6 +327,7 @@ def scan(rel, text, root_ns=""):
         m = BLOCK_RE.match(low)
         if m:
             kind, name = m.group(1), m.group(2).replace("[", "").replace("]", "")
+            enum_members = set()
             if kind == "namespace":
                 stack.append((kind, name))
                 info.namespaces.add(ns())
@@ -341,9 +347,13 @@ def scan(rel, text, root_ns=""):
             continue
         if stack and stack[-1][0] == "enum":
             # An enum member (Customer, Order = 2) is declared, not a type reference.
+            # So is a sibling written bare in a value (Both = Order Or Customer).
             m = re.match(r"^(\s*(?:<[^>]*>\s*)?)([\w\[\]]+)", line)
             if m:
-                line = line[:m.start(2)] + " " * (m.end(2) - m.start(2)) + line[m.end(2):]
+                enum_members.add(m.group(2).replace("[", "").replace("]", "").lower())
+                rest = SIBLING_RE.sub(lambda x: " " * len(x.group(0)) if x.group(0).replace("[", "").replace("]", "").lower()
+                                      in enum_members else x.group(0), line[m.end(2):])
+                line = line[:m.start(2)] + " " * (m.end(2) - m.start(2)) + rest
             body.append((ns(), line))
             continue
         in_type = stack and stack[-1][0] in {"class", "module", "structure", "interface"}
@@ -391,7 +401,12 @@ def scan(rel, text, root_ns=""):
     # Each name is resolved from the namespace block it is written in.
     for ctx, line in body:
         low = line.lower()
+        # Names a parameter, local or loop variable declares (o As Order,
+        # Dim order = 1, For Each customer As String) are not types.
+        declared = {m.start(1) if m.group(1) else m.start(2) for m in DECLARED_RE.finditer(low)}
         for pos, name in chains_at(low, KEYWORDS, fold=True):
+            if pos in declared and "." not in name:
+                continue
             info.names.append((ctx, name))
             if "." in name and type_written_at(low, pos, CHAIN_RE.match(low, pos).end(), TYPE_BEFORE):
                 info.type_chains.append((ctx, name))

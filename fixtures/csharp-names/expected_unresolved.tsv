@@ -1,1 +1,2 @@
 file	reference	reason
+proj/P.csproj	<Using Include="$(NS).Z">	MSBuild property not evaluated; the names it imports may be missing

@@ -605,11 +605,18 @@ def mapper(root, warnings, args):
             static.setdefault(d, set()).update(global_static)
             for name, target in global_aliases.items():
                 aliases.setdefault(d, {}).setdefault(name, set()).add(target)
+    computed_rows = set()
+    project_file = {}
+    for proj in find_files(root, {".csproj"}, SKIP_DIRS):
+        rel = proj.relative_to(root).as_posix()
+        project_file.setdefault(rel.rpartition("/")[0], rel)
     for d, text in sorted(texts.items()):
         names, named, statics, computed = csproj_usings(text)
         for name in computed:
             warnings.append(f"{d or '.'}: <Using Include=\"{name}\"> uses an MSBuild property that is not evaluated; "
                             "it is not applied, so names it would import may be missing")
+            computed_rows.add((project_file.get(d, d or "."), f'<Using Include="{name}">',
+                               "MSBuild property not evaluated; the names it imports may be missing"))
         usings.setdefault(d, set()).update(names)
         static.setdefault(d, set()).update(statics)
         for name, targets in named.items():
@@ -630,7 +637,7 @@ def mapper(root, warnings, args):
     skipped = drop_not_compiled(infos, not_compiled)
     edges, unresolved = resolve(infos, attribute_suffix="Attribute", visible_files=visible_files,
                                  standard=DOTNET_STANDARD)
-    return rels, edges, unresolved | skipped | deep
+    return rels, edges, unresolved | skipped | deep | computed_rows
 
 
 if __name__ == "__main__":

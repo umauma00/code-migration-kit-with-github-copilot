@@ -85,6 +85,11 @@ def context_ns(ctx):
 DOTNET_STANDARD = ("System", "Microsoft", "Windows", "Mono", "Interop")
 JAVA_STANDARD = ("java", "javax", "jakarta", "jdk", "sun", "com.sun", "org.w3c", "org.xml",
                  "org.ietf", "org.omg", "netscape")
+# Namespaces directly under System that VB code may write relative to
+# Imports System (Collections.Generic.List): never taken for a library.
+PLATFORM_CHILDREN = {n.lower() for n in """Buffers Collections ComponentModel Configuration Data
+Diagnostics Drawing Dynamic Globalization IO Linq Management Media Net Numerics Reflection Resources
+Runtime Security ServiceModel ServiceProcess Text Threading Timers Transactions Web Windows Xml""".split()}
 NESTED = "\x00"          # namespace.Name + NESTED + file: a nested type, as its own file sees it
 GLOBAL = "global::"     # a name qualified from the root namespace (C# global::, VB Global.)
 
@@ -793,6 +798,8 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
                 if len(ns) < (1 if root else 2) or (not root and any(
                         p and join(p, segs[0]) in namespaces for p in prefixes(context_ns(ctx)))):
                     continue        # relative to a namespace of the repository
+                if not root and segs[0].lower() in PLATFORM_CHILDREN:
+                    continue        # Collections.Generic.List after Imports System (VB)
                 wanted.add(".".join(ns))
             else:
                 ns = package_of(".".join(segs))
@@ -1080,7 +1087,9 @@ def enum_member_offsets(toks):
     """Start offsets of the member names in enum bodies (enum Kind { Customer,
     Order = 2 }): declarations, not references to the types Customer and
     Order. toks: (text, start, end). Java constants end at the first ";" of
-    the body; a name after = or inside ( ) is an expression."""
+    the body; a name after = or inside ( ) is an expression, except a bare
+    name of a sibling member (Both = Order | Customer).
+    A constant after an annotation (@Ann(x) A) is a member too."""
     out = set()
     i, n = 0, len(toks)
     while i < n:
@@ -1094,6 +1103,7 @@ def enum_member_offsets(toks):
             i = j
             continue
         depth, k = 0, j
+        names, values = set(), []
         while k < n:
             t = toks[k][0]
             if t in {"{", "(", "["}:
@@ -1104,9 +1114,14 @@ def enum_member_offsets(toks):
                     break
             elif depth == 1 and t == ";":
                 break           # Java: the constants end, members follow
-            elif depth == 1 and toks[k - 1][0] in {"{", ",", "]"} and (t[0].isalpha() or t[0] in "_@"):
-                out.add(toks[k][1])
+            elif depth == 1 and (t[0].isalpha() or t[0] in "_@"):
+                if toks[k - 1][0] in {"{", ",", "]", ")"}:
+                    out.add(toks[k][1])
+                    names.add(t.lstrip("@"))
+                elif toks[k - 1][0] != "." and (k + 1 >= n or toks[k + 1][0] != "."):
+                    values.append(k)
             k += 1
+        out.update(toks[v][1] for v in values if toks[v][0].lstrip("@") in names)
         i = k + 1
     return out
 

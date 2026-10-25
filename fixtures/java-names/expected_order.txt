@@ -3,4 +3,5 @@ com/x/U.java
 shop/Customer.java
 shop/EntityType.java
 shop/Holder.java
+shop/Kind2.java
 shop/Order.java
