@@ -1085,6 +1085,43 @@ def type_written_at(code, start, end, before, declared=None):
     return bool(m) and m.group(0) not in declared
 
 
+def list_item_starts(code, heads, stop_words=()):
+    """Offsets of the items of the type lists that follow each match of the
+    regex heads (C# "class X :", Java extends/implements/throws): the
+    list's first item and each item after a comma at its own level. A list
+    ends at { ; = or one of stop_words, or at a > or ) it did not open
+    (<T extends A, U>)."""
+    out = set()
+    for m in heads.finditer(code):
+        k, depth, item = m.end(), 0, True
+        while k < len(code):
+            c = code[k]
+            if c.isspace():
+                k += 1
+                continue
+            if item and depth == 0:
+                out.add(k)
+                item = False
+            if c in "<([":
+                depth += 1
+            elif c in ">)]":
+                if depth == 0:
+                    break
+                depth -= 1
+            elif c in "{;=" and depth == 0:
+                break
+            elif c == "," and depth == 0:
+                item = True
+            elif c.isalpha() and (k == 0 or not (code[k - 1].isalnum() or code[k - 1] == "_")):
+                w = re.match(r"\w+", code[k:]).group(0)
+                if depth == 0 and w in stop_words:
+                    break
+                k += len(w)
+                continue
+            k += 1
+    return out
+
+
 def enum_member_offsets(toks, java=False):
     """Start offsets of the member names in enum bodies (enum Kind { Customer,
     Order = 2 }): declarations, not references to the types Customer and
@@ -1107,8 +1144,16 @@ def enum_member_offsets(toks, java=False):
             continue
         depth, k = 0, j
         names, values, openers = set(), [], []
+        after_annotation = -1   # index of the token after @a.b.Ann (without arguments)
         while k < n:
             t = toks[k][0]
+            if depth == 1 and java and t[0] == "@" and len(t) > 1 and t != "@interface":
+                # @Ann, @a.b.Ann, @Ann(x) before a constant: a reference.
+                k += 1
+                while k + 1 < n and toks[k][0] == "." and (toks[k + 1][0][0].isalpha() or toks[k + 1][0][0] == "_"):
+                    k += 2
+                after_annotation = k
+                continue
             if t in {"{", "(", "["}:
                 depth += 1
                 openers.append(t)
@@ -1119,12 +1164,9 @@ def enum_member_offsets(toks, java=False):
                     break
             elif depth == 1 and t == ";":
                 break           # Java: the constants end, members follow
-            elif depth == 1 and java and t[0] == "@" and k + 1 < n and (
-                    toks[k + 1][0] == "(" or toks[k + 1][0][0].isalpha() or toks[k + 1][0][0] in "_@"):
-                pass            # @Ann before a constant: a reference
             elif (depth == 1 or java and depth == 2 and openers[-1] == "(") and (t[0].isalpha() or t[0] in "_@"):
                 prev = toks[k - 1][0]
-                if depth == 1 and (prev in {"{", ",", "]", ")"} or (java and prev[0] == "@" and len(prev) > 1)):
+                if depth == 1 and (prev in {"{", ",", "]", ")"} or k == after_annotation):
                     out.add(toks[k][1])
                     names.add(t.lstrip("@"))
                 elif prev != "." and (k + 1 >= n or toks[k + 1][0] != "."):

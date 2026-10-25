@@ -64,8 +64,9 @@
   new `external.tsv`, one row per namespace with child namespaces folded
   into a listed parent, so an
   in-house library outside `--root` is not silently missed. A full name
-  written where a type stands (`Acme.Billing.Invoice inv;`, `new`, a base
-  type, an attribute or annotation) counts as an import; Java rows are
+  written where a type stands (`Acme.Billing.Invoice inv;`, `new`, every
+  type of a base list, `where` constraint or Java extends/implements/throws
+  list, an attribute or annotation) counts as an import; Java rows are
   always packages (`import static a.b.Util.*` gives `a.b`); PHP rows come
   from the names code writes (`use Acme\Billing;` with `Billing\Invoice`
   gives `Acme\Billing`), match case-insensitively and leave out PHP's own
@@ -120,12 +121,14 @@
   siblings named in a value, `Both = Order | Customer`, or in Java
   constant arguments) are not type references (`enum EntityType {
   Customer, Order }` made a false cycle); a Java annotation on a constant
-  still is. `<Using Include="A;B">` is an item list,
-  `<Alias>`/`<Static>` may be child elements, and a `<Using>` holding a
+  (`@a.b.Ann A`) still is. `<Using Include="A;B">` is an item list,
+  `<Alias>`/`<Static>` may be child elements (one under a Condition is applied, with a warning), and a `<Using>` holding a
   property (`$(NS).A`) is warned about and listed as unresolved (so is a VB `<Import>` with one); `Imports Global.X` and an Imports
   continued over lines are read; a PHP include inside an expression
   (`if (!include_once 'x.php') {`) ends at its own parenthesis, and
-  `namespace\f()` is a name, not a declaration; COBOL reads a `*>` inside a
+  `namespace\f()` is the current namespace's function, never an import or
+  a global one, an imported function never falls back to a global one,
+  and an include expression also ends at `or`; COBOL reads a `*>` inside a
   literal as text, tab-indented fixed format, and CICS HANDLE ABEND,
   RELEASE and ENABLE PROGRAM.
   PHP follows computable

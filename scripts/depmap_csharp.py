@@ -69,7 +69,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # -I drops the script dir
 from depmap_common import find_files, read_source, run  # noqa: E402
 from depmap_projects import ATTRS, QUOTED, dotnet_projects, drop_not_compiled  # noqa: E402
-from depmap_typed import BLOCK, CHAIN_RE, DOTNET_STANDARD, GLOBAL, Directives, FileInfo, PREDEFINED, TOKEN_RE, chains_at, dotted, enum_member_offsets, flow_c_like, join, resolve, scan_or_none, strip_c_like, type_written_at  # noqa: E402
+from depmap_typed import BLOCK, CHAIN_RE, DOTNET_STANDARD, GLOBAL, Directives, FileInfo, PREDEFINED, TOKEN_RE, chains_at, dotted, enum_member_offsets, flow_c_like, join, resolve, scan_or_none, list_item_starts, strip_c_like, type_written_at  # noqa: E402
 
 EXTS = {".cs"}
 # Build output beside a project, NuGet's packages/ beside a solution (or at --root).
@@ -86,7 +86,7 @@ REFLECTION_RE = re.compile(r"\b(Type\s*\.\s*GetType|Activator\s*\.\s*CreateInsta
 CSPROJ_USING_RE = re.compile(r"<Using\b" + ATTRS + r"(/?)>", re.IGNORECASE)
 CSPROJ_USING_END_RE = re.compile(r"</Using\s*>", re.IGNORECASE)
 # Metadata written as child elements: <Using Include="A"><Alias>X</Alias></Using>.
-CSPROJ_META_RE = re.compile(r"<(Alias|Static)\s*>\s*([^<]*?)\s*</\1\s*>", re.IGNORECASE)
+CSPROJ_META_RE = re.compile(r"<(Alias|Static)\b" + ATTRS + r">\s*([^<]*?)\s*</\1\s*>", re.IGNORECASE)
 CSPROJ_ATTR_RE = re.compile(r"\b(Include|Alias|Static)\s*=\s*" + QUOTED, re.IGNORECASE)
 
 
@@ -104,19 +104,10 @@ QUERY_WORDS = {"where", "into", "equals", "by", "ascending", "descending", "sele
                "on", "join", "let", "group", "from", "when"}
 
 
-def base_list_at(code, start, end):
-    """Whether the chain at code[start:end] is the first base type of a
-    type declaration (class X : Acme.Billing.Base {): after a ":" and before
-    { or where, so that c ? a.b : x.y and named arguments are not taken."""
-    k = start - 1
-    while k >= 0 and code[k].isspace():
-        k -= 1
-    if k < 0 or code[k] != ":" or code[k - 1:k] == ":":
-        return False
-    k = end
-    while k < len(code) and code[k].isspace():
-        k += 1
-    return code[k:k + 1] == "{" or re.match(r"where\b", code[k:k + 6]) is not None
+# A type declaration's base list starts after its ":" (class X<T>(int a) : Base, IFoo).
+BASE_LIST_RE = re.compile(r"\b(?:class|struct|interface|record(?:\s+(?:class|struct))?)\s+@?\w+\s*"
+                          r"(?:<[^{};()]*>)?\s*(?:\((?:[^()]|\([^()]*\))*\))?\s*:(?!:)"
+                          r"|\bwhere\s+@?\w+\s*:(?!:)")     # and a constraint list: where T : Acme.Base, new()
 
 
 def declared_name_at(code, start, end, name):
@@ -428,6 +419,7 @@ def scan(rel, text):
     info.names, info.attribute_names = [], []
     brackets = Brackets(code)
     enum_members = enum_member_offsets(toks)
+    base_items = list_item_starts(code, BASE_LIST_RE, {"where"})
     for pos, name in chains_at(code, KEYWORDS):
         end = CHAIN_RE.match(code, pos).end()
         if pos in enum_members or declared_name_at(code, pos, end, name):
@@ -437,8 +429,7 @@ def scan(rel, text):
         if attribute_name_at(code, pos, end, brackets):
             info.attribute_names.append(ref)
             info.type_chains.append(ref)
-        elif "." in name and (type_written_at(code, pos, end, TYPE_BEFORE, KEYWORDS | QUERY_WORDS)
-                              or base_list_at(code, pos, end)):
+        elif "." in name and (pos in base_items or type_written_at(code, pos, end, TYPE_BEFORE, KEYWORDS | QUERY_WORDS)):
             info.type_chains.append(ref)
     info.member_calls = member_calls(code)
     info.members = {name for _, name in info.member_calls}
@@ -551,19 +542,25 @@ EXPRESSION_WORDS = {"is", "as", "switch", "with", "and", "or", "not", "when"}
 
 
 def csproj_usings(text):
-    """(usings, aliases, static usings, computed) of the <Using> items of a
+    """(usings, aliases, static usings, computed, conditional) of the <Using> items of a
     .csproj. Include is an item list (A;B). Alias and Static may be
     attributes or child elements. aliases maps a name to every target its
     items give: Conditions are not evaluated, so Debug's and Release's alias
     both stay. computed: names that hold an MSBuild property ($(NS).A),
-    which is not evaluated; they are left out and warned about."""
-    usings, aliases, static, computed = [], {}, [], []
+    which is not evaluated; they are left out, warned about and listed.
+    conditional: Alias/Static child elements under a Condition, taken as
+    if it held and warned about."""
+    usings, aliases, static, computed, conditional = [], {}, [], [], []
     for m in CSPROJ_USING_RE.finditer(text):
         attrs = {k.lower(): a or b for k, a, b in CSPROJ_ATTR_RE.findall(m.group(1))}
         if not m.group(2):
             end = CSPROJ_USING_END_RE.search(text, m.end())
-            for key, value in CSPROJ_META_RE.findall(text[m.end():end.start() if end else m.end()]):
+            for key, meta_attrs, value in CSPROJ_META_RE.findall(text[m.end():end.start() if end else m.end()]):
+                # A Condition on the metadata is not evaluated: the alias
+                # (or static) is taken, as an item under a Condition is.
                 attrs.setdefault(key.lower(), value)
+                if re.search(r"\bCondition\s*=", meta_attrs, re.IGNORECASE):
+                    conditional.append(f"{key} {value} of {attrs.get('include', '').strip()}")
         alias = attrs.get("alias", "").strip()
         for name in (n.strip() for n in attrs.get("include", "").split(";")):
             if not name:
@@ -576,7 +573,7 @@ def csproj_usings(text):
                 static.append(name)
             else:
                 usings.append(name)
-    return usings, aliases, static, computed
+    return usings, aliases, static, computed, conditional
 
 
 def mapper(root, warnings, args):
@@ -611,7 +608,10 @@ def mapper(root, warnings, args):
         rel = proj.relative_to(root).as_posix()
         project_file.setdefault(rel.rpartition("/")[0], rel)
     for d, text in sorted(texts.items()):
-        names, named, statics, computed = csproj_usings(text)
+        names, named, statics, computed, conditional = csproj_usings(text)
+        for what in conditional:
+            warnings.append(f"{d or '.'}: <Using> metadata {what} is under a Condition that is not evaluated; "
+                            "it is applied as if the Condition held")
         for name in computed:
             warnings.append(f"{d or '.'}: <Using Include=\"{name}\"> uses an MSBuild property that is not evaluated; "
                             "it is not applied, so names it would import may be missing")

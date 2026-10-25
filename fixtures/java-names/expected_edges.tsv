@@ -1,3 +1,10 @@
 from	to
+annot/K.java	annot/Ann.java
+annot/K.java	annot/Order.java
+annot/K.java	annot/mark/Mark.java
+annot/K1.java	annot/mark/Mark1.java
+annot/Lists.java	annot/Order.java
+annot/Lists.java	annot/mark/Mark.java
+annot/User.java	annot/K.java
 shop/Kind3.java	shop/Ann.java
 shop/Order.java	shop/EntityType.java

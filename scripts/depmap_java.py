@@ -53,7 +53,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # -I drops the script dir
 from depmap_common import find_files, read_source, run  # noqa: E402
 from depmap_projects import java_modules  # noqa: E402
-from depmap_typed import CHAIN_RE, JAVA_STANDARD, FileInfo, TOKEN_RE, chains_at, enum_member_offsets, flow_c_like, join, resolve, scan_or_none, strip_c_like, type_written_at  # noqa: E402
+from depmap_typed import CHAIN_RE, JAVA_STANDARD, FileInfo, TOKEN_RE, chains_at, enum_member_offsets, flow_c_like, join, resolve, scan_or_none, list_item_starts, strip_c_like, type_written_at  # noqa: E402
 
 EXTS = {".java"}
 SKIP_DIRS = {"target", "build", "out"}
@@ -71,6 +71,8 @@ VALUE_WORDS = {"return", "new", "throw", "case", "else", "instanceof", "yield", 
                "implements", "throws", "permits", "import", "package", "default"}
 # Words and marks before a name that make it a type (new a.b.C(), @a.b.Ann).
 TYPE_BEFORE = {"new", "extends", "implements", "throws", "instanceof", "@"}
+# Lists of types: extends A, B / implements A, B / throws A, B / permits A, B.
+TYPE_LIST_RE = re.compile(r"\b(?:extends|implements|throws|permits)\b")
 PRIMITIVES = {"boolean", "byte", "char", "short", "int", "long", "float", "double", "void", "var"}
 
 
@@ -147,12 +149,13 @@ def scan(rel, text):
                     info.nested[join(package, name)] = join(package, ".".join(n for _, n in type_depths) + "." + name)
                 pending = name
     enum_members = enum_member_offsets([(m.group(0), m.start(), m.end()) for m in TOKEN_RE.finditer(body)], java=True)
+    list_items = list_item_starts(body, TYPE_LIST_RE, {"implements", "extends", "throws", "permits"})
     for pos, name in chains_at(body, KEYWORDS):
         end = CHAIN_RE.match(body, pos).end()
         if pos in enum_members or declared_name_at(body, pos, end, name):
             continue
         info.names.append((package, name))
-        if "." in name and type_written_at(body, pos, end, TYPE_BEFORE, KEYWORDS):
+        if "." in name and (pos in list_items or type_written_at(body, pos, end, TYPE_BEFORE, KEYWORDS)):
             info.type_chains.append((package, name))
     info.type_members, info.type_bases, info.flow, info.type_ns = flow_c_like(toks, KEYWORDS, "java", package)
     for m in REFLECTION_RE.finditer(body):

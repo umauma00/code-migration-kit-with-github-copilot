@@ -1,4 +1,11 @@
 # migration order: one batch per line, dependencies first
+bases/Repo.cs
+bases/Local.cs
+bases/M.cs
+cond/Boot.cs
+cond/Model.cs
+cond/Util.cs
+cond/CMain.cs
 inline/U.cs
 inline/U2.cs
 proj/lib/L.cs

@@ -16,3 +16,10 @@ inc-expr/main.php	inc-expr/inc/t3.php
 inc-expr/main.php	inc-expr/inc/t4.php
 inc-expr/main.php	inc-expr/inc/t5.php
 inc-expr/main.php	inc-expr/inc/t6.php
+incor/main.php	incor/fallback.php
+incor/main.php	incor/fallback2.php
+incor/main.php	incor/opt2.php
+incor/main.php	incor/optional.php
+incor/main.php	incor/req.php
+nsrel/main.php	nsrel/app.php
+nsrel/main.php	nsrel/other.php

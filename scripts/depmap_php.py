@@ -420,7 +420,8 @@ def scan(rel, text):
         elif low in {"include", "include_once", "require", "require_once"}:
             # The path expression ends at the ; or at the bracket, comma or
             # brace that closes what holds it: if (!include_once('a.php')) {
-            # f(); } leaves f() to be read as code.
+            # f(); } leaves f() to be read as code, and so does the right side
+            # of include 'a.php' or fallback().
             j, parts, level = i + 1, [], 0
             while j < n:
                 tok = at(j)
@@ -431,7 +432,7 @@ def scan(rel, text):
                         break
                     level -= 1
                 elif tok == ";" or (level == 0 and (tok in {",", "{", "}", "=", "!", "<", ">", "?", ":", "&", "|"}
-                                                    or tok.lower() in {"and", "xor"})):
+                                                    or tok.lower() in {"and", "or", "xor"})):
                     break
                 parts.append(tok)
                 j += 1
@@ -905,11 +906,15 @@ def mapper(root, warnings, args):
             head, _, rest = name.partition("\\")
             uses = uses or {"class": {}, "function": {}, "const": {}}
             imported = head.lower() in uses["class"]
-            if head.lower() == "namespace" and rest:    # namespace\f(): relative to the current namespace
-                name, head, imported = rest, rest.partition("\\")[0], False
-                rest = rest.partition("\\")[2]
-                full = f"{ns}\\{name}".lstrip("\\")
-            elif imported:
+            if head.lower() == "namespace" and rest:
+                # namespace\f(): the current namespace's f, never an import
+                # or the global fallback.
+                full = f"{ns}\\{rest}".lstrip("\\")
+                found = [classes(full.lower()), functions.get(full.lower(), ()), constants.get(full, ())]
+                for hits in found:
+                    add(hits)
+                continue
+            if imported:
                 used.add(uses["class"][head.lower()])
                 full = uses["class"][head.lower()] + ("\\" + rest if rest else "")
             else:
@@ -918,8 +923,11 @@ def mapper(root, warnings, args):
             if not rest:
                 fn = uses["function"].get(name.lower())
                 cn = uses["const"].get(name)
-                found += [functions.get((fn or full).lower(), ()) or functions.get(name.lower(), ()),
-                          constants.get(cn or full, ()) or constants.get(name, ())]
+                # An imported function or constant is that one only; an
+                # unqualified name falls back to the global one.
+                found += [functions.get(fn.lower(), ()) if fn else
+                          functions.get(full.lower(), ()) or functions.get(name.lower(), ()),
+                          constants.get(cn, ()) if cn else constants.get(full, ()) or constants.get(name, ())]
                 used.update(n for n in (fn, cn) if n)
                 if not any(found) and (fn or cn):
                     outside(fn or cn)

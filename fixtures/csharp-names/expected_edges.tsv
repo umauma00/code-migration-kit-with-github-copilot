@@ -1,4 +1,8 @@
 from	to
+bases/Local.cs	bases/Repo.cs
+cond/CMain.cs	cond/Model.cs
+cond/CMain.cs	cond/Util.cs
+cond/Model.cs	cond/Boot.cs
 proj/V.cs	proj/lib/L.cs
 proj/W.cs	proj/lib/L.cs
 shop/Order.cs	shop/EntityType.cs
