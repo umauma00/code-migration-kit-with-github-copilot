@@ -15,6 +15,10 @@ cond3/Boot3.cs	cond3/BMain.cs
 cond3/LMain.cs	cond3/ModelA.cs
 cond3/LMain.cs	cond3/ModelB.cs
 cond3/LMain.cs	cond3/ModelC.cs
+dbuild/src/App/DbMain.cs	dbuild/lib/CommonT.cs
+dbuild/src/App/DbMain.cs	dbuild/lib/KeptT.cs
+dbuild/src/App/DbMain.cs	dbuild/lib/RootT.cs
+dbuild/src/App/DbMain.cs	dbuild/lib/SrcT.cs
 proj/V.cs	proj/lib/L.cs
 proj/W.cs	proj/lib/L.cs
 shop/Order.cs	shop/EntityType.cs

@@ -1,5 +1,11 @@
 # migration order: one batch per line, dependencies first
 ABND.cbl
+D1.cbl
+D2.cbl
+D3.cbl
+D9.cbl
+DYNPGM.cpy
+DYN.cbl
 P1.cbl
 P2.cbl
 P3.cbl

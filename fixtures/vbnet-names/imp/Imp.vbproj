@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><RootNamespace></RootNamespace></PropertyGroup>
+  <ItemGroup>
+    <Import Include="ImpA;ImpB" />
+    <Import Condition="'$(X)' == ''" Include="ImpC" />
+    <Import Include="ImpGone" />
+    <Import Remove="ImpGone" />
+  </ItemGroup>
+</Project>

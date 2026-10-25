@@ -60,7 +60,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # -I drops the script dir
 from depmap_common import EXTERNAL, find_files, read_source, run  # noqa: E402
-from depmap_projects import COMMENT_RE, QUOTED, attr_values, dotnet_projects, drop_not_compiled  # noqa: E402
+from depmap_projects import ATTRS, COMMENT_RE, QUOTED, conditional_spans, dotnet_projects, drop_not_compiled  # noqa: E402
 from depmap_typed import DOTNET_STANDARD, GLOBAL, PREDEFINED, TOKEN_RE, CHAIN_RE, FileInfo, chains, chains_at, is_ident, join, members, parse_expr, resolve, scan_or_none, type_written_at  # noqa: E402
 
 EXTS = {".vb"}
@@ -83,7 +83,42 @@ FOREACH_RE = re.compile(r"^\s*for\s+each\s+([a-z_]\w*)(?:\s+as\s+([\w.]+(?:\s*\(
 IMPORTS_RE = re.compile(r"^\s*imports\s+(.+?)\s*$", re.IGNORECASE)
 IMPORT_CLAUSE_RE = re.compile(r"^(?:([\w\[\]]+)\s*=\s*)?([\w.\[\]]+)$")
 ROOT_NS_RE = re.compile(r"<RootNamespace>\s*([^<]*?)\s*</RootNamespace>", re.IGNORECASE)
-VBPROJ_IMPORT_RE = re.compile(r"<Import\s+Include\s*=\s*" + QUOTED, re.IGNORECASE)
+VBPROJ_IMPORT_RE = re.compile(r"<Import\b" + ATTRS + r"/?>", re.IGNORECASE)
+VBPROJ_ATTR_RE = re.compile(r"\b(Include|Remove|Condition)\s*=\s*" + QUOTED, re.IGNORECASE)
+
+
+def top_level_split(text):
+    """text split at the commas outside parentheses (Imports A, L = D(Of B, C))."""
+    parts, depth, start = [], 0, 0
+    for i, ch in enumerate(text):
+        depth += ch == "("
+        depth -= ch == ")"
+        if ch == "," and depth == 0:
+            parts.append(text[start:i])
+            start = i + 1
+    return parts + [text[start:]]
+
+
+def vbproj_imports(text, warnings=None, where="."):
+    """Include values of the <Import Include> items of a .vbproj (any
+    attribute order; <Import Project> is an MSBuild import, not an item),
+    each an item list (A;B). A <Import Remove> drops the items before it;
+    under a Condition it is not evaluated and the import is kept."""
+    items = []
+    spans = conditional_spans(text)
+    for m in VBPROJ_IMPORT_RE.finditer(text):
+        attrs = {k.lower(): a or b for k, a, b in VBPROJ_ATTR_RE.findall(m.group(1))}
+        if "include" in attrs:
+            items += [n.strip() for n in attrs["include"].split(";") if n.strip()]
+        elif "remove" in attrs:
+            names = {n.strip().lower() for n in attrs["remove"].split(";") if n.strip()}
+            if "condition" in attrs or any(a <= m.start() < b for a, b in spans):
+                if warnings is not None:
+                    warnings.append(f"{where}: <Import Remove=\"{attrs['remove']}\"> is under a Condition "
+                                    "that is not evaluated; it is not applied, so the import stays")
+                continue
+            items = [n for n in items if n.lower() not in names]
+    return items
 REFLECTION_RE = re.compile(r"\b(createobject|activator\s*\.\s*createinstance|type\s*\.\s*gettype|assembly\s*\.\s*load\w*)\s*\(\s*((?:[^()]|\([^()]*\))+?)?\s*\)", re.IGNORECASE)
 # A bare name in an enum member's value: maybe a sibling member.
 SIBLING_RE = re.compile(r"(?<![\w.])\[?[A-Za-z_]\w*\]?(?![\w\[\]]|\s*\.)")
@@ -304,7 +339,12 @@ def scan(rel, text, root_ns=""):
         if m:
             # Imports A, B = C.D: one clause per comma. XML namespace
             # imports (<xmlns:...>) name no type and are skipped.
-            for clause in m.group(1).split(","):
+            for clause in top_level_split(m.group(1)):
+                # Imports L = List(Of Acme.Order): the alias stands for the
+                # generic type, and the type arguments are names this file uses.
+                clause, paren, args = clause.partition("(")
+                if paren:
+                    body.append((ns(), "(" + args))
                 c = IMPORT_CLAUSE_RE.match(re.sub(r"\s+", "", clause))
                 if not c:
                     continue
@@ -482,9 +522,10 @@ def mapper(root, warnings, args):
         infos.append(info)
     # Project-level <Import Include> applies to the files of its projects only.
     computed = set()        # (project dir, Include holding an MSBuild property)
+    imports_of = {d: vbproj_imports(text, warnings, d or ".") for d, text in sorted(texts.items())}
     for info in infos:
         for d in projects_of[info.rel]:
-            for name in attr_values(VBPROJ_IMPORT_RE, texts.get(d, "")):
+            for name in imports_of.get(d, ()):
                 if "$(" in name or "@(" in name or "%(" in name:
                     computed.add((d, name.strip()))
                 elif name.strip():

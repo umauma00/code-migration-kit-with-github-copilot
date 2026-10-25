@@ -21,6 +21,12 @@ cond3/Boot3.cs
 cond3/CMain3.cs
 cond3/ModelC.cs
 cond3/LMain.cs
+dbuild/lib/CommonT.cs
+dbuild/lib/GoneT.cs
+dbuild/lib/KeptT.cs
+dbuild/lib/RootT.cs
+dbuild/lib/SrcT.cs
+dbuild/src/App/DbMain.cs
 inline/U.cs
 inline/U2.cs
 proj/lib/L.cs

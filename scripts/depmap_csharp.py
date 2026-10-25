@@ -68,7 +68,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # -I drops the script dir
 from depmap_common import find_files, read_source, run  # noqa: E402
-from depmap_projects import ATTRS, QUOTED, dotnet_projects, drop_not_compiled  # noqa: E402
+from depmap_projects import ATTRS, QUOTED, conditional_spans, dotnet_projects, drop_not_compiled  # noqa: E402
 from depmap_typed import BLOCK, CHAIN_RE, DOTNET_STANDARD, GLOBAL, Directives, FileInfo, PREDEFINED, TOKEN_RE, chains_at, dotted, enum_member_offsets, flow_c_like, join, resolve, scan_or_none, list_item_starts, strip_c_like, type_written_at  # noqa: E402
 
 EXTS = {".cs"}
@@ -87,7 +87,7 @@ CSPROJ_USING_RE = re.compile(r"<Using\b" + ATTRS + r"(/?)>", re.IGNORECASE)
 CSPROJ_USING_END_RE = re.compile(r"</Using\s*>", re.IGNORECASE)
 # Metadata written as child elements: <Using Include="A"><Alias>X</Alias></Using>.
 CSPROJ_META_RE = re.compile(r"<(Alias|Static)\b" + ATTRS + r"(?:/>|>\s*([^<]*?)\s*</\1\s*>)", re.IGNORECASE)
-CSPROJ_ATTR_RE = re.compile(r"\b(Include|Alias|Static)\s*=\s*" + QUOTED, re.IGNORECASE)
+CSPROJ_ATTR_RE = re.compile(r"\b(Include|Remove|Alias|Static|Condition)\s*=\s*" + QUOTED, re.IGNORECASE)
 
 
 # Words after which a name is a value, not a declaration (select x;, from
@@ -548,11 +548,29 @@ def csproj_usings(text):
     items give: Conditions are not evaluated, so Debug's and Release's alias
     both stay. computed: names that hold an MSBuild property ($(NS).A),
     which is not evaluated; they are left out, warned about and listed.
-    conditional: Alias/Static child elements under a Condition, taken as
-    if it held and warned about."""
+    conditional: warnings for Alias/Static child elements under a Condition
+    (taken as if it held) and for a <Using Remove> under one (not applied).
+    A <Using Remove> drops the items listed before it."""
     usings, aliases, static, computed, conditional = [], {}, [], [], []
+    spans = conditional_spans(text)
     for m in CSPROJ_USING_RE.finditer(text):
         attrs = {k.lower(): a or b for k, a, b in CSPROJ_ATTR_RE.findall(m.group(1))}
+        if "remove" in attrs and "include" not in attrs:
+            # <Using Remove="X" /> (often after an implicit or Directory.Build.props
+            # using) drops the items before it; under a Condition it is not
+            # evaluated and the using is kept.
+            names = {n.strip() for n in attrs["remove"].split(";") if n.strip()}
+            if "condition" in attrs or any(a <= m.start() < b for a, b in spans):
+                conditional.append(f"<Using Remove=\"{';'.join(sorted(names))}\"> is under a Condition that is not evaluated; "
+                                   "it is not applied, so the using stays")
+                continue
+            usings[:] = [n for n in usings if n not in names]
+            static[:] = [n for n in static if n not in names]
+            for alias in list(aliases):
+                aliases[alias] = [n for n in aliases[alias] if n not in names]
+                if not aliases[alias]:
+                    del aliases[alias]
+            continue
         # Every value the item can take: an attribute and each child element
         # (Debug's and Release's Alias both stay).
         metas = {key: [attrs[key]] for key in ("alias", "static") if key in attrs}
@@ -563,7 +581,8 @@ def csproj_usings(text):
                 # (or static) is taken, as an item under a Condition is.
                 metas.setdefault(key.lower(), []).append(value)
                 if re.search(r"\bCondition\s*=", meta_attrs, re.IGNORECASE):
-                    conditional.append(f"{key} {value or '(empty)'} of {attrs.get('include', '').strip()}")
+                    conditional.append(f"<Using> metadata {key} {value or '(empty)'} of {attrs.get('include', '').strip()} "
+                                       "is under a Condition that is not evaluated; it is applied as if the Condition held")
         # An empty value (<Alias Condition="..." />) is the item without
         # that metadata: a plain using under that Condition, kept beside
         # the other values.
@@ -618,8 +637,7 @@ def mapper(root, warnings, args):
     for d, text in sorted(texts.items()):
         names, named, statics, computed, conditional = csproj_usings(text)
         for what in conditional:
-            warnings.append(f"{d or '.'}: <Using> metadata {what} is under a Condition that is not evaluated; "
-                            "it is applied as if the Condition held")
+            warnings.append(f"{d or '.'}: {what}")
         for name in computed:
             warnings.append(f"{d or '.'}: <Using Include=\"{name}\"> uses an MSBuild property that is not evaluated; "
                             "it is not applied, so names it would import may be missing")

@@ -131,6 +131,15 @@
   and an include expression also ends at `or`; COBOL reads a `*>` inside a
   literal as text, tab-indented fixed format, and CICS HANDLE ABEND,
   RELEASE and ENABLE PROGRAM.
+  .NET projects are read with the nearest Directory.Build.props and
+  Directory.Build.targets, and the files imported by a path under `--root`
+  (a `<Using>` there was lost, and Nancy's shared `ProjectReference` to its
+  core project was not seen); `<Using Remove>` and VB `<Import Remove>`
+  apply; VB `<Import Include="A;B">` is split and read in any attribute
+  order (it gave one bogus namespace and lost every name of A and B), and
+  the type arguments of a VB generic alias (`Imports L = List(Of X)`) count;
+  a COBOL `CALL WS-PGM` gets edges to the literals `WS-PGM` is given
+  (`VALUE 'SUB1'`, `MOVE 'SUB1' TO WS-PGM`), and stays listed.
   PHP follows computable
   include paths and case-insensitive class/function names with namespaces
   and `use`, narrowed by composer.json autoload (PSR-4, PSR-0, classmap),

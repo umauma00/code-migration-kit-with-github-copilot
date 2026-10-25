@@ -29,7 +29,9 @@ anywhere outside a literal) are ignored.
 
 Known limits, listed in unresolved.tsv:
   - CALL identifier and PROGRAM(identifier) are dynamic: the program name is
-    data. A copybook or program that is not under --root (vendor or system
+    data. The programs the item is given as a literal (VALUE 'X' in its
+    definition, MOVE 'X' TO it, in the file or a copybook it copies) get
+    an edge, and the CALL is still listed. A copybook or program that is not under --root (vendor or system
     libraries) is unresolved too, as is a name that matches several files.
   - COPY ... REPLACING is followed to the copybook but the replacement is
     not applied; JCL, PROCs and BMS maps are not read.
@@ -65,12 +67,21 @@ SQL_INCLUDE_RE = re.compile(rf"(?<![\w-])EXEC\s+SQL\s+INCLUDE\s+(?:{LITERAL}|({W
 CALL_RE = re.compile(rf"(?<![\w-])CALL\s+(?:{LITERAL}|({WORD}))", re.IGNORECASE)
 CICS_RE = re.compile(rf"(?<![\w-])EXEC\s+CICS\s+(LINK|XCTL|START|LOAD|RELEASE|ENABLE|HANDLE\s+ABEND)\b(?:(?!END-EXEC)[^.])*?\bPROGRAM\s*\(\s*(?:{LITERAL}|({WORD}))\s*\)", re.IGNORECASE | re.DOTALL)
 PROGRAM_ID_RE = re.compile(rf"\bPROGRAM-ID\s*\.?\s*(?:{LITERAL}|({WORD}))", re.IGNORECASE)
+# Literals a data item is given: 01 WS-PGM PIC X(8) VALUE 'SUB1'. and
+# MOVE 'SUB1' TO WS-PGM (each receiving item, up to the end of the
+# sentence or line).
+DATA_VALUE_RE = re.compile(rf"(?<![\w-])(?:0?[1-9]|[1-4][0-9]|77)\s+({WORD})\b[^.]*?(?<![\w-])VALUES?\s+(?:IS\s+|ARE\s+)?{LITERAL}", re.IGNORECASE)
+MOVE_RE = re.compile(rf"(?<![\w-])MOVE\s+{LITERAL}\s+TO\s+([^.\n]*)", re.IGNORECASE)
+TARGET_RE = re.compile(rf"{WORD}")
+STATEMENT_WORDS = {"call", "move", "if", "else", "perform", "display", "go", "goback", "exit", "end-if", "set",
+                   "compute", "add", "evaluate", "when", "exec", "string", "initialize", "stop", "of", "in"}
 FREE_RE = re.compile(r">>\s*SOURCE\s+(?:FORMAT\s+)?(?:IS\s+)?FREE|\$\s*SET\s+SOURCEFORMAT\s*\(?\s*[\"']?FREE", re.IGNORECASE)
 FREE_START_RE = re.compile(r"^(?:IDENTIFICATION|ID|PROCEDURE|DATA|ENVIRONMENT)\s+DIVISION\b|^(?:0[1-9]|[1-4][0-9]|66|77|88)\s+[A-Za-z]", re.IGNORECASE)
 
 
-def code_lines(text):
-    """Source text without sequence area, indicator column and comments."""
+def code_lines(text, values=False):
+    """Source text without sequence area, indicator column and comments.
+    values: keep the literals of VALUE and MOVE too (only for given())."""
     # A tab moves to the next multiple of 8 columns, as editors of fixed
     # format show it (a leading tab puts the code in Area A).
     lines = [line.expandtabs(8) for line in text.splitlines()]
@@ -96,7 +107,7 @@ def code_lines(text):
                     out[-1] = out[-1].rstrip() + " " + cont
                 continue
         out.append(body[:comment_start(body)])
-    return mask_literals("\n".join(out))
+    return mask_literals("\n".join(out), VALUE_OPERAND_RE if values else None)
 
 
 def comment_start(body):
@@ -115,16 +126,17 @@ def comment_start(body):
 
 
 OPERAND_RE = re.compile(r"(?:(?<![\w-])CALL|(?<![\w-])COPY|(?<![\w-])INCLUDE|\bPROGRAM\s*\(|\bPROGRAM-ID\s*\.?|(?<![\w-])OF|(?<![\w-])IN|(?<![\w-])CANCEL)\s*$", re.IGNORECASE)
+VALUE_OPERAND_RE = re.compile(r"(?:(?<![\w-])VALUES?(?:\s+(?:IS|ARE))?|(?<![\w-])MOVE)\s*$", re.IGNORECASE)
 STRING_RE = re.compile(r"'[^'\n]*'|\"[^\"\n]*\"")
 
 
-def mask_literals(text):
+def mask_literals(text, keep=None):
     """Blank every literal that is not a program or copybook name, so that
     DISPLAY "CALL 'X'" is not read as a CALL."""
     def repl(m):
         # The keyword may sit lines above the literal (CALL / 'X' on its own line).
         before = text[max(0, m.start() - 400):m.start()].rstrip()
-        if OPERAND_RE.search(before[-24:]):
+        if OPERAND_RE.search(before[-24:]) or keep and keep.search(before[-24:]):
             return m.group(0)
         return m.group(0)[0] + " " * (len(m.group(0)) - 2) + m.group(0)[-1]
     return STRING_RE.sub(repl, text)
@@ -141,7 +153,8 @@ def name_of(m, first):
 def mapper(root, warnings, args):
     files = find_files(root, EXTS, warnings=warnings)
     rels = [p.relative_to(root).as_posix() for p in files]
-    texts = {rel: code_lines(read_source(path, warnings)) for rel, path in zip(rels, files)}
+    sources = {rel: read_source(path, warnings) for rel, path in zip(rels, files)}
+    texts = {rel: code_lines(sources[rel]) for rel in rels}
 
     by_stem, by_name, programs = {}, {}, {}
     for rel in rels:
@@ -188,6 +201,45 @@ def mapper(root, warnings, args):
             return None, f"program name matches {len(cands)} files"
         return cands, None
 
+    given_cache = {}
+
+    def given(src):
+        """data item -> literals the file (with the copybooks it copies)
+        gives it by VALUE or MOVE: the programs a dynamic CALL may name."""
+        if src in given_cache:
+            return given_cache[src]
+        values, todo, seen = given_cache.setdefault(src, {}), [src], set()
+        while todo:
+            rel = todo.pop()
+            if rel in seen:
+                continue
+            seen.add(rel)
+            for m in COPY_RE.finditer(texts[rel]):
+                hit, _ = copybook(rel, name_of(m, 1), name_of(m, 4))
+                todo += hit or []
+            text = code_lines(sources[rel], values=True)
+            for m in DATA_VALUE_RE.finditer(text):
+                values.setdefault(m.group(1).lower(), set()).add((m.group(2) if m.group(2) is not None else m.group(3)).strip())
+            for m in MOVE_RE.finditer(text):
+                for word in TARGET_RE.findall(m.group(3)):
+                    if word.lower() in STATEMENT_WORDS:
+                        break
+                    values.setdefault(word.lower(), set()).add(name_of(m, 1).strip())
+        return values
+
+    def dynamic(src, item, ref, why):
+        """Edges to the programs item is given a literal for; the CALL
+        stays in unresolved.tsv, since the item may hold another name."""
+        found = []
+        for literal in sorted(given(src).get(item.lower(), ())):
+            hit, _ = program(literal)
+            if hit:
+                edges.update((src, t) for t in hit)
+                found.append(literal)
+        if found:
+            why += f"; edges to the programs it is given: {', '.join(found)}"
+        unresolved.add((src, ref, why))
+
     edges, unresolved = set(), set()
     for src in rels:
         text = texts[src]
@@ -210,7 +262,7 @@ def mapper(root, warnings, args):
         for m in CALL_RE.finditer(text):
             literal = m.group(1) if m.group(1) is not None else m.group(2)
             if literal is None:
-                unresolved.add((src, f"CALL {m.group(3)}", "program name held in a data item (dynamic CALL)"))
+                dynamic(src, m.group(3), f"CALL {m.group(3)}", "program name held in a data item (dynamic CALL)")
                 continue
             hit, why = program(literal.strip())
             if hit:
@@ -221,7 +273,7 @@ def mapper(root, warnings, args):
             verb = " ".join(m.group(1).upper().split())
             literal = m.group(2) if m.group(2) is not None else m.group(3)
             if literal is None:
-                unresolved.add((src, f"EXEC CICS {verb} PROGRAM({m.group(4)})", "program name held in a data item"))
+                dynamic(src, m.group(4), f"EXEC CICS {verb} PROGRAM({m.group(4)})", "program name held in a data item")
                 continue
             hit, why = program(literal.strip())
             if hit:

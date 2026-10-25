@@ -3,8 +3,9 @@
 """Build-file facts the C#, VB.NET and Java mappers use (stdlib only).
 
 The files are read as text, never evaluated: MSBuild properties, imports,
-conditions and Directory.Build.props are not expanded, and Maven/Gradle are
-not run. What they give:
+conditions and imports that use a property are not expanded (the nearest
+Directory.Build.props/.targets and imports by a path under --root are read
+with the project), and Maven/Gradle are not run. What they give:
 
   - which project or module each source file belongs to (the deepest
     directory above it holding a .csproj/.vbproj, pom.xml or build.gradle);
@@ -144,6 +145,29 @@ def compile_items(text):
     return items
 
 
+CONTAINER_RE = re.compile(r"<(/?)(ItemGroup|Choose|When|Otherwise|Target)\b" + ATTRS + r"(/?)>", re.IGNORECASE)
+
+
+def conditional_spans(text):
+    """(start, end) of every ItemGroup with a Condition, Choose branch and
+    Target of text: an item inside one is conditional."""
+    spans, stack = [], []
+    for m in CONTAINER_RE.finditer(text):
+        closing, name, attr_text, empty = m.group(1), m.group(2).lower(), m.group(3), m.group(4)
+        if closing:
+            while stack:
+                open_name, start, cond = stack.pop()
+                if cond:
+                    spans.append((start, m.end()))
+                if open_name == name:
+                    break
+        elif not empty:
+            cond = name != "itemgroup" or re.search(r"\bCondition\s*=", attr_text, re.IGNORECASE)
+            stack.append((name, m.start(), bool(cond)))
+    spans += [(start, len(text)) for _, start, cond in stack if cond]
+    return spans
+
+
 def attr_values(regex, text):
     """Values of a regex built on QUOTED, whichever quote each one uses."""
     return [a or b for a, b in regex.findall(text)]
@@ -207,6 +231,67 @@ def glob_match(rel, pattern):
     return GLOB_CACHE[pattern].fullmatch(rel) is not None
 
 
+IMPORT_PROJECT_RE = re.compile(r"<Import\b" + ATTRS + r"/?>", re.IGNORECASE)
+PROJECT_ATTR_RE = re.compile(r"\bProject\s*=\s*" + QUOTED, re.IGNORECASE)
+DIRECTORY_BUILD = ("Directory.Build.props", "Directory.Build.targets")
+
+
+def directory_build(root, d, name):
+    """rel of the nearest name (Directory.Build.props/.targets) at or above
+    project directory d under root, as MSBuild finds it, or None."""
+    while True:
+        rel = f"{d}/{name}" if d else name
+        if (root / rel).is_file():
+            return rel
+        if not d:
+            return None
+        d = posixpath.dirname(d)
+
+
+def with_imports(root, rel, text, warnings, seen=None):
+    """text with each <Import Project="..."> of a file under root put in
+    its place (paths relative to the importing file, as MSBuild takes
+    them). An import of the next Directory.Build.props/.targets above
+    (GetPathOfFileAbove) is followed too; other imports that use a
+    property are not read."""
+    seen = set() if seen is None else seen
+    seen.add(rel.lower())
+    here = posixpath.dirname(rel)
+
+    def expand(m):
+        values = attr_values(PROJECT_ATTR_RE, m.group(1))
+        if not values:
+            return m.group(0)
+        value = values[0].strip()
+        target = None
+        for name in DIRECTORY_BUILD:
+            if name.lower() in value.lower() and "$(" in value and here:
+                target = directory_build(root, posixpath.dirname(here), name)
+                break
+        if target is None and "$(" not in value:
+            target = msbuild_path(here, value)
+        if target is None or target.lower() in seen or not (root / target).is_file():
+            return m.group(0)
+        return with_imports(root, target, COMMENT_RE.sub("", read_source(root / target, warnings)), warnings, seen)
+    return IMPORT_PROJECT_RE.sub(expand, text)
+
+
+def project_text(root, d, proj_rel, text, warnings):
+    """The project file's text as MSBuild reads it: the nearest
+    Directory.Build.props before it and Directory.Build.targets after it,
+    and the files they and it import by a path under root."""
+    seen = set()
+    parts = []
+    for name, own in ((DIRECTORY_BUILD[0], None), (None, text), (DIRECTORY_BUILD[1], None)):
+        if own is not None:
+            parts.append(with_imports(root, proj_rel, COMMENT_RE.sub("", own), warnings, seen))
+            continue
+        rel = directory_build(root, d, name)
+        if rel and rel.lower() not in seen:
+            parts.append(with_imports(root, rel, COMMENT_RE.sub("", read_source(root / rel, warnings)), warnings, seen))
+    return "\n".join(parts)
+
+
 def dotnet_projects(root, rels, project_ext, warnings):
     """(visible_files, not_compiled, projects_of, texts) for C# (.csproj) or VB.NET (.vbproj).
 
@@ -224,8 +309,10 @@ def dotnet_projects(root, rels, project_ext, warnings):
         if d in projects:
             warnings.append(f"several {project_ext} files in {d or '.'}; using {projects[d][0]}")
             continue
-        projects[d] = (proj.relative_to(root).as_posix(), read_source(proj, warnings))
-        bad = malformed_lines(projects[d][1])
+        proj_rel = proj.relative_to(root).as_posix()
+        own = read_source(proj, warnings)
+        projects[d] = (proj_rel, project_text(root, d, proj_rel, own, warnings))
+        bad = malformed_lines(own)
         if bad:
             lines = ", ".join(map(str, bad[:5])) + (f" and {len(bad) - 5} more" if len(bad) > 5 else "")
             warnings.append(f"{projects[d][0]}: tags not read at line {lines} (a raw < in an attribute "

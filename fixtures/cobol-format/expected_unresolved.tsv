@@ -1,1 +1,5 @@
 file	reference	reason
+DYN.cbl	CALL CP-PGM	program name held in a data item (dynamic CALL); edges to the programs it is given: D3
+DYN.cbl	CALL WS-NEXT	program name held in a data item (dynamic CALL); edges to the programs it is given: D1, D2
+DYN.cbl	CALL WS-NONE	program name held in a data item (dynamic CALL)
+DYN.cbl	EXEC CICS LINK PROGRAM(WS-OTHER)	program name held in a data item; edges to the programs it is given: D1
