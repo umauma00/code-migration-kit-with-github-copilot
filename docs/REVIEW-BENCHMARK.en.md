@@ -59,10 +59,21 @@ Model calls use quota and may cost money. The cases use the three files of `fixt
    node scripts/review_benchmark.mjs run --root /tmp/review-bench --runs 3 --max-calls 177
    ```
 
-   Results go to `review-bench-results/<time>/` in the temp directory (printed when the run ends), never inside the root, which workers can read; `--out` moves them. A root setup did not make, or one with a file at a case's target, stops the run before anything is written. The output holds `report.md`
-   (tables and the cases that changed), `summary.json`, `results.jsonl` (every
-   finding, its match and tokens per run) and `fixes/`. If the first call fails
-   Three failures before any call works (login, model ID) stop the run without measuring anything: calls in flight are aborted and no new ones start. A single malformed answer is recorded as a failed run and the run goes on.
+   Results go to `review-bench-results/<time>/` in the temp directory
+   (printed when the run ends), never inside the root, which workers can
+   read; `--out` moves them. They are written only when the run ends, since
+   workers may also be allowed to read the temp directory; each fixed file
+   exists on disk only while its check runs, under a random name. A root
+   setup did not make, or one with a file at a case's target, stops the run
+   before anything is written. The output holds `report.md` (tables and the
+   cases that changed), `summary.json`, `results.jsonl` (every finding, its
+   match and tokens per run) and `fixes/`.
+
+   Three failures before any call works (login, model ID) stop the run
+   without measuring anything: calls in flight are aborted and no new ones
+   start. With concurrency, calls already started count too. A single
+   malformed answer is recorded as a failed run and the run goes on.
+   Ctrl-C stops the run as interrupted.
 
 ## Cases and matching
 

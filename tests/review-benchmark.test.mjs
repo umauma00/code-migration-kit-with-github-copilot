@@ -9,7 +9,7 @@ import path from 'node:path';
 import { prepare, mini } from './helpers.mjs';
 import { safePath, writeJSON, atomicWrite } from '../lib/core.mjs';
 import { runProcess } from '../lib/process.mjs';
-import { benchDir, loadCases, benchPlan, catches, creditedDefect, runBenchmark, benchMarker, answerLeaks } from '../lib/bench.mjs';
+import { benchDir, loadCases, benchPlan, catches, creditedDefect, runBenchmark, benchMarker, answerLeaks, answerLines } from '../lib/bench.mjs';
 import { kitRoot } from '../scripts/install.mjs';
 import { agentPrompt } from '../scripts/copilot_adapter.mjs';
 
@@ -189,6 +189,31 @@ test('after a failure no further jobs start, and the seeded target is removed', 
   // Two jobs at most were in flight, two reviewers each.
   assert.ok(n <= 4, `calls after failure: ${n}`);
   assert.ok(!fs.existsSync(safePath(f.root, 'ported/math_ops.mjs')));
+  assert.ok(!fs.existsSync(safePath(f.root, 'ported')));
+  assert.ok(!fs.existsSync(f.out));
+});
+
+test('nothing is written to the output until the run ends', async t => {
+  const f = bench(t), base = adapter();
+  const watch = async options => { assert.ok(!fs.existsSync(f.out), 'output written mid-run'); return base(options); };
+  await runBenchmark(f.root, f.config, watch, { cases: loadCases(undefined, 'math-trunc'), runs: 1, out: f.out, maxCalls: 100 });
+  assert.ok(fs.existsSync(path.join(f.out, 'fixes/math-trunc-fixer-0/math_ops.mjs')));
+});
+
+test('Ctrl-C reads as interrupted, not as failing calls', async t => {
+  const f = bench(t), controller = new AbortController();
+  const hang = ({ signal }) => new Promise((_, reject) => signal.addEventListener('abort', () => reject(new Error('killed')), { once: true }));
+  f.config.concurrency = 4;
+  const run = runBenchmark(f.root, f.config, hang, { cases: loadCases(), runs: 2, out: f.out, maxCalls: 1000, signal: controller.signal });
+  setTimeout(() => controller.abort(), 50);
+  await assert.rejects(run, /^Error: Interrupted$/);
+});
+
+test('answer lines are every correct line some seeded case lacks', () => {
+  const lines = answerLines();
+  for (const line of ["if (b === 0) throw new Error('division by zero');", 'const quotient = Math.floor(a / b);', "import { divide } from './math_ops.mjs';", '// PORT STATUS: complete; count Unicode code points, including astral characters.']) assert.ok(lines.includes(line), line);
+  // Lines every seeded case shares are not answers.
+  assert.ok(!lines.includes('export function divide(a, b) {'));
 });
 
 test('one malformed first answer is a failed run, not a stop', async t => {
