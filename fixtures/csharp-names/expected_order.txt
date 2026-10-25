@@ -1,4 +1,9 @@
 # migration order: one batch per line, dependencies first
+arity/ArNestA.cs
+arity/ArNestB.cs
+arity/ArResult.cs	arity/ArResultOfT.cs
+arity/ArService.cs
+arity/ArStatic.cs
 bases/Repo.cs
 bases/Local.cs
 bases/M.cs
@@ -56,6 +61,11 @@ inline/U2.cs
 proj/lib/L.cs
 proj/V.cs
 proj/W.cs
+shadow/ShOrder.cs
+shadow/ShCategory.cs
+shadow/ShStatus.cs
+shadow/ShValidator.cs
+shadow/ShReal.cs
 shop/Customer.cs
 shop/EntityType.cs
 shop/Flags.cs

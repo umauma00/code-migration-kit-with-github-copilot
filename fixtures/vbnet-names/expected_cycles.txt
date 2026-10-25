@@ -1,1 +1,2 @@
-# strongly connected components > 1 file: 0
+# strongly connected components > 1 file: 1
+designer/DsgForm.Designer.vb	designer/DsgForm.vb

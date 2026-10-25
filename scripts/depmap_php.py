@@ -195,6 +195,25 @@ def interpolates(body):
     return False
 
 
+CLASS_BEFORE = {"new", "extends", "implements", "instanceof", "insteadof", "use"}
+
+
+CONST_STYLE_RE = re.compile(r"[A-Z][A-Z0-9_]+")
+
+
+def ref_kind(prev, nxt, after):
+    """What a name written between prev and nxt can be: f() a function,
+    new Foo / Foo::x / Foo $x (a type) a class, anything else a constant or
+    a class in a position this reader does not tell apart (: Foo return
+    type, A|B types)."""
+    if prev.lower() in CLASS_BEFORE or nxt == "::" or nxt.startswith("$") \
+            or (nxt in {"&", "..."} and after.startswith("$")):
+        return "class"
+    if nxt == "(":
+        return "function"
+    return "any"
+
+
 def php_code(text):
     """Code between PHP open and close tags, comments removed and each string
     replaced by a placeholder. Returns (code, strings, interpolated): the
@@ -280,7 +299,7 @@ class FileInfo:
     def __init__(self, rel):
         self.rel = rel
         self.classes, self.functions, self.constants = [], [], []   # declared FQNs
-        self.refs = []          # (namespace, name, is_call, uses)
+        self.refs = []          # (namespace, name, kind, uses); kind: "function", "class", "const" or "any"
         self.includes = []      # (keyword, expression parts)
         self.strings = []
         self.interpolated = set()   # indexes of strings that hold a variable or {$...} hole
@@ -359,7 +378,7 @@ def scan(rel, text):
                         alias = at(j + 2)
                         j += 2
                     uses[item][alias if item == "const" else alias.lower()] = full
-                    info.refs.append((ns, "\\" + full, item == "function", None))
+                    info.refs.append((ns, "\\" + full, "class" if item == "class" else item, None))
                 j += 1
             i = j
             continue
@@ -474,7 +493,7 @@ def scan(rel, text):
                 low in SOFT and not (low == "match" and at(i + 1) == "(" and prev.lower() != "new")
                 and not (low == "from" and prev.lower() == "yield"))):
             if not (prev.lower() in {"function", "const"} and not t.startswith("\\")) and i not in declared_at:
-                info.refs.append((ns, t, at(i + 1) == "(", uses))
+                info.refs.append((ns, t, ref_kind(prev, at(i + 1), at(i + 2)), uses))
         i += 1
     # String callables: the callback argument of a function that takes one
     # ('my_cb', or callback: 'my_cb'), and the class of a ['Cls', 'm'] /
@@ -803,9 +822,11 @@ def mapper(root, warnings, args):
     include_path = [p for p in path_list(args.include_path) if p != "."]
     autoload = composer_autoload(root, warnings)
     declared, functions, constants = {}, {}, {}
+    class_spellings = set()     # short class names as declared, for pick()
     fallback = {"class": {}, "function": {}, "const": {}}   # key -> files with a guarded declaration
     for info in infos:
         for c in info.classes:
+            class_spellings.add(c.rpartition("\\")[2])
             declared.setdefault(c.lower(), set()).add(info.rel)
             if ("class", c.lower()) in info.guarded:
                 fallback["class"].setdefault(c.lower(), set()).add(info.rel)
@@ -946,11 +967,28 @@ def mapper(root, warnings, args):
                     and ns_name.split("\\")[0].lower() not in PHP_STANDARD:
                 external.setdefault(ns_name.lower(), (ns_name, set()))[1].add(src)
 
+        def pick(kind, written, cls, fns, consts):
+            """The declarations a name can mean where it is written: f() a
+            function, Foo::x a class, FOO a constant (a class only when no
+            constant has the name and the class is not spelled differently
+            from an all-capitals name, which is a constant's style)."""
+            if kind == "function":
+                return [fns]
+            if kind == "class":
+                return [cls]
+            if kind == "const" or consts:
+                return [consts]
+            last = written.lstrip("\\").rpartition("\\")[2]
+            if CONST_STYLE_RE.fullmatch(last) and last not in class_spellings:
+                return [()]
+            return [cls]
+
         used, unused = set(), []     # use targets code names; use targets that resolve to nothing
-        for ns, name, is_call, uses in info.refs:
+        for ns, name, kind, uses in info.refs:
             if name.startswith("\\"):
                 full = name[1:]
-                hits = classes(full.lower()) | functions.get(full.lower(), set()) | constants.get(full, set())
+                hits = set().union(*pick(kind, name, classes(full.lower()), functions.get(full.lower(), set()),
+                                         constants.get(full, set())))
                 add(hits)
                 # A use statement may import a namespace (use Acme\Billing;)
                 # or a class: the names written with it tell (below). One
@@ -968,7 +1006,7 @@ def mapper(root, warnings, args):
                 # namespace\f(): the current namespace's f, never an import
                 # or the global fallback.
                 full = f"{ns}\\{rest}".lstrip("\\")
-                found = [classes(full.lower()), functions.get(full.lower(), ()), constants.get(full, ())]
+                found = pick(kind, rest, classes(full.lower()), functions.get(full.lower(), ()), constants.get(full, ()))
                 for hits in found:
                     add(hits)
                 if not any(found):      # as \App\Billing\Invoice would be
@@ -979,20 +1017,21 @@ def mapper(root, warnings, args):
                 full = uses["class"][head.lower()] + ("\\" + rest if rest else "")
             else:
                 full = f"{ns}\\{name}".lstrip("\\")
-            found = [classes(full.lower())]
             if not rest:
-                fn = uses["function"].get(name.lower())
-                cn = uses["const"].get(name)
+                fn = uses["function"].get(name.lower()) if kind == "function" else None
+                cn = uses["const"].get(name) if kind in {"any", "const"} else None
                 # An imported function or constant is that one only; an
                 # unqualified name falls back to the global one.
-                found += [functions.get(fn.lower(), ()) if fn else
-                          functions.get(full.lower(), ()) or functions.get(name.lower(), ()),
-                          constants.get(cn, ()) if cn else constants.get(full, ()) or constants.get(name, ())]
+                found = pick(kind, name, classes(full.lower()),
+                             functions.get(fn.lower(), ()) if fn else
+                             functions.get(full.lower(), ()) or functions.get(name.lower(), ()),
+                             constants.get(cn, ()) if cn else constants.get(full, ()) or constants.get(name, ()))
                 used.update(n for n in (fn, cn) if n)
                 if not any(found) and (fn or cn):
                     outside(fn or cn)
             else:
-                found += [functions.get(full.lower(), ()), constants.get(full, ())]
+                found = pick(kind, rest.rpartition("\\")[2], classes(full.lower()), functions.get(full.lower(), ()),
+                             constants.get(full, ()))
             for hits in found:      # each kind on its own: the file's own declaration wins per kind
                 add(hits)
             hits = any(found)

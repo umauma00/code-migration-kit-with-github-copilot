@@ -157,7 +157,15 @@
   `\define()` is a `define()` and `const A = 1, B = 2;` declares each name;
   names a `const` or enum `case` declares are not class references;
   `<RootNamespace />` is the empty namespace and an empty
-  `<EnableDefaultCompileItems />` leaves the SDK default on.
+  `<EnableDefaultCompileItems />` leaves the SDK default on; PHP names are
+  looked up by position (`f()` a function, `Foo::`/`new Foo` a class, `FOO` a
+  constant), so `date()` or `DEBUG` no longer link the classes `Date` and
+  `Debug`; a later use of a parameter, local or member spelled like a type
+  (`message.Length`, `Category == "food"`) is not that type; a VB class with
+  `Partial` on one part only (WinForms designer files) links every part; C#
+  `Result` and `Result<T>` are different types; VB6/VBA get no VB.NET mapper
+  command and a mapper that reads no file warns; `depmap_php.py --include-var`
+  is in the CLI spec.
   PHP follows computable
   include paths and case-insensitive class/function names with namespaces
   and `use`, narrowed by composer.json autoload (PSR-4, PSR-0, classmap),

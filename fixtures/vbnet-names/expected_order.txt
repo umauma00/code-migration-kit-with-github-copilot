@@ -5,6 +5,7 @@ Later.vb
 Order.vb
 Params.vb
 U.vb
+designer/DsgForm.Designer.vb	designer/DsgForm.vb
 imp/AT.vb
 imp/BT.vb
 imp/CT.vb
@@ -21,3 +22,6 @@ rns/Two/TwoF.vb
 rns2/Rns2Marker.vb
 rns2/Rns2Model.vb
 rns2/Rns2Main.vb
+shadow/ShLogger.vb
+shadow/ShMessage.vb
+shadow/ShUser.vb

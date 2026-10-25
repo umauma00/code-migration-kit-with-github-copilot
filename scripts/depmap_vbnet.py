@@ -151,6 +151,8 @@ REFLECTION_RE = re.compile(r"\b(createobject|activator\s*\.\s*createinstance|typ
 SIBLING_RE = re.compile(r"(?<![\w.])\[?[A-Za-z_]\w*\]?(?![\w\[\]]|\s*\.)")
 # The name a declaration introduces: x As T, x() As T, Dim x, Const x.
 DECLARED_RE = re.compile(r"(?:^|(?<=[\s(,]))\[?([a-z_]\w*)\]?(?:\s*\(\s*\))?\??\s+as\b|\b(?:dim|const|static)\s+\[?([a-z_]\w*)")
+# A lambda's parameter list: Sub(order), Function(a, b As Integer).
+LAMBDA_RE = re.compile(r"(?<![\w.])(?:sub|function)\s*\(([^()]*)\)")
 # Words before a name that make it a type (As Acme.Billing.Invoice).
 TYPE_BEFORE = {"as", "new", "inherits", "implements", "of", "gettype("}
 KEYWORDS = set("""addhandler addressof alias and andalso as boolean byref byte byval call case catch cbool
@@ -301,8 +303,24 @@ def scan(rel, text, root_ns=""):
     lines, strings = strip_vb(text)
     info.strings = strings
     stack = []      # (kind, name) of open Namespace/Class/Module... blocks
-    body = []
     member = None   # "sub"/"function"/"property"/"operator" body being read
+    scopes = []     # per body line: (open type blocks, procedure number or None)
+    procedure = {"n": 0, "open": False}
+    type_member_names = {}  # open type blocks -> lower-cased names of its members
+
+    def where():
+        if member and not procedure["open"]:
+            procedure["n"] += 1
+        procedure["open"] = bool(member)
+        return tuple(stack), procedure["n"] if member else None
+
+    class Body(list):
+        """Body lines, each with the type and procedure it is written in."""
+        def append(self, item):
+            super().append(item)
+            scopes.append(where())
+
+    body = Body()
     enum_members = set()    # member names of the enum being read
     lines = [line for line in lines if line.strip()]
 
@@ -327,9 +345,7 @@ def scan(rel, text, root_ns=""):
 
     def bind_params(low):
         for name, typ in PARAM_RE.findall(low[low.find("("):] if "(" in low else ""):
-            chains = vb_type(typ)
-            if chains:
-                info.flow.append(("bind", name, enclosing(), [], chains, False, ns()))
+            info.flow.append(("bind", name, enclosing(), [], vb_type(typ), False, ns()))
 
     def body_line(low):
         m = DIM_RE.match(low)
@@ -337,8 +353,7 @@ def scan(rel, text, root_ns=""):
             name, typ, value = m.group(1), m.group(2), m.group(3)
             chains = vb_type(typ) if typ else []
             expr = vb_expr(value) if value else None
-            if chains or expr:
-                info.flow.append(("bind", name, enclosing(), [expr] if expr else [], chains, False, ns()))
+            info.flow.append(("bind", name, enclosing(), [expr] if expr else [], chains, False, ns()))
         m = FOREACH_RE.match(low)
         if m:
             name, typ, value = m.group(1), m.group(2), m.group(3)
@@ -444,6 +459,7 @@ def scan(rel, text, root_ns=""):
             declared = m and (m.group(1) or re.match(r"^\s*(?:<[^>]*>\s*)?(?:public|friend|private|protected|const|dim|shared|readonly)\b", low))
             if declared:
                 name = m.group(2).replace("[", "").replace("]", "")
+                type_member_names.setdefault(tuple(stack), set()).add(name.lower())
                 # The declared name (Property Customer As Integer) is not a type reference.
                 line = line[:m.start(2)] + " " * (m.end(2) - m.start(2)) + line[m.end(2):]
                 kind = (m.group(1) or "").split()[0] if m.group(1) else ""
@@ -473,14 +489,42 @@ def scan(rel, text, root_ns=""):
     if not info.namespaces:
         info.namespaces.add(root_ns)
     code = "\n".join(line for _, line in body).lower()
-    # Each name is resolved from the namespace block it is written in.
-    for ctx, line in body:
+    # Names a parameter, local or loop variable declares (o As Order, Dim
+    # order = 1, For Each customer As String) are not types, and neither is
+    # a later use of one (order += 1, message.Length) in its procedure, nor
+    # of a member of the type the code is in (Order = 0, Validate()): VB
+    # looks a simple name up there before it looks for a type. A name
+    # written where only a type stands (As Order, New Order) is still one.
+    local_names = {}    # procedure number -> names declared in it
+    for (ctx, line), (types, proc) in zip(body, scopes):
         low = line.lower()
-        # Names a parameter, local or loop variable declares (o As Order,
-        # Dim order = 1, For Each customer As String) are not types.
+        found = [m.group(1) or m.group(2) for m in DECLARED_RE.finditer(low)]
+        # Lambda parameters: Sub(order) total += order, Function(x) x.Id
+        found += [re.sub(r"^(?:byval|byref)\s+", "", p.strip()).split()[0].strip("[]")
+                  for m in LAMBDA_RE.finditer(low) for p in m.group(1).split(",") if p.strip()]
+        for name in found:
+            if proc is None:
+                type_member_names.setdefault(types, set()).add(name)
+            else:
+                local_names.setdefault(proc, set()).add(name)
+
+    def shadowed(head, types, proc):
+        if head in local_names.get(proc, ()):
+            return True
+        return any(head in type_member_names.get(types[:k], ()) for k in range(len(types), 0, -1)
+                   if types[k - 1][0] != "namespace")
+
+    # Each name is resolved from the namespace block it is written in.
+    for (ctx, line), (types, proc) in zip(body, scopes):
+        low = line.lower()
         declared = {m.start(1) if m.group(1) else m.start(2) for m in DECLARED_RE.finditer(low)}
         for pos, name in chains_at(low, KEYWORDS, fold=True):
             if pos in declared and "." not in name:
+                continue
+            if "." not in name and re.match(r"\s*:=", low[pos + len(name):]):
+                continue        # Create(order:=1): a named argument, not a type
+            before = re.search(r"([\w(]+)\s*$", low[:pos])
+            if shadowed(name.split(".")[0], types, proc) and not (before and before.group(1) in TYPE_BEFORE):
                 continue
             info.names.append((ctx, name))
             if "." in name and type_written_at(low, pos, CHAIN_RE.match(low, pos).end(), TYPE_BEFORE):

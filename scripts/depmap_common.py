@@ -267,6 +267,9 @@ def run(description, mapper, options=()):
         print(f"WARN {w}", file=sys.stderr)
     print(f"files={len(files)} edges={len(edges)} batches={len(sccs)} cycles={len(cycles)} unresolved={len(rows)} external={len(external)}")
     print(f"wrote {args.out}/edges.tsv, order.txt, cycles.txt, unresolved.tsv, external.tsv")
+    if not files:
+        print("WARN: no source files of this language under --root. Check --root, and that the "
+              "language is the one this mapper reads (VB6/VBA .frm/.bas/.cls need an adapter).", file=sys.stderr)
     if len(files) > 1 and not edges:
         print("WARN: 0 edges across multiple files. Check that --root covers the "
               "whole source tree, and read unresolved.tsv.", file=sys.stderr)

@@ -32,6 +32,12 @@ incor/main.php	incor/fallback2.php
 incor/main.php	incor/opt2.php
 incor/main.php	incor/optional.php
 incor/main.php	incor/req.php
+kinds/Date.php	kinds/config.php
+kinds/PkDebug.php	kinds/config.php
+kinds/PkView.php	kinds/config.php
+kinds/users.php	kinds/Date.php
+kinds/users.php	kinds/PkDebug.php
+kinds/users.php	kinds/PkView.php
 nsrel/main.php	nsrel/app.php
 nsrel/main.php	nsrel/other.php
 nsrel2/main.php	nsrel2/boot.php

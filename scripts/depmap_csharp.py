@@ -339,6 +339,8 @@ def scan(rel, text):
                 ns = current()
                 info.namespaces.add(ns)
                 info.decls.append((ns, name))
+                if not type_depths:     # a nested Inner and Inner<T> stay with their own file
+                    info.arity.setdefault(join(ns, name), set()).add(type_args_at(code, toks[j][2]))
                 if type_depths:     # nested: a type of its own, not a copy of a same-named one
                     info.nested[join(ns, name)] = join(ns, ".".join(n for _, n in type_depths) + "." + name)
                 type_pending = name
@@ -422,9 +424,27 @@ def scan(rel, text):
     brackets = Brackets(code)
     enum_members = enum_member_offsets(toks)
     base_items = list_item_starts(code, BASE_LIST_RE, {"where"})
-    for pos, name in chains_at(code, KEYWORDS):
-        end = CHAIN_RE.match(code, pos).end()
-        if pos in enum_members or declared_name_at(code, pos, end, name):
+    chains = [(pos, name, CHAIN_RE.match(code, pos).end()) for pos, name in chains_at(code, KEYWORDS)]
+    declared = {pos for pos, name, end in chains if declared_name_at(code, pos, end, name)}
+    scopes = variable_scopes(code, brackets, [(pos, name) for pos, name, _ in chains if pos in declared])
+    for pos, name, end in chains:
+        if pos in enum_members or pos in declared:
+            continue
+        # Attempt.Succeed(): Attempt with no type arguments; Attempt<int> one.
+        # A constructor (public EnumerableTester(...) in EnumerableTester<T>)
+        # names its own type without them.
+        segs = name.split(".")
+        for seg in segs[:-1]:
+            info.written_arity.setdefault(seg, set()).add(0)
+        if not (CTOR_RE.search(code[max(0, pos - 40):pos]) and re.match(r"\s*\(", code[end:end + 50])):
+            info.written_arity.setdefault(segs[-1], set()).add(type_args_at(code, end))
+        head = name.split(".")[0]
+        if head in scopes and any(a < pos < b for a, b in scopes[head]) and not (
+                pos in base_items or attribute_name_at(code, pos, end, brackets) or cast_or_type_arg_at(code, pos, end)
+                or type_written_at(code, pos, end, TYPE_BEFORE, KEYWORDS | QUERY_WORDS)):
+            # Category == "food" in a class with a property Category, or
+            # status++ after int status: C# takes the member, parameter or
+            # local of that name before a type.
             continue
         ref = (contexts[bisect.bisect_right(offsets, pos) - 1][1], name)
         info.names.append(ref)
@@ -450,6 +470,69 @@ def scan(rel, text):
 # Attribute targets ([assembly: Foo], [return: Foo]).
 ATTRIBUTE_TARGETS = {"assembly", "module", "field", "event", "method", "param",
                      "property", "return", "type", "typevar"}
+
+
+CTOR_RE = re.compile(r"(?:\b(?:public|private|protected|internal|static|extern|unsafe)|~)\s*\Z")
+
+
+def type_args_at(code, k):
+    """How many type arguments a <...> at code[k:] holds (Result<int, string>
+    2, typeof(Result<>) 1), or 0 when none follows."""
+    while k < len(code) and code[k].isspace():
+        k += 1
+    if code[k:k + 1] != "<":
+        return 0
+    depth, commas = 0, 0
+    for j in range(k, min(len(code), k + 2000)):
+        c = code[j]
+        if c == "<":
+            depth += 1
+        elif c == ">":
+            depth -= 1
+            if depth == 0:
+                return commas + 1
+        elif c == "," and depth == 1:
+            commas += 1
+        elif c in ";{}=":
+            break
+    return 0
+
+
+def variable_scopes(code, brackets, declarations):
+    """name -> (start, end) spans where a member, parameter or local of that
+    name is in view: a member or local, the braces it is declared in; a
+    parameter, the body after its parameter list ({...} or => ...;)."""
+    scopes = {}
+    for pos, name in declarations:
+        o = brackets.around(pos)
+        if o < 0:
+            continue
+        if code[o] == "{":
+            scopes.setdefault(name, []).append((o, brackets.close.get(o, len(code))))
+        elif code[o] == "(":
+            k = brackets.close.get(o, len(code)) + 1
+            hits = [h for h in (code.find("{", k), code.find("=>", k), code.find(";", k)) if h >= 0]
+            if not hits:
+                continue
+            k = min(hits)
+            if code[k] == "{":
+                scopes.setdefault(name, []).append((k, brackets.close.get(k, len(code))))
+            elif code[k] == "=":
+                scopes.setdefault(name, []).append((k, code.find(";", k) % (len(code) + 1)))
+    return scopes
+
+
+def cast_or_type_arg_at(code, start, end):
+    """(Category)x, List<Category>, Dictionary<int, Category>: a type."""
+    k = start - 1
+    while k >= 0 and code[k].isspace():
+        k -= 1
+    if k >= 0 and code[k] in "<,":
+        return True
+    j = end
+    while j < len(code) and code[j].isspace():
+        j += 1
+    return k >= 0 and code[k] == "(" and code[j:j + 1] == ")" and re.match(r"\)\s*[\w@(]", code[j:]) is not None
 
 
 class Brackets:

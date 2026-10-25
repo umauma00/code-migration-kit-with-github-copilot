@@ -39,6 +39,8 @@ class FileInfo:
         self.extensions = []        # (namespace, name) of members called as x.Name (C# extension methods, VB module members)
         self.extension_receivers = {}   # C# extension fqn -> simple names of its receiver types (this T x)
         self.partial = set()        # FQNs declared partial in this file
+        self.arity = {}             # C#: FQN -> type parameter counts it is declared with here (Result 0, Result<T> 1)
+        self.written_arity = {}     # C#: simple type name -> type argument counts written after it here
         self.nested = {}            # namespace.Name -> namespace.Outer.Name of each type nested in another type of this file
         self.member_decls = set()   # FQNs in decls that are VB Module members, not types
         self.usings = set()         # imported namespaces (or types: Java on-demand of a type)
@@ -529,10 +531,32 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
         files = set(lookup(fq))
         return (files - nested_in.get(fq, set())) or files
 
-    def add_types(src, fqns):
+    # C# Result and Result<T> share the key Acme.Result but are different
+    # types: a mention goes to the declaration whose type parameter count
+    # the file writes after the name (Result<int>: Result<T>; Result: Result).
+    arity_of = {}       # fqn -> {file: counts}, for names declared with several counts
+    for info in infos:
+        for fq, counts in info.arity.items():
+            arity_of.setdefault(fq, {}).setdefault(info.rel, set()).update(counts)
+    arity_of = {fq: by_file for fq, by_file in arity_of.items() if len(set().union(*by_file.values())) > 1}
+    written_by = {info.rel: info.written_arity for info in infos}
+
+    def add_types(src, fqns, written_name=False):
+        """written_name: the types of a name written in src, which picks
+        Result or Result<T> by what follows it; a type reached through a
+        member or return type may be either."""
         files = set()
         mine = own.get(src, ())
         for fq in fqns:
+            if fq in arity_of:
+                by_file = arity_of[fq]
+                every = set().union(*by_file.values())
+                written = (written_by[src].get(fq.rpartition(".")[2]) if written_name else None) or every
+                if fq in mine and (not written_name or by_file.get(src, set()) >= written):
+                    continue        # its own type (with the counts the file writes)
+                candidates = top_level(fq)
+                files.update({f for f in candidates if by_file.get(f, set()) & written} or candidates)
+                continue
             if fq in mine and fq not in partial_types:
                 continue        # its own type; another copy is not a dependency
             files.update(top_level(fq))
@@ -545,6 +569,9 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
         files = files - nested_in.get(fq, set())
         if len(files) < 2 or fq in partial_types or fq in member_decls:
             continue
+        counts = [c for f, c in arity_of.get(fq, {}).items() if f in files]
+        if len(counts) == len(files) and all(not (a & b) for i, a in enumerate(counts) for b in counts[i + 1:]):
+            continue        # Result and Result<T>: different types, not copies
         for rel in sorted(files):
             seen = visible_files(rel) if visible_files else None
             others = sorted(f for f in files if f != rel and (seen is None or f in seen))
@@ -639,8 +666,10 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
     for info in infos:
         src = info.rel
         file_scope = scope_of(info, "")
-        # Partial parts of one type depend on each other.
-        for fqn in info.partial:
+        # Partial parts of one type depend on each other. VB needs Partial
+        # on one part only (Form1.vb's Public Class Form1 beside the
+        # designer's Partial Class Form1): every part is linked.
+        for fqn in sorted(info.partial | (own.get(src, set()) & partial_types)):
             add(src, lookup(fqn))
         for target in sorted(info.direct.union(*(b.direct for b in info.blocks.values()))):
             segs = target.split(".")
@@ -662,10 +691,10 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
             if lookup(u):  # Java on-demand import of a type's members, C# using of a type
                 add(src, lookup(u))
         for ctx, chain in info.names:
-            add_types(src, scope_of(info, ctx).mentioned(chain))
+            add_types(src, scope_of(info, ctx).mentioned(chain), written_name=True)
         if attribute_suffix:
             for ctx, chain in info.attribute_names:
-                add_types(src, scope_of(info, ctx).attribute(chain))
+                add_types(src, scope_of(info, ctx).attribute(chain), written_name=True)
         for text in info.strings:
             name = text.split(",")[0].strip()
             name = name.lower() if fold else name
@@ -689,8 +718,10 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
                         elems = {(fq, False) for fq, elem in final if elem}
                         final = elems or {(fq, False) for fq, _ in final}
                     bound.update(final)
-                if bound:
-                    env.setdefault(var, set()).update((fq, elem) for fq, elem in bound)
+                # A variable of a type the repository does not declare
+                # (message As String) is still a variable: message.Length is
+                # not the class Message.
+                env.setdefault(var, set()).update((fq, elem) for fq, elem in bound)
             else:
                 _, enclosing, expr, _ = step
                 enclosing = [mine.get(t, t) for t in enclosing]
@@ -1546,7 +1577,7 @@ def flow_c_like(toks, keywords, language, package=""):
                     name = name.lstrip("@")
                     if in_body:
                         members[type_stack[-1][0]].setdefault(name, []).extend(chains)
-                    elif chains:
+                    else:   # string message too: message is then a variable, not a type
                         flow.append(("bind", name, enclosing(), [], chains, False, context()))
                     i = j       # continue at the declared name
                     continue

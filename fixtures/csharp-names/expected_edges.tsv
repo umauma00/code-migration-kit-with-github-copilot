@@ -1,4 +1,9 @@
 from	to
+arity/ArResult.cs	arity/ArResultOfT.cs
+arity/ArResultOfT.cs	arity/ArResult.cs
+arity/ArService.cs	arity/ArResultOfT.cs
+arity/ArStatic.cs	arity/ArResult.cs
+arity/ArStatic.cs	arity/ArResultOfT.cs
 bases/Local.cs	bases/Repo.cs
 cimp/A/Main.cs	cimp/A/Model.cs
 cimp/B/Main.cs	cimp/B/Model.cs
@@ -39,5 +44,11 @@ extname/M5.cs	extname/E5.cs
 extname/M5.cs	extname/Thing.cs
 proj/V.cs	proj/lib/L.cs
 proj/W.cs	proj/lib/L.cs
+shadow/ShCategory.cs	shadow/ShOrder.cs
+shadow/ShReal.cs	shadow/ShCategory.cs
+shadow/ShReal.cs	shadow/ShStatus.cs
+shadow/ShReal.cs	shadow/ShValidator.cs
+shadow/ShStatus.cs	shadow/ShOrder.cs
+shadow/ShValidator.cs	shadow/ShOrder.cs
 shop/Order.cs	shop/EntityType.cs
 stat/StatV.cs	stat/Util.cs

@@ -87,6 +87,11 @@ test('source-as-spec suggests the bundled mapper for each legacy language, C# be
   for (const [language, script] of [['C#', 'csharp'], ['csharp', 'csharp'], ['Java', 'java'], ['PHP', 'php'], ['VB.NET', 'vbnet'], ['COBOL', 'cobol'], ['C', 'c'], ['C++', 'c'], ['JavaScript', 'ts']])
     assert.match(command(language), new RegExp(`depmap_${script}\\.(?:py|mjs) --root src `), language);
   assert.match(command('RPG'), /No bundled parser for RPG; write a deterministic adapter under migration\/tools\/ \(docs\/DEPENDENCY-MAPPERS\.md\)/);
+  // VB6 and VBA are not VB.NET: depmap_vbnet.py reads .vb only and would map nothing.
+  for (const language of ['VB6', 'VBA', 'Visual Basic 6', 'Visual Basic 6.0', 'Visual Basic for Applications'])
+    assert.match(command(language), /^No bundled parser for /, language);
+  for (const language of ['Visual Basic', 'Visual Basic .NET'])
+    assert.match(command(language), /depmap_vbnet\.py --root src /, language);
 });
 
 test('one user OK records 00b-02 together; unfilled contracts and gaps stop with guidance', async t => {

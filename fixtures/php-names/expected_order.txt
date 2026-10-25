@@ -49,6 +49,11 @@ incor/opt2.php
 incor/optional.php
 incor/req.php
 incor/main.php
+kinds/config.php
+kinds/Date.php
+kinds/PkDebug.php
+kinds/PkView.php
+kinds/users.php
 nsrel/app.php
 nsrel/global.php
 nsrel/other.php

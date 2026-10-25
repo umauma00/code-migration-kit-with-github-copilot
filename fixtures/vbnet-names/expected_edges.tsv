@@ -1,5 +1,7 @@
 from	to
 Order.vb	EntityType.vb
+designer/DsgForm.Designer.vb	designer/DsgForm.vb
+designer/DsgForm.vb	designer/DsgForm.Designer.vb
 imp/ImpMain.vb	imp/AT.vb
 imp/ImpMain.vb	imp/BT.vb
 imp/ImpMain.vb	imp/CT.vb
@@ -10,3 +12,5 @@ rns/App/RnsMain.vb	rns/Two/TwoC.vb
 rns/App/RnsMain.vb	rns/Two/TwoT.vb
 rns2/Rns2Main.vb	rns2/Rns2Marker.vb
 rns2/Rns2Main.vb	rns2/Rns2Model.vb
+shadow/ShMessage.vb	shadow/ShLogger.vb
+shadow/ShUser.vb	shadow/ShMessage.vb
