@@ -8,6 +8,13 @@ cond2/DMain.cs	cond2/Model.cs
 cond2/RMain.cs	cond2/Model.cs
 cond2/SMain.cs	cond2/Other.cs
 cond2/TMain.cs	cond2/Other.cs
+cond3/AMain.cs	cond3/ModelA.cs
+cond3/BMain.cs	cond3/ModelB.cs
+cond3/Boot3.cs	cond3/AMain.cs
+cond3/Boot3.cs	cond3/BMain.cs
+cond3/LMain.cs	cond3/ModelA.cs
+cond3/LMain.cs	cond3/ModelB.cs
+cond3/LMain.cs	cond3/ModelC.cs
 proj/V.cs	proj/lib/L.cs
 proj/W.cs	proj/lib/L.cs
 shop/Order.cs	shop/EntityType.cs

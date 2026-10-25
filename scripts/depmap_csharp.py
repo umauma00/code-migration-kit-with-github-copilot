@@ -86,7 +86,7 @@ REFLECTION_RE = re.compile(r"\b(Type\s*\.\s*GetType|Activator\s*\.\s*CreateInsta
 CSPROJ_USING_RE = re.compile(r"<Using\b" + ATTRS + r"(/?)>", re.IGNORECASE)
 CSPROJ_USING_END_RE = re.compile(r"</Using\s*>", re.IGNORECASE)
 # Metadata written as child elements: <Using Include="A"><Alias>X</Alias></Using>.
-CSPROJ_META_RE = re.compile(r"<(Alias|Static)\b" + ATTRS + r">\s*([^<]*?)\s*</\1\s*>", re.IGNORECASE)
+CSPROJ_META_RE = re.compile(r"<(Alias|Static)\b" + ATTRS + r"(?:/>|>\s*([^<]*?)\s*</\1\s*>)", re.IGNORECASE)
 CSPROJ_ATTR_RE = re.compile(r"\b(Include|Alias|Static)\s*=\s*" + QUOTED, re.IGNORECASE)
 
 
@@ -563,21 +563,24 @@ def csproj_usings(text):
                 # (or static) is taken, as an item under a Condition is.
                 metas.setdefault(key.lower(), []).append(value)
                 if re.search(r"\bCondition\s*=", meta_attrs, re.IGNORECASE):
-                    conditional.append(f"{key} {value} of {attrs.get('include', '').strip()}")
-        alias_names = list(dict.fromkeys(a.strip() for a in metas.get("alias", ()) if a.strip()))
+                    conditional.append(f"{key} {value or '(empty)'} of {attrs.get('include', '').strip()}")
+        # An empty value (<Alias Condition="..." />) is the item without
+        # that metadata: a plain using under that Condition, kept beside
+        # the other values.
+        alias_values = [a.strip() for a in metas.get("alias", ())]
+        alias_names = list(dict.fromkeys(a for a in alias_values if a))
         is_static = any(v.strip().lower() == "true" for v in metas.get("static", ()))
         for name in (n.strip() for n in attrs.get("include", "").split(";")):
             if not name:
                 continue
             if "$(" in name or "@(" in name or "%(" in name:
                 computed.append(name)
-            elif alias_names:
+            else:
                 for alias in alias_names:
                     aliases.setdefault(alias, []).append(name)
-            elif is_static:
-                static.append(name)
-            else:
-                usings.append(name)
+                if alias_names and "" not in alias_values:
+                    continue
+                (static if is_static else usings).append(name)
     return usings, aliases, static, computed, conditional
 
 

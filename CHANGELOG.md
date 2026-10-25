@@ -122,7 +122,7 @@
   constant arguments) are not type references (`enum EntityType {
   Customer, Order }` made a false cycle); a Java annotation on a constant
   (`@a.b.Ann A`) still is. `<Using Include="A;B">` is an item list,
-  `<Alias>`/`<Static>` may be child elements (one under a Condition is applied, with a warning, and every `<Alias>` of a `<Using>` applies), and a `<Using>` holding a
+  `<Alias>`/`<Static>` may be child elements (one under a Condition is applied, with a warning, and every `<Alias>` of a `<Using>` applies, an empty one as a plain using), and a `<Using>` holding a
   property (`$(NS).A`) is warned about and listed as unresolved (so is a VB `<Import>` with one); `Imports Global.X` and an Imports
   continued over lines are read; a PHP include inside an expression
   (`if (!include_once 'x.php') {`) ends at its own parenthesis, and

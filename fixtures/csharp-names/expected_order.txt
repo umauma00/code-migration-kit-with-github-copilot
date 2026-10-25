@@ -13,6 +13,14 @@ cond2/DMain.cs
 cond2/Other.cs
 cond2/SMain.cs
 cond2/TMain.cs
+cond3/ModelA.cs
+cond3/AMain.cs
+cond3/ModelB.cs
+cond3/BMain.cs
+cond3/Boot3.cs
+cond3/CMain3.cs
+cond3/ModelC.cs
+cond3/LMain.cs
 inline/U.cs
 inline/U2.cs
 proj/lib/L.cs
