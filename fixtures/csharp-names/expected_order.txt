@@ -66,6 +66,8 @@ flowtypes/FtTagged.cs
 flowtypes/FtService.cs
 inline/U.cs
 inline/U2.cs
+partarity/PaResult.cs
+partarity/PaResultOfT.More.cs	partarity/PaResultOfT.cs
 partmem/PmBase.cs
 partmem/PmDerived.cs
 partmem/PmProduct.Logic.cs	partmem/PmProduct.cs

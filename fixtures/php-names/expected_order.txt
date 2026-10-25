@@ -66,3 +66,8 @@ nsrel2/boot.php
 nsrel2/full.php
 nsrel2/local.php
 nsrel2/main.php
+rettype/RtConsts.php
+rettype/RtLeft.php
+rettype/RtRight.php
+rettype/RtTypes.php
+rettype/RtMain.php

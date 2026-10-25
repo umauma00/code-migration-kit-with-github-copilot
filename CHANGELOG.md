@@ -170,7 +170,9 @@
   (`#[Route('/home')]`) name their class; a VB class with
   `Partial` on one part only (WinForms designer files) links every part; C#
   `Result` and `Result<T>` are different types (`Result<(int, string)>` has
-  one type argument); VB6/VBA (not `Visual Basic 2010`) get no VB.NET mapper
+  one type argument, and a partial `Result<T>` is not a part of `Result`; VB
+  `Result(Of T)` is told from `Result` too); PHP return and union types are
+  classes even beside a same-named constant; VB6/VBA (not `Visual Basic 2010`) get no VB.NET mapper
   command and a mapper that reads no file warns; `depmap_php.py --include-var`
   is in the CLI spec.
   PHP follows computable

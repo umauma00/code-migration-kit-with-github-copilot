@@ -232,6 +232,43 @@ def attribute_name_at(toks, i):
     return False
 
 
+def union_type_at(toks, i):
+    """Whether toks[i] starts a union or intersection type before a
+    variable (A|B $x, A&B $x in a parameter, property or catch): a name
+    right before $x cannot be an expression, so FLAG | $x is not one."""
+    j = i + 1
+    while j + 1 < len(toks) and toks[j][0] in {"|", "&"} and NAME_RE.fullmatch(toks[j + 1][0]):
+        j += 2
+    if j == i + 1 or j >= len(toks):
+        return False
+    nxt = toks[j][0]
+    return nxt.startswith("$") or nxt in {"&", "..."} and j + 1 < len(toks) and toks[j + 1][0].startswith("$")
+
+
+def return_type_at(toks, i):
+    """Whether toks[i] (text, offset pairs) is in a function's return type:
+    function f(): Result, fn($x): ?Result, function () use ($y): A|(B&C).
+    Not the else branch of a ternary ($ok ? f() : Result)."""
+    k = i - 1
+    while k >= 0 and k > i - 40 and (toks[k][0] in {"?", "|", "&", "(", ")"} or NAME_RE.fullmatch(toks[k][0])):
+        k -= 1
+    if k < 1 or toks[k][0] != ":" or toks[k - 1][0] != ")":
+        return False
+    level, j = 0, k - 1
+    while j >= 0:
+        level += {")": 1, "(": -1}.get(toks[j][0], 0)
+        if level == 0:
+            break
+        j -= 1
+    before = toks[j - 1][0].lower() if j > 0 else ""
+    if before in {"function", "fn", "use"}:
+        return True
+    k = j - 2
+    while k >= 0 and toks[k][0] == "&":     # function &name(): T
+        k -= 1
+    return bool(NAME_RE.fullmatch(before)) and k >= 0 and toks[k][0].lower() == "function"
+
+
 def php_code(text):
     """Code between PHP open and close tags, comments removed and each string
     replaced by a placeholder. Returns (code, strings, interpolated): the
@@ -511,7 +548,8 @@ def scan(rel, text):
                 low in SOFT and not (low == "match" and at(i + 1) == "(" and prev.lower() != "new")
                 and not (low == "from" and prev.lower() == "yield"))):
             if not (prev.lower() in {"function", "const"} and not t.startswith("\\")) and i not in declared_at:
-                kind = "class" if prev in {"[", ","} and attribute_name_at(toks, i) else ref_kind(prev, at(i + 1), at(i + 2))
+                kind = "class" if prev in {"[", ","} and attribute_name_at(toks, i) or return_type_at(toks, i) \
+                    or union_type_at(toks, i) else ref_kind(prev, at(i + 1), at(i + 2))
                 info.refs.append((ns, t, kind, uses))
         i += 1
     # String callables: the callback argument of a function that takes one

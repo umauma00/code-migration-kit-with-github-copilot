@@ -1,3 +1,4 @@
-# strongly connected components > 1 file: 2
+# strongly connected components > 1 file: 3
+arity/ArResultOfT.More.vb	arity/ArResultOfT.vb
 designer/DsgForm.Designer.vb	designer/DsgForm.vb
 partmem/PmProduct.Logic.vb	partmem/PmProduct.vb

@@ -53,6 +53,8 @@ flowtypes/FtService.cs	flowtypes/FtTagged.cs
 flowtypes/FtService.cs	flowtypes/FtUnit.cs
 flowtypes/FtTagged.cs	flowtypes/FtTag.cs
 flowtypes/FtUnit.cs	flowtypes/FtEvents.cs
+partarity/PaResultOfT.More.cs	partarity/PaResultOfT.cs
+partarity/PaResultOfT.cs	partarity/PaResultOfT.More.cs
 partmem/PmCategory.cs	partmem/PmDerived.cs
 partmem/PmCategory.cs	partmem/PmProduct.Logic.cs
 partmem/PmCategory.cs	partmem/PmProduct.cs

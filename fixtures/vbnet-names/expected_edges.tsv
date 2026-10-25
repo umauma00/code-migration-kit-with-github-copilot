@@ -1,5 +1,11 @@
 from	to
 Order.vb	EntityType.vb
+arity/ArResultOfT.More.vb	arity/ArResultOfT.vb
+arity/ArResultOfT.vb	arity/ArResult.vb
+arity/ArResultOfT.vb	arity/ArResultOfT.More.vb
+arity/ArSvc.vb	arity/ArResult.vb
+arity/ArSvc2.vb	arity/ArResultOfT.More.vb
+arity/ArSvc2.vb	arity/ArResultOfT.vb
 casts/CsForm.vb	casts/CsCustomer.vb
 casts/CsForm.vb	casts/CsLine.vb
 casts/CsForm.vb	casts/CsOrder.vb

@@ -674,7 +674,11 @@ def resolve(infos, fold=False, global_usings=(), attribute_suffix=None,
         # on one part only (Form1.vb's Public Class Form1 beside the
         # designer's Partial Class Form1): every part is linked.
         for fqn in sorted(info.partial | (own.get(src, set()) & partial_types)):
-            add(src, lookup(fqn))
+            files = set(lookup(fqn))
+            counts = arity_of.get(fqn, {}).get(src)
+            if counts:      # partial Result<T> is not a part of Result
+                files = {f for f in files if arity_of[fqn].get(f) is None or arity_of[fqn][f] & counts}
+            add(src, files)
         for target in sorted(info.direct.union(*(b.direct for b in info.blocks.values()))):
             segs = target.split(".")
             fq = longest(segs)

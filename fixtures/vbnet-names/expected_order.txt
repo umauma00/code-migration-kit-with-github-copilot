@@ -5,6 +5,10 @@ Later.vb
 Order.vb
 Params.vb
 U.vb
+arity/ArResult.vb
+arity/ArResultOfT.More.vb	arity/ArResultOfT.vb
+arity/ArSvc.vb
+arity/ArSvc2.vb
 casts/CsCustomer.vb
 casts/CsLine.vb
 casts/CsOrder.vb

@@ -45,3 +45,7 @@ nsrel/main.php	nsrel/app.php
 nsrel/main.php	nsrel/other.php
 nsrel2/main.php	nsrel2/boot.php
 nsrel2/main.php	nsrel2/local.php
+rettype/RtMain.php	rettype/RtConsts.php
+rettype/RtMain.php	rettype/RtLeft.php
+rettype/RtMain.php	rettype/RtRight.php
+rettype/RtMain.php	rettype/RtTypes.php

@@ -448,6 +448,9 @@ def scan(rel, text, root_ns=""):
                 stack.append((kind, name))
                 info.namespaces.add(ns())
                 continue
+            if not [k for k, _ in stack if k != "namespace"]:
+                # Result and Result(Of T) are different types (nested ones stay with their file)
+                info.arity.setdefault(join(ns(), name), set()).add(of_count(low, m.end(2)))
             declare(name)
             if re.search(r"\bpartial\b", low[:m.start(1)]):
                 info.partial.add(f"{ns()}.{name}" if ns() else name)
@@ -547,6 +550,10 @@ def scan(rel, text, root_ns=""):
         for pos, name in chains_at(low, KEYWORDS, fold=True):
             if pos in declared and "." not in name:
                 continue
+            segs = name.split(".")
+            for seg in segs[:-1]:
+                info.written_arity.setdefault(seg, set()).add(0)
+            info.written_arity.setdefault(segs[-1], set()).add(of_count(low, pos + len(name)))
             if "." not in name and re.match(r"\s*:=", low[pos + len(name):]):
                 continue        # Create(order:=1): a named argument, not a type
             typed = type_place_at(low, pos)
@@ -567,6 +574,25 @@ def scan(rel, text, root_ns=""):
         if not arg.startswith('""'):
             info.dynamic.append((f"{m.group(1)}({arg})", "late binding or reflection with a computed name"))
     return info
+
+
+def of_count(low, k):
+    """How many type arguments an (Of ...) at low[k:] holds (Result(Of
+    Integer) 1, Pair(Of K, List(Of V)) 2), or 0 when none follows."""
+    m = re.compile(r"\s*\(\s*of\b").match(low, k)
+    if not m:
+        return 0
+    depth, commas = 1, 0
+    for c in low[m.end():m.end() + 2000]:
+        if c == "(":
+            depth += 1
+        elif c == ")":
+            depth -= 1
+            if depth == 0:
+                break
+        elif c == "," and depth == 1:
+            commas += 1
+    return commas + 1
 
 
 # Conversions whose second argument is a type: DirectCast(x, Customer).
