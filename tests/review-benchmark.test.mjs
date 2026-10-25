@@ -63,6 +63,23 @@ test('every seeded case fails its check and every control passes it', async () =
   }
 });
 
+test('main checks behavior while accepting valid import quotes and rejecting broken code', async t => {
+  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'bench-main-test-'));
+  t.after(() => fs.rmSync(scratch, { recursive: true, force: true }));
+  const correct = fs.readFileSync(path.join(mini, 'expected/main.mjs'), 'utf8');
+  for (const [name, content, passes] of [
+    ['double-quotes', correct.replace("from './math_ops.mjs'", 'from "./math_ops.mjs"'), true],
+    ['broken-syntax', `${correct}\nconst broken = ;\n`, false],
+    ['broken-output', correct.replace('return { quotient, remainder, greeting: message, length };', 'return {};'), false],
+    ['broken-errors', correct.replace('return { error: error.message };', 'return {};'), false]
+  ]) {
+    const file = path.join(scratch, `${name}.mjs`);
+    fs.writeFileSync(file, content);
+    const checked = await runProcess(process.execPath, [path.join(benchDir, 'checks/main.mjs'), file], { timeoutMs: 20000 });
+    assert.equal(checked.code === 0, passes, `${name}: ${checked.stderr}`);
+  }
+});
+
 test('a finding catches a defect by an exact cited line or by its pattern', () => {
   const defect = { anchors: ['ported/math_ops.mjs:3', 'src/math_ops.py:4'], pattern: 'trunc' };
   assert.ok(catches({ message: 'x', evidence: 'ported/math_ops.mjs:3 wrong' }, defect));
@@ -98,6 +115,16 @@ test('setup leaves no correct fixture code where workers can read it', async t =
   assert.deepEqual(answerLeaks(root), []);
   assert.ok(fs.existsSync(path.join(root, benchMarker)));
   assert.ok(!fs.existsSync(path.join(root, 'migration-kit/docs/REVIEW-BENCHMARK.md')));
+  const plan = async extra => {
+    const result = await runProcess(process.execPath, [path.join(kitRoot, 'scripts/review_benchmark.mjs'), 'plan', '--root', root, ...extra]);
+    assert.equal(result.code, 0, result.stderr);
+    return JSON.parse(result.stdout);
+  };
+  const initial = await plan([]), repeated = await plan(['--runs', '3']);
+  assert.equal(initial.runs, 1);
+  assert.equal(initial.total, 59);
+  assert.equal(repeated.runs, 3);
+  assert.equal(repeated.total, 177);
   // The check itself finds a leak.
   fs.writeFileSync(path.join(root, 'migration/leak.md'), 'const quotient = Math.floor(a / b);\n');
   assert.deepEqual(answerLeaks(root), ['migration/leak.md']);
@@ -178,6 +205,48 @@ test('the single reviewer is told it is the only one; dual reviewers keep the sh
   const unit = { source: 'src/math_ops.py', target: 'ported/math_ops.mjs' };
   assert.match(agentPrompt({ role: 'reviewer-semantics', unit, reviewInput: '{}', reviewFocus: 'single' }), /You are the only reviewer: report every defect/);
   assert.match(agentPrompt({ role: 'reviewer-semantics', unit, reviewInput: '{}', reviewFocus: 'shared' }), /one of two independent full reviewers/);
+  assert.match(fs.readFileSync(path.join(f.out, 'report.md'), 'utf8'), /One run per case checks the harness/);
+});
+
+test('concurrency caps model calls across dual reviewers and arbiters', async t => {
+  const f = bench(t), base = adapter();
+  f.config.concurrency = 2;
+  let active = 0, peak = 0;
+  const delayed = async options => {
+    active++; peak = Math.max(peak, active);
+    try {
+      await new Promise(resolve => setTimeout(resolve, 10));
+      return await base(options);
+    } finally { active--; }
+  };
+  await runBenchmark(f.root, f.config, delayed, { cases: loadCases(undefined, 'math-trunc'), runs: 2, part: 'review', out: f.out, maxCalls: 100 });
+  assert.equal(peak, 2);
+  assert.equal(active, 0);
+});
+
+test('arbitration rejects omitted, unknown and duplicate finding references like the runner', async t => {
+  for (const kind of ['omitted', 'unknown', 'duplicate']) {
+    const f = bench(t), base = adapter();
+    const invalid = async options => {
+      const response = await base(options);
+      if (options.role === 'arbiter') {
+        const first = response.result.decisions[0];
+        response.result.decisions = kind === 'omitted' ? [] : kind === 'unknown'
+          ? [{ ...first, finding: 'unknown:F1' }] : [first, first];
+      }
+      return response;
+    };
+    const summary = await runBenchmark(f.root, f.config, invalid, { cases: loadCases(undefined, 'math-trunc'), runs: 1, part: 'review', out: f.out, maxCalls: 100 });
+    for (const variant of ['dual', 'single']) {
+      assert.equal(summary.review[variant].failed, 1, kind);
+      assert.equal(summary.review[variant].runs, 0, kind);
+      assert.equal(summary.review[variant].missRateConfirmed, null, kind);
+    }
+    const records = fs.readFileSync(path.join(f.out, 'results.jsonl'), 'utf8').trim().split('\n').map(JSON.parse);
+    assert.ok(records.every(r => /Arbiter omitted|Unknown\/duplicate/.test(r.error)), kind);
+    assert.equal(summary.review.dual.tokens, 25);
+    assert.equal(summary.review.single.tokens, 15);
+  }
 });
 
 test('after a failure no further jobs start, and the seeded target is removed', async t => {
@@ -186,7 +255,7 @@ test('after a failure no further jobs start, and the seeded target is removed', 
   let n = 0;
   const failing = async () => { n++; throw new Error('not logged in'); };
   await assert.rejects(runBenchmark(f.root, f.config, failing, { cases: loadCases(), runs: 3, out: f.out, maxCalls: 1000 }), /First/);
-  // Two jobs at most were in flight, two reviewers each.
+  // Already-started calls can fail together, but no unbounded queue starts.
   assert.ok(n <= 4, `calls after failure: ${n}`);
   assert.ok(!fs.existsSync(safePath(f.root, 'ported/math_ops.mjs')));
   assert.ok(!fs.existsSync(safePath(f.root, 'ported')));
@@ -241,6 +310,59 @@ test('a reviewer failure after other successes counts both calls of that run', a
   assert.equal(s.review.dual.failed, 1);
   assert.equal(s.review.dual.calls, 4);
   assert.equal(s.calls, 6);
+  assert.equal(s.review.dual.tokens, null, 'failed call usage is unknown');
+  assert.equal(s.review.single.tokens, 20);
+});
+
+test('failed review runs include both reviewers and reported error usage in token totals', async t => {
+  const f = bench(t), base = adapter();
+  let rules = 0;
+  const failing = async options => {
+    if (options.role === 'reviewer-rules' && ++rules === 2) throw Object.assign(new Error('Invalid review JSON'), { tokens: 30 });
+    return base(options);
+  };
+  f.config.concurrency = 1;
+  const s = await runBenchmark(f.root, f.config, failing, { cases: loadCases(undefined, 'control-math'), runs: 2, part: 'review', out: f.out, maxCalls: 100 });
+  assert.equal(s.review.dual.tokens, 60);
+  assert.equal(s.review.single.tokens, 20);
+  const records = fs.readFileSync(path.join(f.out, 'results.jsonl'), 'utf8').trim().split('\n').map(JSON.parse);
+  assert.equal(records.find(r => r.status === 'failed').tokens, 40);
+});
+
+test('fix adapter failures keep usage but do not count as generated code failures', async t => {
+  const f = bench(t), base = adapter({ implementerFixes: true });
+  const failing = async options => {
+    if (options.role === 'fixer') throw Object.assign(new Error('network failure'), { tokens: 30 });
+    return base(options);
+  };
+  const s = await runBenchmark(f.root, f.config, failing, { cases: loadCases(undefined, 'math-trunc'), runs: 1, part: 'fix', out: f.out, maxCalls: 100 });
+  assert.equal(s.fix.fixer.failed, 1);
+  assert.equal(s.fix.fixer.runs, 0);
+  assert.equal(s.fix.fixer.passRate, null);
+  assert.equal(s.fix.fixer.tokens, 30);
+  assert.equal(s.fix.implementer.pass, 1);
+});
+
+test('generated code that times out is a failed fix, with its calls and tokens retained', async t => {
+  const f = bench(t), base = adapter({ fixerFixes: true, implementerFixes: true });
+  const hanging = async options => {
+    const response = await base(options);
+    if (options.role === 'fixer' && fs.readFileSync(safePath(options.root, options.unit.target), 'utf8').includes('Math.trunc')) {
+      response.result.content = '// PORT STATUS: complete\nfor (;;) {}\n';
+    }
+    return response;
+  };
+  const s = await runBenchmark(f.root, f.config, hanging, { cases: loadCases(undefined, 'math-trunc,math-remainder'), runs: 1, part: 'fix', out: f.out, maxCalls: 100 });
+  assert.equal(s.fix.fixer.runs, 2);
+  assert.equal(s.fix.fixer.failed, 0);
+  assert.equal(s.fix.fixer.passRate, 0.5);
+  assert.equal(s.fix.fixer.tokens, 40);
+  assert.equal(s.fix.implementer.passRate, 1);
+  const records = fs.readFileSync(path.join(f.out, 'results.jsonl'), 'utf8').trim().split('\n').map(JSON.parse);
+  const timeout = records.find(r => r.part === 'fix' && r.case === 'math-trunc' && r.variant === 'fixer');
+  assert.equal(timeout.status, 'ok');
+  assert.equal(timeout.pass, false);
+  assert.match(timeout.checkOutput, /Process timed out after/);
 });
 
 test('behavior checks run without this shell\'s environment', async t => {

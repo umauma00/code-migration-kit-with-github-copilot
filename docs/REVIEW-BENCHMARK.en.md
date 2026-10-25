@@ -2,9 +2,9 @@
 
 [日本語](REVIEW-BENCHMARK.md) | English
 
-Fewer workers in the translation loop means fewer calls and less time, but
-only a measurement shows whether quality drops. This benchmark compares two
-folds on the same seeded cases with the same Copilot CLI workers:
+A simpler set of roles may reduce calls or elapsed time, but the effect and
+quality need measuring. This benchmark compares two alternatives on the same
+seeded cases with the same Copilot CLI workers:
 
 | Comparison | Current | Fold | Measured |
 |---|---|---|---|
@@ -13,6 +13,10 @@ folds on the same seeded cases with the same Copilot CLI workers:
 
 It does not change the translation loop. A person reads the results and
 decides whether to fold.
+
+The fix comparison asks whether the implementer can do the fixer's work in a
+fresh CLI session. Both variants still make one fix call. It does not measure
+retaining the implementation session's context or eliminating that call.
 
 ## Background
 
@@ -24,8 +28,8 @@ Anthropic's article "[Building agents: When to fold subagents into your main age
 
 By the article's criteria, roles that chain outputs or touch the same data are
 fold candidates; the fixer shares the implementer's tools and output contract.
-The two reviewers are separate so the graded party does not grade itself, a
-reason outside the article's criteria. Both are measured here before deciding.
+One reviewer still provides verification independent of the generator. This
+comparison measures how much the second reviewer adds to quality.
 
 ## Steps
 
@@ -41,22 +45,23 @@ Model calls use quota and may cost money. The cases use the three files of `fixt
    `/tmp/review-bench/migration/config.json` to differ per role. Setup sets
    `reviewFocus: "shared"` so a single reviewer covers both lenses.
 
-2. Check the call bound:
+2. Start with one run per case to check the root and workers. Check the call bound:
 
    ```bash
-   node scripts/review_benchmark.mjs plan --root /tmp/review-bench --runs 3
+   node scripts/review_benchmark.mjs plan --root /tmp/review-bench
    ```
 
-   The default (9 cases x 3 runs) makes at most 177 calls: 81 for two
-   reviewers, 54 for one, 42 for fixes. The arbiter runs only when a review
+   The default is one run per case: at most 59 calls for 9 cases, with 27 for
+   two reviewers, 18 for one, and 14 for fixes. The arbiter runs only when a review
    found something, so actual calls are at or below the bound. Use
    `--part review|fix` for one half and `--cases math-trunc,text-trailer` to
-   select cases.
+   select cases. The configured `concurrency` caps actual model calls,
+   including both reviewers.
 
 3. Run with the plan's `total` as `--max-calls`:
 
    ```bash
-   node scripts/review_benchmark.mjs run --root /tmp/review-bench --runs 3 --max-calls 177
+   node scripts/review_benchmark.mjs run --root /tmp/review-bench --max-calls 59
    ```
 
    Results go to `review-bench-results/<time>/` in the temp directory
@@ -74,6 +79,18 @@ Model calls use quota and may cost money. The cases use the three files of `fixt
    start. With concurrency, calls already started count too. A single
    malformed answer is recorded as a failed run and the run goes on.
    Ctrl-C stops the run as interrupted.
+
+4. Before deciding whether to fold, repeat the same conditions more than once.
+   One run cannot reveal intermittent misses. Three runs, for example, allow
+   up to 177 calls. Check the plan again and write to a new results directory:
+
+   ```bash
+   node scripts/review_benchmark.mjs plan --root /tmp/review-bench --runs 3
+   node scripts/review_benchmark.mjs run --root /tmp/review-bench --runs 3 --max-calls 177
+   ```
+
+   Start with small cases and add cases close to real migrations before deciding.
+   A single setup check is not a basis for reducing reviewers.
 
 ## Cases and matching
 
@@ -97,10 +114,18 @@ Model calls use quota and may cost money. The cases use the three files of `fixt
   is mechanical: audit the findings in `results.jsonl` before deciding.
 - The fix comparison hands both variants the same correct findings, so review
   variance stays out of it. Fixed files are judged by the checks in
-  `fixtures/review-bench/checks/`; a file returned unchanged fails. The checks
-  import model output with Node with only PATH and the temp directory in
-  their environment, no credentials; that is not isolation, so run the
-  benchmark in a throwaway environment.
+  `fixtures/review-bench/checks/`. For `main`, a separate temporary directory
+  holds the candidate and correct dependencies; the check runs it with stdin
+  and compares its output, regardless of quote style. An unchanged file,
+  wrong output or generated code that exceeds the check's time limit fails.
+  Model-call and check-process startup failures are recorded separately.
+- Arbitration must decide every supplied finding exactly once, as in the
+  production loop. Missing, unknown or duplicate references fail that run.
+- Tokens include failed runs. If any call's usage is unavailable, the total is
+  `unknown`. Token counts are not measured charges.
+- Checks execute model output with Node with only PATH and temporary-directory
+  variables in their environment, no credentials. That is not isolation, so use
+  a throwaway environment.
 - Add cases in `fixtures/review-bench/cases.json`; `tests/review-benchmark.test.mjs`
   checks that seeded cases fail their check and controls pass it.
 

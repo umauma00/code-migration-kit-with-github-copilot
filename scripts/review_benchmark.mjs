@@ -17,7 +17,7 @@ const args = parseCommandLine(process.argv.slice(2), specs.review_benchmark);
 if (args.help) { console.log(usageText(specs.review_benchmark)); process.exit(0); }
 const command = args._[0];
 const runs = () => {
-  const n = Number(args.runs ?? 3);
+  const n = Number(args.runs ?? 1);
   if (!Number.isInteger(n) || n < 1) throw new Error('--runs must be a positive integer');
   return n;
 };
