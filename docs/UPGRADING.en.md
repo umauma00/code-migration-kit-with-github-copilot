@@ -8,6 +8,7 @@ Existing approvals and completion records are revoked once because the kit's fil
 
 1. New `scripts/review_benchmark.mjs` compares two reviewers with one, and the fixer with the implementer, on seeded cases. See [REVIEW-BENCHMARK.en.md](REVIEW-BENCHMARK.en.md). Run it from the kit checkout, not in a migration target.
 2. The translation loop is unchanged.
+3. 0.4.0 is reserved for the dependency-mapper change (in progress on another branch), so this release is 0.5.0.
 
 ## 0.3.2 (phase 00 no longer stops on a credential suspicion or misread guidance)
 

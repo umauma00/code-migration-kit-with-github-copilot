@@ -37,7 +37,7 @@ Model calls use quota and may cost money. The cases use the three files of `fixt
    node scripts/review_benchmark.mjs setup --target /tmp/review-bench --model MODEL_ID
    ```
 
-   Every role gets that model; edit `models` and `reasoningEfforts` in
+   Setup leaves this benchmark's docs and code, and the fixture judge's mutant, out of the root workers read, so the answers are not visible to them. Every role gets that model; edit `models` and `reasoningEfforts` in
    `/tmp/review-bench/migration/config.json` to differ per role. Setup sets
    `reviewFocus: "shared"` so a single reviewer covers both lenses.
 
@@ -59,10 +59,10 @@ Model calls use quota and may cost money. The cases use the three files of `fixt
    node scripts/review_benchmark.mjs run --root /tmp/review-bench --runs 3 --max-calls 177
    ```
 
-   Results go to `/tmp/review-bench/bench-results/<time>/`: `report.md`
+   Results go to `review-bench-results/<time>/` in the temp directory (printed when the run ends), never inside the root, which workers can read; `--out` moves them. A root setup did not make, or one with a file at a case's target, stops the run before anything is written. The output holds `report.md`
    (tables and the cases that changed), `summary.json`, `results.jsonl` (every
    finding, its match and tokens per run) and `fixes/`. If the first call fails
-   (login, model ID), the run stops without measuring anything.
+   (login, model ID), the run stops without measuring anything: calls in flight are aborted and no new ones start.
 
 ## Cases and matching
 
@@ -77,13 +77,17 @@ Model calls use quota and may cost money. The cases use the three files of `fixt
 | main-import | imports `./math_ops.js` (rules require .mjs) | rules |
 | control-math / control-text | none: every finding is a false finding | — |
 
-- A finding catches a defect when it cites the defect's line (within one
-  line) as `path:line`, or matches the defect's `pattern`. Matching is
-  mechanical: audit the findings in `results.jsonl` before deciding.
+- A finding catches a defect when it cites the defect's exact line as
+  `path:line`, or matches the defect's `pattern`. One finding counts for one
+  defect at most: a cited line decides first, and a finding whose words alone
+  match several defects counts for none (recorded as `ambiguous`). Matching
+  is mechanical: audit the findings in `results.jsonl` before deciding.
 - The fix comparison hands both variants the same correct findings, so review
   variance stays out of it. Fixed files are judged by the checks in
   `fixtures/review-bench/checks/`; a file returned unchanged fails. The checks
-  import model output with Node, so run the benchmark in a throwaway root.
+  import model output with Node with only PATH and the temp directory in
+  their environment, no credentials; that is not isolation, so run the
+  benchmark in a throwaway environment.
 - Add cases in `fixtures/review-bench/cases.json`; `tests/review-benchmark.test.mjs`
   checks that seeded cases fail their check and controls pass it.
 
@@ -93,7 +97,8 @@ Following the article (keep it separate if the score drops), consider a fold onl
 
 - **Review**: one reviewer's miss rate after the arbiter is at or below two
   reviewers', no defect is caught less often by one reviewer under "Cases that
-  changed", and confirmed findings on clean controls do not rise.
+  changed", and confirmed findings on clean controls do not rise. A case
+  whose completed runs differ (failures) is marked: measure it again with equal runs.
 - **Fix**: the implementer's pass rate is at or above the fixer's, with no case passing fewer times.
 
 No difference is not proof that a fold is safe: three small files and eight

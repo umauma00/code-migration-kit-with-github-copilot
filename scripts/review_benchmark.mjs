@@ -5,10 +5,11 @@
 // throwaway root from fixtures/mini; plan prints the call bound; run makes
 // real Copilot CLI calls with the models in that root's migration/config.json.
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { prepare } from '../tests/helpers.mjs';
 import { loadConfig, safePath, writeJSON, stamp } from '../lib/core.mjs';
-import { loadCases, benchPlan, runBenchmark } from '../lib/bench.mjs';
+import { loadCases, benchPlan, runBenchmark, benchMarker } from '../lib/bench.mjs';
 import { parseCommandLine, specs, usageText } from '../lib/cli.mjs';
 import { createCopilotAdapter } from './copilot_adapter.mjs';
 
@@ -31,6 +32,13 @@ try {
     // the single reviewer must check both lenses to be a fair fold.
     config.reviewFocus = 'shared';
     writeJSON(safePath(root, 'migration/config.json'), config);
+    // Workers read this root with view/grep/glob. Leave out what names the
+    // seeded defects or holds correct code: the benchmark's own docs and code,
+    // and the fixture judge's mutant and cases. The benchmark runs from the kit.
+    for (const name of ['migration-kit/docs/REVIEW-BENCHMARK.md', 'migration-kit/docs/REVIEW-BENCHMARK.en.md', 'migration-kit/lib/bench.mjs', 'migration-kit/scripts/review_benchmark.mjs', 'tests']) {
+      fs.rmSync(safePath(root, name), { recursive: true, force: true });
+    }
+    writeJSON(safePath(root, benchMarker), { schemaVersion: 1, kind: 'review-benchmark-root', createdAt: stamp() });
     console.log(JSON.stringify({ root, models: config.models, next: `Choose models per role if they differ (migration/config.json models), then: node scripts/review_benchmark.mjs plan --root ${root}` }, null, 2));
   } else {
     if (!args.root) throw new Error(`${command} needs --root PATH (a directory made by setup)`);
@@ -39,7 +47,8 @@ try {
     const plan = benchPlan(cases, { runs: runs(), part: args.part ?? 'all' });
     if (command === 'plan') console.log(JSON.stringify({ ...plan, models: config.models, reviewFocus: config.reviewFocus }, null, 2));
     else {
-      const out = path.resolve(args.out ?? path.join(root, 'bench-results', stamp().replace(/[:.]/g, '-')));
+      // Outside the root: workers can read the root, and results hold the answers.
+      const out = path.resolve(args.out ?? path.join(os.tmpdir(), 'review-bench-results', stamp().replace(/[:.]/g, '-')));
       const controller = new AbortController();
       process.once('SIGINT', () => controller.abort());
       const summary = await runBenchmark(root, config, createCopilotAdapter({ command: args.copilot }), {

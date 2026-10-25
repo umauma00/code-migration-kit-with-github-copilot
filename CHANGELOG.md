@@ -12,7 +12,8 @@
   if the score drops. `run` refuses a `--max-calls` below the planned bound
   and stops if the first call fails. The translation loop is unchanged; the
   implementer is told to apply findings only when the benchmark hands it
-  `confirmedFindings`, which the loop never does.
+  `confirmedFindings`, which the loop never does. 0.4.0 is reserved for the
+  dependency-mapper change still in progress on another branch.
 
 # 0.3.2 — 2026-10-23
 

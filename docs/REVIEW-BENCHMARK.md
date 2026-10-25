@@ -31,7 +31,7 @@ Anthropic の記事「[Building agents: When to fold subagents into your main ag
    node scripts/review_benchmark.mjs setup --target /tmp/review-bench --model MODEL_ID
    ```
 
-   全担当に同じモデルが入ります。担当ごとに変える場合は `/tmp/review-bench/migration/config.json` の `models` と `reasoningEfforts` を編集します。レビューの観点は `reviewFocus: "shared"` に設定されます（1人のレビューでも両方の観点を見るため）。
+   setup は、ワーカーが読めるルートから、このベンチマークの文書・コードと、比較器の mutant などを除きます。題材の答えをワーカーに見せないためです。全担当に同じモデルが入ります。担当ごとに変える場合は `/tmp/review-bench/migration/config.json` の `models` と `reasoningEfforts` を編集します。レビューの観点は `reviewFocus: "shared"` に設定されます（1人のレビューでも両方の観点を見るため）。
 
 2. 呼び出し回数の上限を確認します。
 
@@ -47,7 +47,7 @@ Anthropic の記事「[Building agents: When to fold subagents into your main ag
    node scripts/review_benchmark.mjs run --root /tmp/review-bench --runs 3 --max-calls 177
    ```
 
-   結果は `/tmp/review-bench/bench-results/<時刻>/` に出ます。
+   結果は一時ディレクトリの `review-bench-results/<時刻>/` に出ます（場所は実行後に表示されます）。ワーカーはルートを読めるので、結果をルートの中に置くことはできません。`--out` で場所を変えられます。setup で作っていないルートや、題材の出力先にファイルがあるルートでは、何も書かずに止まります。
 
    | ファイル | 内容 |
    |---|---|
@@ -56,7 +56,7 @@ Anthropic の記事「[Building agents: When to fold subagents into your main ag
    | `results.jsonl` | 1回ごとの全指摘・照合結果・トークン |
    | `fixes/` | 修正結果のファイル |
 
-   最初の呼び出しが失敗したとき（ログインやモデルIDの誤り）は、何も測らずに止まります。
+   最初の呼び出しが失敗したとき（ログインやモデルIDの誤り）は、何も測らずに止まります。実行中の呼び出しを止め、新しい呼び出しも始めません。
 
 ## 題材と照合
 
@@ -71,15 +71,15 @@ Anthropic の記事「[Building agents: When to fold subagents into your main ag
 | main-import | `./math_ops.js` を import（規則は .mjs） | 規則 |
 | control-math / control-text | 欠陥なし（指摘はすべて誤検出） | — |
 
-- 指摘が欠陥の行（前後1行まで）を `パス:行` で挙げているか、欠陥ごとの語句（`pattern`）に当てはまれば、見つけたと数えます。機械的な照合なので、判断の前に `results.jsonl` の指摘を目で確かめてください。
-- 修正の比較では、両方に同じ正解の指摘を渡します。レビューのばらつきを修正の比較に混ぜないためです。修正後のファイルは `fixtures/review-bench/checks/` の動作チェックで判定します。未変更で返したときは不合格です。チェックはモデルが返したコードを Node で import するので、検証用のディレクトリで実行してください。
+- 指摘が欠陥の行をそのまま `パス:行` で挙げているか、欠陥ごとの語句（`pattern`）に当てはまれば、見つけたと数えます。1つの指摘で数える欠陥は1つまでです。行の一致を語句より優先し、語句だけで複数の欠陥に当たる指摘はどれにも数えません（`ambiguous` と記録します）。機械的な照合なので、判断の前に `results.jsonl` の指摘を目で確かめてください。
+- 修正の比較では、両方に同じ正解の指摘を渡します。レビューのばらつきを修正の比較に混ぜないためです。修正後のファイルは `fixtures/review-bench/checks/` の動作チェックで判定します。未変更で返したときは不合格です。チェックはモデルが返したコードを Node で import します。環境変数は PATH と一時ディレクトリだけを渡し、資格情報は渡しません。それでも隔離はされないので、使い捨ての環境で実行してください。
 - 題材を足すときは `fixtures/review-bench/cases.json` に書きます。欠陥ありの題材はチェックに落ち、欠陥なしの題材は通ることを `tests/review-benchmark.test.mjs` が確かめます。
 
 ## 判断の目安
 
 記事の原則（スコアが下がったら分けたまま）に沿って、次をすべて満たすときだけ統合を検討します。
 
-- **レビュー**：レビュー1人の裁定後の見逃し率がレビュー2人以下で、「Cases that changed」にレビュー1人が少なく見つけた欠陥がない。欠陥なし題材での確定した誤検出も増えていない。
+- **レビュー**：レビュー1人の裁定後の見逃し率がレビュー2人以下で、「Cases that changed」にレビュー1人が少なく見つけた欠陥がない。欠陥なし題材での確定した誤検出も増えていない。失敗した回があって回数がそろわない題材は、注記が付きます。回数をそろえて測り直してください。
 - **修正**：implementer の合格率が fixer 以上で、合格回数が減った題材がない。
 
 差がなくても、統合して安全だという証明にはなりません。題材は小さな3ファイルで、欠陥は8件だけです。実案件に近い難しい題材を足してから判断することを勧めます。統合すると決めた場合も、翻訳ループの変更は別の変更として入れ、同じベンチマークで確かめ直します。
