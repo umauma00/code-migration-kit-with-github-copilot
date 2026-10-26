@@ -210,10 +210,13 @@ const reviewLenses = {
 };
 export function agentPrompt({ role, unit, extra = {}, reviewInput, frozenInput, reviewMode = 'frozen', reviewFocus }) {
   const contracts = {
-    implementer: 'Return {"schemaVersion":1,"kind":"implementation","target":"PATH","content":"COMPLETE TARGET FILE","summary":"reason"}. Translate faithfully; preserve source behavior. Return code, do not write files.',
+    // Only the fold benchmark (lib/bench.mjs) hands the implementer findings;
+    // the translation loop never does, so its implementer prompt is unchanged.
+    implementer: `Return {"schemaVersion":1,"kind":"implementation","target":"PATH","content":"COMPLETE TARGET FILE","summary":"reason"}. Translate faithfully; preserve source behavior. Return code, do not write files.${Array.isArray(extra.confirmedFindings) ? ' The target exists: apply ONLY extra.confirmedFindings to it and preserve all other behavior.' : ''}`,
     fixer: 'Return {"schemaVersion":1,"kind":"implementation","target":"PATH","content":"COMPLETE FIXED FILE","summary":"changes"}. Apply ONLY confirmed findings; preserve all other behavior. Return code, do not write files.',
-    ...Object.fromEntries(Object.entries(reviewLenses).map(([reviewer, lens]) => [reviewer, reviewFocus === 'shared'
-      ? `Check ${lens} first, then ${reviewLenses[reviewer === 'reviewer-rules' ? 'reviewer-semantics' : 'reviewer-rules']}. You are one of two independent full reviewers: report every defect either check finds.`
+    // single exists only in the fold benchmark (lib/bench.mjs); config validation rejects it.
+    ...Object.fromEntries(Object.entries(reviewLenses).map(([reviewer, lens]) => [reviewer, reviewFocus === 'shared' || reviewFocus === 'single'
+      ? `Check ${lens} first, then ${reviewLenses[reviewer === 'reviewer-rules' ? 'reviewer-semantics' : 'reviewer-rules']}. ${reviewFocus === 'single' ? 'You are the only reviewer' : 'You are one of two independent full reviewers'}: report every defect either check finds.`
       : `Check ${lens}.`])),
     arbiter: 'Return {"schemaVersion":1,"kind":"arbitration","target":"PATH","decisions":[{"finding":"reviewer-role:ID","confirmed":true,"reason":"source/rule evidence"}]}. Decide EVERY supplied finding exactly once. Default to not confirmed when evidence is insufficient. Each samePlace pair is two findings citing the same source location: confirm both only if they ask for compatible changes; if they conflict, confirm at most the one the evidence supports.',
     surveyor: 'Return {"schemaVersion":1,"kind":"survey","survey":"KIND from the input","target":"PATH","items":[...]} following the task in the frozen input exactly. Every item cites PATH:LINE inside the given files. Return only facts the given files show; never propose code.',

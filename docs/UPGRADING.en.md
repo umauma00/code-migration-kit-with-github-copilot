@@ -1,6 +1,14 @@
-# Upgrading (0.4.0 and earlier releases)
+# Upgrading (0.5.0 and earlier releases)
 
 [日本語](UPGRADING.md) | English
+
+## 0.5.0 (benchmark for folding workers)
+
+Existing approvals and completion records are revoked once because the kit's files (lib, scripts) change. Re-validate from judge. Completed outputs are kept.
+
+1. New `scripts/review_benchmark.mjs` compares two reviewers with one, and the fixer with the implementer, on seeded cases. See [REVIEW-BENCHMARK.en.md](REVIEW-BENCHMARK.en.md). Run it from the kit checkout, not in a migration target.
+2. The translation loop is unchanged.
+3. This release also includes the dependency mappers added in 0.4.0. When upgrading from 0.3.2 or earlier, also follow the 0.4.0 instructions below.
 
 ## 0.4.0 (dependency mappers for C#, Java, VB.NET, PHP and COBOL)
 

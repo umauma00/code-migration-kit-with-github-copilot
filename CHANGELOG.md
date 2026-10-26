@@ -1,3 +1,26 @@
+# 0.5.0 — 2026-10-25
+
+- Seeded-defect benchmark for folding workers together
+  (`scripts/review_benchmark.mjs`, `lib/bench.mjs`, `fixtures/review-bench/`,
+  [docs/REVIEW-BENCHMARK.en.md](docs/REVIEW-BENCHMARK.en.md)). It compares two
+  independent reviewers with one shared reviewer (miss rate after the arbiter,
+  findings on clean controls) and the fixer with the implementer handed the same
+  confirmed findings (behavior-check pass rate), and lists the cases whose
+  result changed. Start with one run per case (at most 59 calls); repeat with
+  `--runs 3` before making a fold decision (at most 177 calls). It follows Anthropic's article
+  "[Building agents: When to fold subagents into your main agent loop](https://claude.com/ja/resources/articles/building-agents-when-to-fold-subagents-into-your-main-agent-loop)"
+  (2026-10-22): measure first, fold one worker at a time, keep it separate
+  if the score drops. `run` refuses a `--max-calls` below the planned bound
+  and stops when three calls fail before any works. The translation loop is unchanged; the
+  implementer is told to apply findings only when the benchmark hands it
+  `confirmedFindings`, which the loop never does.
+- Benchmark checks now execute main's inputs and outputs, count generated-code
+  timeouts as failed fixes, validate every arbitration reference, include failed
+  calls in token totals (unknown usage stays unknown), and cap actual model calls
+  at `concurrency`, including both reviewers.
+- All benchmark checks require a real final PORT STATUS comment; a header or
+  string containing those words no longer counts as a completed fix.
+
 # 0.4.0 — 2026-10-23
 
 - 2026-10-23 dependency mappers for C#, Java, VB.NET, PHP and COBOL
