@@ -4,8 +4,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-const text = fs.readFileSync(process.argv[2], 'utf8');
-assert.match(text, /PORT STATUS/, 'PORT STATUS trailer missing');
+import { readCandidate } from './common.mjs';
+const text = readCandidate(process.argv[2]);
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'bench-main-'));
 try {
   fs.writeFileSync(path.join(scratch, 'main.mjs'), text);

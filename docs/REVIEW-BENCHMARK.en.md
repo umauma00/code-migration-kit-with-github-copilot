@@ -121,6 +121,9 @@ Model calls use quota and may cost money. The cases use the three files of `fixt
   Model-call and check-process startup failures are recorded separately.
 - Arbitration must decide every supplied finding exactly once, as in the
   production loop. Missing, unknown or duplicate references fail that run.
+- Every case needs a PORT STATUS comment on the last nonempty line. A header
+  or string containing the words does not pass. Trailing blank lines and CRLF
+  are allowed.
 - Tokens include failed runs. If any call's usage is unavailable, the total is
   `unknown`. Token counts are not measured charges.
 - Checks execute model output with Node with only PATH and temporary-directory

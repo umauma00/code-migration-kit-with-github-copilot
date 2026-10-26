@@ -18,6 +18,8 @@
   timeouts as failed fixes, validate every arbitration reference, include failed
   calls in token totals (unknown usage stays unknown), and cap actual model calls
   at `concurrency`, including both reviewers.
+- All benchmark checks require a real final PORT STATUS comment; a header or
+  string containing those words no longer counts as a completed fix.
 
 # 0.4.0 — 2026-10-23
 

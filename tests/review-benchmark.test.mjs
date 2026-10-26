@@ -80,6 +80,43 @@ test('main checks behavior while accepting valid import quotes and rejecting bro
   }
 });
 
+test('all behavior checks require a final status comment and accept blank lines and CRLF', async t => {
+  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'bench-trailer-test-'));
+  t.after(() => fs.rmSync(scratch, { recursive: true, force: true }));
+  for (const name of ['math_ops', 'text_ops', 'main']) {
+    const correct = fs.readFileSync(path.join(mini, 'expected', `${name}.mjs`), 'utf8');
+    const body = correct.replace(/^\/\/ PORT STATUS[^\r\n]*(?:\r?\n|$)/m, '');
+    for (const [variant, content, passes] of [
+      ['header', `// PORT STATUS: complete\n${body}`, false],
+      ['string', `${body}\nconst status = 'PORT STATUS: complete';\n`, false],
+      ['template', `${body}\nconst status = \`\n// PORT STATUS: complete\`;\n`, false],
+      ['crlf', `${body}\n// PORT STATUS: complete\n\n \t\n`.replaceAll('\n', '\r\n'), true],
+      ['block-comment', `${body}\n/* PORT STATUS: complete */\n`, true]
+    ]) {
+      const file = path.join(scratch, `${name}-${variant}.mjs`);
+      fs.writeFileSync(file, content);
+      const checked = await runProcess(process.execPath, [path.join(benchDir, 'checks', `${name}.mjs`), file], { timeoutMs: 20000 });
+      assert.equal(checked.code === 0, passes, `${name} ${variant}: ${checked.stderr}`);
+    }
+  }
+});
+
+test('fix scoring rejects a status header and accepts the required trailer', async t => {
+  const f = bench(t), cases = loadCases(undefined, 'text-trailer');
+  const seeded = fs.readFileSync(path.join(benchDir, cases[0].file), 'utf8');
+  const base = adapter({ fixerFixes: true, implementerFixes: true });
+  const fixes = async options => {
+    const response = await base(options);
+    response.result.content = options.role === 'fixer' ? `// PORT STATUS: complete\n${seeded}` : `${seeded}\n// PORT STATUS: complete\n`;
+    return response;
+  };
+  const s = await runBenchmark(f.root, f.config, fixes, { cases, runs: 1, part: 'fix', out: f.out, maxCalls: 2 });
+  assert.equal(s.fix.fixer.passRate, 0);
+  assert.equal(s.fix.fixer.failed, 0);
+  assert.equal(s.fix.implementer.passRate, 1);
+  assert.equal(s.fixChanges.length, 1);
+});
+
 test('a finding catches a defect by an exact cited line or by its pattern', () => {
   const defect = { anchors: ['ported/math_ops.mjs:3', 'src/math_ops.py:4'], pattern: 'trunc' };
   assert.ok(catches({ message: 'x', evidence: 'ported/math_ops.mjs:3 wrong' }, defect));
@@ -348,7 +385,7 @@ test('generated code that times out is a failed fix, with its calls and tokens r
   const hanging = async options => {
     const response = await base(options);
     if (options.role === 'fixer' && fs.readFileSync(safePath(options.root, options.unit.target), 'utf8').includes('Math.trunc')) {
-      response.result.content = '// PORT STATUS: complete\nfor (;;) {}\n';
+      response.result.content = 'for (;;) {}\n// PORT STATUS: complete\n';
     }
     return response;
   };
@@ -369,7 +406,7 @@ test('behavior checks run without this shell\'s environment', async t => {
   const f = bench(t);
   process.env.BENCH_TEST_SECRET = 'x';
   t.after(() => { delete process.env.BENCH_TEST_SECRET; });
-  const leaky = unit => `${fs.readFileSync(path.join(mini, 'expected', path.basename(unit.target)), 'utf8')}if (process.env.BENCH_TEST_SECRET) throw new Error('environment leaked');\n`;
+  const leaky = unit => `if (process.env.BENCH_TEST_SECRET) throw new Error('environment leaked');\n${fs.readFileSync(path.join(mini, 'expected', path.basename(unit.target)), 'utf8')}`;
   const s = await runBenchmark(f.root, f.config, adapter({ fixedContent: leaky }), { cases: loadCases(undefined, 'math-trunc'), runs: 1, part: 'fix', out: f.out, maxCalls: 100 });
   assert.equal(s.fix.fixer.pass, 1);
 });
