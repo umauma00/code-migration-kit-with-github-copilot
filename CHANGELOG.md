@@ -1,3 +1,51 @@
+# 0.6.0 — 2026-10-26
+
+- Exercise large legacy C# sources from three pinned OSS releases with a
+  transport-only test double, using explicitly converted UTF-8 working copies
+  for non-UTF-8 files. Real model analysis and formal phase 02 completion remain
+  unverified. Balance source and census capacity to avoid thousands of redundant inventory calls;
+  preserve readable scopes, report unreadable/missing inputs as incomplete,
+  reject partial merges and reuse successful scopes after input repair.
+- Address six P2 findings from Astra's full-change review: JSX closing tags,
+  source selection before indexing across all eight mappers, diagnostic
+  cancellation, malformed survey payload recovery through the real adapter,
+  systemic failures with transient status codes, and shutdown log preservation.
+- Harden all eight dependency-mapper paths: Python BOM/coding cookies and
+  unresolved parse errors, PHP composer metadata shapes and decoded tagged
+  sources, iterative C#/VB.NET Import expansion and directory/metadata walks,
+  comment-aware C/C++ and JS/TS references and emitted TypeScript suffixes.
+  Keep unparsed files explicit and retain existing fixture graph bytes.
+- Generate source-spec commands for every configured source root with quoted
+  paths and prefix-only manifest --map-root mappings, verified end to end for
+  all languages without compiling or executing their original applications.
+- Add inventory-preview using the formal merge's shared parser/renderer, so
+  preparation needs no ad hoc TSV review-candidate helper. Preserve comments,
+  validated shards and official files; optional inventory-merge --expected-hash
+  verifies reviewed bytes before publication. Fix coordinator helper contract
+  bugs within the authorized phase without asking to bypass validation.
+- Make normal and legacy-config execution continuous: remove implicit worker,
+  command and diagnostic deadlines, call/fix/input/credit/retry-count stops and
+  default build-loop round/stalled stops. Explicit user budgets/cancellation
+  and real validation/permission/input failures remain enforced.
+- Spill large process output to full logs instead of terminating at 16 MiB;
+  parse CLI JSONL and build diagnostics from all output, including the middle.
+- Fragment a single oversized survey source, including huge minified lines,
+  preserve original line/column ranges and Unicode, and resume validated parts.
+  Require all parts for completion and retain cross-fragment unknowns.
+- Document every stop category and add a reproducible source index of explicit
+  exits, exceptions, cancellation, termination, deadlines and control flow.
+- Number frozen survey source lines and validate citation bounds. Preserve valid
+  rows and legacy completed scopes; correct rejected contracts/inventory once
+  within the same call budget, and resume only unfinished rows. Split oversized
+  pending requests by file/census subset without changing saved scope IDs or
+  publishing incomplete scope results.
+- Add `status --fast` for recorded progress without source scans, live survey
+  progress records and CLI liveness messages. Reuse source fingerprints within
+  a full read-only status report; execution/gates still revalidate normally.
+- Continue authorized bounded recovery and diagnostics without repeated user
+  questions. Treat quiet output as waiting, respect explicit cancellation and
+  ask only when recovery is exhausted or a new decision is required.
+
 # 0.5.0 — 2026-10-25
 
 - Seeded-defect benchmark for folding workers together

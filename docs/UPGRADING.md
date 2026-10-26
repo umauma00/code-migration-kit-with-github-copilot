@@ -1,6 +1,12 @@
-# 更新手順（0.5.0 と以前の版）
+# 更新手順（0.6.0 と以前の版）
 
 日本語 | [English](UPGRADING.en.md)
+
+## 0.6.0（継続実行と巨大survey）
+
+依存解析の追加修正では、Python版はすべてdepmap_common.pyを使い、JS/TS版はdepmap_js_scan.mjsを読みます。source-specの生成コマンドは全8mapperの--source-rootとmake_manifest.pyの新しい--map-rootを使います。単一スクリプトだけでなくキット全体を更新し、既存の期待結果と未解決情報を確認して依存マップ・manifest・依存宣言を再生成してください。
+
+キットの更新後はexecutionMode未指定の既存設定もcontinuousとして動作します。旧設定の600秒・呼び出し数・修正回数で中断しません。有限の上限を望む場合だけ利用者がboundedを選びます。巨大ソースは全survey種類で断片処理し、正常な既存scopeと断片を保持します。移行先にコピーしたキットは更新が必要です。停止条件・ログ保存・外部制約は [継続方針](INTERRUPTION-POLICY.md) を参照してください。
 
 ## 0.5.0（ワーカー統合を測るベンチマーク）
 

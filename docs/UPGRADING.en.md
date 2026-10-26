@@ -1,6 +1,20 @@
-# Upgrading (0.5.0 and earlier releases)
+# Upgrading (0.6.0 and earlier releases)
 
 [日本語](UPGRADING.md) | English
+
+## 0.6.0 (continuous execution and large surveys)
+
+The mapper fixes make every Python mapper depend on depmap_common.py, add
+depmap_js_scan.mjs beside the JS/TS mapper, and use every mapper's --source-root
+and make_manifest.py --map-root from generated source-spec commands. Update the complete kit together; then
+regenerate and audit the map, manifest and review dependency declaration.
+
+After upgrading the installed kit, existing configurations without executionMode
+also run continuously: saved 600-second/call/fix defaults no longer interrupt
+work. Only choose bounded mode when finite limits are wanted. All survey kinds
+process oversized source bodies as resumable validated fragments. Current valid
+scope results are retained. Repository-copy installations must update their kit.
+See [interruption conditions and logging](INTERRUPTION-POLICY.md).
 
 ## 0.5.0 (benchmark for folding workers)
 
