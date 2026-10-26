@@ -1,0 +1,23 @@
+[
+  {
+    "id": "dnn-7.4.2",
+    "repository": "dnnsoftware/Dnn.Platform",
+    "tag": "v7.4.2",
+    "commit": "331764de9a65dc01f1c9e1205a2e70b1b3079df3",
+    "archiveSha256": "5edd45d853f7f36e68d320540740f4edafea527cf7a0365fab68d2598da48402"
+  },
+  {
+    "id": "nopcommerce-3.90",
+    "repository": "nopSolutions/nopCommerce",
+    "tag": "release-3.90",
+    "commit": "12d1f0139149a9d6e84964d325d62bae6ac748f6",
+    "archiveSha256": "ba69193e7f06de89370cc80be0060890b16af2856061f40756babece8d8ece69"
+  },
+  {
+    "id": "nhibernate-4.1.1",
+    "repository": "nhibernate/nhibernate-core",
+    "tag": "4.1.1.GA",
+    "commit": "b64b6b74278a12a6a12e19e6a33f97fac6b6c910",
+    "archiveSha256": "540cfb34b27ebf787226da49d71a57bd078068a4f748523bb9c5b290411659d5"
+  }
+]

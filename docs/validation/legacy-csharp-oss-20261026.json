@@ -1,0 +1,320 @@
+{
+  "schemaVersion": 1,
+  "kind": "legacy-csharp-oss-transport-verification",
+  "startedAt": "2026-10-26T16:51:31.176Z",
+  "finishedAt": "2026-10-26T16:56:38.184Z",
+  "kitHead": "0e3c71b plus working-tree fixes",
+  "liveModelCalls": 0,
+  "semanticStep02Completed": false,
+  "networkBlock": "Copilot models.list: api.individual.githubcopilot.com tunnel error",
+  "scope": "All C# sources plus project/config/license text. Original archives preserved. UTF-8 working copies use explicit benchmark-only cp1252/BOM assumptions; no binaries, markup or original execution.",
+  "results": [
+    {
+      "id": "dnn-7.4.2",
+      "repository": "dnnsoftware/Dnn.Platform",
+      "tag": "v7.4.2",
+      "commit": "331764de9a65dc01f1c9e1205a2e70b1b3079df3",
+      "archiveSha256": "5edd45d853f7f36e68d320540740f4edafea527cf7a0365fab68d2598da48402",
+      "csharpFiles": 2711,
+      "csharpBytes": 20276901,
+      "largeCsharpFiles": 25,
+      "normalizedCsharp": 1164,
+      "stages": {
+        "dependencyMap": {
+          "seconds": 19.369,
+          "files": 2711,
+          "edges": 16857,
+          "unresolved": 183
+        },
+        "manifest": {
+          "seconds": 0.036
+        },
+        "reviewDependencies": {
+          "seconds": 2.976
+        },
+        "contracts": {
+          "seconds": 7.681,
+          "files": 2894,
+          "sites": 0,
+          "requests": 1347,
+          "requestBytes": 25596738,
+          "maxRequestBytes": 65535,
+          "sourceCharacters": 21155102,
+          "scopes": 691,
+          "liveModelCalls": 0,
+          "outputBytes": 1442570,
+          "resume": {
+            "requests": 0,
+            "seconds": 2.432
+          }
+        },
+        "inventory": {
+          "seconds": 51.861,
+          "files": 2711,
+          "sites": 31878,
+          "requests": 1757,
+          "requestBytes": 36847642,
+          "maxRequestBytes": 65533,
+          "sourceCharacters": 20193663,
+          "scopes": 651,
+          "censusMode": "all raw-text matches of the documented construct vocabulary plus file fallback; not a semantic-completeness proof",
+          "liveModelCalls": 0,
+          "preview": {
+            "seconds": 1.65,
+            "sites": 31878,
+            "unknown": 31878,
+            "outputHash": "480fa3eb88ee3973b54563704c59746530ca721d61f154315db4525c654d54e9"
+          }
+        },
+        "phase02": {
+          "completed": false,
+          "formalInventoryPublished": false,
+          "reason": "Live semantic survey, independent preparation audits and human gates have not run"
+        },
+        "largestResume": {
+          "file": "DNN Platform/Library/Services/Upgrade/Upgrade.cs",
+          "originalBytes": 290855,
+          "utf8Bytes": 290856,
+          "preservedParts": 2,
+          "resumedRequests": 5,
+          "repeatedValidatedRequests": 0
+        },
+        "dense628": {
+          "requests": 22,
+          "maxRequestBytes": 65532,
+          "note": "real largest file with a synthetic 628-site load; no live model calls"
+        }
+      },
+      "semanticStep02Completed": false,
+      "sameInputDenseComparison": {
+        "before": {
+          "id": "dnn-7.4.2",
+          "file": "source/DNN Platform/Library/Services/Upgrade/Upgrade.cs",
+          "sourceBytes": 290855,
+          "sites": 628,
+          "requests": 3144,
+          "fragments": 7,
+          "maxRequestBytes": 65532,
+          "requestBytes": 205885152,
+          "seconds": 2.886
+        },
+        "after": {
+          "id": "dnn-7.4.2",
+          "file": "source/DNN Platform/Library/Services/Upgrade/Upgrade.cs",
+          "sourceBytes": 290855,
+          "sites": 628,
+          "requests": 34,
+          "fragments": 12,
+          "maxRequestBytes": 65529,
+          "requestBytes": 2050023
+        },
+        "note": "628 synthetic sites on the same real source and frozen input; zero live model calls"
+      }
+    },
+    {
+      "id": "nopcommerce-3.90",
+      "repository": "nopSolutions/nopCommerce",
+      "tag": "release-3.90",
+      "commit": "12d1f0139149a9d6e84964d325d62bae6ac748f6",
+      "archiveSha256": "ba69193e7f06de89370cc80be0060890b16af2856061f40756babece8d8ece69",
+      "csharpFiles": 1731,
+      "csharpBytes": 10519746,
+      "largeCsharpFiles": 24,
+      "normalizedCsharp": 9,
+      "stages": {
+        "dependencyMap": {
+          "seconds": 11.569,
+          "files": 1731,
+          "edges": 11310,
+          "unresolved": 18
+        },
+        "manifest": {
+          "seconds": 0.036
+        },
+        "reviewDependencies": {
+          "seconds": 2.109
+        },
+        "contracts": {
+          "seconds": 5.027,
+          "files": 1863,
+          "sites": 0,
+          "requests": 763,
+          "requestBytes": 13572989,
+          "maxRequestBytes": 65536,
+          "sourceCharacters": 11247034,
+          "scopes": 529,
+          "liveModelCalls": 0,
+          "outputBytes": 947862,
+          "resume": {
+            "requests": 0,
+            "seconds": 1.608
+          }
+        },
+        "inventory": {
+          "seconds": 19.556,
+          "files": 1731,
+          "sites": 14698,
+          "requests": 1068,
+          "requestBytes": 25565585,
+          "maxRequestBytes": 65536,
+          "sourceCharacters": 10295883,
+          "scopes": 504,
+          "censusMode": "all raw-text matches of the documented construct vocabulary plus file fallback; not a semantic-completeness proof",
+          "liveModelCalls": 0,
+          "preview": {
+            "seconds": 0.838,
+            "sites": 14698,
+            "unknown": 14698,
+            "outputHash": "3d88eb521a371ca199d7902feddc6dfd9c1f446338fce9825611fe0c03c85715"
+          }
+        },
+        "phase02": {
+          "completed": false,
+          "formalInventoryPublished": false,
+          "reason": "Live semantic survey, independent preparation audits and human gates have not run"
+        },
+        "largestResume": {
+          "file": "src/Libraries/Nop.Services/Installation/CodeFirstInstallationService.cs",
+          "originalBytes": 631067,
+          "utf8Bytes": 631093,
+          "preservedParts": 2,
+          "resumedRequests": 10,
+          "repeatedValidatedRequests": 0
+        },
+        "dense628": {
+          "requests": 45,
+          "maxRequestBytes": 65535,
+          "note": "real largest file with a synthetic 628-site load; no live model calls"
+        }
+      },
+      "semanticStep02Completed": false,
+      "sameInputDenseComparison": {
+        "before": {
+          "id": "nopcommerce-3.90",
+          "file": "source/src/Libraries/Nop.Services/Installation/CodeFirstInstallationService.cs",
+          "sourceBytes": 631067,
+          "sites": 628,
+          "requests": 5997,
+          "fragments": 13,
+          "maxRequestBytes": 65531,
+          "requestBytes": 392709800,
+          "seconds": 10.418
+        },
+        "after": {
+          "id": "nopcommerce-3.90",
+          "file": "source/src/Libraries/Nop.Services/Installation/CodeFirstInstallationService.cs",
+          "sourceBytes": 631067,
+          "sites": 628,
+          "requests": 91,
+          "fragments": 24,
+          "maxRequestBytes": 65532,
+          "requestBytes": 5321490
+        },
+        "note": "628 synthetic sites on the same real source and frozen input; zero live model calls"
+      }
+    },
+    {
+      "id": "nhibernate-4.1.1",
+      "repository": "nhibernate/nhibernate-core",
+      "tag": "4.1.1.GA",
+      "commit": "b64b6b74278a12a6a12e19e6a33f97fac6b6c910",
+      "archiveSha256": "540cfb34b27ebf787226da49d71a57bd078068a4f748523bb9c5b290411659d5",
+      "csharpFiles": 4338,
+      "csharpBytes": 14019168,
+      "largeCsharpFiles": 13,
+      "normalizedCsharp": 4,
+      "stages": {
+        "dependencyMap": {
+          "seconds": 23.253,
+          "files": 4338,
+          "edges": 22858,
+          "unresolved": 77
+        },
+        "manifest": {
+          "seconds": 0.047
+        },
+        "reviewDependencies": {
+          "seconds": 3.685
+        },
+        "contracts": {
+          "seconds": 10.045,
+          "files": 4372,
+          "sites": 0,
+          "requests": 1830,
+          "requestBytes": 20126121,
+          "maxRequestBytes": 65535,
+          "sourceCharacters": 14625219,
+          "scopes": 1012,
+          "liveModelCalls": 0,
+          "outputBytes": 2020250,
+          "resume": {
+            "requests": 0,
+            "seconds": 2.737
+          }
+        },
+        "inventory": {
+          "seconds": 55.78,
+          "files": 4338,
+          "sites": 24464,
+          "requests": 2420,
+          "requestBytes": 44004301,
+          "maxRequestBytes": 65535,
+          "sourceCharacters": 14016043,
+          "scopes": 1000,
+          "censusMode": "all raw-text matches of the documented construct vocabulary plus file fallback; not a semantic-completeness proof",
+          "liveModelCalls": 0,
+          "preview": {
+            "seconds": 1.299,
+            "sites": 24464,
+            "unknown": 24464,
+            "outputHash": "7100c0df4d9ccfe2a550cefde34426d86dbf2cf461b7f283dc26fe7cbf3e30b3"
+          }
+        },
+        "phase02": {
+          "completed": false,
+          "formalInventoryPublished": false,
+          "reason": "Live semantic survey, independent preparation audits and human gates have not run"
+        },
+        "largestResume": {
+          "file": "src/NHibernate.Test/Linq/NorthwindDbCreator.cs",
+          "originalBytes": 938745,
+          "utf8Bytes": 940374,
+          "preservedParts": 2,
+          "resumedRequests": 15,
+          "repeatedValidatedRequests": 0
+        },
+        "dense628": {
+          "requests": 65,
+          "maxRequestBytes": 65533,
+          "note": "real largest file with a synthetic 628-site load; no live model calls"
+        }
+      },
+      "semanticStep02Completed": false,
+      "sameInputDenseComparison": {
+        "before": {
+          "id": "nhibernate-4.1.1",
+          "file": "source/src/NHibernate.Test/Linq/NorthwindDbCreator.cs",
+          "sourceBytes": 938745,
+          "sites": 628,
+          "requests": 7565,
+          "fragments": 17,
+          "maxRequestBytes": 65533,
+          "requestBytes": 495271360,
+          "seconds": 7.132
+        },
+        "after": {
+          "id": "nhibernate-4.1.1",
+          "file": "source/src/NHibernate.Test/Linq/NorthwindDbCreator.cs",
+          "sourceBytes": 938745,
+          "sites": 628,
+          "requests": 97,
+          "fragments": 33,
+          "maxRequestBytes": 65535,
+          "requestBytes": 5928937
+        },
+        "note": "628 synthetic sites on the same real source and frozen input; zero live model calls"
+      }
+    }
+  ],
+  "reproductionScriptLocalArchiveReplay": "All three pinned archives, extraction counts, largest files and encoding conversion counts matched the recorded corpus."
+}
