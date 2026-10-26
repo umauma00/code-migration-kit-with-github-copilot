@@ -262,14 +262,17 @@ test('installer dry run, idempotency, existing instructions and conflict preflig
   assert.equal(fs.existsSync(safePath(root, '.github/prompts/migrate-00-feasibility.prompt.md')), false, 'preflight must prevent partial installation');
 });
 
-test('subprocess preserves literal argv and reports failure, timeout, abort and output limit', async () => {
+test('subprocess preserves literal argv, explicit timeout and abort; large output is spooled', async t => {
   const literal = '$(echo unsafe); `echo unsafe` "quotes"';
   const r = await node(['-e', 'console.log(process.argv[1]); process.exit(9)', literal]);
   assert.equal(r.stdout.trim(), literal); assert.equal(r.code, 9);
   await assert.rejects(node(['-e', 'setInterval(()=>{},1000)'], { timeoutMs: 100 }), /timed out/);
   const abort = new AbortController(); abort.abort();
   await assert.rejects(node(['-e', ''], { signal: abort.signal }), /Interrupted/);
-  await assert.rejects(node(['-e', 'console.log("x".repeat(10000))'], { maxBytes: 100 }), /exceeded/);
+  const output = await node(['-e', 'console.log("x".repeat(10000))'], { maxBytes: 100 });
+  t.after(() => fs.rmSync(path.dirname(output.stdoutFile), { recursive: true, force: true }));
+  assert.equal(output.code, 0); assert.equal(output.stdoutBytes, 10001);
+  assert.equal(fs.readFileSync(output.stdoutFile, 'utf8'), 'x'.repeat(10000) + '\n');
 });
 
 test('CLI transport pins model/tools and validates JSON without authenticating', async t => {

@@ -62,8 +62,24 @@ reported invisibility. Read [source-only mode](../../docs/SOURCE-ONLY.md) and
 
 The user-facing parent initializes ordered phase records with `phase init`, then reads `phase next` before routing. Use `phase start ID` to enforce prerequisites; review early reports before `phase complete ID --note TEXT`. Follow [ordered workflow](../../docs/ORDERED-WORKFLOW.md) and [cost logs](../../docs/COST-LOG.md). A planning child returns this required next action to its parent.
 
-On any failure, report cause, impact and at least two choices plus pause, with
-one recommended option first and a reason for each, then ask and wait
-([When a step fails](../../docs/PHASE-HANDOFF.md#when-a-step-fails)). Start every report with
-`status --format checklist`. Without a runnable original or a specification,
+Fix verified parser/caller TypeError or SyntaxError in coordinator-owned
+preparation/report helpers within the authorized phase, check mechanically and
+resume from validated shards. Use inventory-preview and hash-bound inventory-merge
+instead of a new TSV helper. Never ask to drop validation/candidate generation
+or repeat survey as a workaround for a local helper bug.
+
+Use bounded recovery and read-only diagnostics within the authorized phase
+without asking again; preserve validated rows. Ask only after recovery is
+exhausted or a new decision is required. Then report cause, impact and at least
+two choices plus pause, one recommended first with reasons, and wait
+([When a step fails](../../docs/PHASE-HANDOFF.md#when-a-step-fails)). For in-phase reports use
+`status --fast --format checklist`; revalidate normally at phase boundaries. Without a runnable original or a specification,
 offer [source as the only specification](../../docs/SOURCE-AS-SPEC.md).
+
+For preparation progress use `status --fast --format checklist`; it is recorded
+progress only. Never interrupt, cancel or relaunch work just for silence, CPU
+at 100% or low CPU, elapsed time (including 600 seconds), log volume or a host
+wait returning a running session. Keep the existing job and wait/poll it.
+Normal execution is continuous even if legacy timeout/call/round values exist.
+Do not add finite deadlines or budgets without the person's explicit choice.
+A `status --wait 600` return never means the worker should be stopped.

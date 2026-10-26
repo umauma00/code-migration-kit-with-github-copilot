@@ -5,16 +5,17 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadConfig, writeJSON, lockRun, assertReportPath } from '../lib/core.mjs';
 import { parseCommandLine, specs, usageText } from '../lib/cli.mjs';
-import { mergeInventory, packageCycles, dependencySamples, compareDependencyAudit } from '../lib/preparation.mjs';
+import { previewInventory, mergeInventory, packageCycles, dependencySamples, compareDependencyAudit } from '../lib/preparation.mjs';
 export function preparationCommand(root, config, action, options = {}) {
-  if (action === 'inventory-merge') return mergeInventory(root, config, { shards: options.shards?.split(','), sites: options.sites });
+  if (action === 'inventory-preview') return previewInventory(root, config, { shards: options.shards?.split(','), sites: options.sites, out: options.out });
+  if (action === 'inventory-merge') return mergeInventory(root, config, { shards: options.shards?.split(','), sites: options.sites, expectedHash: options['expected-hash'] });
   const release = lockRun(root, `preparation-${action}`);
   try {
     let result, out;
     if (action === 'package-cycles') { result = packageCycles(root, config, options.map ?? config.packageMap); out = 'migration/depmap/package-cycles.json'; }
     else if (action === 'dependency-samples') { result = dependencySamples(root, config, { seed: options.seed, size: options.size === undefined ? 20 : Number(options.size) }); out = options.out ?? 'migration/depmap/audit-samples.json'; }
     else if (action === 'dependency-diff') { result = compareDependencyAudit(root, config, { files: options.files?.split(','), audit: options.audit }); out = options.out ?? 'migration/depmap/audit-diff.json'; }
-    else throw new Error('Use inventory-merge --shards LIST --sites PATH | package-cycles --map PATH | dependency-samples --seed TEXT | dependency-diff --files LIST --audit PATH');
+    else throw new Error('Use inventory-preview --shards LIST --sites PATH | inventory-merge --shards LIST --sites PATH [--expected-hash SHA256] | package-cycles --map PATH | dependency-samples --seed TEXT | dependency-diff --files LIST --audit PATH');
     if (!out.startsWith('migration/depmap/')) throw new Error('Audit reports must be under migration/depmap/');
     writeJSON(assertReportPath(root, config, out), result); return result;
   } finally { release(); }

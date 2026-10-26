@@ -78,8 +78,10 @@ does not apply to automated workers, which keep their JSON-only contracts.
 8. Report requested model, timing and observed usage when available. Unknown
    usage/model fields stay null; never invent measurements. Set each worker model
    explicitly in config. The runner rejects profile-level model overrides.
-9. Every failure ends with a report of its cause, impact and choices, one of
-   them recommended with reasons, and waits for the user's choice
+9. Use the current phase's bounded recovery and read-only diagnostics without
+   asking again. Preserve validated work and report the recovery. When it is
+   exhausted or a new decision is needed, report cause, impact and choices, one
+   recommended with reasons, and wait for the missing choice
    ([When a step fails](PHASE-HANDOFF.md#when-a-step-fails)).
    Repeated failures signal an upstream rule/design problem. Stop at the repair
    limit and propose a rule amendment rather than endlessly patching instances.
@@ -115,3 +117,12 @@ Live VS Code rendering and Stop behavior remain pending until checked on a real
 host. Models and existing execution limits are unchanged.
 
 The [ordered workflow](ORDERED-WORKFLOW.md) records reviewed preparation before judge and implementation. The main skill starts with phase init/next; future phase requests return to missing prerequisites. Use [cost logs](COST-LOG.md) for main-compatible TSV output.
+
+## Continue running work
+
+Normal execution is continuous, including legacy configurations with 600-second
+limits. Never kill, cancel or relaunch a running command/survey/worker for CPU
+at 100% or low CPU, elapsed time, silence or log volume. Use a continuing terminal
+and wait on the same session. A status/host wait returning is not job failure.
+Only user-chosen bounded mode or explicit command budgets impose finite limits.
+Read [every interruption condition and source index](INTERRUPTION-POLICY.md).

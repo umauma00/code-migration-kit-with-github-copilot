@@ -2,6 +2,54 @@
 
 日本語 | [English](TESTING.en.md)
 
+## 2026-10-26 大規模C# OSSでの準備処理検証
+
+- `npm test` は440件中438成功、失敗0、Windows専用skip 2。`npm run demo` は成功し、比較12件・差分0・skip 0。追加したsurvey・停止索引の重点35件も成功。
+- DNN Platform、nopCommerce、NHibernateの固定版で、C#計8,780ファイルの分割・再開、依存解析とinventory候補生成を機械検証。最大本文は原本938,745 bytes。[検証範囲・結果・再現方法](reviews/2026-10-26-legacy-csharp-oss.md)。
+- 大きい本文と628件の合成censusでは、同一入力の分割要求が3,144→34、5,997→91、7,565→97になった。各census項目が全本文の断片を受け取ることを確認。
+- 読めないファイル、欠落census、空の入力があれば未完了として報告し、正常なscopeを保持する。実モデルはCopilot APIへの接続が拒否されて使えず、意味分析・独立監査を含む正式step 02は未完了。旧文字コードの検証用コピーは明示したCP1252等の仮定で、実際の意味の正しさは未確認。
+
+## 2026-10-26 Astraによる変更全体のレビューと修正後検証
+
+- 最終 `npm test`：435件中433成功、失敗0、skip 2（Windows専用）。`npm run demo` はcontinuousでoriginal・mutation・変換・build・smoke・parity成功、比較12件・差分0・skip 0。`git diff --check` 成功。元のfixture期待出力は変更なし。
+- Astraが全作業差分・新規ファイルをレビューし、P2を6件検出。全件修正後の再レビューは追加の確定指摘なし。[指摘と対応・検証範囲](reviews/2026-10-26-astra-full-review.md)。
+- `tests/astra-full-review.test.mjs` の新9件で、実adapterの不正JSON/schema/target/itemsの保存・1回補正、doctorの3プローブへのcancel伝播、実mainへのSIGINT、SIGTERM後の両ストリームの完全保存を確認。JSX後のimport、全8mapperの未選択ソース・不正選択、quota+429の優先分類、bounded/continuousのversion確認切替も検証。
+- 停止候補の索引は70ファイル・795行で現コードと一致。CPU・無出力・600秒による自動中断を戻さず、明示キャンセルと復旧不能な障害を正しく扱う。認証済みモデル・実案件・Windows実機の結果とは区別する。
+
+## 2026-10-26 言語別依存解析の精査
+
+- 最終 `npm test`：422件中420成功、失敗0、Windows専用skip 2。追加の言語別34件はすべて成功。`npm run demo` はcontinuousモードでoriginal・mutation・変換・build・smoke・parity成功、12ケースの比較差分・skipとも0。`git diff --check` も成功。
+- Python・PHP・C#・Java・VB.NET・COBOL・C/C++・JS/TSの8系統を確認。言語別の不具合・修正・制限は[調査記録](reviews/2026-10-26-dependency-parsers.md)に記載。
+- `tests/dependency-parsers.test.mjs` はBOM/coding宣言、UTF-16/32・読取不可・binary、composer型ずれ、1200段Import、root外Import、1050段ディレクトリ、C/JSの偽の辺とTS出力拡張子、全言語の複数rootコマンド・manifest・依存宣言、出力の決定性を検証。
+- 元のアプリやビルドツールを動かさず、パーサーCLIと生成した準備コマンドだけを実行。既存fixtureの期待ファイルは変更していない。実案件・Windows実機での検証は行っていない。
+
+## 2026-10-26 inventory候補生成helperの型ずれ対策
+
+- 最終 `npm test`：388件中386成功、失敗0、skip 2（Windows専用）。`npm run demo` はcontinuousモードで成功し、12ケースの比較差分・skipとも0。`git diff --check` も成功。停止候補の索引は69ファイル・760行へ更新済み。
+- 画像の `parseTsv` / `writeReviewCandidate` はこのキット・workspace内に存在せず、移行先に追加されたhelperの実装とログは未入手。画像の原因説明と、コードで確認した同梱パーサーの `{notes, rows}` 契約を区別して記録した。[調査記録](reviews/2026-10-26-inventory-preview.md)。
+- `tests/inventory-preview.test.mjs` の7件で、標準preview→正式mergeの同一出力、BOM/CRLF・コメント・重複の保持、未網羅・不正行・矛盾・UNKNOWN不備・ハッシュ不一致での非更新を検証。出力先とcensus/shard/正式receiptの衝突・hardlinkも拒否する。
+- 628箇所・16shard＋再試行shardの合成データで、欠落・重複なく候補を生成し、正式mergeのhash一致を確認。独立監査・工程承認をpreviewで代替しない。導入済みCLIの候補生成と正式mergeの往復も実行した。
+- 構文チェック・shard検証だけでなく、候補writerまで実行する回帰テストを追加。型ずれhelperの修正・機械的検証は同じ許可範囲で行い、候補や検証の省略を利用者へ選ばせない指示を全親skill/agentに反映した。
+- 画像の実プロジェクトのhelper自体は未修正・未再実行であり、実データを修復済みとは扱わない。
+
+## 2026-10-26 継続実行・単一巨大ファイルのsurvey
+
+- 最終 `npm test`：381件中379成功、失敗0、skip 2（Windows専用）。`npm run demo` はcontinuousモードでoriginal・mutation・3ファイル変換・build・smoke・parityが成功し、12ケースの比較差分・skipとも0。`git diff --check` も成功。
+- `tests/continuous-execution.test.mjs`：既存600秒設定の無効化、CPU負荷と無出力の実プロセスが従来の設定時間を超えて完了すること、保存済みの呼び出し・入力・修正回数・連続失敗上限を超える継続を確認。build-loopは旧既定5回と件数横ばいを超え、7回目で完了するfixtureを確認。
+- 16MiB超の実プロセス出力を欠落なく保存し、中間の診断とCopilot JSONL末尾の結果を読み取る。ログの改変・範囲外パスは拒否する。
+- `tests/survey-large-source.test.mjs`：64KiB超の単一本文、巨大な1行、日本語・絵文字・引用符・バックスラッシュ・CRLFを欠落なく分割する。手動中断から正常な断片を再利用し、未読範囲の引用を拒否する。inventoryは全箇所について全断片を読み、未確定の関係をUNKNOWNとして保持する。
+- `tests/interruption-policy.test.mjs`：維持対象の全ソース索引が現在のコードと一致し、暗黙の数値deadlineが残っていないこと、配布する全親エージェント指示にCPU・時間・無出力による中断禁止があることを確認。[停止条件一覧と行番号付き索引](INTERRUPTION-POLICY.md)。
+- ソース索引は69ファイルを走査し、例外・終了・cancel/kill・時間指定・ループ脱出等の候補757行を収集。PIDの生存確認や通常のループ脱出も含むため、757個の停止原因があるという意味ではない。vendor・外部プログラムの内部は対象外。
+- モデル応答はテスト用。実アカウント・画像の628箇所の対象プロジェクトでの完走時間は未計測。OS・サービス・ホスト自身の制約はキットから解除できない。
+
+## 2026-10-26 00b調査の修復・進捗表示（先行検証）
+
+- 最新の0.5.0ブランチを基点に、`npm test` は362件中360成功、失敗0、skip 2。
+- `tests/survey-recovery.test.mjs` の16件では、元のCRLF行番号、範囲外の行・ファイルの引用、HTTP状態に似た行番号、部分結果の保持、失敗行だけの修復、再開時の呼び出し上限、旧形式結果とscope IDの再利用を確認。
+- 複数ファイルの過大入力と、1ファイル80箇所のcensusを、JSON化後の上限内へ分けて欠落・重複なく完了することも確認。この時点で残っていた単一本文の過大入力は、上の追加修正で断片処理に対応した。
+- `status --fast` のソース読取が0回であること、記録上の完了を未再検証と表示すること、実際のgateはソース変更後に従来どおり拒否すること、進捗変化でwaitが戻ること、quietな実行の通知とtimer解放を確認。
+- ワーカーはテスト用の固定応答。画像にある移行先の実ソース・独自の調査スクリプト・認証済みモデルを使った実測は行っていない。
+
 ## 2026-10-25 ワーカー統合のベンチマーク
 
 - `tests/review-benchmark.test.mjs`：固定ワーカー応答で、見逃し率・誤検出・修正合格率の集計、結果が変わった題材の一覧、呼び出し上限の拒否、成功前に3回失敗したときの停止、ルート内（シンボリックリンク経由を含む）への出力の拒否、setup 後のルートに正しいコードが残らないこと、埋め込み題材がチェックに落ちること（欠陥なしは通ること）を確認。

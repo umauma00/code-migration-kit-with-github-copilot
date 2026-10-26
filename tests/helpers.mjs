@@ -21,7 +21,7 @@ export function nodeCli(file, body) {
 }
 // import() of an absolute path inside a generated script needs a file URL on Windows.
 export const importable = file => pathToFileURL(file).href;
-export function prepare(t, { realCommands = false, count = 1, model = 'test-double', root, workflow = false, layout = 'repository' } = {}) {
+export function prepare(t, { realCommands = false, count = 1, model = 'test-double', root, workflow = false, layout = 'repository', executionMode = 'bounded' } = {}) {
   root ??= fs.mkdtempSync(path.join(os.tmpdir(), 'copilot-migration-test-'));
   t?.after(() => fs.rmSync(root, { recursive: true, force: true }));
   install(root, { apply: true, model, withWorkflow: workflow, layout });
@@ -36,6 +36,10 @@ export function prepare(t, { realCommands = false, count = 1, model = 'test-doub
   delete config.markerPolicy;
   // Scheduling and fix-loop defaults for new installs have dedicated tests.
   delete config.dependencyOrder; delete config.fixPolicy; delete config.reviewFocus;
+  // Existing budget/interruption fixtures intentionally select bounded mode;
+  // continuous-mode tests exercise the installed default separately.
+  config.executionMode = executionMode;
+  if (executionMode === 'bounded') { config.timeoutSeconds = 600; config.commandTimeoutSeconds = 600; }
   config.concurrency = 2;
   for (const name of ['original', 'mutation', 'build', 'smoke', 'parity']) {
     config.commands[name] = realCommands ? [python, '-B', 'tests/judge.py', name] : [process.execPath, '-e', 'console.log("test command OK")'];

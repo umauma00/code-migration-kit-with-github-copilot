@@ -13,6 +13,7 @@ import { outputFingerprint } from '../lib/pipeline.mjs';
 import { readReviewText } from '../lib/review.mjs';
 import { diagnosticsForUnits, diagnosticTsv } from '../lib/diagnostics.mjs';
 import { assertRepairableRun } from '../lib/scopes.mjs';
+import { processOutputLines } from '../lib/process.mjs';
 export const repairStages = ['build', 'smoke', 'parity'];
 const stageCommands = { build: ['build'], smoke: ['smoke'], parity: ['parity'] };
 const roundsFiles = { build: 'migration/build-rounds.tsv', smoke: 'migration/smoke-rounds.tsv', parity: 'migration/parity-rounds.tsv' };
@@ -81,8 +82,13 @@ export function diagnoseBuild(root, config, { out = 'migration/repair-queue.json
     return { clean: true, stage, buildExecutionId: build.executionId, round, rounds: roundsFile };
   }
   assertRepairableRun(build, stage, record);
-  const text = (build.commands ?? []).filter(c => stageCommands[stage].includes(c.name)).map(c => `${c.stdout ?? ''}\n${c.stderr ?? ''}`).join('\n');
-  const { rows, unmapped, formats, parsed } = diagnosticsForUnits(root, readManifest(root, config), text);
+  function* lines() {
+    for (const command of (build.commands ?? []).filter(c => stageCommands[stage].includes(c.name))) {
+      yield* processOutputLines(command, 'stdout', root); yield '';
+      yield* processOutputLines(command, 'stderr', root); yield '';
+    }
+  }
+  const { rows, unmapped, formats, parsed } = diagnosticsForUnits(root, readManifest(root, config), lines());
   const diagnostics = `migration/${stage}-diagnostics/${build.executionId}.tsv`;
   assertReportPath(root, config, diagnostics);
   if (!rows.length) {

@@ -99,6 +99,46 @@ semantic correctness or independent review. Finally run a joint RULEBOOK/invento
 audit; each contradiction cites rule, row key, source evidence and a concrete
 wrong translation example. Reconcile and re-audit before completing 02.
 
+To review a combined candidate before publishing, use the built-in preview with
+the existing shards. It uses the SAME TSV parser, comment handling, validation
+and deterministic renderer as the formal merge. Do not add a project-local
+parseTsv/writeReviewCandidate implementation or resurvey completed scopes.
+
+```bash
+node migration-kit/scripts/preparation_cli.mjs inventory-preview \
+  --sites migration/inventory-sites.tsv \
+  --shards migration/inventory-shards/numeric.tsv,migration/inventory-shards/errors.tsv
+```
+
+The JSON reports `out` (default migration/inventory-review-candidate.tsv),
+`outputHash`, site/unknown counts and the input shard hashes. Preview checks full
+census coverage, conflicts, row shape and UNKNOWN requirements BEFORE writing;
+it never changes inventory.tsv or inventory-merge.json and grants no phase.
+Notes are retained and identical retried rows deduplicate. Optional `--out` must
+not overwrite inputs, shard/survey records, protected files or aliases.
+
+After reviewing, pass that exact outputHash (replace OUTPUT_HASH below) to
+`inventory-merge`. A changed output is rejected before either formal file is
+written; regenerate the preview from existing shards when corrections are needed.
+
+```bash
+node migration-kit/scripts/preparation_cli.mjs inventory-merge \
+  --sites migration/inventory-sites.tsv \
+  --shards migration/inventory-shards/numeric.tsv,migration/inventory-shards/errors.tsv \
+  --expected-hash OUTPUT_HASH
+```
+
+Hash equality proves byte equality with the reviewed candidate; the ordinary
+independent audits, source evidence and human gates still determine correctness.
+If a preparation/report helper raises TypeError or SyntaxError, inspect its
+actual return value and caller, fix only the coordinator-owned helper, run its
+syntax/mechanical checks and resume candidate generation. This is technical
+recovery within the authorized phase, not a choice between fixing the helper
+and dropping validation. Preserve all validated shards and official receipts.
+Never change a shared parser's return shape without checking all callers; a row
+array has no notes field, while the kit's internal table parser returns
+`{ notes: [], rows: [] }` even when no comments exist.
+
 migration/inventory-merge.json is reserved generated evidence; do not register
 it as designInputs, verificationInputs or reviewDependencyMap. Configuration
 validation and the merge writer reject input/receipt collisions, including file

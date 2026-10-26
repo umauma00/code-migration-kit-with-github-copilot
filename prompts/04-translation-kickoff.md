@@ -29,11 +29,12 @@ repository for repository-copy installations. For plugin installations, use
 target repository as cwd. Resolve the plugin root from the loaded skill/agent.
 Do not replace the runner with fleet or an unrestricted chat loop.
 Run `translate` in a background or continuing terminal and check it with
-`status --wait 600 --format markdown` (the runner waits until a unit finishes or
-the run stops); never block on it or kill it for being slow. A stop at the AI
-call budget is not a failure: rerun `translate`, or use `translate --max-calls N`
-with the number the person agreed. Run limits (concurrency, maxAgentCalls,
-timeouts, retries) can change between runs without revoking reviewed units.
+`status --fast --wait 600 --format markdown`. This waits for status only; keep
+polling the same job after it returns. Never kill/cancel/relaunch work for CPU
+at 100% or low CPU, silence, elapsed time or output volume. Normal execution is
+continuous even with old 600-second/maxAgentCalls settings. Finite time/call/round
+limits require the person's explicit choice (executionMode bounded or a command
+budget). Execution-policy changes retain reviewed work and approvals.
 Failures name the CLI's own cause (for example `session.error rate_limit 429`).
 The configured `fixPolicy` decides whether a fixed output is reviewed again
 (`rereview`) or judged by build/smoke/parity after one fix (`single-pass`,
@@ -58,7 +59,7 @@ the run. Missing decisions get TODO(port), BUG(port) or PERF(port) markers.
 No source “improvement” is mixed into faithful translation. Expensive compiler
 and test commands wait for their phases; an explicitly configured cheap
 per-target typecheck is owned by the coordinator; its failure becomes a confirmed
-finding for the fixer within maxFixRounds (README Step 4 dissolved into Step 3).
+finding for the fixer (maxFixRounds applies only in bounded mode) (README Step 4 dissolved into Step 3).
 
 On timeout, rejected permission, invalid JSON or interrupted execution, inspect
 `migration/state/units/` and the run summary. Reinvoke `translate` to resume.

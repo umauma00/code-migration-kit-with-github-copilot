@@ -219,10 +219,14 @@ test('R6: malformed model JSON is a recorded failed attempt with model and bound
   assert.match(records[0].process.stdout, /NOT JSON/); assert.match(records[0].process.stderr, /model diagnostic/);
 });
 
-test('R6: abort, output overflow and spawn failure preserve process diagnostics', async () => {
+test('R6: abort, output spooling and spawn failure preserve process diagnostics', async t => {
   const aborted = new AbortController(); aborted.abort();
   await assert.rejects(node(['-e', ''], { signal: aborted.signal }), e => e.result.code === null && /Interrupted/.test(e.result.error));
-  await assert.rejects(node(['-e', 'console.log("x".repeat(1000))'], { maxBytes: 100 }), e => Buffer.byteLength(e.result.stdout) === 100 && /exceeded/.test(e.result.error));
+  const output = await node(['-e', 'console.log("x".repeat(1000))'], { maxBytes: 100 });
+  t.after(() => fs.rmSync(path.dirname(output.stdoutFile), { recursive: true, force: true }));
+  assert.equal(output.code, 0); assert.equal(output.outputSpooled, true);
+  assert.equal(fs.readFileSync(output.stdoutFile, 'utf8'), 'x'.repeat(1000) + '\n');
+  assert.ok(Buffer.byteLength(output.stdout) <= 50);
   await assert.rejects(runProcess('nonexistent-migration-test-executable', []), e => e.result.command[0] === 'nonexistent-migration-test-executable' && e.result.code === null);
 });
 

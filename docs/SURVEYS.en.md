@@ -12,9 +12,45 @@ Phase 00 only decides whether to migrate, so by default the parent samples the s
 - The scope's source text is the frozen input; a surveyor never reads other files or other scopes' results.
 - Results go to `migration/surveys/<kind>/<scope-id>.json` with the scope's input hash. A current file means done; rerunning after an interruption runs only the remaining scopes.
 - One scope's failure does not stop the others; transient failures retry and systemic ones (sign-in, credits) stop the run, as in translation.
-- The model is `phaseModels.survey`, else the implementer model; `concurrency` and `maxAgentCalls` apply.
+- The model is `phaseModels.survey`, else the implementer model. `concurrency` limits active calls. Normal execution is continuous, including legacy configurations; only explicitly selected bounded mode enforces saved time/call budgets.
 
 ## Kinds and phases
+
+Frozen sources include original line numbers and final-line bounds. Validation
+checks every cited start/end line against the actual supplied excerpt. Each part
+gets at most one focused correction of an invalid response: preserve validated rows and send only unfinished
+files/sites to the fresh worker. Rejected answers remain in run records; the
+coordinator never rewrites citations to make them pass. Resume reuses valid
+partial rows and legacy results when current source/citations still validate,
+and retains the saved max-files setting if it is omitted.
+
+All three survey kinds split oversized file sets, site lists and individual
+source bodies into fitting requests without renaming scopes. Even a minified
+single line is split by character position without breaking Unicode pairs or
+losing source characters. Original line/column ranges and validated part results
+are saved under `<scope-id>.parts/`; unchanged completed parts are reused on
+resume. Serialized JSON bytes are checked before dispatch, and no scope is done
+until every part/file/site is covered. Contracts concatenate source-anchored
+observations and retain cross-fragment unknowns. Inventory visits all fragments
+for each site and retains UNKNOWN/TODO(port) for cross-fragment data flow.
+Required metadata that cannot fit with even one source character gets a precise
+capacity error; source text is never silently removed.
+
+For large files with many census sites, capacity is shared between the source
+and site batches to reduce duplicate requests while retaining every site's full
+fragment coverage. Unreadable sources, missing or out-of-root census files,
+empty source roots and empty censuses are reported as incomplete and cannot be
+merged. Readable scopes are preserved, and repaired inputs resume without
+re-running completed scopes. Confirm source encoding before preparing UTF-8
+input; the runner does not silently guess or convert it.
+
+Monitor the existing terminal with `status --fast --format markdown` (optionally
+`--wait 600`), which reads recorded progress without walking the source tree.
+This view is explicitly not revalidated and cannot authorize a gate. Quiet
+output, CPU at 100% or low CPU, elapsed time (including 600 seconds), and log
+volume are never reasons to interrupt or relaunch work. A status wait returning
+never terminates the worker. The runner emits liveness messages on stderr.
+See [all interruption conditions and source index](INTERRUPTION-POLICY.md).
 
 | Kind | Phase | What a surveyor returns | Merged into |
 |---|---|---|---|
@@ -37,8 +73,8 @@ $R survey merge --kind inventory --sites migration/inventory-sites.tsv
 ```
 
 Scopes are mechanical: files of one directory together, at most `--max-files`
-each and within the frozen-input limit (`maxReviewInputBytes`). A single file
-over the limit is reported instead of run.
+each, with fitting work requests under `maxReviewInputBytes`. A single file
+over the limit is processed in source fragments.
 
 ## Quality
 

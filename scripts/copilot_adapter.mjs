@@ -4,8 +4,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import http from 'node:http';
-import { runProcess } from '../lib/process.mjs';
-import { roles, workerModel, workerEffort } from '../lib/core.mjs';
+import { runProcess, processOutputLines } from '../lib/process.mjs';
+import { roles, workerModel, workerEffort, safePath } from '../lib/core.mjs';
+import { executionLimits, processTimeout } from '../lib/execution-policy.mjs';
 import { parseResult, validateResult } from '../lib/results.mjs';
 import { isReviewer, isToolFree, toolAssistedRole, assistedReviewerRoles, validateWorkerProfile } from '../lib/review.mjs';
 import { runtimeLayout } from '../lib/runtime.mjs';
@@ -33,7 +34,7 @@ export function copilotArgs(role, model, prompt, layout, session, { usageFile, m
 export function requiredCopilotFlags(layout, config = {}) {
   // Diagnose the same stdin-based invocation used by every worker role.
   const session = { id: '00000000-0000-4000-8000-000000000000' };
-  const options = { usageFile: 'diagnostic-usage.json', maxAiCredits: config.maxAiCreditsPerCall, effort: Object.keys(config.reasoningEfforts ?? {}).length ? 'medium' : undefined };
+  const options = { usageFile: 'diagnostic-usage.json', maxAiCredits: executionLimits(config).aiCredits, effort: Object.keys(config.reasoningEfforts ?? {}).length ? 'medium' : undefined };
   return [...new Set(roles.flatMap(role => copilotArgs(role, 'diagnostic-model', undefined, layout, session, options).filter(arg => arg.startsWith('-'))))];
 }
 // The CLI's final usage statistics. aiCredits stays null: the CLI reports AI
@@ -66,8 +67,8 @@ export function copilotEnv(role) {
   if (assistedReviewerRoles.includes(role)) env.GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS = 'true';
   return env;
 }
-export async function copilotVersion(command = 'copilot', prefixArgs = [], { cwd, signal } = {}) {
-  const result = await runProcess(command, [...prefixArgs, '--version'], { cwd, signal, timeoutMs: 20000, env: copilotEnv('reviewer-rules') });
+export async function copilotVersion(command = 'copilot', prefixArgs = [], { cwd, signal, timeoutMs = 0 } = {}) {
+  const result = await runProcess(command, [...prefixArgs, '--version'], { cwd, signal, timeoutMs, env: copilotEnv('reviewer-rules') });
   const version = result.stdout.match(/\d+\.\d+\.\d+(?:[-+][\w.]*\w)?/)?.[0];
   if (result.code !== 0 || !version) throw new Error(`Cannot read the Copilot CLI version (exit ${result.code}): ${(result.stderr || result.stdout).slice(-500)}`);
   return version;
@@ -78,23 +79,24 @@ export async function copilotVersion(command = 'copilot', prefixArgs = [], { cwd
 // open files"). The need is per CLI process and not documented, so a low hard
 // limit is a doctor warning, not a failure; raising it needs the person.
 export const fileLimitMinimum = 4096;
-export async function fileLimits() {
+export async function fileLimits({ signal, timeoutMs = 0 } = {}) {
+  if (signal?.aborted) throw new Error('Interrupted');
   if (process.platform === 'win32') return { platform: 'win32', ok: true };
   try {
-    const r = await runProcess('/bin/sh', ['-c', 'ulimit -Hn'], { timeoutMs: 5000 });
+    const r = await runProcess('/bin/sh', ['-c', 'ulimit -Hn'], { signal, timeoutMs });
     const value = r.stdout.trim(), hard = value === 'unlimited' ? 'unlimited' : Number(value);
     if (hard !== 'unlimited' && !(hard > 0)) return { ok: true, unknown: true };
     const low = hard !== 'unlimited' && hard < fileLimitMinimum;
     return { hard, ok: true, ...(low ? { warning: `The hard open-file limit is ${hard} (below ${fileLimitMinimum}). Workers may fail with EMFILE "Too many open files"; if they do, lower concurrency or have an administrator raise the hard limit.` } : {}) };
-  } catch { return { ok: true, unknown: true }; }
+  } catch (e) { if (signal?.aborted) throw new Error('Interrupted'); return { ok: true, unknown: true }; }
 }
 export const probeAgentName = '__migration_kit_probe_missing_agent__';
 // An unknown --agent fails before any session or model request and lists the
 // agents this exact invocation discovers. Help text alone cannot show that.
-export async function probeWorkerAgents(command = 'copilot', prefixArgs = [], { cwd, layout } = {}) {
+export async function probeWorkerAgents(command = 'copilot', prefixArgs = [], { cwd, layout, signal, timeoutMs = 0 } = {}) {
   const args = copilotArgs('reviewer-rules', 'diagnostic-model', undefined, layout);
   args[args.indexOf('--agent') + 1] = probeAgentName;
-  const result = await runProcess(command, [...prefixArgs, ...args], { cwd, timeoutMs: 30000,
+  const result = await runProcess(command, [...prefixArgs, ...args], { cwd, signal, timeoutMs,
     input: 'Agent resolution probe. No model request is expected.', env: copilotEnv('reviewer-rules') });
   const listed = `${result.stdout}\n${result.stderr}`.match(new RegExp(`No such agent: ${probeAgentName}, available:([^\\r\\n]*)`));
   const required = [...roles, ...assistedReviewerRoles, 'surveyor', 'preparation-auditor'].map(role => layout?.agentId(role) ?? `migration-${role}`);
@@ -112,7 +114,8 @@ export async function probeWorkerAgents(command = 'copilot', prefixArgs = [], { 
 // So doctor proves it end to end: a loopback model provider asks the real CLI
 // to view migration/runs and must get the hook's denial back. No account,
 // network or AI model is used (COPILOT_OFFLINE).
-export async function probeReviewerHook(command = 'copilot', prefixArgs = [], { cwd, layout, timeoutMs = 60000 } = {}) {
+export async function probeReviewerHook(command = 'copilot', prefixArgs = [], { cwd, layout, signal, timeoutMs = 0 } = {}) {
+  if (signal?.aborted) throw new Error('Interrupted');
   const role = assistedReviewerRoles[0], marker = 'Tool-assisted reviewers may not read';
   let requests = 0, denied = false;
   const server = http.createServer(async (req, res) => {
@@ -133,12 +136,12 @@ export async function probeReviewerHook(command = 'copilot', prefixArgs = [], { 
     const env = { ...copilotEnv(role), COPILOT_HOME: home, COPILOT_OFFLINE: 'true', COPILOT_PROVIDER_BASE_URL: `http://127.0.0.1:${server.address().port}/v1`,
       COPILOT_PROVIDER_TYPE: 'openai', COPILOT_PROVIDER_API_KEY: 'loopback-probe', COPILOT_PROVIDER_BEARER_TOKEN: '', COPILOT_PROVIDER_WIRE_API: 'completions',
       COPILOT_MODEL: 'gpt-4.1', COPILOT_GITHUB_TOKEN: '', GH_TOKEN: '', GITHUB_TOKEN: '' };
-    const result = await runProcess(command, [...prefixArgs, ...copilotArgs(role, 'gpt-4.1', undefined, layout)], { cwd, env, timeoutMs, input: 'Hook probe. Follow the tool call.' });
+    const result = await runProcess(command, [...prefixArgs, ...copilotArgs(role, 'gpt-4.1', undefined, layout)], { cwd, env, signal, timeoutMs, input: 'Hook probe. Follow the tool call.' });
     if (denied) return { ok: true };
     return { ok: false, requests, detail: requests < 2
       ? `The CLI did not complete the loopback probe (exit ${result.code}): ${(result.stderr || result.stdout).slice(-400)}`
       : 'The worker hook did not deny a tool-assisted reviewer\'s read of migration/runs: this CLI no longer loads repository/plugin hooks in prompt mode through GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS. Oversized reviews are not isolated from other workers\' records; keep maxReviewInputBytes high enough that reviews stay frozen, or pin a CLI version that passes this check.' };
-  } catch (e) { return { ok: false, detail: e.message }; }
+  } catch (e) { if (signal?.aborted) throw new Error('Interrupted'); return { ok: false, detail: e.message }; }
   finally { server.closeAllConnections?.(); server.close(); fs.rmSync(home, { recursive: true, force: true }); }
 }
 // In JSON mode the CLI reports model and session failures (rate limits, 5xx,
@@ -150,7 +153,7 @@ const describeStreamError = data => {
 };
 export function copilotStreamError(stdout) {
   let last;
-  for (const line of String(stdout ?? '').split(/\r?\n/)) {
+  for (const line of typeof stdout === 'string' ? stdout.split(/\r?\n/) : stdout ?? []) {
     if (!line.includes('session.error')) continue;
     try { const event = JSON.parse(line); if (event?.type === 'session.error') last = event.data ?? {}; } catch {}
   }
@@ -161,7 +164,7 @@ export function copilotStreamError(stdout) {
 export function copilotStreamFacts(stdout) {
   const models = new Set();
   let usage = null;
-  for (const line of String(stdout ?? '').split(/\r?\n/)) {
+  for (const line of typeof stdout === 'string' ? stdout.split(/\r?\n/) : stdout ?? []) {
     let event;
     try { event = JSON.parse(line); } catch { continue; }
     if (event?.agentId || event?.data?.parentToolCallId) continue;
@@ -177,7 +180,8 @@ export function copilotStreamFacts(stdout) {
 // Only accept a completed machine-output stream and the main agent's last reply.
 export function parseCopilotOutput(stdout) {
   let content, terminal = false;
-  for (const line of stdout.split(/\r?\n/).filter(line => line.trim())) {
+  for (const line of typeof stdout === 'string' ? stdout.split(/\r?\n/) : stdout) {
+    if (!line.trim()) continue;
     let event;
     try { event = JSON.parse(line); } catch { throw new Error('Copilot output is not valid JSONL'); }
     if (!event || typeof event.type !== 'string' || terminal) throw new Error('Invalid Copilot JSONL event order');
@@ -197,7 +201,8 @@ export function parseCopilotOutput(stdout) {
     }
   }
   if (!terminal || !content?.trim()) throw new Error('Copilot JSONL is incomplete: successful result and final assistant message required');
-  return parseResult(content);
+  try { return parseResult(content); }
+  catch (e) { e.code = 'INVALID_AGENT_RESULT'; e.rawAgentResult = content; throw e; }
 }
 // Fixed role text first, task data next (shared rules lead it), and the
 // unit-specific target last, so repeated calls reuse the cached prompt prefix.
@@ -247,9 +252,9 @@ export function createCopilotAdapter({ command = 'copilot', prefixArgs = [], ver
   // and it repeats only after versionRecheckMs; a change warns once and the run continues.
   let baseline, check;
   const warned = new Set();
-  const currentVersion = root => {
-    if (!check || Date.now() - check.at >= versionRecheckMs) {
-      check = { at: Date.now(), result: copilotVersion(command, prefixArgs, { cwd: root }).then(version => ({ version }), error => ({ error })) };
+  const currentVersion = (root, signal, timeoutMs) => {
+    if (!check || check.timeoutMs !== timeoutMs || Date.now() - check.at >= versionRecheckMs) {
+      check = { at: Date.now(), timeoutMs, result: copilotVersion(command, prefixArgs, { cwd: root, signal, timeoutMs }).then(version => ({ version }), error => ({ error })) };
     }
     return check.result;
   };
@@ -262,7 +267,7 @@ export function createCopilotAdapter({ command = 'copilot', prefixArgs = [], ver
     // An override (a preparation audit's host-chosen model) keeps that model's own default effort.
     const effort = modelOverride ? undefined : workerEffort(config, role);
     let cliVersion = null, cliVersionWarning;
-    const checked = await currentVersion(root);
+    const checked = await currentVersion(root, signal, processTimeout(config, 'commandTimeoutSeconds'));
     if (signal?.aborted) throw new Error('Interrupted');
     if (checked.error) cliVersionWarning = `Copilot CLI version unknown before this call: ${checked.error.message.slice(0, 300)}`;
     else cliVersion = checked.version;
@@ -286,8 +291,8 @@ export function createCopilotAdapter({ command = 'copilot', prefixArgs = [], ver
     const usageDir = fs.mkdtempSync(path.join(os.tmpdir(), 'migration-kit-usage-')), usageFile = path.join(usageDir, 'usage.json');
     let usage = null;
     try {
-      result = await runProcess(command, [...prefixArgs, ...copilotArgs(worker, model, undefined, layout, session, { usageFile, maxAiCredits: config.maxAiCreditsPerCall, effort })], {
-        cwd: root, signal, input: prompt, timeoutMs: config.timeoutSeconds * 1000,
+      result = await runProcess(command, [...prefixArgs, ...copilotArgs(worker, model, undefined, layout, session, { usageFile, maxAiCredits: executionLimits(config).aiCredits, effort })], {
+        cwd: root, signal, input: prompt, timeoutMs: processTimeout(config, 'timeoutSeconds'), outputDir: safePath(root, 'migration/runs/process-output'),
         env: copilotEnv(worker)
       });
       usage = readUsageFile(usageFile);
@@ -298,16 +303,27 @@ export function createCopilotAdapter({ command = 'copilot', prefixArgs = [], ver
     }
     finally { fs.rmSync(usageDir, { recursive: true, force: true }); }
     try {
-      if (result.code !== 0) throw new Error(`Copilot ${role} failed (exit ${result.code}): ${[copilotStreamError(result.stdout), result.stderr.slice(-2000)].filter(Boolean).join('\n')}`);
-      const value = validateResult(role, parseCopilotOutput(result.stdout), unit);
-      const { observedModel, observedModels, cliUsage } = copilotStreamFacts(result.stdout);
+      if (result.code !== 0) throw new Error(`Copilot ${role} failed (exit ${result.code}): ${[copilotStreamError(processOutputLines(result)), result.stderr.slice(-2000)].filter(Boolean).join('\n')}`);
+      let parsed, value;
+      try {
+        parsed = parseCopilotOutput(processOutputLines(result));
+      } catch (e) {
+        if (role === 'surveyor' && e.code === 'INVALID_AGENT_RESULT') e.code = 'SURVEY_VALIDATION';
+        throw e;
+      }
+      try { value = validateResult(role, parsed, unit); }
+      catch (e) {
+        if (role === 'surveyor') { e.code = 'SURVEY_VALIDATION'; e.surveyResult = parsed; }
+        throw e;
+      }
+      const { observedModel, observedModels, cliUsage } = copilotStreamFacts(processOutputLines(result));
       // A different reported model is a fallback or alias, never a silent pass.
       const modelWarning = observedModels.length && !observedModels.includes(model)
         ? `Copilot CLI reported model ${observedModels.join(', ')} for requested ${model}` : undefined;
       return { result: value, requestedModel: model, ...(effort ? { requestedEffort: effort } : {}), promptBytes, responseBytes: Buffer.byteLength(JSON.stringify(value)),
         observedModel, tokens: usage ? usage.inputTokens + usage.outputTokens : null, aiCredits: null,
         ...(cliUsage || usage ? { cliUsage: { ...cliUsage, ...usage } } : {}), ...(modelWarning ? { modelWarning } : {}),
-        ...(worker !== role ? { workerProfile: worker } : {}), ...versionFields };
+        ...(worker !== role ? { workerProfile: worker } : {}), ...(result.outputSpooled ? { processOutput: { stdoutFile: result.stdoutFile, stderrFile: result.stderrFile, stdoutBytes: result.stdoutBytes, stderrBytes: result.stderrBytes, stdoutHash: result.stdoutHash, stderrHash: result.stderrHash } } : {}), ...versionFields };
     } catch (e) { e.result = result; Object.assign(e, versionFields, usageFields(usage)); throw e; }
   };
 }

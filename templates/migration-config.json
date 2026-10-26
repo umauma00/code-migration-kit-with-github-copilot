@@ -25,10 +25,11 @@
   "dependencyOrder": "auto",
   "fixPolicy": "single-pass",
   "reviewFocus": "shared",
+  "executionMode": "continuous",
   "maxFixRounds": 2,
   "maxAgentCalls": 100,
-  "timeoutSeconds": 600,
-  "commandTimeoutSeconds": 600,
+  "timeoutSeconds": 0,
+  "commandTimeoutSeconds": 0,
   "commands": {
     "original": null,
     "mutation": null,

@@ -43,14 +43,14 @@ Approve and run a fresh build after repaired outputs invalidate the previous gat
 
 Upstream's build daemon repeats this until clean. Here, once the human agrees in
 chat, run `run_migration.mjs build-loop --note "what was agreed" [--max-rounds N]
-[--max-calls N]` (defaults: 5 rounds, `maxAgentCalls` AI calls for the whole loop;
-state both in the proposal; the host asks the human to confirm the command). Each round records its build
-approval under that one grant in `migration/gates/build-loop-<id>.json`, runs the
-build, diagnoses it and repairs the queue with the normal reviews. It stops when
-the build is clean, at the round limit, or when the error count fails to fall for
-two rounds (`stalled`), or when its call budget is spent (`budget`; unfinished
-repairs resume with translate). An unmapped failure, a build that times out or a
-stale approval stops it with an error. While it runs, `status` shows it and other
+[--max-calls N]` (normal default: continuous until clean, without implicit
+round/call/time limits; state that in the proposal and respect any finite limits
+the person explicitly chooses; the host confirms the command). Each round
+records its approval under one grant in migration/gates/build-loop-<id>.json,
+runs validation, diagnoses failures and repairs the queue with normal reviews.
+Only bounded mode applies saved budgets and a stalled-count stop. Actual invalid
+inputs, stale approvals, unmapped failures or explicit cancellation still stop it.
+While it runs, `status` shows it and other
 runner commands are refused. Report every round's counts and the calls used.
 
 With `--through smoke` or `--through parity` (state it in the proposal) the same

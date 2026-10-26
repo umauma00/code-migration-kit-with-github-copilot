@@ -22,7 +22,7 @@ The orchestrator profiles enable the documented [`todo` alias](https://docs.gith
 exposed by the current host rather than assuming a fixed API name. Only the
 parent manages this list; automated workers keep their JSON-only contracts.
 
-Build the items from `run_migration.mjs status --format todo`: it returns the
+During an active phase, build the items from `run_migration.mjs status --fast --format todo`: it returns the
 ten phases as `{ "todoList": [{ id, title, status, description }], "current": {…} }`
 in the user's language, with statuses computed from receipts. `current` names
 the first incomplete phase in every state. Its item is `in-progress` only while
@@ -33,6 +33,11 @@ schema; Copilot CLI's `update_todo` takes one markdown checklist string, so pass
 it the item lines of `status --format checklist`. That command prints the same list for chat; include that
 checklist in **every** phase report and failure report, whether or not the TODO
 tool rendered, so the user always sees the current phase.
+
+Fast status marks completion as recorded, not revalidated. At resumption,
+upstream changes and actual phase/gate boundaries, use normal status or the
+phase checks to verify current evidence once. Progress updates within that
+same work do not need another whole-tree verification.
 
 Keep these ten phase items, with stable phase identifiers and names in the
 user's language, in this order:
@@ -171,6 +176,41 @@ instruction. Do not create a question merely to end the conversation.
 
 ## When a step fails
 
+First apply bounded recovery already authorized by the current phase: the
+runner's transient retry and single survey correction, preserving validated
+rows, read-only diagnostics and resuming the same authorized process. Report
+what is happening; these operations do not need a new decision after each
+attempt. Never kill, cancel or relaunch work solely for CPU at 100%, low CPU,
+silence, elapsed time (including 600 seconds), output volume, or a host wait
+returning a running session. Normal execution is continuous, including legacy
+configurations. Do not add finite time/call/round limits unless the person chose
+them. Wait on the same terminal/job and use `status --fast --format markdown`
+for progress (add `--wait 600` when waiting). That wait returning never stops
+the worker. Respect explicit cancellation and actual invalid inputs/permissions.
+See [interruption policy and complete source index](INTERRUPTION-POLICY.md).
+
+A deterministic TypeError/SyntaxError in a coordinator-owned preparation/report
+helper is technical recovery inside the same authorized phase. Inspect the
+implementation and call sites (especially array vs object return contracts),
+fix that helper, run syntax and mechanical regression checks, and resume from
+validated shards. Do not ask the person to choose fixing this bug versus omitting
+the candidate, dropping validation or restarting survey. Prefer the standard
+`preparation_cli.mjs inventory-preview` / hash-bound `inventory-merge` path.
+This does not authorize changes to source, judge, RULEBOOK, inventory decisions
+or protected evidence. If one of those must change, follow its actual gate.
+For a new/changed helper, exercise the writer with a small representative input
+(including comments and normal rows); syntax or shard validation alone does
+not execute that path. This mechanical check needs no new model call.
+
+The fast view labels recorded completion as not revalidated; it never grants
+approval. Use normal status/phase checks when verifying a boundary. Do not
+run full status and phase next repeatedly during the same preparation work:
+they revalidate source evidence and are not required between survey scopes.
+
+Ask only when recovery is exhausted or the next action requires a missing
+decision, a new budget/model/limit, a changed scope or a human gate. Reuse an
+answer already given for that action. In that case follow the report below.
+
 Every failed command, failed phase check, blocked unit or refused gate ends with
 a **failure report**, never with a bare error or a silent retry. Runner commands
 print it after the `ERROR:` line (one section per distinct cause when several
@@ -203,7 +243,7 @@ actually observed, then report:
    labels as `choices`. Without a question tool, show the same
    numbered choices in chat with a reply example such as 「1で進めて」.
 
-Wait for the answer. Never pick an option on the user's behalf, never treat the
+When a new decision is required, wait for the answer. Never pick an option on the user's behalf, never treat the
 recommendation as consent, and never route around a guardrail or weaken a test
 as an option. Options that are the human's own act (installing guardrails,
 approving a gate, changing models or limits) say so explicitly; the agent runs

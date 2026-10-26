@@ -97,10 +97,10 @@ Create or reconcile the host TODO list before starting phase work; update it on
 phase start, completion, approval waits, revisions, failures and resumption.
 Only the parent orchestrator updates it from actual evidence. If the tool is
 unavailable, show the same checklist in chat. TODO items never authorize a gate.
-Build the items from `run_migration.mjs status --format todo` (ten phases, names
+During an active phase, build the items from `run_migration.mjs status --fast --format todo` (ten phases, names
 in the user's language; the current phase is in progress only while it runs or
 is worked on, otherwise not-started with its state in the title) and put the output of
-`status --format checklist` at the top of every phase and failure report, so the
+`status --fast --format checklist` at the top of every phase and failure report, so the
 user always sees which phase is current even when the TODO UI does not render.
 
 The runner selects the first incomplete phase. Existing artifacts supply evidence
@@ -154,13 +154,32 @@ request or its path to a task/agent subagent: the auditor has no tools.
 
 ## When a step fails
 
-Follow [When a step fails](../../../docs/PHASE-HANDOFF.md#when-a-step-fails) for every
-failed command, refused gate or blocked unit: cause, impact, at least two
-choices plus pause, exactly one recommended option first, a reason for each,
-then ask with the question tool and wait. Runner errors already print this
-guidance; for other failures run `run_migration.mjs guidance --message TEXT`
-(its exit 0 output explains that message; it is not guidance failing).
-Never choose on the user's behalf or offer routing around a guardrail.
+Follow [When a step fails](../../../docs/PHASE-HANDOFF.md#when-a-step-fails). Use the current phase's bounded
+retry/survey correction and read-only diagnostics, preserving validated rows;
+report that recovery without asking again. Ask and wait only when it is
+exhausted or a new scope/model/budget/limit or human gate needs a missing
+choice. Then report cause, impact, at least two choices plus pause, one
+recommended first with a reason for each. Reuse answers already given.
+Never route around a guardrail or change citation evidence by hand.
+A TypeError/SyntaxError in a coordinator-owned preparation/report helper is
+technical recovery: inspect the parser/caller contract, fix the helper, run
+syntax/mechanical checks and resume from validated shards. Do not ask whether
+to omit the review candidate, skip validation or restart survey. Use the shared
+inventory-preview/inventory-merge renderer; only actual scope/rule/judge/approval
+changes need their gate.
+
+
+During preparation, monitor the existing terminal/job with
+`run_migration.mjs status --fast --format markdown` (add `--wait 600` when
+waiting). It shows recorded progress without source rehashing; use normal
+status/phase checks at verification boundaries. Do not keep repeating full
+status plus phase next between scopes. Never interrupt, cancel or relaunch work
+solely for silence, CPU at 100% or low CPU, elapsed time (including 600 seconds),
+log volume, or a host tool returning a running session. Keep the same job and
+wait/poll it. Normal execution is continuous, including legacy configurations;
+never add a finite timeout or call/round budget without the person's choice.
+Respect explicit user cancellation and actual input/permission failures.
+`status --wait 600` returning is only the end of that status wait, not the job.
 
 ## Ordered workflow entry
 
@@ -221,12 +240,12 @@ reviewed work). A run that stops at its AI call budget is a budget stop: rerun
 `translate`, or propose `translate --max-calls N` with the number the person agrees.
 
 After a failed build, propose `build-loop --note TEXT [--through build|smoke|parity]
-[--max-rounds N] [--max-calls N]` (defaults: build only, 5 rounds and
-`maxAgentCalls` AI calls for the whole loop; say all three): one host-confirmed
+[--max-rounds N] [--max-calls N]` (defaults: build only, continuous until clean;
+state the stages and absence of an implicit round/call deadline): one host-confirmed
 grant that rebuilds (then runs smoke and parity with `--through`), parses errors
-into the repair queue, runs reviewed repairs and stops when clean, at the round
-or call limit, or when the error count stops falling (then propose a rule
-amendment). Offer `--through parity` when the person wants upstream's
+into the repair queue and runs reviewed repairs until clean. Only limits explicitly
+chosen by the person, or executionMode bounded, impose a round/call budget;
+the stalled-count breaker applies only in bounded mode. Offer `--through parity` when the person wants upstream's
 run-until-parity loop instead of approving every rerun. While it runs, other runner commands are refused; check `status --wait`.
 Show the round counts and calls used.
 

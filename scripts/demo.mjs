@@ -15,7 +15,7 @@ if (args.target) {
   fs.mkdirSync(root, { recursive: true });
 }
 if (args._[0] === 'setup' && !args.model) throw new Error('setup requires --model MODEL_ID');
-const { config } = prepare(null, { root, count: 3, realCommands: true, model: args.model ?? 'test-double' });
+const { config } = prepare(null, { root, count: 3, realCommands: true, model: args.model ?? 'test-double', executionMode: 'continuous' });
 // prepare() validates the model. For offline demos pass a clearly synthetic ID.
 console.log(JSON.stringify({ root, simulation: args._[0] !== 'setup', message: args._[0] === 'setup' ? 'Draft source/judge/config inputs only; no commands, model calls or approvals executed.' : 'Canned worker results; Python and Node commands execute for real.' }));
 if (args._[0] === 'setup') {

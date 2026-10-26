@@ -61,3 +61,11 @@ For source-as-spec, draft the contracts with `survey run --kind contracts` and
 `survey merge --kind contracts` instead of reading every file yourself; the merge
 fills `migration/source-spec/contracts.md` only while it is the untouched skeleton.
 See [surveys](../docs/SURVEYS.md).
+
+Preserve completed scopes and validated rows. The runner supplies original line
+numbers and makes one bounded correction of bad citations/missing rows within
+the current call budget; do not ask for another decision at each repair attempt.
+Do not resurvey the whole repository, discard sites or edit citations to make
+validation pass. Monitor the same terminal using `status --fast --format
+markdown`; silence alone does not justify cancellation. Ask only after bounded
+recovery is exhausted or a scope/model/budget change needs a new decision.

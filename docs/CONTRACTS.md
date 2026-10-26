@@ -165,9 +165,10 @@ select the affected manifest targets for `repair`; then approve a fresh build.
 ## Validation commands
 
 `build-loop --note TEXT [--through build|smoke|parity] [--max-rounds N] [--max-calls N]` is one host-confirmed
-grant (default 5, at most 50 rounds; `--max-calls` defaults to `maxAgentCalls` and
-caps the AI calls of all its repair rounds together, as does `maxRunInputBytes`
-for prompt bytes) stored as `migration/gates/build-loop-<id>.json` with its note,
+grant. Normal continuous execution has no implicit round/call/input budget;
+explicit --max-rounds (1–50) / --max-calls (1–10000) choices still apply.
+Only executionMode bounded enables the saved defaults (5 rounds, maxAgentCalls,
+maxRunInputBytes and the stalled-count breaker). The grant is stored as `migration/gates/build-loop-<id>.json` with its note,
 owner `pid`, `through` (default `build`), current `stage`, `agentCalls`, `promptBytes` and per-round
 `{round, stage, buildExecutionId, success, errors, targets, unmapped}` (`stage` is the
 last stage the round ran; `buildExecutionId` names that stage's run).
@@ -175,10 +176,12 @@ Each round records an ordinary build approval whose gate carries
 `loop: {grantId, round}`, runs build and diagnoses the recorded output. When it is
 clean and `through` is `smoke` or `parity`, it records and runs those stages the
 same way, in order. The first failing stage's queue is repaired through `translate`
-with the normal reviews, and the next round starts again from build. It stops
-`clean`, `stalled` (three rounds failing at the same stage without a falling error count), `budget` or
-`round-limit`. Once the loop's prompt bytes reach `maxRunInputBytes` it starts no
-further repair round. A build that could not run, a stale approval or an unmapped failure
+with the normal reviews, and the next round starts again from build. Normal
+execution stops clean or on a real input/permission/validation failure or manual
+cancellation. Explicit finite limits can return budget or round-limit; bounded
+mode can also return stalled after three rounds without a falling error count.
+Unlimited grants store maxRounds/maxCalls as null, displayed as infinity.
+A build that could not run, a stale approval or an unmapped failure
 is an error, not a round; so is a parity run whose original suite failed. Only build, smoke and parity approvals may carry `loop`; source-only refuses `--through parity`. A loop takes
 `migration/build-loop.lock` before it saves its grant and holds it to the end, so a
 second loop stops at start; a lock whose pid is gone is retaken. Until the grant
@@ -223,7 +226,7 @@ The runner does not infer scenario coverage from exit codes. The human reviews
 the command definitions and their reported counts at gates. Every validation
 record includes the command, output, exit code and input/output fingerprints.
 Attempts are saved before execution. Failures preserve bounded stdout/stderr,
-timestamps, exit/signal/error and the requested model when applicable. A timeout
+timestamps, exit/signal/error and the requested model when applicable. An explicitly selected bounded timeout
 does not release the caller before POSIX process-group SIGKILL escalation;
 Windows uses taskkill /T /F, but Windows execution remains unverified. Detached
 processes that deliberately create a separate process group are outside this
@@ -237,3 +240,47 @@ replace a live test of the consumer's hook handling.
 ## VS Code orchestration and verification modes
 
 See the canonical section in the [operating manual](OPERATING-MANUAL.md#vs-code-orchestration-and-verification-modes).
+
+## Continuous execution and survey fragments
+
+executionMode defaults to continuous even when the key is absent in a legacy
+configuration. Saved 600-second, call, fix-round, input, credit and retry-count
+limits do not interrupt normal work. CPU usage and silence are never kill
+conditions. status --wait is a reporting wait only. See
+[all interruption conditions and source index](INTERRUPTION-POLICY.md).
+
+runProcess spills output over its memory threshold to private files under
+migration/runs/process-output. Result stdout/stderr then contain display tails;
+stdoutFile/stderrFile, stdoutBytes/stderrBytes and stdoutHash/stderrHash identify
+the complete output; diagnostic reads reject altered logs or non-runner paths.
+The CLI JSONL and build diagnostic consumers iterate full logs, not the tails.
+A write failure is real evidence loss and remains an error.
+
+All survey kinds split oversized source bodies, including single long lines,
+into source-numbered ranges. A part receipt under <scope-id>.parts/<request-hash>.json
+binds scopeInputHash and requestHash to validated items. The scope result records
+parts and partReceipts and is published only after all parts/files/sites are
+validated and the original inputs are unchanged. Rejected replies and validated
+partial rows stay available for resume. Contracts concatenate anchored fragment
+observations and retain unknown relationships. Inventory visits all fragments
+for every site and retains UNKNOWN/TODO(port) for cross-fragment data flow.
+The final shape (one contract per file, one inventory item per census site) and
+independent phase audits/human gates are unchanged.
+
+## Inventory review candidate
+
+`preparation_cli.mjs inventory-preview --sites PATH --shards LIST [--out PATH]`
+validates and renders the same complete inventory bytes as inventory-merge,
+using one shared parser with `{notes, rows}` output. Only the candidate file is
+written (default migration/inventory-review-candidate.tsv); formal inventory,
+merge receipt and phase approvals are untouched. The result kind is
+inventory-preview and includes out, outputHash, census/shard hashes and counts.
+It is a draft, not a formal receipt or review attestation.
+
+`inventory-merge --expected-hash SHA256` compares the recomputed full output to
+that reviewed candidate hash before either formal write. A mismatch preserves
+existing formal files. The merge receipt records reviewedCandidateHash when
+provided; existing callers without the option retain their behavior.
+Preview retains comments, deduplicates identical retries and rejects incomplete
+or conflicting sites. Its output cannot overlap census/shards/survey records,
+formal receipts or protected inputs, including hardlink aliases of inputs.

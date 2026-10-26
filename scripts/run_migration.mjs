@@ -12,6 +12,8 @@ import { preparePilot } from '../lib/pilot.mjs';
 import { createCopilotAdapter, requiredCopilotFlags, copilotEnv, probeWorkerAgents, probeReviewerHook, fileLimits, fileLimitMinimum } from './copilot_adapter.mjs';
 import { runtimeLayout, pluginRoot } from '../lib/runtime.mjs';
 import { migrationStatus, statusMarkdown, statusTodo, statusChecklist } from '../lib/status.mjs';
+import { statusSnapshot } from '../lib/status-snapshot.mjs';
+import { commandProgress } from '../lib/command-progress.mjs';
 import { failureGuidance, guidanceMarkdown, failureGuidanceList, guidanceListMarkdown, doctorGuidance } from '../lib/guidance.mjs';
 import { initSourceSpec, sourceSpecReadiness } from '../lib/source-spec.mjs';
 import { runSurvey, mergeSurvey, surveyStatus, planSurvey } from '../lib/survey.mjs';
@@ -23,10 +25,12 @@ import { buildLoop } from '../lib/build-loop.mjs';
 import { readPreferences, setPreferences, preferencesReport } from '../lib/preferences.mjs';
 import { readGuardrails, cliFolderTrust, guardrailsProposal, installGuardrails } from '../lib/guardrails.mjs';
 import { listAvailableModels, modelsMarkdown, setRoleModels, readConfigIfPresent, currentAssignments } from '../lib/models.mjs';
+import { processTimeout } from '../lib/execution-policy.mjs';
 
 export const usage = `Usage: node migration-kit/scripts/run_migration.mjs COMMAND [options]
   doctor [--check-cli] [--copilot /path/to/copilot]
-  status [--format json|markdown|todo|checklist] [--wait SECONDS]
+  status [--format json|markdown|todo|checklist] [--wait SECONDS] [--fast]
+                              --fast shows recorded progress without scanning source files; gates still revalidate
                               Read-only evidence; todo = host task-list items, checklist = chat progress.
                               --wait (1-1800) returns once a running runner makes progress, stops or the time is up
   guidance --message TEXT [--format json|markdown]
@@ -55,7 +59,7 @@ export const usage = `Usage: node migration-kit/scripts/run_migration.mjs COMMAN
                               translation may use --batch N or --targets PATH,PATH, and --complete-phase 03
                               to record the reviewed phase 03 in the same confirmation
   translate [--max-calls N]  Run/resume translation with Copilot CLI workers; --max-calls is this run's
-                              AI call budget (default maxAgentCalls), agreed with the person
+                              explicit AI call budget, agreed with the person (normal default: continuous)
   pilot prepare --target NEW_DIR --sources src/a,src/b --note TEXT [--through translation|build|smoke|parity]
   pilot run --root PILOT_DIR  Run only the explicitly authorized, isolated pilot
   repair --target PATH --evidence migration/PATH | repair --queue migration/QUEUE.json [--max-calls N]
@@ -65,13 +69,15 @@ export const usage = `Usage: node migration-kit/scripts/run_migration.mjs COMMAN
                              diagnose, then repair the queue; fresh build (and smoke/parity) runs still need approval
   build-loop --note TEXT [--through build|smoke|parity] [--max-rounds N] [--max-calls N]
                              One host-confirmed grant: build (then smoke, then parity with --through), diagnose,
-                             repair with reviews and start again from build until clean, N rounds (default 5),
-                             N AI calls in total (default maxAgentCalls) or a stalled error count
+                             repair with reviews and start again from build until clean; finite round/call
+                             limits apply only when explicitly chosen or executionMode is bounded
   build | smoke | parity | handoff     Run one approved validation stage and stop
   unlock --pid PID           Remove a lock only after its owning process has stopped
 Options: --root PATH (default cwd), --copilot PATH (default copilot)
 Configuration: migration/config.json. No command commits or pushes changes.`;
-export async function doctor(root, config, { checkCLI = false, command = 'copilot' } = {}) {
+export async function doctor(root, config, { checkCLI = false, command = 'copilot', signal } = {}) {
+  if (signal?.aborted) throw new Error('Interrupted');
+  const timeoutMs = processTimeout(config, 'commandTimeoutSeconds');
   const checks = [{ check: 'configuration', ok: true }];
   const unset = unsetModels(config);
   checks.push(unset.length ? { check: 'worker models chosen', ok: false, missing: unset, note: 'Choose them with models list and models set; the other checks run without them.' } : { check: 'worker models chosen', ok: true });
@@ -115,9 +121,12 @@ export async function doctor(root, config, { checkCLI = false, command = 'copilo
     const argv = typeof line === 'string' ? [...line.replaceAll('${PLUGIN_ROOT}', layout.root).matchAll(/"([^"]*)"|(\S+)/g)].map(m => m[1] ?? m[2]) : [];
     const probe = async (role, command) => {
       const started = Date.now();
-      const r = await runProcess(argv[0] === 'node' ? process.execPath : argv[0], argv.slice(1), { cwd: root, timeoutMs: 60000,
+      const r = await runProcess(argv[0] === 'node' ? process.execPath : argv[0], argv.slice(1), { cwd: root,
         input: JSON.stringify({ toolName: 'bash', toolArgs: { command }, cwd: root }),
-        env: { ...process.env, ...(role ? { MIGRATION_KIT_ROLE: role } : {}) } }).catch(e => ({ code: null, stdout: '', stderr: e.message }));
+        signal, timeoutMs, env: { ...process.env, ...(role ? { MIGRATION_KIT_ROLE: role } : {}) } }).catch(e => {
+          if (signal?.aborted) throw new Error('Interrupted');
+          return { code: null, stdout: '', stderr: e.message };
+        });
       let decision = null; try { decision = JSON.parse(r.stdout); } catch {}
       return { ms: Date.now() - started, code: r.code, decision };
     };
@@ -147,20 +156,23 @@ export async function doctor(root, config, { checkCLI = false, command = 'copilo
     try {
       // Same environment as workers: a launcher may pick a different build otherwise.
       const env = copilotEnv('reviewer-rules');
-      const version = await runProcess(command, ['--version'], { cwd: root, timeoutMs: 20000, env });
-      const help = await runProcess(command, ['--help'], { cwd: root, timeoutMs: 20000, env });
+      const version = await runProcess(command, ['--version'], { cwd: root, env, signal, timeoutMs });
+      const help = await runProcess(command, ['--help'], { cwd: root, env, signal, timeoutMs });
       const text = help.stdout + help.stderr;
       checks.push({ check: 'Copilot executable', ok: version.code === 0, detail: version.stdout.trim() });
       const advertised = new Set(text.match(/(?<![\w-])--?[A-Za-z][A-Za-z0-9-]*/g) ?? []);
       const missing = requiredCopilotFlags(layout, config).filter(flag => !advertised.has(flag));
       checks.push({ check: 'required flags', ok: help.code === 0 && missing.length === 0, missing });
-      const agents = await probeWorkerAgents(command, [], { cwd: root, layout });
+      const agents = await probeWorkerAgents(command, [], { cwd: root, layout, signal, timeoutMs });
       checks.push({ check: 'worker agents resolve', ...agents });
-      if (agents.ok) checks.push({ check: 'tool-assisted reviewer hook loads in prompt mode', ...await probeReviewerHook(command, [], { cwd: root, layout }),
+      if (agents.ok) checks.push({ check: 'tool-assisted reviewer hook loads in prompt mode', ...await probeReviewerHook(command, [], { cwd: root, layout, signal, timeoutMs }),
         note: 'Live check with a loopback model provider: no account, network or AI usage. It proves the hook keeps tool-assisted reviewers out of migration/runs.' });
-      checks.push({ check: 'file descriptor limit', ...await fileLimits(), minimum: fileLimitMinimum,
+      checks.push({ check: 'file descriptor limit', ...await fileLimits({ signal, timeoutMs }), minimum: fileLimitMinimum,
         note: 'Each CLI process raises its soft open-file limit to the hard limit by itself. A hard limit below the minimum is a warning: workers may hit EMFILE "Too many open files", which stops the run with guidance.' });
-    } catch (e) { checks.push({ check: 'Copilot executable', ok: false, detail: e.message }); }
+    } catch (e) {
+      if (signal?.aborted) throw new Error('Interrupted');
+      checks.push({ check: 'Copilot executable', ok: false, detail: e.message });
+    }
   }
   const staticValid = checks.every(x => x.ok !== false);
   // Passing checks can still carry a warning the person should hear.
@@ -172,15 +184,17 @@ export async function doctor(root, config, { checkCLI = false, command = 'copilo
 // poll by the parent agent is a model turn over its whole conversation, so the
 // runner waits here instead and answers once something changed.
 const progressKey = report => JSON.stringify([report.ok, report.running, report.lock?.runId, report.done, report.total,
-  report.units?.filter(u => u.status === 'blocked').length, report.buildLoop && [report.buildLoop.stage, report.buildLoop.rounds, report.buildLoop.agentCalls]]);
-export async function waitForProgress(root, seconds, { intervalMs = 5000 } = {}) {
+  report.units?.filter(u => u.status === 'blocked').length, report.buildLoop && [report.buildLoop.stage, report.buildLoop.rounds, report.buildLoop.agentCalls],
+  report.survey && [report.survey.runId, report.survey.done, report.survey.activeScopes, report.survey.agentCalls, report.survey.parts, report.survey.state]]);
+export async function waitForProgress(root, seconds, { intervalMs = 5000, fast = false } = {}) {
   if (!Number.isInteger(seconds) || seconds < 1 || seconds > 1800) throw new Error('--wait must be a number of seconds from 1 to 1800');
   const deadline = Date.now() + seconds * 1000;
-  let report = migrationStatus(root);
+  const read = fast ? statusSnapshot : migrationStatus;
+  let report = read(root);
   const start = progressKey(report);
   while ((report.running || report.buildLoop) && Date.now() < deadline) {
     await new Promise(resolve => setTimeout(resolve, Math.min(intervalMs, Math.max(0, deadline - Date.now()))));
-    report = migrationStatus(root);
+    report = read(root);
     if (progressKey(report) !== start) break;
   }
   return report;
@@ -222,7 +236,7 @@ export async function main(argv = process.argv.slice(2)) {
   }
   if (cmd === 'status') {
     if (args.format && !['json', 'markdown', 'todo', 'checklist'].includes(args.format)) throw new Error('status format must be json, markdown, todo or checklist');
-    const report = args.wait === undefined ? migrationStatus(root) : await waitForProgress(root, Number(args.wait));
+    const report = args.wait === undefined ? (args.fast ? statusSnapshot(root) : migrationStatus(root)) : await waitForProgress(root, Number(args.wait), { fast: args.fast });
     if (!report.ok) process.exitCode = 1;
     // Problems that need the person's decision: blocked units and unreadable state.
     const problems = !report.ok ? [{ targets: [report.blockers[0]?.path].filter(Boolean), guidance: failureGuidance(report.blockers[0]?.reason ?? 'status failed', { root, language }) }]
@@ -281,8 +295,8 @@ export async function main(argv = process.argv.slice(2)) {
     else if (cmd === 'phase') result = phaseCommand(root,config,args._[1],args._[2],args);
     else if (cmd === 'build-loop') {
       // One host-confirmed grant for build (→ smoke → parity) → diagnose → reviewed repairs → rebuild rounds.
-      const maxRounds = args['max-rounds'] === undefined ? 5 : Number(args['max-rounds']);
-      const maxCalls = args['max-calls'] === undefined ? config.maxAgentCalls : Number(args['max-calls']);
+      const maxRounds = args['max-rounds'] === undefined ? undefined : Number(args['max-rounds']);
+      const maxCalls = args['max-calls'] === undefined ? undefined : Number(args['max-calls']);
       result = await buildLoop(root, config, createCopilotAdapter({ command: args.copilot }), { maxRounds, maxCalls, through: args.through ?? 'build', note: args.note, signal: controller.signal,
         onProgress: event => console.error(`${event.unit}: ${event.stage}${event.calls === undefined ? '' : ` (agent calls ${event.calls})`}`) });
     }
@@ -300,7 +314,7 @@ export async function main(argv = process.argv.slice(2)) {
       } else throw new Error('Use guardrails show | install [--add CSV] [--remove CSV] [--deny CSV] [--waiver NOTE] [--replace]');
     }
     else if (cmd === 'doctor') {
-      result = await doctor(root, config, { checkCLI: args['check-cli'], command: args.copilot });
+      result = await doctor(root, config, { checkCLI: args['check-cli'], command: args.copilot, signal: controller.signal });
       if (!result.ok) {
         process.exitCode = 1;
         // Failed checks are results, not exceptions: explain them the same way.
@@ -330,7 +344,9 @@ export async function main(argv = process.argv.slice(2)) {
   } finally { process.removeListener('SIGINT', abort); process.removeListener('SIGTERM', abort); }
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
-  main().catch(e => {
+  const argv = process.argv.slice(2);
+  const progress = !argv.includes('--help') && (['status', 'survey', 'models', 'doctor', 'translate', 'repair', 'repair-round', 'build-loop', 'pilot', 'judge-prepare', 'judge', 'build', 'smoke', 'parity', 'handoff'].includes(argv[0]) || (argv[0] === 'phase' && argv[1] === 'next'));
+  (progress ? commandProgress(argv.slice(0, argv[0] === 'phase' ? 2 : 1).join(' '), () => main()) : main()).catch(e => {
     console.error(`ERROR: ${e.message}`);
     // Every failure ends with its cause and the user's choices (docs/PHASE-HANDOFF.md).
     try {

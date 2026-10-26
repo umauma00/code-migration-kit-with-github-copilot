@@ -32,7 +32,9 @@ Status directs the parent to review and request the next batch. Build requires
 all manifest units to have current independent reviews.
 
 A batch count is files/units, not maxAgentCalls. All implementation, review,
-arbitration and fix calls share concurrency/maxAgentCalls/maxFixRounds limits.
+arbitration and fix calls share concurrency; saved call/fix-round budgets apply
+only in executionMode bounded. Normal execution is continuous. Explicit
+--max-calls/--max-rounds choices are still respected.
 Bounded calls can stop a batch early; resume only its authorized scope with valid
 receipts. Re-approval does not discard already reviewed units.
 

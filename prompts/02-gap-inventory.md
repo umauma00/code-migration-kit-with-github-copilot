@@ -62,3 +62,11 @@ and `survey merge --kind inventory --sites …`. Each scope's surveyor receives 
 RULEBOOK, the scope's sources and its census sites; results are per-scope shards
 merged by the existing inventory merge, which refuses an incomplete census. The
 paired independent audits and the joint audit still follow. See [surveys](../docs/SURVEYS.md).
+
+When existing shards need a combined review candidate before formal publication,
+use `preparation_cli.mjs inventory-preview --sites PATH --shards LIST`; then pass
+its exact outputHash to `inventory-merge --expected-hash SHA256` after review.
+Both operations share the same parser and renderer. Do not write another TSV
+parser/merge helper or rerun survey just to create this candidate. Fix a local
+helper's return-shape TypeError within authorized preparation work, preserving
+validated shards; do not ask whether to skip the candidate or its checks.

@@ -32,9 +32,12 @@ validation are the same as the ordinary runner.
 The adapter does not memoize workers or filesystem writes with `ctx.step` keys.
 Disk receipts decide what remains after restart; SDK durable subagent results
 and SDK schema retries are no longer used. `ctx.signal` reaches CLI processes
-and validation commands. The runner enforces concurrency, maxAgentCalls,
-maxFixRounds and timeoutSeconds; SDK subagent limits do not control these child
-processes. An outer workflow cancellation/timeout still reaches the runner.
+and validation commands. The runner always enforces concurrency and authorized
+scope; normal execution is continuous. Saved call/round/time budgets apply only
+in executionMode bounded. SDK subagent limits do not control these child
+processes. An actual outer workflow cancellation still reaches the runner;
+never manufacture cancellation merely because a host wait returns or CPU/time
+looks high. Host-imposed deadlines are external and must be reported as such.
 
 By default workers run `copilot` from PATH. To select a particular executable,
 run doctor with that executable first and set the workflow argument:

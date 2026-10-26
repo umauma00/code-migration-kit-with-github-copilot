@@ -135,13 +135,14 @@ node migration-kit/scripts/run_migration.mjs doctor --check-cli
 | `dependencyOrder` | `auto`（新規導入）: 単位型チェックがあるときだけ、依存先のレビュー完了まで依存元を待たせる。型チェックがなければ上流と同じく承認範囲を一斉に展開する。`reviewed`（省略時・既存設定）: 常に待つ。`none`: 待たない（型チェックとは併用不可） |
 | `fixPolicy` | `single-pass`（新規導入の既定）: 上流Step 3と同じく、確定指摘の修正は1回で完了とし、build/smoke/parityが判定する。呼び出し数と停止する単位が減る。`rereview`（キーのない既存設定）: 修正後に再レビューし、確定した指摘がなくなるまで繰り返す |
 | `reviewFocus` | `shared`（新規導入）: 2人のレビュアーがそれぞれ自分の観点を先に、両方の観点（元の動作・ルール順守）を確認し、見つけた欠陥をすべて報告する。互いの結果は見ない。`specialized`（省略時・既存設定）: 上流と同じく1人1観点 |
-| `maxFixRounds`, `maxAgentCalls` | 1単位の修正回数、1回の実行（translate・repair 1回ごと）のAI呼び出し数の上限。`maxAgentCalls` は同時実行数ではなく呼び出しの総数（同時実行数は `concurrency`）。1単位はレビューに問題がなければ3回、上流と同じ修正1回なら4〜5回の呼び出し。実行上限なので、変更してもレビュー済みの単位と承認は失効しない。1回だけ変える場合は `translate --max-calls N` |
-| `maxRunInputBytes` | 任意。1回の実行でワーカーへ送る入力の合計バイト数の上限。AI Creditsはトークン量で消費され、使い切ると利用が止まるため、区切って使用量を確認するための予算。runの要約の `usageEstimate` に実測バイト数と推定トークン数（バイト÷4、課金データではない）を残す。判定は完了した呼び出しの合計で行うため、実行中の呼び出し（最大 `concurrency` 件）の分だけ上限を超えることがある |
-| `maxAiCreditsPerCall` | 任意。各ワーカー呼び出しに `--max-ai-credits` として渡す1呼び出しあたりのAI Credits上限。CLIの下限は30で、30未満は設定検証で拒否（CLI 1.0.98・1.0.100-1は30未満で起動しない）。GitHubの説明では処理中の応答の分だけ超え得るソフト上限（この環境からは未確認）。実アカウントでの上限到達時の動作は未検証 |
-| `timeoutSeconds` | 通常CLIの1ワーカー呼び出しの時間上限 |
-| `transientRetries`, `transientRetryDelayMs` | 任意。レート制限（429）・5xx・通信エラーの自動再試行の回数（既定2）と最初の待ち時間（既定5000ms、毎回倍）。再試行もAI呼び出し数に数える |
-| `maxConsecutiveFailures` | 任意。単位の失敗が続いたら残りの配布を止める回数（既定3）。1単位の失敗は他の単位を止めない。サインイン切れ・クレジット切れなど全体に共通する失敗は即座に全体を止める |
-| `commandTimeoutSeconds` | ビルド・比較コマンドの時間上限 |
+| `executionMode` | 既定・未指定は `continuous`。旧設定の時間・呼び出し数・修正回数・累計入力・リトライ回数で打ち切らず、終了まで継続する。利用者が明示的に `bounded` を選んだ場合だけ以下の上限を適用する。[停止条件一覧](docs/INTERRUPTION-POLICY.md) |
+| `maxFixRounds`, `maxAgentCalls` | boundedモードだけで使う1単位の修正回数・1実行のAI呼び出し数上限。continuousでは適用しない。`translate --max-calls N` を利用者が明示した場合は、その実行の有限上限として扱う |
+| `maxRunInputBytes` | boundedモードだけで使う入力累計bytesの上限。通常実行は量だけで打ち切らず、`usageEstimate` とCLIの使用量を記録する |
+| `maxAiCreditsPerCall` | boundedモードだけで各workerへ渡す任意の `--max-ai-credits`（CLIの最小値30）。continuousでは渡さない。サービス側の残高・組織上限は外部制約 |
+| `timeoutSeconds` | boundedモードだけで使うCLI呼び出し時間上限。0は期限なし。通常実行は旧設定が600でも打ち切らない |
+| `transientRetries`, `transientRetryDelayMs` | レート制限・5xx・通信障害を待って再試行する。通常実行は回数で打ち切らない。boundedだけ既定2回。待機は既定5秒から倍増、最大60秒 |
+| `maxConsecutiveFailures` | boundedモードだけで使う連続失敗時の新規起動停止（既定3）。通常実行は独立した残りの単位を処理する。認証・残高など共通の実障害は原因を報告する |
+| `commandTimeoutSeconds` | boundedモードだけで使うビルド・比較の時間上限。0は期限なし。CPU使用率・無出力・600秒経過を理由に正常な処理を中断しない |
 
 `commands` は、シェル文字列ではなく引数配列です。パイプや複数コマンドは別スクリプトにまとめます。設定したコマンドは信頼できるものを指定してください。
 
@@ -265,12 +266,12 @@ node migration-kit/scripts/run_migration.mjs approve parity --note "基本動作
 node migration-kit/scripts/run_migration.mjs parity
 ```
 
-ビルドが失敗したら、チャットで合意したうえでAIが `build-loop` を実行します（ホストが確認を求めます）。上流のビルドデーモンと同じく「build → エラー解析 → レビュー付き修正 → 再build」を、クリーンになるか、指定回数（`--max-rounds`、既定5）かループ全体のAI呼び出し数（`--max-calls`、既定は `maxAgentCalls`）に達するか、エラー件数が減らなくなる（`stalled`：ルール改訂を提案）まで繰り返します。AIは提案時に両方の数を伝えます。各回の承認は1つの許可（`migration/gates/build-loop-<id>.json`）の下に記録され、実行中は `status` に表示され、ほかのrunnerコマンドは拒否されます。1回ずつ進める場合は `repair-round` を使います。同梱のパーサー（Python・Java/Maven・JavaScript/Node/ESLint/tsc・シェル/ShellCheck・Rust・汎用の `file:line:col: error` 形式）が記録済みのビルド出力からエラーを読み取り、manifestの変換先ごとの修正キューを作って修正まで実行します。manifestに対応しない行は推測せず一覧で報告します。ラウンドごとのエラー件数は `migration/build-rounds.tsv` に残ります。`--through smoke` または `--through parity` を付けると、同じ1つの許可で、buildがクリーンになった後のsmoke（とparity）も承認・実行し、その失敗もレビュー付き修正に回して次の回をbuildからやり直します（上流のStep 5・6）。元テストの失敗や、変換先に対応しない失敗は推測せずに止まります。ループを使わない場合、修正後のbuildには従来どおり承認が必要です。
+ビルドが失敗したら、チャットで合意したうえでAIが `build-loop` を実行します（ホストが確認を求めます）。通常は「build → エラー解析 → レビュー付き修正 → 再build」をクリーンになるまで継続し、既定の5回・呼び出し数・エラー件数の横ばいでは打ち切りません。有限の上限は利用者が `--max-rounds N` / `--max-calls N` またはboundedモードを選んだ場合だけです。AIは実行範囲と上限の有無を明示します。各回の承認は1つの許可（`migration/gates/build-loop-<id>.json`）の下に記録され、実行中は `status` に表示され、ほかのrunnerコマンドは拒否されます。1回ずつ進める場合は `repair-round` を使います。同梱のパーサー（Python・Java/Maven・JavaScript/Node/ESLint/tsc・シェル/ShellCheck・Rust・汎用の `file:line:col: error` 形式）が記録済みのビルド出力からエラーを読み取り、manifestの変換先ごとの修正キューを作って修正まで実行します。manifestに対応しない行は推測せず一覧で報告します。ラウンドごとのエラー件数は `migration/build-rounds.tsv` に残ります。`--through smoke` または `--through parity` を付けると、同じ1つの許可で、buildがクリーンになった後のsmoke（とparity）も承認・実行し、その失敗もレビュー付き修正に回して次の回をbuildからやり直します（上流のStep 5・6）。元テストの失敗や、変換先に対応しない失敗は推測せずに止まります。ループを使わない場合、修正後のbuildには従来どおり承認が必要です。
 
 ```bash
-node migration-kit/scripts/run_migration.mjs build-loop --note "ビルド修正を最大5回・AI呼び出し100回まで許可" --max-rounds 5 --max-calls 100
+node migration-kit/scripts/run_migration.mjs build-loop --note "ビルドが通るまでレビュー付き修正を継続することに合意"
 # smoke・parityまで同じ許可で繰り返す場合
-node migration-kit/scripts/run_migration.mjs build-loop --through parity --note "parityが通るまで最大5回・AI呼び出し100回まで許可" --max-rounds 5 --max-calls 100
+node migration-kit/scripts/run_migration.mjs build-loop --through parity --note "parityが通るまでレビュー付き修正を継続することに合意"
 # 1回ずつ進める場合
 node migration-kit/scripts/run_migration.mjs repair-round
 node migration-kit/scripts/run_migration.mjs approve build --note "修正結果を確認"
@@ -290,7 +291,7 @@ smoke・parityの失敗も同じ経路で修正します（上流Step 6）。元
 
 同じ入力であっても、build等の再実行を開始すると下流の結果と承認は失効します。再実行が成功した場合も、smoke以降を改めて確認・承認・実行してください。judgeを再実行した場合はtranslationの承認からやり直します。
 
-長い実行中の進捗確認は `status --wait 600 --format markdown` を使います。runnerが最大600秒待ち、単位の完了や停止があった時点で返すので、親エージェントの確認回数（＝AI呼び出し）を減らせます。中断後は `translate` を再実行します。通常の `translate` は開始時に完了していた単位も終了時に再確認し、全単位の有効なレビュー記録が揃わなければ失敗します。`repair` の成功条件は指定した単位の完了です。異常終了でロックが残った場合のみ、所有プロセスの終了を確認して `unlock --pid OWNER_PID` を使います。稼働中のPIDでは解除できません。
+長い実行中の進捗確認は `status --fast --wait 600 --format markdown` を使います。これは状態確認だけを最大600秒待つ指定で、workerの期限ではありません。返った後も既存の実行を待ちます。単位の完了や状態変化で返すので、親エージェントの確認回数（＝AI呼び出し）を減らせます。中断後は `translate` を再実行します。通常の `translate` は開始時に完了していた単位も終了時に再確認し、全単位の有効なレビュー記録が揃わなければ失敗します。`repair` の成功条件は指定した単位の完了です。異常終了でロックが残った場合のみ、所有プロセスの終了を確認して `unlock --pid OWNER_PID` を使います。稼働中のPIDでは解除できません。
 
 ## 任意：Dynamic Workflows
 
