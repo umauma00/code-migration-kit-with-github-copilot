@@ -40,8 +40,10 @@ can tell libraries apart; `depmap_common.py` writes it).
 | `#include` (other C dialects) | `depmap_c.py` |
 
 Copy the mapper and every `depmap_*.py` it imports. Prefer one built on
-`depmap_common.py` (all but `depmap_c.py` and `depmap_python.py`): it gives the
-file walk, encoding fallback, SCC order and the output writer.
+`depmap_common.py` (all Python mappers now use it): it gives iterative file
+walking, encoding fallback, SCC order and the output writer. Python's ast input
+keeps Python's own coding-cookie/BOM rules. Copy depmap_js_scan.mjs together with
+the JS/TS mapper when adapting that version.
 Keep `run()` and `write_outputs()` unchanged so the contract holds; change only
 the scanner and the resolver.
 

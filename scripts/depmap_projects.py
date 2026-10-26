@@ -1,5 +1,6 @@
 # Copyright 2026 Anthropic PBC
 # SPDX-License-Identifier: Apache-2.0
+# Copilot adaptation: dependency parsing/decoding updated on 2026-10-26; see NOTICE.
 """Build-file facts the C#, VB.NET and Java mappers use (stdlib only).
 
 The files are read as text, never evaluated: MSBuild properties, imports,
@@ -265,43 +266,61 @@ def with_imports(root, rel, text, warnings, seen=None, chain=(), under_condition
     then a later import of it may be the one that is read, so it is read
     again, as conditional. chain stops an import loop."""
     seen = {} if seen is None else seen
-    chain = chain + (rel.lower(),)
-    here = posixpath.dirname(rel)
-    spans = conditional_spans(text)
+    active = set(chain)
+    output = []
 
-    def expand(m):
+    def frame(name, body, conditional, close=""):
+        active.add(name.lower())
+        return {"rel": name, "text": body, "here": posixpath.dirname(name),
+                "spans": conditional_spans(body), "matches": iter(IMPORT_PROJECT_RE.finditer(body)),
+                "cursor": 0, "conditional": conditional, "close": close}
+
+    frames = [frame(rel, text, under_condition)]
+    while frames:
+        current = frames[-1]
+        m = next(current["matches"], None)
+        if m is None:
+            output.append(current["text"][current["cursor"]:])
+            output.append(current["close"])
+            active.discard(current["rel"].lower())
+            frames.pop()
+            continue
+        output.append(current["text"][current["cursor"]:m.start()])
+        current["cursor"] = m.end()
         values = attr_values(PROJECT_ATTR_RE, m.group(1))
         if not values:
-            return m.group(0)
+            output.append(m.group(0))
+            continue
         value = values[0].strip()
         target = None
         for name in DIRECTORY_BUILD:
-            if name.lower() in value.lower() and "$(" in value and here:
-                target = directory_build(root, posixpath.dirname(here), name)
+            if name.lower() in value.lower() and "$(" in value and current["here"]:
+                target = directory_build(root, posixpath.dirname(current["here"]), name)
                 break
         if target is None and "$(" not in value:
-            target = msbuild_path(here, value)
+            target = msbuild_path(current["here"], value)
+        if target and (target == '..' or target.startswith('../') or posixpath.isabs(target) or re.match(r'^[A-Za-z]:', target)):
+            warnings.append(f"{current['rel']}: import outside --root not read: {value}")
+            output.append(m.group(0))
+            continue
         key = target.lower() if target else None
-        if target is None or key in chain or seen.get(key) == "yes" or not (root / target).is_file():
-            return m.group(0)
+        if target is None or key in active or seen.get(key) == "yes" or not (root / target).is_file():
+            output.append(m.group(0))
+            continue
         conditions = attr_values(CONDITION_ATTR_RE, m.group(1))
-        # Condition="Exists('x.props')" on the import of x.props holds: the
-        # file is there.
         exists = conditions and re.fullmatch(r"\s*Exists\s*\(\s*'([^']*)'\s*\)\s*", conditions[0], re.IGNORECASE)
         if exists and exists.group(1).strip() == value:
             conditions = []
-        # An import under a Condition (its own, an ImportGroup's, a Choose
-        # branch's, an importing file's), or one an earlier conditional
-        # import may already have read, is conditional: what it adds or
-        # removes is read as if written in a <When>.
-        local = bool(conditions) or any(a <= m.start() < b for a, b in spans) or seen.get(key) == "maybe"
-        seen[key] = "maybe" if local or under_condition else "yes"
-        body = with_imports(root, target, COMMENT_RE.sub("", read_source(root / target, warnings)), warnings,
-                            seen, chain, under_condition or local)
+        local = bool(conditions) or any(a <= m.start() < b for a, b in current["spans"]) or seen.get(key) == "maybe"
+        seen[key] = "maybe" if local or current["conditional"] else "yes"
+        close = ""
         if local:
-            body = f"<Choose><When Condition=\"'$(Imported)' != ''\">{body}</When></Choose>"
-        return body
-    return IMPORT_PROJECT_RE.sub(expand, text)
+            output.append('<Choose><When Condition="\'$(Imported)\' != \'\'">')
+            close = "</When></Choose>"
+        body = COMMENT_RE.sub("", read_source(root / target, warnings))
+        frames.append(frame(target, body, current["conditional"] or local, close))
+    return "".join(output)
+
 
 
 def project_text(root, d, proj_rel, text, warnings):
@@ -485,8 +504,7 @@ def java_modules(root, rels, warnings):
                 builds.setdefault(rel_dir(path, root), []).append(path)
     if not builds:
         return None
-    settings_dirs = sorted({rel_dir(p, root) for n in GRADLE_SETTINGS for p in root.rglob(n)
-                            if not any(x.startswith(".") for x in p.relative_to(root).parts[:-1])}, key=len)
+    settings_dirs = sorted({rel_dir(p, root) for p in found if p.name in GRADLE_SETTINGS}, key=lambda d: (len(d), d))
     for d, paths in builds.items():
         modules[d] = set()
         for path in paths:

@@ -6,7 +6,11 @@ Phase 01's dependency map comes from a **deterministic mapper that only reads so
 
 ## Bundled mappers
 
-All of them need only the Python 3 standard library (nothing to install; Windows, macOS and Linux alike).
+The Python mappers use Python's standard library; JS/TS uses Node.js builtins. No parser packages or compilers are installed. In source-as-spec work, phases 00b–02 are prepared together, so these commands also appear during 00b.
+
+All mappers accept repeated `--source-root DIR` selections relative to `--root`. They select source files before building declaration/module indexes, so same-named types outside the selection cannot create false edges. Omitting the option preserves the whole-root behavior. Build metadata at the common parent is still read. Audit unresolved references and add any source root needed by a real dependency. Generated source-spec commands supply these selections automatically.
+
+The JS/TS scanner also filters JSX tags and text, scans imports inside JSX expressions, and preserves imports following a closing tag on the same line. TypeScript files with `.ts`, `.mts` and `.cts` suffixes keep type assertions distinct from JSX.
 
 | Source language | Command | Where edges come from |
 |---|---|---|
@@ -31,9 +35,15 @@ Every mapper writes:
 - `edges.tsv`: one edge per line (from → to, paths relative to `--root`)
 - `order.txt`: migration order, dependencies first, a cycle on one line
 - `cycles.txt`: cycles of two or more files
-- `unresolved.tsv` (C#, Java, VB.NET, PHP, COBOL): references the mapper saw but could not tie to a file, with the reason: computed includes, CALL through a data item (the programs the item is given as a literal by `VALUE 'X'` or `MOVE 'X' TO`, in the file or a copybook it copies, also get an edge), reflection with a computed name, an import of a type the repository's package does not declare
+- `unresolved.tsv` (all languages): unresolved references and unparsed whole files. This includes Python syntax/encoding/AST limits, missing or macro C includes, unresolved relative JS/TS imports, unreadable sources, and the typed/dynamic references described below.
 
-The same input always gives byte-identical output. Shift_JIS (cp932) sources are read too: a file that is not UTF-8 is read as cp932, then Latin-1, with a warning. A file that decodes as cp932 without a single kana or full-width punctuation mark (Western Windows-1252 text) is read as Latin-1. UTF-16 and UTF-32 are recognised by their byte order mark. UTF-16 without one is read only when every other byte is NUL, with a warning; any other file holding NUL bytes is not text, is not analysed, and is listed in `unresolved.tsv` as `(whole file)`.
+The same input gives byte-identical output. Python source follows Python's own UTF-8 BOM and coding-cookie rules (including cp932 and Latin-1). Invalid syntax/encoding or AST recursion limits are recorded as unparsed files. C/C++, C#, Java, VB.NET, PHP and COBOL share UTF-8, BOM-marked UTF-16/32, cp932 and Latin-1 decoding. A cp932 decode with no kana/full-width punctuation uses Latin-1 instead; unmarked UTF-16 is recognized by alternating NULs. Other NULs and read failures become `(whole file)` unresolved rows while independent sources continue. JS/TS requires UTF-8 and records invalid UTF-8/NUL sources as unparsed.
+
+### Fixes checked on 2026-10-26
+
+Literal C#/VB.NET Import chains expand iteratively (including 1200-deep chains and loops); imports outside --root warn without being read. PHP validates composer metadata shapes, keeps usable autoload entries and detects tagged Drupal sources after decoding. C/C++ ignores includes in comments/raw strings and handles line continuations. JS/TS filters comments, strings, regex and template text, retains imports in template expressions and resolves emitted .js/.mjs/.cjs suffixes back to TypeScript sources. Shared walking and PHP/Java metadata discovery are iterative.
+
+Source-spec commands map all sourceRoots from their common parent and quote spaced/quoted paths. Manifest `--map-root SOURCE=TARGET` replaces a directory prefix once, before extension `--sub` rules; multi-root suggestions retain the relative layout under outputRoots. Review naming against RULEBOOK. Paths containing commas remain unsupported by comma-delimited CLI options. These static approximations do not execute source, MSBuild, Maven, Gradle or PHP, and do not implement full compiler/type resolution.
 
 ## Accuracy (typed languages)
 

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # Copyright 2026 Anthropic PBC
 # SPDX-License-Identifier: Apache-2.0
+# Copilot adaptation: source-root selection updated on 2026-10-26; see NOTICE.
 """Deterministic dependency mapper for COBOL codebases (stdlib only).
 
 Implements the kit's dependency-map contract (prompts/01-dependency-map.md) by
@@ -151,7 +152,7 @@ def name_of(m, first):
 
 
 def mapper(root, warnings, args):
-    files = find_files(root, EXTS, warnings=warnings)
+    files = find_files(root, EXTS, warnings=warnings, source_roots=getattr(args, 'source_roots', ()))
     rels = [p.relative_to(root).as_posix() for p in files]
     sources = {rel: read_source(path, warnings) for rel, path in zip(rels, files)}
     texts = {rel: code_lines(sources[rel]) for rel in rels}

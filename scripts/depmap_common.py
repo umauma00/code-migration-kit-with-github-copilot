@@ -1,5 +1,6 @@
 # Copyright 2026 Anthropic PBC
 # SPDX-License-Identifier: Apache-2.0
+# Copilot adaptation: dependency parsing/decoding updated on 2026-10-26; see NOTICE.
 """Shared parts of the stdlib-only dependency mappers (depmap_csharp.py,
 depmap_java.py, depmap_php.py, depmap_vbnet.py, depmap_cobol.py).
 
@@ -31,7 +32,7 @@ COMMON_SKIP = {"node_modules", "__pycache__"}
 KIT_DIRS = {"migration-kit": "scripts/run_migration.mjs", "migration": "config.json"}
 
 
-def find_files(root: Path, exts, skip_dirs=(), markers=(), warnings=None):
+def find_files(root: Path, exts, skip_dirs=(), markers=(), warnings=None, skip_all=(), source_roots=()):
     """Sorted source files under root whose suffix (case-insensitive) is in exts.
 
     skip_dirs are build-output or third-party directory names (bin, target,
@@ -55,40 +56,86 @@ def find_files(root: Path, exts, skip_dirs=(), markers=(), warnings=None):
             return False
 
     out, skipped = [], []
-
-    def walk(d, top, ancestors):
+    always = COMMON_SKIP | {d.lower() for d in skip_all}
+    pending = [(root, True, frozenset(), None)]
+    while pending:
+        d, top, ancestors, resolved = pending.pop()
         # A directory symlink is followed, so two paths to one directory are
         # both mapped (as copies); one that points back at a directory being
         # walked (a loop) is not.
         try:
-            real = d.resolve()
+            # Normal children already have a resolved parent. Resolve again
+            # only for links/junctions, avoiding quadratic work in deep trees.
+            real = resolved if resolved is not None else d.resolve()
             if real in ancestors:
                 if warnings is not None:
                     warnings.append(f"symlink loop not followed: {d.relative_to(root).as_posix()}/")
-                return
+                continue
             entries = sorted(d.iterdir())
-        except OSError:
-            return
+        except (OSError, RuntimeError) as e:
+            if warnings is not None:
+                warnings.append(f"directory not read: {d.relative_to(root).as_posix()}: {e}")
+            continue
         ancestors = ancestors | {real}
+        children = []
         for p in entries:
+            rel = p.relative_to(root).as_posix()
+            selected = not source_roots or any(r == '.' or rel == r or rel.startswith(r + '/') for r in source_roots)
             if p.is_dir():
+                if not selected and not any(r.startswith(rel + '/') for r in source_roots):
+                    continue
                 name = p.name
                 if name.startswith(".") or name.lower() in COMMON_SKIP or (top and name in kit):
+                    continue
+                if name.lower() in always:
+                    skipped.append(p)
                     continue
                 if name.lower() in skip and (top or beside_marker(d, skip[name.lower()])):
                     skipped.append(p)
                     continue
-                walk(p, False, ancestors)
-            elif p.is_file() and p.suffix.lower() in exts:
+                linked = p.is_symlink() or getattr(p, 'is_junction', lambda: False)()
+                children.append((p, False, ancestors, None if linked else real / name))
+            elif selected and p.is_file() and p.suffix.lower() in exts:
                 out.append(p)
 
-    walk(root, True, frozenset())
+        pending.extend(reversed(children))
     if warnings is not None:
         for d in skipped:
-            if any(p.is_file() and p.suffix.lower() in exts for p in d.rglob("*")):
+            pending_skipped, found = [d], False
+            while pending_skipped and not found:
+                current = pending_skipped.pop()
+                try:
+                    for p in sorted(current.iterdir()):
+                        if p.is_dir() and not p.is_symlink():
+                            pending_skipped.append(p)
+                        elif p.is_file() and p.suffix.lower() in exts:
+                            found = True
+                            break
+                except OSError as e:
+                    warnings.append(f"skipped directory not read: {current.relative_to(root).as_posix()}: {e}")
+            if found:
                 warnings.append(f"skipped build-output/third-party directory with sources: "
                                 f"{d.relative_to(root).as_posix()}/")
     return sorted(out)
+
+
+def checked_source_roots(root, values, ap):
+    """Optional source selection, relative to the parser root, before indexing.
+
+    Build metadata can still be discovered at a common ancestor. Source files
+    outside this selection must not add declarations or ambiguous candidates.
+    """
+    selected = []
+    for value in values:
+        value = value.replace('\\', '/')
+        if value != '.' and (not value or value.startswith('/') or ':' in value or
+                             any(p in ('', '.', '..') for p in value.split('/'))):
+            ap.error('--source-root must be a normalized directory relative to --root')
+        if not (root / value).is_dir():
+            ap.error(f'--source-root is not a directory: {value}')
+        if value not in selected:
+            selected.append(value)
+    return tuple(selected)
 
 
 # Byte order marks, longest first (the UTF-32 LE one starts like UTF-16 LE's).
@@ -104,7 +151,12 @@ def read_source(path: Path, warnings):
     identifiers outside ASCII depend on it. Text with NUL bytes and no mark
     is read as UTF-16 when every other byte is NUL; else it is not text, and
     run() lists the file in unresolved.tsv."""
-    data = path.read_bytes()
+    UNREADABLE.pop(path, None)
+    try:
+        data = path.read_bytes()
+    except OSError as e:
+        UNREADABLE[path] = f"source not read: {e.strerror or e.__class__.__name__}; not analysed"
+        return ""
     for bom, codec in BOMS:
         if data.startswith(bom):
             try:
@@ -236,18 +288,21 @@ def run(description, mapper, options=()):
     ap = argparse.ArgumentParser(description=description)
     ap.add_argument("--root", required=True, type=Path)
     ap.add_argument("--out", required=True, type=Path)
+    ap.add_argument("--source-root", action="append", default=[], help="source directory relative to --root; repeatable, selects files before dependency resolution")
     for flag, text in options:
         ap.add_argument(flag, default="", help=text)
     args = ap.parse_args()
     root = args.root.resolve()
     if not root.is_dir():
         ap.error(f"--root is not a directory: {args.root}")
+    args.source_roots = checked_source_roots(root, args.source_root, ap)
     warnings = []
+    UNREADABLE.clear()
     files, edges, unresolved = mapper(root, warnings, args)
     listed = set(files)
     for path, why in sorted(UNREADABLE.items()):
         try:
-            rel = path.resolve().relative_to(root).as_posix()
+            rel = path.relative_to(root).as_posix()
         except ValueError:
             rel = None
         if rel in listed:

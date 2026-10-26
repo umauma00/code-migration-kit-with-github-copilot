@@ -6,7 +6,7 @@
 
 ## 同梱の解析器
 
-どれも Python 3 の標準ライブラリだけで動きます（追加インストール不要、Windows・macOS・Linux 共通）。
+Python版はPython 3の標準ライブラリ、JS/TS版はNode.jsの標準機能だけで動きます（追加インストール不要）。source-as-specでは00b〜02の準備を続けて進めるため、00bの作業中にもこれらを使います。
 
 | 元の言語 | コマンド | 辺の根拠 |
 |---|---|---|
@@ -21,6 +21,8 @@
 
 Windows では `python3` の代わりに `py` または `python` を使います。
 
+全言語で `--source-root DIR` を繰り返すと、`--root` からの相対ディレクトリを解析対象として選べます。選択は型・モジュールの索引を作る前に適用し、対象外の同名型が偽の依存を作ることを防ぎます。省略時は従来どおりroot全体です。共通親のプロジェクト設定は引き続き読みます。選択外に実依存がある場合は、未解決記録の監査で必要なrootを追加してください。
+
 追加のオプション（どちらも `--root` からの相対パスをカンマ区切りで指定）：
 
 - PHP：`--include-var phpbb_root_path=phpBB/,phpEx=php` で include パスに使われる変数（`$NAME`）や定数（`NAME`）の値を指定できます（ディレクトリは `--root` からの相対パス）。`"$IP/includes/x.php"` のように `"..."` の文字列やヒアドキュメントの中に書いた変数も置き換えます（`'...'` の中の `$IP` は文字なので置き換えません）。`define('WPINC', 'wp-includes')` のように全ファイルで同じ相対パスのリテラルを与える定数と、`define('DO_MAINTENANCE', dirname(__FILE__) . '/doMaintenance.php')` のように計算できるパスを与える定数は自動で使います（同じ定数に違う値の define があれば、同じファイルの if/else でも別のファイルでも、include は各値が指すファイル全部への辺になり、`unresolved.tsv` にも載ります。`define('BASE', $dir)` のようにリテラルでない値もあれば、値は絞らず従来どおり未解決にします）。`\define(...)` も `define(...)` と同じに読み、`const A = 1, B = 2;` はリストの全部の名前を宣言します。`const`（クラス定数・型付き定数も）や enum の `case` が宣言する名前は、同名のクラスへの参照として数えません。Drupal の `.install`・`.test`・`.theme`・`.engine`・`.profile` は `<?php` を含むときだけ PHP のファイルとして読みます。`--include-path lib,inc` で PHP の include_path を指定します。相対パスの include はまずここを探し、次に include したファイルの場所、最後に `--root` を探します。`./x` や `../x` のように明示した相対パスは作業ディレクトリ基準なので include_path は使わず、include したファイルの場所と `--root` だけを探します。この2つで別のファイルになるときは両方を辺にし、`unresolved.tsv` にも載せます。`composer.json`（vendor 以外）の autoload（PSR-4・PSR-0・classmap）は自動で読みます。同じクラスが複数のファイルにあるときは autoload が指すファイルを選びます
@@ -31,9 +33,18 @@ Windows では `python3` の代わりに `py` または `python` を使います
 - `edges.tsv`：1行1辺（依存元 → 依存先、`--root` からの相対パス）
 - `order.txt`：移行順（依存先が先、循環は1行にまとめる）
 - `cycles.txt`：2ファイル以上の循環
-- `unresolved.tsv`（C#・Java・VB.NET・PHP・COBOL）：見えたのにファイルへ結び付けられなかった参照と理由。動的な include、データ項目経由の CALL（そのデータ項目に `VALUE 'X'` や `MOVE 'X' TO` で与えたリテラルのプログラムには辺も出します。コピーブック内の定義も読みます）、計算した名前のリフレクション、リポジトリ内パッケージに無い型の import など
+- `unresolved.tsv`（全言語）：結び付けられない参照や解析できなかったファイルと理由。Pythonの構文・文字コード・AST上限、Cの未解決quoted include・マクロinclude、JS/TSの未解決相対import・読めないファイルも残します。型付き言語などでは動的include・CALL・リフレクション・未解決型も記録します。
 
-同じ入力なら毎回バイト単位で同じ出力になります。Shift_JIS（cp932）のソースも読めます（UTF-8 で読めないファイルは警告を出して cp932、それも駄目なら Latin-1 で読みます。cp932 として読めても、かなや全角記号が1つもないファイルは欧文の Windows-1252 とみなして Latin-1 で読みます）。UTF-16・UTF-32 は BOM で判定します。BOM の無い UTF-16 は、1バイトおきに NUL が並ぶときだけ UTF-16 として読み、警告を出します。それ以外で NUL を含むファイルはテキストとして読めないので解析せず、`unresolved.tsv` に `(whole file)` として載せます。
+同じ入力なら毎回バイト単位で同じ出力になります。PythonソースはPython自身の規則でUTF-8 BOM・coding宣言（cp932・Latin-1など）を読み、読めない構文・文字コードはファイル全体を未解析として記録します。C/C++・C#・Java・VB.NET・PHP・COBOLは共通のデコーダーでUTF-8、BOM付きUTF-16/32、cp932、Latin-1を扱います。cp932にかな・全角記号がない場合は欧文としてLatin-1を選びます。BOMなしUTF-16は1バイトおきのNULで判定します。それ以外のNULや読取失敗は `(whole file)` として記録し、独立したファイルの解析を続けます。JS/TS版はUTF-8専用で、不正UTF-8・NULを未解析として記録します。
+
+### 調査で修正したケース（2026-10-26）
+
+- C#・VB.NETのliteral Importは再帰を使わず展開し、1200段の連鎖・循環を扱います。`--root` 外のImportは読まず警告します。MSBuildの実行・Condition評価は行いません。
+- PHPのcomposer.jsonは値の型を確認し、不正なsection/pathを警告して除外します。他の正常なautoload設定と解析結果は保持します。Drupal形式の拡張子のPHPタグは文字コードの復号後に判定します。
+- C/C++のコメント・raw string内のincludeを除外し、行継続・コメントを挟んだquoted includeを読みます。JS/TSはコメント・文字列・regex・template・JSXの本文を除外し、template/JSXの式内のliteral importと、出力拡張子 `.js/.mjs/.cjs` で書かれたTSソースへの参照を読みます。JSXの閉じタグ後も同じ行のimportを読みます。
+- 共通のディレクトリ走査・PHP/Javaの設定ファイル探索は反復処理にし、深いツリーでの再帰例外を避けます。解析器はプロジェクトのソースを実行しません。
+
+`source-spec check` の生成コマンドは複数sourceRootsの共通親をrootにして、`--source-root` で設定済みのソースだけを選び、空白や引用符を含むパスを引用します。manifest生成の `--map-root SOURCE=TARGET` はディレクトリの先頭だけを置換し、`--sub` による拡張子変更を後から適用します。複数rootは共通親からの相対配置を保ち、全対象をoutputRoots内へ配置する案を作ります。命名はRULEBOOKに合わせて確認してください。カンマ区切りのCLIオプションで、パス自体にカンマを含む形式は未対応です。
 
 ## 精度について（型の言語）
 

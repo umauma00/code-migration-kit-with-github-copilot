@@ -10,6 +10,10 @@ substitutions (repeatable, applied in order, simple string replacement), and
 writes a TSV with header `source\ttarget`, preserving batch order —
 dependencies first, so queue_runner.mjs hands out work in migration order.
 
+--map-root SOURCE=TARGET (repeatable) remaps only a leading directory prefix,
+longest match first, before --sub. Use it for generated multi-root suggestions;
+the old --sub behavior remains a global text substitution.
+
 Targets must come out matching the rulebook's naming rules (RULEBOOK.md §4) —
 the --sub substitutions are how you encode those rules. If any derived target
 equals its source (the substitutions didn't apply), the script refuses and
@@ -39,6 +43,8 @@ def main():
                     help="manifest TSV to write (header: source\\ttarget)")
     ap.add_argument("--sub", action="append", default=[], metavar="OLD=NEW",
                     help="substitution old=new, repeatable, applied in order")
+    ap.add_argument("--map-root", action="append", default=[], metavar="SOURCE=TARGET",
+                    help="map a source directory prefix to a target directory (repeatable, longest prefix first); applied before --sub")
     ap.add_argument("--prefix", default="", metavar="DIR/",
                     help="prepend to every order.txt path; use when the parser ran with "
                          "--root DIR so its paths are relative to DIR")
@@ -54,6 +60,19 @@ def main():
             print(f"ERROR: --sub must look like 'old=new', got: {s!r}", file=sys.stderr)
             sys.exit(1)
         subs.append((old, new))
+
+    root_maps = {}
+    for value in args.map_root:
+        old, sep, new = value.partition('=')
+        for directory in (old, new):
+            if not directory or (directory != '.' and (directory.startswith('/') or
+                    any(part in ('', '.', '..') for part in directory.split('/')) or
+                    any(c in directory for c in ('\\', ':', '\t', '\n', '\r', '\x00')))):
+                ap.error('--map-root needs normalized relative directories: SOURCE=TARGET')
+        if not sep or old in root_maps:
+            ap.error('--map-root needs unique SOURCE=TARGET mappings')
+        root_maps[old] = new
+    ordered_maps = sorted(root_maps, key=lambda p: (-len(p), p))
 
     try:
         order = args.order.read_text(encoding="utf-8")
@@ -75,6 +94,12 @@ def main():
             if args.include and not any(source.startswith(p.rstrip("/") + "/") for p in args.include):
                 continue
             target = source
+            if root_maps:
+                selected = next((p for p in ordered_maps if p == '.' or source.startswith(p + '/')), None)
+                if selected is None:
+                    raise SystemExit(f"ERROR: no --map-root mapping for source: {source!r}")
+                suffix = source if selected == '.' else source[len(selected) + 1:]
+                target = suffix if root_maps[selected] == '.' else root_maps[selected] + '/' + suffix
             for old, new in subs:
                 target = target.replace(old, new)
             if target == source:

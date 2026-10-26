@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # Copyright 2026 Anthropic PBC
 # SPDX-License-Identifier: Apache-2.0
+# Copilot adaptation: source-root selection updated on 2026-10-26; see NOTICE.
 """Deterministic dependency mapper for Java codebases (stdlib only).
 
 Implements the kit's dependency-map contract (prompts/01-dependency-map.md) by
@@ -166,7 +167,7 @@ def scan(rel, text):
 
 
 def mapper(root, warnings, args):
-    files = find_files(root, EXTS, SKIP_DIRS, MARKERS, warnings)
+    files = find_files(root, EXTS, SKIP_DIRS, MARKERS, warnings, source_roots=getattr(args, 'source_roots', ()))
     rels, infos, deep = [], [], set()
     for path in files:
         rel = path.relative_to(root).as_posix()

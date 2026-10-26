@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # Copyright 2026 Anthropic PBC
 # SPDX-License-Identifier: Apache-2.0
+# Copilot adaptation: dependency parsing/decoding updated on 2026-10-26; see NOTICE.
 """Deterministic dependency mapper for PHP codebases (stdlib only).
 
 Implements the kit's dependency-map contract (prompts/01-dependency-map.md) by
@@ -857,18 +858,15 @@ def resolve_include(src, parts, info, by_rel, by_tail, include_path=(), variable
 
 
 def mapper(root, warnings, args):
-    files = find_files(root, EXTS | PHP_IF_TAGGED, SKIP_DIRS, MARKERS, warnings)
+    files = find_files(root, EXTS | PHP_IF_TAGGED, SKIP_DIRS, MARKERS, warnings, source_roots=getattr(args, 'source_roots', ()))
     rels, infos = [], []
     for path in files:
         rel = path.relative_to(root).as_posix()
+        text = read_source(path, warnings)
         if path.suffix.lower() in PHP_IF_TAGGED:
-            try:
-                if b"<?php" not in path.read_bytes().lower():
-                    continue
-            except OSError as e:
-                warnings.append(f"not read: {rel}: {e.strerror}")
+            if "<?php" not in text.lower():
                 continue
-        infos.append(scan(rel, read_source(path, warnings)))
+        infos.append(scan(rel, text))
         rels.append(rel)
     by_rel = set(rels)
     by_tail = {}
@@ -1159,7 +1157,9 @@ class Autoload:
 def composer_autoload(root, warnings):
     """Autoload rules, matched case-insensitively against existing paths."""
     auto = Autoload()
-    for path in sorted(root.rglob("composer.json")):
+    for path in find_files(root, {'.json'}, skip_all=COMPOSER_SKIP):
+        if path.name != 'composer.json':
+            continue
         parts = path.relative_to(root).parts
         if any(p.startswith(".") or p in COMPOSER_SKIP for p in parts[:-1]):
             continue
@@ -1167,17 +1167,40 @@ def composer_autoload(root, warnings):
         base = "" if base == "." else base
         try:
             data = json.loads(read_source(path, warnings))
-        except ValueError as e:
+        except (ValueError, RecursionError) as e:
             warnings.append(f"composer.json not parsed, autoload ignored: {path} ({e})")
             continue
+        if not isinstance(data, dict):
+            warnings.append(f"composer.json root must be an object; autoload ignored: {path}")
+            continue
         for section in ("autoload", "autoload-dev"):
-            block = data.get(section) or {}
+            block = data.get(section, {})
+            if not isinstance(block, dict):
+                warnings.append(f"composer.json {section} must be an object; section ignored: {path}")
+                continue
             for kind, target in (("psr-4", auto.psr4), ("psr-0", auto.psr0)):
-                for prefix, dirs in (block.get(kind) or {}).items():
+                mapping = block.get(kind, {})
+                if not isinstance(mapping, dict):
+                    warnings.append(f"composer.json {section}.{kind} must be an object; mapping ignored: {path}")
+                    continue
+                for prefix, dirs in mapping.items():
+                    if not isinstance(dirs, (str, list)):
+                        warnings.append(f"composer.json {section}.{kind}[{prefix!r}] needs a string or list of paths; ignored: {path}")
+                        continue
                     for d in [dirs] if isinstance(dirs, str) else dirs:
+                        if not isinstance(d, str) or '\x00' in d:
+                            warnings.append(f"composer.json {section}.{kind}[{prefix!r}] has a non-string/invalid path; entry ignored: {path}")
+                            continue
                         target.append((prefix.lower(), posixpath.normpath(posixpath.join(base, d)).lower()
                                        if d not in ("", ".") else base.lower()))
-            for entry in block.get("classmap") or []:
+            entries = block.get("classmap", [])
+            if not isinstance(entries, list):
+                warnings.append(f"composer.json {section}.classmap must be a list of paths; ignored: {path}")
+                continue
+            for entry in entries:
+                if not isinstance(entry, str) or '\x00' in entry:
+                    warnings.append(f"composer.json {section}.classmap has a non-string/invalid path; entry ignored: {path}")
+                    continue
                 auto.classmap.append(posixpath.normpath(posixpath.join(base, entry)))
     # Longest prefix first, as composer does.
     auto.psr4.sort(key=lambda p: -len(p[0]))

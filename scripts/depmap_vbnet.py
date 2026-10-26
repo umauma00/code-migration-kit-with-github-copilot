@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # Copyright 2026 Anthropic PBC
 # SPDX-License-Identifier: Apache-2.0
+# Copilot adaptation: source-root selection updated on 2026-10-26; see NOTICE.
 """Deterministic dependency mapper for VB.NET codebases (stdlib only).
 
 Implements the kit's dependency-map contract (prompts/01-dependency-map.md) by
@@ -647,7 +648,7 @@ def merge_info(info, other):
 
 
 def mapper(root, warnings, args):
-    files = find_files(root, EXTS, SKIP_DIRS, warnings=warnings)
+    files = find_files(root, EXTS, SKIP_DIRS, warnings=warnings, source_roots=getattr(args, 'source_roots', ()))
     rels = [path.relative_to(root).as_posix() for path in files]
     visible_files, not_compiled, projects_of, texts = dotnet_projects(root, rels, ".vbproj", warnings)
     root_ns = {}        # project dir -> RootNamespace candidates

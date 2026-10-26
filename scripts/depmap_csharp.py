@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # Copyright 2026 Anthropic PBC
 # SPDX-License-Identifier: Apache-2.0
+# Copilot adaptation: source-root selection updated on 2026-10-26; see NOTICE.
 """Deterministic dependency mapper for C# codebases (stdlib only).
 
 Implements the kit's dependency-map contract (prompts/01-dependency-map.md) by
@@ -834,7 +835,7 @@ def csproj_usings(text):
 
 
 def mapper(root, warnings, args):
-    files = find_files(root, EXTS, SKIP_DIRS, warnings=warnings)
+    files = find_files(root, EXTS, SKIP_DIRS, warnings=warnings, source_roots=getattr(args, 'source_roots', ()))
     rels, infos, project_globals, deep = [], [], [], set()
     for path in files:
         rel = path.relative_to(root).as_posix()
