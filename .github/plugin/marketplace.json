@@ -6,7 +6,7 @@
       "name": "code-migration-kit",
       "source": "./",
       "description": "Staged language migration with explicit approvals and independent reviews.",
-      "version": "0.7.0"
+      "version": "0.8.0"
     }
   ]
 }

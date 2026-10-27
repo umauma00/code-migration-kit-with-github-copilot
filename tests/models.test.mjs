@@ -14,7 +14,7 @@ import { failureGuidance } from '../lib/guidance.mjs';
 // A stand-in for `copilot --headless --stdio`: framed JSON-RPC with connect and models.list.
 const catalog = [
   { id: 'big-model', name: 'Big Model', capabilities: { supports: { reasoningEffort: true } }, policy: { state: 'enabled', terms: '' },
-    billing: { multiplier: 1, tokenPrices: { inputPrice: 200, outputPrice: 1000, cacheReadPrice: 10, batchSize: 1000000, maxPromptTokens: 272000, longContext: { inputPrice: 400, outputPrice: 1500 } } }, supportedReasoningEfforts: ['low', 'medium', 'high', 'xhigh'], defaultReasoningEffort: 'medium' },
+    billing: { multiplier: 1, tokenPrices: { inputPrice: 200, outputPrice: 1000, cacheReadPrice: 10, batchSize: 1000000, maxPromptTokens: 272000, longContext: { inputPrice: 400, outputPrice: 1500, maxPromptTokens: 1000000 } } }, supportedReasoningEfforts: ['low', 'medium', 'high', 'xhigh'], defaultReasoningEffort: 'medium' },
   { id: 'small-model', name: 'Small Model', capabilities: {}, billing: { tokenPrices: { inputPrice: 10000000, outputPrice: 50000000, batchSize: 1000 } }, supportedReasoningEfforts: ['low', 'medium', 'high', 'max'], defaultReasoningEffort: 'high' },
   { id: 'plain-model', name: 'Plain Model', capabilities: {}, billing: { tokenPrices: { inputPrice: 3, outputPrice: 9, batchSize: 1000 } } },
   { id: 'blocked-model', name: 'Blocked Model', capabilities: {}, policy: { state: 'disabled', terms: '' } },
@@ -55,9 +55,9 @@ test('models list reads the account catalog from the CLI headless server', async
   assert.equal(models[0].defaultEffort, 'medium');
   const ja = modelsMarkdown(models, null, 'ja');
   // Official ModelBillingTokenPrices: inputPrice/outputPrice per batchSize tokens, unit from models.listTokenPriceUnits.
-  assert.match(ja, /\| `big-model` \| Big Model \| low, medium, high, xhigh \(medium\) \| 200 \/ 1000 AIC\/100万トークン、長文脈（入力 272000 トークン超） 400 \/ 1500 \|/);
-  assert.match(ja, /\| `small-model` \| Small Model \| .* \| 10 \/ 50 AIC\/100万トークン \|/, 'nano-AIU per 1000 tokens becomes AI Credits per million');
-  assert.match(modelsMarkdown(models, null, 'en'), /\| `plain-model` \| Plain Model \| — \| 3 \/ 9 per 1000 tokens \(unit unknown\) \|/);
+  assert.match(ja, /\| `big-model` \| Big Model \| low, medium, high, xhigh \(medium\) \| default 272K \/ long_context 1M \| 200 \/ 1000 AIC\/100万トークン、長文脈（入力 272000 トークン超） 400 \/ 1500 \|/);
+  assert.match(ja, /\| `small-model` \| Small Model \| [^|]* \| — \| 10 \/ 50 AIC\/100万トークン \|/, 'nano-AIU per 1000 tokens becomes AI Credits per million');
+  assert.match(modelsMarkdown(models, null, 'en'), /\| `plain-model` \| Plain Model \| — \| — \| 3 \/ 9 per 1000 tokens \(unit unknown\) \|/);
   assert.match(ja, /利用できないモデル.*`blocked-model` \(disabled\)/);
   await assert.rejects(listAvailableModels({ command: process.execPath, prefixArgs: [fakeCli(t, { auth: false })] }), /not signed in to Copilot.*copilot login/);
   await assert.rejects(listAvailableModels({ command: path.join(os.tmpdir(), 'no-such-copilot') }), /Cannot start the Copilot CLI.*ENOENT/);
@@ -96,8 +96,8 @@ test('models set records the person\'s choice and revokes reviews made under the
   assert.throws(() => setRoleModels(f.root, models, { role: 'planner', model: 'big-model' }), /Unknown role planner/);
   assert.throws(() => setRoleModels(f.root, models, { role: 'fixer', model: 'blocked-model' }), /disabled/);
   assert.deepEqual(readJSON(safePath(f.root, 'migration/config.json')), written, 'a refused choice changes nothing');
-  assert.match(modelsMarkdown(models, config, 'en'), /\| reviewer-rules \| `big-model` \| xhigh \|/);
-  assert.deepEqual(currentAssignments({ models: {} }).find(a => a.role === 'surveyor'), { role: 'surveyor', model: null, effort: null, inherits: 'implementer' });
+  assert.match(modelsMarkdown(models, config, 'en'), /\| reviewer-rules \| `big-model` \| xhigh \| default \|/);
+  assert.deepEqual(currentAssignments({ models: {} }).find(a => a.role === 'surveyor'), { role: 'surveyor', model: null, effort: null, context: 'default', inherits: 'implementer' });
 });
 
 test('models set --assign records every role from one answer, all or nothing', async t => {

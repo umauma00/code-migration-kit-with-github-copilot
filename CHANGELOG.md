@@ -1,3 +1,15 @@
+# 0.8.0 — 2026-10-27
+
+- Let the person choose each worker's context size with its model and effort,
+  in the same single answer: `models set --assign "reviewers=ID:high:long_context,..."`
+  (or `--role ROLE --model ID --context long_context|default`). `models list`
+  shows each model's tiers and prompt limits from the CLI's `models.list`
+  (`billing.tokenPrices.longContext`, `supportedContextTiers`). A model without
+  a long tier is refused. Only roles that chose `long_context` get the CLI's
+  `--context long_context`; other workers get no new flag. The choice is
+  stored as `contextTiers` in `migration/config.json`, the surveyor inherits
+  it like its effort, and a change makes reviewed units be reviewed again.
+
 # 0.7.0 — 2026-10-27
 
 - Make the orchestrator agent the only entry point in VS Code and the Copilot

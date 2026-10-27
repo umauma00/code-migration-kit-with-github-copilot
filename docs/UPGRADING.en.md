@@ -1,6 +1,18 @@
-# Upgrading (0.7.0 and earlier releases)
+# Upgrading (0.8.0 and earlier releases)
 
 [日本語](UPGRADING.md) | English
+
+## 0.8.0 (choosing the context size)
+
+Kit files (lib, scripts) change, so existing approvals and completion records
+lapse once; rerun judge. Completed outputs are kept.
+
+1. Each role's context size is chosen in the same single answer as its model
+   and effort: add `:long_context` only for the roles that need it, as in
+   `models set --assign "reviewers=ID:high:long_context,..."`. The Context column
+   of `models list` shows which models offer it.
+2. Roles without it start as before, with no `--context` flag. Existing
+   configurations keep working.
 
 ## 0.7.0 (the orchestrator is the only entry point)
 

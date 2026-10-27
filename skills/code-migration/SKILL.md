@@ -104,7 +104,11 @@ everything in one answer" section shows:
 `implementer=ID:EFFORT, reviewers=ID:EFFORT, arbiter=ID:EFFORT, fixer=ID:EFFORT`
 (effort left out = default; `all=ID` first, then overrides; roles are
 implementer, reviewer-semantics, reviewer-rules, reviewers, arbiter, fixer,
-surveyor, all; surveyor follows the implementer unless named). You may explain
+surveyor, all; surveyor follows the implementer unless named). The same answer
+picks the context size: `:long_context` after the effort (`ID:EFFORT:long_context`)
+selects the long context tier, only for models whose Context column lists it;
+left out, the role runs the default context. Say that long_context costs more,
+and never add it on their behalf. You may explain
 the upstream model plan — tier by blast radius: reviewers on the largest or a
 mid model, high-volume implementers on a mid or small model, fixers and the
 arbiter on a mid model; higher effort costs more tokens — as information, never
@@ -112,10 +116,10 @@ as a preselected answer, and never choose for them. Record the whole answer with
 one `run_migration.mjs models set --assign "ROLE=ID:EFFORT,..."` (a single
 choice for everyone may use `--role all --model ID --effort LEVEL|default`);
 the host asks them to confirm once. Every entry is checked before anything is
-written: if one is refused (unlisted model, unsupported effort), nothing
+written: if one is refused (unlisted model, unsupported effort or context), nothing
 changes, so ask again about that entry only and record the full answer again.
 If `models list` reports that the CLI is not signed in, start `copilot login`
-first. A changed model or effort makes reviewed units be reviewed again.
+first. A changed model, effort or context makes reviewed units be reviewed again.
 
 Follow [phase reports and user decisions](../../docs/PHASE-HANDOFF.md) at every
 phase boundary. Show the actual artifacts, review points and a copyable next
