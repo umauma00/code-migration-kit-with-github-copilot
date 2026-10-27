@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import http from 'node:http';
-import { runProcess, processOutputLines } from '../lib/process.mjs';
+import { runProcess, processOutputLines, relativeProcessOutput } from '../lib/process.mjs';
 import { roles, workerModel, workerEffort, workerContext, safePath } from '../lib/core.mjs';
 import { executionLimits, processTimeout } from '../lib/execution-policy.mjs';
 import { parseResult, validateResult } from '../lib/results.mjs';
@@ -300,6 +300,7 @@ export function createCopilotAdapter({ command = 'copilot', prefixArgs = [], ver
     } catch (e) {
       // A killed or timed-out CLI may still have written its usage.
       usage = readUsageFile(usageFile);
+      if (e.result) e.result = relativeProcessOutput(e.result, root);
       Object.assign(e, versionFields, usageFields(usage)); throw e;
     }
     finally { fs.rmSync(usageDir, { recursive: true, force: true }); }
@@ -324,7 +325,7 @@ export function createCopilotAdapter({ command = 'copilot', prefixArgs = [], ver
       return { result: value, requestedModel: model, ...(effort ? { requestedEffort: effort } : {}), ...(context ? { requestedContext: context } : {}), promptBytes, responseBytes: Buffer.byteLength(JSON.stringify(value)),
         observedModel, tokens: usage ? usage.inputTokens + usage.outputTokens : null, aiCredits: null,
         ...(cliUsage || usage ? { cliUsage: { ...cliUsage, ...usage } } : {}), ...(modelWarning ? { modelWarning } : {}),
-        ...(worker !== role ? { workerProfile: worker } : {}), ...(result.outputSpooled ? { processOutput: { stdoutFile: result.stdoutFile, stderrFile: result.stderrFile, stdoutBytes: result.stdoutBytes, stderrBytes: result.stderrBytes, stdoutHash: result.stdoutHash, stderrHash: result.stderrHash } } : {}), ...versionFields };
-    } catch (e) { e.result = result; Object.assign(e, versionFields, usageFields(usage)); throw e; }
+        ...(worker !== role ? { workerProfile: worker } : {}), ...(result.outputSpooled ? { processOutput: (({ stdoutFile, stderrFile, stdoutBytes, stderrBytes, stdoutHash, stderrHash }) => ({ stdoutFile, stderrFile, stdoutBytes, stderrBytes, stdoutHash, stderrHash }))(relativeProcessOutput(result, root)) } : {}), ...versionFields };
+    } catch (e) { e.result = relativeProcessOutput(result, root); Object.assign(e, versionFields, usageFields(usage)); throw e; }
   };
 }
