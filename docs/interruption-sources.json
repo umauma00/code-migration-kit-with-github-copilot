@@ -950,7 +950,7 @@
     },
     {
       "path": "lib/guardrails.mjs",
-      "sha256": "da7a6ff4b0f99906c5cc60dc3c8423a2a9b17bafe021b54c4279025b5aaa4fca",
+      "sha256": "dcfa66ddf9932d34ba2f3e966612576ce4f954e7e98a2ae9f9d7d1820f61eed7",
       "entries": [
         {
           "line": 44,
@@ -2359,7 +2359,7 @@
     },
     {
       "path": "lib/run-settings.mjs",
-      "sha256": "6da883cf695362026a9c80afe6bb2408cea1ede44d6d96dd4ee308059ada61bd",
+      "sha256": "13ccd5a5678a73a8080a63baef191d251a4474ab021dc2546e8e3bd37af5d492",
       "entries": [
         {
           "line": 20,
@@ -2372,52 +2372,57 @@
           "code": "const configKeys = ['sourceLanguage', 'targetLanguage', 'mode', 'sourceRoots', 'outputRoots', 'verificationRoots', 'verificationMode', 'executionMode', 'concurrency', 'commands'];"
         },
         {
-          "line": 39,
+          "line": 32,
+          "kind": "error-or-exit-candidate",
+          "code": "const configDefaults = { verificationMode: 'runtime', executionMode: 'continuous', commands: {} };"
+        },
+        {
+          "line": 45,
           "kind": "error-or-exit-candidate",
           "code": "executionMode: 'continuous は終わるまで続ける、bounded は config.json の上限で止める。', concurrency: '同時に動かすワーカーの数（1〜64）。',"
         },
         {
-          "line": 51,
+          "line": 57,
           "kind": "error-or-exit-candidate",
           "code": "executionMode: 'continuous runs until done; bounded stops at the limits in config.json.', concurrency: 'Workers running at once (1-64).',"
         },
         {
-          "line": 73,
+          "line": 79,
           "kind": "error-or-exit-candidate",
           "code": "verificationMode: config.verificationMode ?? 'runtime', executionMode: config.executionMode ?? 'continuous', concurrency: config.concurrency,"
         },
         {
-          "line": 81,
+          "line": 87,
           "kind": "error-or-exit-candidate",
           "code": "reportLanguage: userLanguages, originalRuntime: originalRuntimes, mode: modes, verificationMode: verificationModes, executionMode: executionModes,"
         },
         {
-          "line": 94,
+          "line": 100,
           "kind": "error-or-exit-candidate",
           "code": "if (!config) throw new Error('migration/config.json is missing: initialize the project (install.mjs) before writing run settings');"
         },
         {
-          "line": 98,
+          "line": 104,
           "kind": "error-or-exit-candidate",
           "code": "try { values = readJSON(file); } catch (e) { throw new Error(`${runSettingsFile} is not valid JSON (${e.message}); correct it or delete it and run settings init again`); }"
         },
         {
-          "line": 99,
+          "line": 105,
           "kind": "error-or-exit-candidate",
           "code": "if (!values || typeof values !== 'object' || Array.isArray(values)) throw new Error(`${runSettingsFile} must be a JSON object; correct it or delete it and run settings init again`);"
         },
         {
-          "line": 122,
+          "line": 128,
           "kind": "error-or-exit-candidate",
           "code": "if (!fs.existsSync(file)) throw new Error(`${runSettingsFile} is missing: run settings init first`);"
         },
         {
-          "line": 124,
+          "line": 130,
           "kind": "error-or-exit-candidate",
           "code": "try { value = readJSON(file); } catch (e) { throw new Error(`${runSettingsFile} is not valid JSON: ${e.message}`); }"
         },
         {
-          "line": 125,
+          "line": 131,
           "kind": "error-or-exit-candidate",
           "code": "if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${runSettingsFile} must be a JSON object`);"
         }
@@ -2580,7 +2585,7 @@
     },
     {
       "path": "lib/status.mjs",
-      "sha256": "1fa3fc89b89d17e6769a3f17773d0dc869282da4430a4a0fe7798b75c0e4a5eb",
+      "sha256": "35d49fea6e502e366c213dc8a683f4eecbb279fe8a312a480c9c4eb1c07c5171",
       "entries": [
         {
           "line": 75,
@@ -4200,7 +4205,7 @@
     },
     {
       "path": "scripts/run_migration.mjs",
-      "sha256": "14a1330ebd0dd3d40de3b8a7fdcc9a240e001964e1cbed605730544d7051b58d",
+      "sha256": "2e4a3bdb7ed7a79483b4dd6139bca660411b1ca899712c137d0fca4d566952dc",
       "entries": [
         {
           "line": 77,
@@ -4335,7 +4340,7 @@
         {
           "line": 255,
           "kind": "error-or-exit-candidate",
-          "code": "try { settings = readJSON(file); } catch (e) { throw new Error(`${runSettingsFile} is not valid JSON: ${e.message}`); }"
+          "code": "try { settings = JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\\uFEFF/, '')); } catch (e) { throw new Error(`${runSettingsFile} is not valid JSON: ${e.message}`); }"
         },
         {
           "line": 257,
@@ -4489,5 +4494,5 @@
       ]
     }
   ],
-  "candidateLines": 813
+  "candidateLines": 814
 }

@@ -252,7 +252,7 @@ export async function main(argv = process.argv.slice(2)) {
       const file = safePath(root, runSettingsFile);
       if (!fs.existsSync(file)) throw new Error(`${runSettingsFile} is missing: run settings init first`);
       let settings;
-      try { settings = readJSON(file); } catch (e) { throw new Error(`${runSettingsFile} is not valid JSON: ${e.message}`); }
+      try { settings = JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, '')); } catch (e) { throw new Error(`${runSettingsFile} is not valid JSON: ${e.message}`); }
       const { errors } = checkRunSettings(root, settings && typeof settings === 'object' && !Array.isArray(settings) ? settings : {}, models);
       if (errors.length) process.exitCode = 1;
       console.log(JSON.stringify({ ok: !errors.length, file: runSettingsFile, errors }, null, 2));

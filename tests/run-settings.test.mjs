@@ -4,10 +4,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { ready, fake, modelCatalogCli } from './helpers.mjs';
+import { ready, prepare, fake, modelCatalogCli } from './helpers.mjs';
 import { install, kitRoot } from '../scripts/install.mjs';
 import { contextHash, done, readJSON, writeJSON, safePath, loadConfig } from '../lib/core.mjs';
-import { translate } from '../lib/pipeline.mjs';
+import { translate, runStage, approve } from '../lib/pipeline.mjs';
 import { normalizeModels } from '../lib/models.mjs';
 import { initRunSettings, checkRunSettings, applyRunSettings, runSettingsState, runSettingsFile } from '../lib/run-settings.mjs';
 import { migrationStatus, statusMarkdown } from '../lib/status.mjs';
@@ -198,4 +198,71 @@ test('the runner writes, checks and applies run settings with the CLI\'s model l
   assert.equal(JSON.parse(out.stdout).applied, true);
   assert.equal(readJSON(safePath(root, 'migration/config.json')).targetLanguage, 'TypeScript');
   assert.equal(fs.existsSync(safePath(root, 'migration/run.lock')), false, 'the lock is released');
+});
+
+test('applying an unchanged file never adds keys, rewrites a model\'s spelling or revokes reviews', async t => {
+  // A configuration that leaves out keys the file shows with their defaults,
+  // and records a model with another case than the account lists.
+  const f = prepare(t);
+  const config = readJSON(safePath(f.root, 'migration/config.json'));
+  delete config.commands.typecheck;
+  for (const key of ['verificationMode', 'executionMode']) delete config[key];
+  config.models.arbiter = 'Big-Model';
+  writeJSON(safePath(f.root, 'migration/config.json'), config);
+  f.config = loadConfig(f.root);
+  await runStage(f.root, f.config, 'judge');
+  approve(f.root, f.config, 'translation', 'Automated fixture approval for tests only');
+  await translate(f.root, f.config, fake);
+  assert.equal(done(f.root, f.units[0], contextHash(f.root, f.config)), true);
+  const list = normalizeModels([...catalog, { id: 'test-double', name: 'Test double' }]);
+  initRunSettings(f.root, list);
+  const s = settingsOf(f.root);
+  assert.equal(s.verificationMode, 'runtime');
+  Object.assign(s, { reportLanguage: 'en', originalRuntime: 'available' });
+  writeSettings(f.root, s);
+  const result = applyRunSettings(f.root, list);
+  assert.equal(result.applied, true, JSON.stringify(result.errors));
+  assert.deepEqual(result.changed, ['reportLanguage', 'originalRuntime']);
+  const after = readJSON(safePath(f.root, 'migration/config.json'));
+  assert.equal(Object.hasOwn(after, 'verificationMode'), false);
+  assert.equal(after.models.arbiter, 'Big-Model');
+  assert.equal(done(f.root, f.units[0], contextHash(f.root, loadConfig(f.root))), true);
+  assert.equal(runSettingsState(f.root, loadConfig(f.root)).state, 'applied');
+  // An operational change alone (concurrency) is applied without the re-review note.
+  s.concurrency = 3;
+  writeSettings(f.root, s);
+  const operational = applyRunSettings(f.root, list);
+  assert.deepEqual(operational.changed, ['concurrency']);
+  assert.equal(operational.note, undefined);
+});
+
+test('settings apply refuses unreadable preferences, malformed commands and a null effort before writing anything', t => {
+  const root = fresh(t);
+  initRunSettings(root, models);
+  const config = readJSON(safePath(root, 'migration/config.json'));
+  writeSettings(root, filled(root));
+  writeJSON(safePath(root, 'migration/preferences.json'), { schemaVersion: 1, userLanguage: 'ja', originalRuntime: 'maybe' });
+  let result = applyRunSettings(root, models);
+  assert.equal(result.applied, false);
+  assert.match(result.errors.join('\n'), /originalRuntime must be available or unavailable; correct it before applying/);
+  assert.deepEqual(readJSON(safePath(root, 'migration/config.json')), config, 'config.json is untouched');
+  writeJSON(safePath(root, 'migration/preferences.json'), { schemaVersion: 1, userLanguage: 'ja' });
+  for (const commands of [5, true, []]) {
+    writeSettings(root, { ...filled(root), commands });
+    assert.match(applyRunSettings(root, models).errors.join('\n'), /commands: must be an object/, JSON.stringify(commands));
+  }
+  const s = filled(root);
+  s.models.fixer = { model: 'small-model', effort: null };
+  writeSettings(root, s);
+  assert.match(applyRunSettings(root, models).errors.join('\n'), /models\.fixer\.effort: must be default or one of/);
+  assert.deepEqual(readJSON(safePath(root, 'migration/config.json')), config);
+});
+
+test('a file saved with a byte order mark is read like any other', t => {
+  const root = fresh(t);
+  initRunSettings(root, models);
+  fs.writeFileSync(safePath(root, runSettingsFile), `﻿${JSON.stringify(filled(root))}`);
+  assert.equal(applyRunSettings(root, models).applied, true);
+  assert.equal(runSettingsState(root, loadConfig(root)).state, 'applied');
+  assert.equal(initRunSettings(root, models).refreshed, true);
 });
