@@ -6,7 +6,7 @@ An unofficial adaptation of Anthropic's [Code Migration Kit](https://github.com/
 
 **0.3.0** removes the VS Code subagent (native) backend: workers always run on the Copilot CLI, also from VS Code. People complete the migration from AI chat alone; the AI runs the commands, including installing the CLI, starting its sign-in and installing the guardrails. **0.2.0** supports the Agent Plugins format for VS Code and the Copilot CLI. Install the kit itself as a plugin and keep only configuration and artifacts in the project. See [plugin installation](docs/PLUGIN.en.md), [fixes and re-review of the previous version](docs/reviews/2026-10-10-copilot-rereview-fixes.md) and [upgrading an existing install](docs/UPGRADING.en.md).
 
-Reference versions: Copilot CLI **1.0.98** (provider transport also checked on 1.0.93 and 1.0.95; on 1.0.98 every role's round trip in both layouts, hook loading and the error output format were checked too) and VS Code **1.142**. In VS Code 1.142 the Copilot harness is becoming the default for new sessions, and prompt files are Local-harness only (`chat.promptFilesLocations` is deprecated; sources: [1.142 release notes](https://code.visualstudio.com/updates/v1_142), [Prompt files](https://code.visualstudio.com/docs/agent-customization/prompt-files), [AI settings reference](https://code.visualstudio.com/docs/agents/reference/ai-settings), checked 2026-10-18); use the shared `/code-migration` skill as the entry point in VS Code. The pinned upstream commit and SDK reference are recorded in [UPSTREAM.json](UPSTREAM.json). This is not an official Anthropic or GitHub distribution.
+Reference versions: Copilot CLI **1.0.98** (provider transport also checked on 1.0.93 and 1.0.95; on 1.0.98 every role's round trip in both layouts, hook loading and the error output format were checked too) and VS Code **1.142**. In VS Code 1.142 the Copilot harness is becoming the default for new sessions, and prompt files are Local-harness only (`chat.promptFilesLocations` is deprecated; sources: [1.142 release notes](https://code.visualstudio.com/updates/v1_142), [Prompt files](https://code.visualstudio.com/docs/agent-customization/prompt-files), [AI settings reference](https://code.visualstudio.com/docs/agents/reference/ai-settings), checked 2026-10-18); from 0.7.0 the only entry point, in VS Code and the Copilot CLI alike, is the migration orchestrator in the agent picker (skills and workers are set to stay out of the slash menu and the picker). The pinned upstream commit and SDK reference are recorded in [UPSTREAM.json](UPSTREAM.json). This is not an official Anthropic or GitHub distribution.
 
 **Verification status: automated tests, the offline fixture and real-CLI transport against a loopback test provider on macOS are verified. Real Copilot authentication, AI translation quality, interactive use in VS Code and live Dynamic Workflows sessions are not.** Run the small check in [LIVE-SMOKE.en.md](docs/LIVE-SMOKE.en.md) before a real project.
 
@@ -16,7 +16,7 @@ Following reviews 1 and 2, this version adds [isolated pilots](docs/PILOT.md) be
 
 | Area | Behavior in this version |
 |---|---|
-| Instructions and skill | The plugin's `skills/code-migration/SKILL.md`, or `.github/skills/code-migration/SKILL.md` for a repository copy. Workers disable implicit instruction loading |
+| Entry point and skill | The orchestrator is the only entry point (`migration-orchestrator` for a repository copy, `code-migration-plugin-orchestrator` for the plugin). Its procedure is the plugin's `skills/code-migration/SKILL.md`, or `.github/skills/code-migration/SKILL.md` for a repository copy, which the orchestrator reads first; the skill is set to stay out of the `/` menu (`user-invocable: false`). Workers disable implicit instruction loading |
 | Roles | Orchestrator / implementer / two independent reviewers / arbiter / fixer, plus a tool-free profile for preparation audits |
 | Models | Set explicitly for each of the five worker roles, using model IDs available to your account |
 | Translation | Copilot CLI workers get only `view,grep,glob`. JSON responses are validated and the Node coordinator writes only the target file |
@@ -24,16 +24,16 @@ Following reviews 1 and 2, this version adds [isolated pilots](docs/PILOT.md) be
 | Completion | Hashes of output, inputs, both reviews and any arbitration are recorded. A file merely existing is never "done" |
 | Resumption | Resumes from the interrupted stage. Missing reviews or changed outputs are reviewed again |
 | Approvals | Bound to inputs, outputs and the previous stage's run ID. Re-running an upstream stage revokes downstream results and approvals |
-| VS Code | The Copilot harness (becoming the default in 1.142) uses the shared skill; Local uses the ten phase prompt files (Local only; skills are their successor) and Local hooks |
+| VS Code | In both the Copilot harness (becoming the default in 1.142) and Local, select the orchestrator in the agent picker. Local uses Local hooks with `--harness vscode-local` |
 | Dynamic Workflows | Optional experimental adapter on the same execution engine |
 
 ## Chat only
 
 People never type commands: the whole migration runs from AI chat in VS Code (or the Copilot CLI). Open the target repository and ask Copilot Chat, for example:
 
-> Clone the `feat/github-copilot-migration-kit` branch of https://github.com/umauma00/code-migration-kit-with-github-copilot into `../code-migration-kit`, install it into this repository with `scripts/install.mjs`, and start a Python to TypeScript migration with the `code-migration` skill
+> Clone the `feat/github-copilot-migration-kit` branch of https://github.com/umauma00/code-migration-kit-with-github-copilot into `../code-migration-kit`, and install it into this repository with `scripts/install.mjs`
 
-After installation, invoke `/code-migration` in a new chat, or ask to continue the migration. The AI runs everything itself and reports in chat:
+After installation, open a new chat, select `migration-orchestrator` in the agent picker (`code-migration-plugin-orchestrator` for a plugin install; `/agent` in the Copilot CLI), and ask, for example, "start a Python to TypeScript migration" or "continue the migration". Other agents do not start phases; they point you to the orchestrator. The AI runs everything itself and reports in chat:
 
 - It checks the Copilot CLI. If it is missing, the AI explains why it is required and runs `npm install -g @github/copilot` after you agree. If sign-in is needed, it starts `copilot login` and shows the URL and one-time code in chat. This is needed once, separately from the VS Code sign-in.
 - It runs initialization, configuration and every phase command, runs long translations in a background terminal with progress reports, and presents cause and choices when something fails.
@@ -219,9 +219,7 @@ Phase 00 reads a sample of the source directly, as upstream does, and reports wh
 
 Before phase 03, install the command guardrails `migration/guardrails.json`. They replace the upstream `.claude/settings.json` deny rules: a hook denies matching shell commands in every agent session (builds run by the runner are not affected). Installing them is the human's decision: the AI proposes a deny list (or a waiver with its reason) in chat from `run_migration.mjs guardrails show`, adapted to the target's build and test commands. Once you agree, it runs `guardrails install`, and the host asks you to confirm; that confirmation is your act. The hook denies the AI writing the file directly. `phase start 03` / `04` stops without this file (or a recorded waiver). When you drive the migration from an interactive Copilot CLI session, its repository-copy hook loads only in a trusted folder; `doctor` checks this (runner-started workers always load it).
 
-Have Copilot read the matching prompt and review each phase's artifacts. In VS Code **Local**, the matching `/migrate-…` prompt files are available.
-
-VS Code **Copilot (Agent Host)** does not load prompt files. Invoke the shared `/code-migration` skill and name the phase from the table below, for example "continue with the comparator design". The skill links every phase prompt, so no per-phase skills are needed, and the ten Local `/migrate-…` commands are not registered in this session type.
+Name the phase from the table below to the orchestrator, for example "continue with the comparator design", and review each phase's artifacts. The procedure the orchestrator reads (the skill) links every phase prompt. The entry point is the same in VS Code Copilot (Agent Host) and Local. The Local `/migrate-…` prompt files of 0.6.0 and earlier were removed in 0.7.0.
 
 At start or resumption, the parent orchestrator registers the ten phases below in Copilot's TODO list and shows running, awaiting approval, revising and stopped states; initial setup is listed separately. Each phase ends with progress such as "5/10 phases complete, next: awaiting approval for 04", and on resumption the list is reconciled with the actual artifacts and validation records. Where no TODO tool exists, the same list is shown in chat. See [phase TODO tracking](docs/PHASE-HANDOFF.md#track-the-ten-phases-in-the-host-todo-list).
 
@@ -335,6 +333,6 @@ The parent agent's responsibilities (phase TODO, questions, running the commands
 
 ## Phase order and usage records
 
-`/code-migration` enables the [ten-phase order check](docs/ORDERED-WORKFLOW.en.md) and continues from the first incomplete phase. New configurations use phasePolicy=strict. Missing review records for 00–03 block the formal judge and the real translation. For existing projects, phase records are created by reviewing the actual artifacts in order.
+The orchestrator enables the [ten-phase order check](docs/ORDERED-WORKFLOW.en.md) and continues from the first incomplete phase. New configurations use phasePolicy=strict. Missing review records for 00–03 block the formal judge and the real translation. For existing projects, phase records are created by reviewing the actual artifacts in order.
 
 The same [migration/cost-log.tsv](docs/COST-LOG.en.md) as upstream main is produced; usage or models that cannot be obtained are `unknown`. The current `models` setting assigns a model to each of the five worker roles, with the two reviewers as independent profiles. The automatic runner has no per-phase setting for investigators such as 01/02 or for optional review profiles.

@@ -98,11 +98,10 @@ const groups=[
 ['text.mjs','入力テキストの検査','UTF-8のテキストを読み込み、不正な文字コードやNULを含むファイルを拒否します。',[]],
 ['workflow.mjs','任意のWorkflowアダプター','Dynamic Workflowsから承認済みの1工程を共通エンジンに渡す実験的な接続部分です。',[]]
 ]},
-{name:'.github/',role:'Copilot向けの入口と定義',desc:'通常のCopilot対話に適用する指示、工程を開始するprompt files、ワーカーの役割、hooksを置きます。',items:[
+{name:'.github/',role:'Copilot向けの入口と定義',desc:'通常のCopilot対話に適用する指示、入口のオーケストレーターとワーカーの役割、スキル、hooksを置きます。',items:[
 ['copilot-instructions.md','共通の対話指示','運用マニュアルと工程プロンプトへの入口です。元実装の維持、工程ごとの停止、ランナー経由の変換を指示します。',[]],
-['agents/','役割別のプロファイル','migration-orchestrator、implementer、reviewer-semantics、reviewer-rules、arbiter、fixerを定義します。',['orchestrator：工程を案内する','implementer：候補を作る','reviewer-semantics / reviewer-rules：振る舞いとルールを独立に調べる','arbiter：指摘を裁定する / fixer：確認済みの指摘を修正する']],
-['prompts/','VS Codeで工程を始める指示','migrate-*.prompt.mdは、prompts/の工程指示をVS Codeのprompt filesとして呼び出す入口です。',[]],
-['skills/code-migration/SKILL.md','Copilot向けスキル','現在の成果物と承認状態に応じて、次に読む工程プロンプトを案内します。',[]],
+['agents/','役割別のプロファイル','migration-orchestrator、implementer、reviewer-semantics、reviewer-rules、arbiter、fixerを定義します。',['orchestrator：唯一の入口。工程を案内する','implementer：候補を作る','reviewer-semantics / reviewer-rules：振る舞いとルールを独立に調べる','arbiter：指摘を裁定する / fixer：確認済みの指摘を修正する']],
+['skills/code-migration/SKILL.md','オーケストレーターの手順','オーケストレーターが最初に読む手順です。/メニューには出しません。現在の成果物と承認状態に応じて、次に読む工程プロンプトを案内します。',[]],
 ['hooks/code-migration.json','ツール操作への制約','移植ワーカーの書き込みやコマンド実行などを制限するhooks設定です。scripts/migration_hook.mjsと連携します。',[]],
 ['extensions/code-migration/extension.mjs','実験的なWorkflowの入口','Copilot SDKのDynamic Workflowsに共通エンジンを接続します。導入時は--with-workflowを指定した場合に配置されます。',[]]
 ]},

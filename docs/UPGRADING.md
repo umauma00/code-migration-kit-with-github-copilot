@@ -9,6 +9,15 @@
 1. 担当ごとのコンテキストサイズを、モデル・エフォートと同じ1回の回答で選べます。長いコンテキストにする担当だけ、`models set --assign "reviewers=ID:high:long_context,..."` のように末尾に `:long_context` を付けます。対応するモデルは `models list` のコンテキスト列でわかります。
 2. 付けない担当はこれまでどおり `--context` なしで起動します。既存の設定はそのまま使えます。
 
+## 0.7.0（入口はオーケストレーターだけ）
+
+オーケストレーターの定義が変わるため、既存の承認・完了記録は一度だけ失効します。judgeから再検証してください。完了済みの出力は保持されます。
+
+1. 移行はエージェント一覧のオーケストレーター（コピー導入は `migration-orchestrator`、プラグインは `code-migration-plugin-orchestrator`。Copilot CLIでは `/agent`）から始めます。`/code-migration` は `/` メニューに出なくなりました。オーケストレーターが最初にスキルを読みます。
+2. `code-migration`・`depmap-adapter` スキルは `user-invocable: false` です。AIは引き続き読み込めます。ほかのエージェントがスキルを読み込んでも、工程は始めずオーケストレーターへの切り替えを案内します。この案内はAIへの指示で、ホストが強制するものではありません。
+3. VS Code Local用の `/migrate-…` prompt files（10個）を削除しました。コピー導入の案件に残る `.github/prompts/migrate-*.prompt.md` はinstallerが削除しません。オーケストレーターが残っているファイルを見つけると削除を提案し、同意を得てから削除します。
+4. コピー導入では `migration-kit/` 全体と、`.github/agents/migration-orchestrator.agent.md`、`.github/skills/` の2つのSKILL.md、`.github/copilot-instructions.md` の管理ブロックを一時導入先の内容に手で置き換えます（管理ブロックの置き換えは0.3.0の手順6と同じです）。内容が違うファイルがあるとinstallerの再実行は上書きせず停止するためです。プラグインは更新だけで入ります。
+
 ## 0.6.1（0.6.0 のレビュー修正）
 
 キットのファイル（lib・scripts）が変わるため、既存の承認・完了記録は一度だけ失効します。judgeから再検証してください。完了済みの出力は保持されます。

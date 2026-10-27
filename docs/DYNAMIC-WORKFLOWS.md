@@ -57,6 +57,5 @@ interpret this adapter as measured cost control.
 Before use, verify registration, CLI JSON output, no ambient AGENTS/personal
 instructions, no tools for reviewers, view/grep/glob-only tools for other workers, an
 interrupted run, and the absence of an unapproved next-stage execution in your
-account's CLI. The SDK extension entrypoint is CLI-specific; VS Code's shared
-`code-migration` skill and Local prompt files are separate conversational
-entrypoints, not a native workflow runtime.
+account's CLI. The SDK extension entrypoint is CLI-specific; the orchestrator
+agent is a separate conversational entrypoint, not a native workflow runtime.

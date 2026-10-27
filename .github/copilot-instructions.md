@@ -1,8 +1,11 @@
 # Code migration
 
-This repository runs a staged language migration. For any migration request, use
-the [code-migration skill](skills/code-migration/SKILL.md) and read only what the
-current phase needs. The person works from chat only: run commands yourself.
+This repository runs a staged language migration, only in the
+`migration-orchestrator` agent, which follows the
+[code-migration skill](skills/code-migration/SKILL.md). Other agents never start,
+resume or approve phases. A subagent the orchestrator starts returns its plan and
+status to it; any other agent asks the person to select `migration-orchestrator`
+(Copilot CLI: `/agent`). The person works from chat only: run commands yourself.
 
 - Never approve a gate or record a phase on your own recommendation; the host asks
   the person before every human-gate command.

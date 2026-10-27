@@ -256,10 +256,10 @@ test('installer dry run, idempotency, existing instructions and conflict preflig
   assert.equal(loadConfig(root).models.implementer, 'test-double');
   const agent = '.github/agents/migration-implementer.agent.md';
   assert.match(fs.readFileSync(safePath(root, agent), 'utf8'), /\.\.\/\.\.\/migration-kit\/docs\/CONTRACTS.md/);
-  fs.unlinkSync(safePath(root, '.github/prompts/migrate-00-feasibility.prompt.md'));
+  fs.unlinkSync(safePath(root, '.github/skills/depmap-adapter/SKILL.md'));
   write(root, agent, 'Existing custom agent');
   assert.throws(() => install(root, { apply: true, withWorkflow: true }), /overwrite/);
-  assert.equal(fs.existsSync(safePath(root, '.github/prompts/migrate-00-feasibility.prompt.md')), false, 'preflight must prevent partial installation');
+  assert.equal(fs.existsSync(safePath(root, '.github/skills/depmap-adapter/SKILL.md')), false, 'preflight must prevent partial installation');
 });
 
 test('subprocess preserves literal argv, explicit timeout and abort; large output is spooled', async t => {
