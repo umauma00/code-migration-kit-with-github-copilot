@@ -19,7 +19,8 @@ silence or output volume; continuous execution stays continuous.
   as foreign citations, so evidence such as `api.example.com:8443` or `0.5:3` is
   accepted while `other.h:9` from a `.c` scope or `Form1.frm:3` is still
   rejected. Extensions that are also country domains (`.rs`, `.md`, `.sh`, ...)
-  count only with a directory, unless the scope itself uses them.
+  and very short ones (`.r`, `.m`, ...) count only with a relative directory,
+  unless the scope itself uses them, so URLs and `self.r:5` stay plain evidence.
   A file with no census sites in an oversized inventory request no longer
   crashes the split, and is still surveyed.
 - C/C++ mapper: string and character literals end at the line, so `#error

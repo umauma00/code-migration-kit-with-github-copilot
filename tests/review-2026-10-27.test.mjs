@@ -135,7 +135,7 @@ test('ordinary evidence text with host:port or numbers is not a foreign citation
     const input = JSON.parse(args.reviewInput);
     return { result: { schemaVersion: 1, kind: 'survey', survey: 'contracts', target: args.unit.target,
       items: input.files.map(file => ({ file: file.path, publicInterface: 'class A', inputsOutputsErrors: 'none',
-        edgeCases: 'unknown', evidence: `${file.path}:2 calls api.example.com:8443 and example.rs:8080; ratio 0.5:3${extra}`, unknowns: 'unknown' })) } };
+        edgeCases: 'unknown', evidence: `${file.path}:2 calls api.example.com:8443, example.rs:8080 and https://example.sh:443 via self.r:5; ratio 0.5:3${extra}`, unknowns: 'unknown' })) } };
   };
   await assert.rejects(runSurvey(f.root, f.config, 'contracts', answer(' and other/File.cs:5')), /outside source lines/);
   // A foreign file with another source extension is still a citation.
