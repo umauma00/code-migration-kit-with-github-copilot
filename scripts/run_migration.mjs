@@ -177,7 +177,7 @@ export async function doctor(root, config, { checkCLI = false, command = 'copilo
   const staticValid = checks.every(x => x.ok !== false);
   // Passing checks can still carry a warning the person should hear.
   const warnings = checks.filter(x => typeof x.warning === 'string').map(x => `${x.check}: ${x.warning}`);
-  return { ok: staticValid, staticValid, executionReady: 'not-verified', checks, ...(warnings.length ? { warnings } : {}), workerBackend: 'copilot-cli', requestedModels: config.models, requestedEfforts: config.reasoningEfforts ?? {}, requestedPhaseModels: config.phaseModels ?? {},
+  return { ok: staticValid, staticValid, executionReady: 'not-verified', checks, ...(warnings.length ? { warnings } : {}), workerBackend: 'copilot-cli', requestedModels: config.models, requestedEfforts: config.reasoningEfforts ?? {}, requestedContextTiers: config.contextTiers ?? {}, requestedPhaseModels: config.phaseModels ?? {},
     note: 'Help checks do not authenticate, verify model availability, exercise hooks, or make AI calls. Run the live smoke procedure before production use.' };
 }
 // A long translate or build-loop runs in a background terminal. Each status
@@ -220,13 +220,13 @@ export async function main(argv = process.argv.slice(2)) {
   try { language = readPreferences(root).userLanguage ?? 'en'; } catch {}
   if (cmd === 'models') {
     // The person picks; the list is their account's, read live from the CLI.
-    if (!['list', 'set'].includes(args._[1])) throw new Error('Use models list [--format json|markdown] | models set --assign ROLE=ID[:EFFORT],... | models set --role ROLE --model ID [--effort LEVEL|default]');
+    if (!['list', 'set'].includes(args._[1])) throw new Error('Use models list [--format json|markdown] | models set --assign ROLE=ID[:EFFORT][:long_context],... | models set --role ROLE --model ID [--effort LEVEL|default] [--context default|long_context]');
     if (args.format !== undefined && !['json', 'markdown'].includes(args.format)) throw new Error('models list format must be json or markdown');
     const models = await listAvailableModels({ command: args.copilot ?? 'copilot', cwd: root });
     if (args._[1] === 'set') {
       if (!readConfigIfPresent(root)) throw new Error('migration/config.json is missing: initialize the project (install.mjs) before recording model choices');
       const release = lockRun(root, 'models-set');
-      try { console.log(JSON.stringify(setRoleModels(root, models, { role: args.role, model: args.model, effort: args.effort, assign: args.assign }), null, 2)); } finally { release(); }
+      try { console.log(JSON.stringify(setRoleModels(root, models, { role: args.role, model: args.model, effort: args.effort, context: args.context, assign: args.assign }), null, 2)); } finally { release(); }
       return;
     }
     const config = readConfigIfPresent(root);

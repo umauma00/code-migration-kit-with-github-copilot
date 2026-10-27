@@ -77,15 +77,17 @@ node scripts/install.mjs --target /path/to/your-project --model MODEL_ID --langu
 node scripts/install.mjs --target /path/to/your-project --model MODEL_ID --language en --apply
 ```
 
-**The person chooses models and reasoning effort.** Install without `--model`, then in the target repository run the commands below: the first reads the models your account can use, each model's selectable efforts (and default) and prices from the CLI. From that list the AI asks for every role's model and effort in **one question** and records the answer with one `models set --assign` (the host asks the person to confirm once).
+**The person chooses models, reasoning effort and context size.** Install without `--model`, then in the target repository run the commands below: the first reads the models your account can use, each model's selectable efforts (and default), context sizes (prompt limits) and prices from the CLI. From that list the AI asks for every role's model, effort and context in **one question** and records the answer with one `models set --assign` (the host asks the person to confirm once).
 
 ```bash
 node migration-kit/scripts/run_migration.mjs models list --format markdown
-node migration-kit/scripts/run_migration.mjs models set --assign "implementer=MODEL_ID:medium,reviewers=MODEL_ID:high,arbiter=MODEL_ID,fixer=MODEL_ID"
+node migration-kit/scripts/run_migration.mjs models set --assign "implementer=MODEL_ID:medium,reviewers=MODEL_ID:high:long_context,arbiter=MODEL_ID,fixer=MODEL_ID"
 node migration-kit/scripts/run_migration.mjs models set --role reviewers --model MODEL_ID --effort high
 ```
 
 `--assign` is one answer: `role=MODEL_ID:EFFORT` entries separated by commas (effort left out = default; `all=ID` first sets every role, and later roles override it). Every entry is checked before writing, so one refused entry changes nothing. `--role` takes a role name, `reviewers` (both reviewers) or `all` (the surveyor drops its own setting and follows the implementer). The surveyor inherits the implementer's model and effort only while it has no model of its own. Prices are the CLI's published token prices, shown as AI Credits per million tokens. `--effort default` returns to the model's default. A model that is not listed or is disabled by policy, or an effort the model does not support, is refused. Listing needs a signed-in Copilot CLI.
+
+For context size, only roles with `:long_context` after the effort run the long context tier (the Copilot CLI's `--context long_context`), and only models whose Context column lists long_context accept it. It costs more, so keep it to the roles that need it. Without it a role runs the default context and workers get no `--context` flag (the CLI's own `contextTier` setting applies). For a single role, `--role ROLE --model ID --context long_context|default` works too. Like model and effort, a change makes reviewed units be reviewed again.
 
 `--models implementer=ID,reviewers=ID,arbiter=ID,fixer=ID` still sets per-role models (unlisted roles use `--model`). As in the upstream model plan, choose by blast radius: reviewers on the largest or a mid model, high-volume implementers on a mid or small model, fixers and the arbiter on a mid model.
 

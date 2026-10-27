@@ -100,7 +100,8 @@ choices. `ask_user` takes one question per call, so ask related setup questions
 such as the migration languages one after another; group them only where the
 host takes several questions in one call (`vscode/askQuestions`). Models and
 efforts are the exception: ask them as one question for every role, answered
-in the `role=ID:EFFORT, ...` form that `models list` shows, and record it with
+in the `role=ID:EFFORT[:long_context], ...` form that `models list` shows (the
+context size rides in the same answer), and record it with
 one `models set --assign`. A
 free-text reply that does not clearly pick a choice is a new instruction, not
 consent: clarify it before acting on a gate.
