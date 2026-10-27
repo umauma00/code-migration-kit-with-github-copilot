@@ -119,6 +119,17 @@ setInterval(() => {}, 1000);
   assert.ok(fs.existsSync(path.join(f.root, error.result.stdoutFile)));
 });
 
+test('a 0.6.0 absolute log record reads through a symlinked root', { skip: process.platform === 'win32' && 'symlinks need privileges on Windows' }, async t => {
+  const base = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'migration-symlink-')));
+  t.after(() => fs.rmSync(base, { recursive: true, force: true }));
+  const real = path.join(base, 'real'), link = path.join(base, 'link');
+  fs.mkdirSync(real); fs.symlinkSync(real, link);
+  const r = await runProcess(process.execPath, ['-e', "process.stdout.write('x'.repeat(5000) + '\\nlast line\\n')"],
+    { cwd: real, maxBytes: 1024, outputDir: path.join(real, 'migration/runs/process-output') });
+  assert.equal([...processOutputLines(r, 'stdout', link)].filter(Boolean).at(-1), 'last line');
+  assert.equal(relativeProcessOutput(r, link).stdoutFile.startsWith('migration/'), true);
+});
+
 test('runCommand keeps a small result unchanged', async t => {
   const f = prepare(t, { executionMode: 'continuous' });
   f.config.commands.build = [process.execPath, '-e', "console.log('ok')"];
@@ -142,6 +153,8 @@ test('ordinary evidence text with host:port or numbers is not a foreign citation
   await assert.rejects(runSurvey(f.root, f.config, 'contracts', answer(' and include/other.h:9')), /outside source lines/);
   await assert.rejects(runSurvey(f.root, f.config, 'contracts', answer(' and Form1.frm:3')), /outside source lines/);
   await assert.rejects(runSurvey(f.root, f.config, 'contracts', answer(' and src/lib.rs:3')), /outside source lines/);
+  // Extensions the kit has never heard of are still citations.
+  await assert.rejects(runSurvey(f.root, f.config, 'contracts', answer(' and Lib.adb:3')), /outside source lines/);
   const report = await runSurvey(f.root, f.config, 'contracts', answer(''));
   assert.equal(report.done, 1);
   assert.equal(surveyStatus(f.root, f.config, 'contracts').complete, true);

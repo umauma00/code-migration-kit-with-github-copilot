@@ -15,12 +15,11 @@ silence or output volume; continuous execution stays continuous.
   including the record of a command or worker that failed after spilling.
   Records written by 0.6.0 with absolute paths still read in place.
 - Keep benchmark check output inside the scratch folder that is removed.
-- Survey citations: only names with a source, build or text file extension count
-  as foreign citations, so evidence such as `api.example.com:8443` or `0.5:3` is
-  accepted while `other.h:9` from a `.c` scope or `Form1.frm:3` is still
-  rejected. Extensions that are also country domains (`.rs`, `.md`, `.sh`, ...)
-  and very short ones (`.r`, `.m`, ...) count only with a relative directory,
-  unless the scope itself uses them, so URLs and `self.r:5` stay plain evidence.
+- Survey citations: a foreign `NAME.EXT:LINE` is still rejected for any
+  extension, but a URL (`https://example.sh:443`), a name without a directory
+  whose extension is a common domain (`api.example.com:8443`, `example.rs:8080`)
+  or one/two letters (`self.r:5`), and numbers (`0.5:3`) stay plain evidence,
+  unless the scope itself uses that extension.
   A file with no census sites in an oversized inventory request no longer
   crashes the split, and is still surveyed.
 - C/C++ mapper: string and character literals end at the line, so `#error
