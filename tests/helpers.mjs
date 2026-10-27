@@ -95,9 +95,20 @@ export const fake = async ({ role, unit, extra }) => ({ result: result(role, uni
   role === 'arbiter' ? { decisions: extra.findings.map(f => ({ finding: f.reference, confirmed: true, reason: f.evidence })) } : {}),
   requestedModel: 'test-double', observedModel: null, tokens: null, aiCredits: null });
 // A stand-in for `copilot --headless --stdio` that answers connect and
-// models.list with the given catalog, launched by path like the real CLI.
+// models.list with the given catalog, launched by path like the real CLI. On
+// Windows it is laid out as npm installs @github/copilot (a copilot.cmd shim
+// naming npm-loader.js), which the kit runs through node, as it does the real one.
 export function modelCatalogCli(dir, catalog) {
-  return nodeCli(path.join(dir, 'copilot-models.mjs'), `
+  if (process.platform === 'win32') {
+    const pkg = path.join(dir, 'node_modules', '@github', 'copilot');
+    fs.mkdirSync(pkg, { recursive: true });
+    fs.writeFileSync(path.join(pkg, 'npm-loader.js'), modelCatalogScript(catalog));
+    fs.writeFileSync(path.join(dir, 'copilot.cmd'), '@node "%~dp0\\node_modules\\@github\\copilot\\npm-loader.js" %*\r\n');
+    return path.join(dir, 'copilot.cmd');
+  }
+  return nodeCli(path.join(dir, 'copilot-models.mjs'), modelCatalogScript(catalog));
+}
+const modelCatalogScript = catalog => `
 let buf = Buffer.alloc(0);
 const send = m => { const b = JSON.stringify(m); process.stdout.write('Content-Length: ' + Buffer.byteLength(b) + '\\r\\n\\r\\n' + b); };
 process.stdin.on('data', d => {
@@ -112,5 +123,4 @@ process.stdin.on('data', d => {
     else send({ jsonrpc: '2.0', id: msg.id, error: { code: -32601, message: 'unknown' } });
   }
 });
-`);
-}
+`;
