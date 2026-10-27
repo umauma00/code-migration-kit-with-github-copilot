@@ -4169,7 +4169,7 @@
     },
     {
       "path": "scripts/run_migration.mjs",
-      "sha256": "57e13347bf392d63c11abcfdf5d857db8f9c0e09eebae130be3a68051afdaaba",
+      "sha256": "3fdd67ae4e47e63c1f9f5ea98871d51f68410465d0c39368b85b82ab16373884",
       "entries": [
         {
           "line": 73,

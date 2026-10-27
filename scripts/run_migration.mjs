@@ -36,10 +36,10 @@ export const usage = `Usage: node migration-kit/scripts/run_migration.mjs COMMAN
   guidance --message TEXT [--format json|markdown]
                               Explain a failure: cause, impact and choices with a recommendation
   models list [--format json|markdown]
-                              The models and reasoning efforts your Copilot account offers, and the current choice
-  models set --assign ROLE=ID[:EFFORT],...
-                              Record every role's model and effort from one answer (all=ID first, then overrides)
-  models set --role ROLE[,ROLE]|reviewers|all --model ID [--effort LEVEL|default]
+                              The models, reasoning efforts and context tiers your Copilot account offers, and the current choice
+  models set --assign ROLE=ID[:EFFORT][:long_context],...
+                              Record every role's model, effort and context from one answer (all=ID first, then overrides)
+  models set --role ROLE[,ROLE]|reviewers|all --model ID [--effort LEVEL|default] [--context default|long_context]
                               Record one choice; both forms are checked against that list before writing
   preferences [--language ja|en] [--original-runtime available|unavailable]
                               Report language; whether the original can still run (guides recommendations)
