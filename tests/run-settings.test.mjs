@@ -266,3 +266,31 @@ test('a file saved with a byte order mark is read like any other', t => {
   assert.equal(runSettingsState(root, loadConfig(root)).state, 'applied');
   assert.equal(initRunSettings(root, models).refreshed, true);
 });
+
+test('re-review of 4eadc77: null commands, inherited efforts on a recorded spelling, and key order', t => {
+  const root = fresh(t);
+  initRunSettings(root, models);
+  writeSettings(root, { ...filled(root), commands: null });
+  assert.match(applyRunSettings(root, models).errors.join('\n'), /commands: must be an object/);
+  // The implementer recorded as Small-Model still supports only low/medium/high,
+  // so a surveyor following it at xhigh is refused.
+  const config = readJSON(safePath(root, 'migration/config.json'));
+  writeSettings(root, filled(root));
+  assert.equal(applyRunSettings(root, models).applied, true);
+  const recorded = readJSON(safePath(root, 'migration/config.json'));
+  recorded.models.implementer = 'Small-Model';
+  writeJSON(safePath(root, 'migration/config.json'), recorded);
+  const s = filled(root);
+  s.models.surveyor = { model: 'same-as-implementer', effort: 'xhigh' };
+  writeSettings(root, s);
+  assert.match(applyRunSettings(root, models).errors.join('\n'), /surveyor would run small-model with reasoning effort xhigh/);
+  assert.deepEqual(readJSON(safePath(root, 'migration/config.json')), recorded);
+  // Commands written in another key order are not a change.
+  const reordered = filled(root);
+  reordered.commands = Object.fromEntries(Object.entries(recorded.commands).reverse());
+  writeSettings(root, reordered);
+  assert.equal(runSettingsState(root, loadConfig(root)).state, 'applied');
+  const result = applyRunSettings(root, models);
+  assert.deepEqual(result.changed, []);
+  assert.deepEqual(Object.keys(readJSON(safePath(root, 'migration/config.json')).commands), Object.keys(config.commands));
+});

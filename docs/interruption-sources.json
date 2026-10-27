@@ -2359,7 +2359,7 @@
     },
     {
       "path": "lib/run-settings.mjs",
-      "sha256": "13ccd5a5678a73a8080a63baef191d251a4474ab021dc2546e8e3bd37af5d492",
+      "sha256": "85358b29d7d0d82b22e08edb3274b3810b37266056ad9418ce533a438e512dad",
       "entries": [
         {
           "line": 20,
@@ -2377,52 +2377,52 @@
           "code": "const configDefaults = { verificationMode: 'runtime', executionMode: 'continuous', commands: {} };"
         },
         {
-          "line": 45,
+          "line": 48,
           "kind": "error-or-exit-candidate",
           "code": "executionMode: 'continuous は終わるまで続ける、bounded は config.json の上限で止める。', concurrency: '同時に動かすワーカーの数（1〜64）。',"
         },
         {
-          "line": 57,
+          "line": 60,
           "kind": "error-or-exit-candidate",
           "code": "executionMode: 'continuous runs until done; bounded stops at the limits in config.json.', concurrency: 'Workers running at once (1-64).',"
         },
         {
-          "line": 79,
+          "line": 82,
           "kind": "error-or-exit-candidate",
           "code": "verificationMode: config.verificationMode ?? 'runtime', executionMode: config.executionMode ?? 'continuous', concurrency: config.concurrency,"
         },
         {
-          "line": 87,
+          "line": 90,
           "kind": "error-or-exit-candidate",
           "code": "reportLanguage: userLanguages, originalRuntime: originalRuntimes, mode: modes, verificationMode: verificationModes, executionMode: executionModes,"
         },
         {
-          "line": 100,
+          "line": 103,
           "kind": "error-or-exit-candidate",
           "code": "if (!config) throw new Error('migration/config.json is missing: initialize the project (install.mjs) before writing run settings');"
         },
         {
-          "line": 104,
+          "line": 107,
           "kind": "error-or-exit-candidate",
           "code": "try { values = readJSON(file); } catch (e) { throw new Error(`${runSettingsFile} is not valid JSON (${e.message}); correct it or delete it and run settings init again`); }"
         },
         {
-          "line": 105,
+          "line": 108,
           "kind": "error-or-exit-candidate",
           "code": "if (!values || typeof values !== 'object' || Array.isArray(values)) throw new Error(`${runSettingsFile} must be a JSON object; correct it or delete it and run settings init again`);"
         },
         {
-          "line": 128,
+          "line": 131,
           "kind": "error-or-exit-candidate",
           "code": "if (!fs.existsSync(file)) throw new Error(`${runSettingsFile} is missing: run settings init first`);"
         },
         {
-          "line": 130,
+          "line": 133,
           "kind": "error-or-exit-candidate",
           "code": "try { value = readJSON(file); } catch (e) { throw new Error(`${runSettingsFile} is not valid JSON: ${e.message}`); }"
         },
         {
-          "line": 131,
+          "line": 134,
           "kind": "error-or-exit-candidate",
           "code": "if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${runSettingsFile} must be a JSON object`);"
         }
