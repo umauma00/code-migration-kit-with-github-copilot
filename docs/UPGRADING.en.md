@@ -1,6 +1,29 @@
-# Upgrading (0.8.0 and earlier releases)
+# Upgrading (0.10.0 and earlier releases)
 
 [日本語](UPGRADING.md) | English
+
+## 0.10.0 (no mid-run stops; no contract memo)
+
+Kit files (lib, scripts) change, so existing approvals and completion records
+lapse once; rerun judge. Completed outputs and completed survey scopes are kept.
+
+1. Survey rows whose citations cannot be verified after the one correction
+   finish as UNKNOWN marked `uncited`. A scope that stopped before finishes when
+   you rerun the same `survey run`. Counts are in the scope record (`uncited`,
+   and `unsurveyedOversizedFiles` for oversized inventory files).
+2. A `migration/run.lock` left by a crashed run is removed by the next command;
+   `unlock` is not needed.
+3. New installs set `maxReviewInputBytes` to 262144. Existing configs are not
+   changed. Raising it in `migration/config.json` changes the config
+   fingerprint, so phase 02 onward and approvals are reviewed again.
+4. New source-as-spec plans draft no contract memo (`contracts.md`). Existing
+   plans keep working, including their `TODO(spec)` check. To move to the source
+   index, delete `migration/judge-plan.json`, rerun `source-spec init --apply`
+   and review 00b–02 together again.
+5. For a repository copy, replace all of `migration-kit/`, the
+   `.github/agents/migration-orchestrator.agent.md` file and the `.github/skills/`
+   SKILL.md files with the freshly installed versions. The plugin only needs an
+   update.
 
 ## 0.8.0 (choosing the context size)
 
@@ -58,7 +81,7 @@ also run continuously: saved 600-second/call/fix defaults no longer interrupt
 work. Only choose bounded mode when finite limits are wanted. All survey kinds
 process oversized source bodies as resumable validated fragments. Current valid
 scope results are retained. Repository-copy installations must update their kit.
-See [interruption conditions and logging](INTERRUPTION-POLICY.md).
+See [interruption conditions and logging](INTERRUPTION-POLICY.en.md).
 
 ## 0.5.0 (benchmark for folding workers)
 

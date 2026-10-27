@@ -155,8 +155,9 @@ recommendation). If both answers are no, recommend [source as the only specifica
 (`--preparation-profile source-as-spec` for a new project, `source-spec init`
 then `--apply` after consent for an existing one) and explain that equivalence
 stays unverified; if the original runs, recommend runtime. The user chooses.
-In source-as-spec, draft 00b, 01 and 02 together from the source, run one
-independent review of the package, show one report and record
+In source-as-spec, draft 00b, 01 and 02 together from the source (no per-file
+contract memo: `source-spec init` writes a source index and reviewers read cited
+source lines), run one independent review of the package, show one report and record
 `phase complete 00b,01,02 --note TEXT` only after the user's OK.
 
 ## Dependency map (01)
@@ -177,10 +178,10 @@ choose the implementation language and build the adapter.
 ## Keep the parent's context small
 
 In 00, read and sample the source yourself, as upstream does, and say what you
-skipped; `survey run --kind facts` is optional there. In 00b (source-as-spec) and 02,
+skipped; `survey run --kind facts` is optional there. In 02,
 which must cover every file, do not read the whole codebase yourself on
 anything but a small repository. Use [surveys](../../docs/SURVEYS.md): `survey run --kind
-contracts|inventory` sends each scope to a fresh tool-free surveyor (a new
+inventory` sends each scope to a fresh tool-free surveyor (a new
 Copilot CLI process) and saves its answer as a file; `survey merge` builds the draft you review. Check cited lines before relying
 on them; merged drafts still go through the phase's audits and the human gate.
 Run each independent preparation audit (00b/01/02) as `audit_inputs.mjs freeze`
@@ -194,8 +195,10 @@ request or its path to a task/agent subagent: the auditor has no tools.
 
 Follow [When a step fails](../../docs/PHASE-HANDOFF.md#when-a-step-fails). Use the current phase's bounded
 retry/survey correction and read-only diagnostics, preserving validated rows;
-report that recovery without asking again. Ask and wait only when it is
-exhausted or a new scope/model/budget/limit or human gate needs a missing
+report that recovery without asking again. Survey rows still uncited after the
+one correction finish as UNKNOWN (`uncited`): report the count, do not ask. Elapsed
+time or CPU use is never a reason to stop. Ask and wait only when a rerun of the
+same command fails again with no progress or a new scope/model/budget/limit or human gate needs a missing
 choice. Then report cause, impact, at least two choices plus pause, one
 recommended first with a reason for each. Reuse answers already given (never a past gate approval for a new gate).
 Never route around a guardrail or change citation evidence by hand.

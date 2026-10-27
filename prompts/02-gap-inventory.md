@@ -47,10 +47,11 @@ Save the concrete phase report to `migration/gap-report.md`. After its actual us
 
 With `preparationProfile: source-as-spec`, draft RULEBOOK and inventory from how the
 source actually behaves, without the first-20-rows stop or paired batch audits.
-Run one independent review of the whole package (contracts, RULEBOOK, inventory,
-dependency map) in a separate context, fix its findings, then show ONE report for
-00b–02 with links, review points (high-impact inferred contracts, UNKNOWN rows,
-open findings) and choices: proceed to migration (recommended), revise, pause.
+Run one independent review of the whole package (cited source lines, RULEBOOK,
+inventory, dependency map) in a separate context, fix its findings, then show ONE
+report for 00b–02 with links, review points (high-impact inferences, UNKNOWN rows
+including the survey's `uncited` count and `unsurveyedOversizedFiles`, open
+findings) and choices: proceed to migration (recommended), revise, pause.
 Only after the user's OK run `phase complete 00b,01,02 --note TEXT`, then `judge`.
 See [source-as-spec](../docs/SOURCE-AS-SPEC.md).
 
@@ -62,6 +63,10 @@ and `survey merge --kind inventory --sites …`. Each scope's surveyor receives 
 RULEBOOK, the scope's sources and its census sites; results are per-scope shards
 merged by the existing inventory merge, which refuses an incomplete census. The
 paired independent audits and the joint audit still follow. See [surveys](../docs/SURVEYS.md).
+A file too large for one survey input, and rows whose citations stay invalid
+after the one correction, finish as UNKNOWN/TODO(port) (`unsurveyedOversizedFiles`,
+`uncited`) instead of stopping; trace them in the inventory review and report the
+counts. Never stop or ask because of them.
 
 When existing shards need a combined review candidate before formal publication,
 use `preparation_cli.mjs inventory-preview --sites PATH --shards LIST`; then pass

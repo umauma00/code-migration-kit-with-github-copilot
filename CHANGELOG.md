@@ -1,3 +1,37 @@
+# 0.10.0 — 2026-10-27
+
+Remove mid-run stops that a rerun would only repeat. Nothing here adds a stop
+based on time, CPU, silence or output volume.
+
+- Survey: rows whose citations or coverage are still invalid after the one
+  correction no longer stop the scope. They finish as UNKNOWN/TODO(port) marked
+  `uncited`, with evidence naming only the original file range and the
+  rejected-answer record (never the worker's citation); facts drop only the
+  invalid items. Scope records count them under `uncited`.
+- Survey: an inventory file whose body exceeds the input capacity is recorded
+  as UNKNOWN/TODO(port) for every site without model calls and listed under
+  `unsurveyedOversizedFiles`. Its fragment answers were always merged as
+  UNKNOWN; one 20k-line, 1,000-site file took 148 serial calls for that result.
+- Liveness notices now come from a separate thread, so synchronous checks
+  (`status`, `phase next`) no longer look silent to a host; `phase`, `approve`,
+  `diagnose` and `source-spec` get the notice too (without an opening line, so
+  a failure still starts with `ERROR:`). Manifest checks resolve each protected
+  path once per check: about 5.5 s to 2.2 s for 2,000 files.
+- A `run.lock` whose owner process is gone is removed by the next command, as
+  the build-loop lock already was; release removes only the caller's own lock.
+- A "request/connection/... timed out" reported by the service or network is
+  retried as transient; only the kit's own explicit deadline stays final.
+- New installs default `maxReviewInputBytes` to 262144 (256 KiB). Existing
+  configs keep their value.
+- Source-as-spec drafts no per-file contract memo. `source-spec init` writes a
+  mechanical source index (`migration/source-spec/sources.md`) as the plan's
+  scenario, and reviewers read cited source lines. Plans drafted earlier that
+  name `contracts.md` keep their TODO(spec) gate; the `contracts` survey stays
+  only for them.
+- Prompts, skills and orchestrators: report uncited and oversized counts
+  instead of asking; ask only when a rerun fails again with no progress or a new
+  decision is needed. Add the English interruption policy.
+
 # 0.8.0 — 2026-10-27
 
 - Let the person choose each worker's context size with its model and effort,

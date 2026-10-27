@@ -348,8 +348,11 @@ export async function main(argv = process.argv.slice(2)) {
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
   const argv = process.argv.slice(2);
-  const progress = !argv.includes('--help') && (['status', 'survey', 'models', 'doctor', 'translate', 'repair', 'repair-round', 'build-loop', 'pilot', 'judge-prepare', 'judge', 'build', 'smoke', 'parity', 'handoff'].includes(argv[0]) || (argv[0] === 'phase' && argv[1] === 'next'));
-  (progress ? commandProgress(argv.slice(0, argv[0] === 'phase' ? 2 : 1).join(' '), () => main()) : main()).catch(e => {
+  // Every command that hashes inputs or waits on workers says it is alive, so a
+  // host does not take a long synchronous check for a hung process.
+  const announced = ['status', 'survey', 'models', 'doctor', 'translate', 'repair', 'repair-round', 'build-loop', 'pilot', 'judge-prepare', 'judge', 'build', 'smoke', 'parity', 'handoff'].includes(argv[0]) || (argv[0] === 'phase' && argv[1] === 'next');
+  const progress = !argv.includes('--help') && (announced || ['phase', 'approve', 'diagnose', 'source-spec'].includes(argv[0]));
+  (progress ? commandProgress(argv.slice(0, argv[0] === 'phase' ? 2 : 1).join(' '), () => main(), { announce: announced }) : main()).catch(e => {
     console.error(`ERROR: ${e.message}`);
     // Every failure ends with its cause and the user's choices (docs/PHASE-HANDOFF.md).
     try {

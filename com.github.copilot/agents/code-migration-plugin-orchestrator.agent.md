@@ -76,8 +76,10 @@ instead of a new TSV helper. Never ask to drop validation/candidate generation
 or repeat survey as a workaround for a local helper bug.
 
 Use bounded recovery and read-only diagnostics within the authorized phase
-without asking again; preserve validated rows. Ask only after recovery is
-exhausted or a new decision is required. Then report cause, impact and at least
+without asking again; preserve validated rows. A survey whose rows stay uncited
+after its one correction finishes them as UNKNOWN (`uncited`); report the count
+in the package, never stop to ask about it. Ask only when a rerun of the same
+command fails again with no progress or a new decision is required. Then report cause, impact and at least
 two choices plus pause, one recommended first with reasons, and wait
 ([When a step fails](../../docs/PHASE-HANDOFF.md#when-a-step-fails)). For in-phase reports use
 `status --fast --format checklist`; revalidate normally at phase boundaries. Without a runnable original or a specification,

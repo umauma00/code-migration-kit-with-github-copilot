@@ -34,12 +34,17 @@ test('survey input provides original CRLF line numbers and validates range ends'
   const input = surveyInput(f.root, f.config, 'contracts', scope), data = JSON.parse(input.text);
   assert.deepEqual(data.files[0], { path: 'case/A.cs', firstLine: 1, lastLine: 2, content: '1|class A {}\n2|// 日本語' });
   let calls = 0;
-  await assert.rejects(runSurvey(f.root, f.config, 'contracts', async args => {
+  const report = await runSurvey(f.root, f.config, 'contracts', async args => {
     calls++;
     const r = answer(args); r.result.items[0].evidence = `${r.result.items[0].file}:1-235`; return r;
-  }), /Survey citation outside source lines/);
+  });
   assert.equal(calls, 2, 'a deterministic validation failure gets at most one correction');
-  assert.equal(surveyStatus(f.root, f.config, 'contracts').done, 0);
+  // The rerun would ask the same question: the row finishes as uncited instead
+  // of stopping the survey, and the rejected line 235 is not kept.
+  assert.equal(report.done, 1);
+  const item = readJSON(safePath(f.root, 'migration/surveys/contracts/001-case.json')).items.find(i => i.file === 'case/A.cs');
+  assert.equal(item.uncited, true); assert.match(item.evidence, /^case\/A\.cs:1-2 \(no verified citation/); assert.doesNotMatch(item.evidence, /235/);
+  assert.equal(item.publicInterface, 'unknown');
 });
 
 test('a bad citation repairs only that file and preserves validated rows and rejected evidence', async t => {
@@ -68,9 +73,10 @@ test('a bad citation repairs only that file and preserves validated rows and rej
 test('a resumed run uses the saved valid rows and never exceeds its call budget', async t => {
   const f = fixture(t); f.config.maxAgentCalls = 1;
   let first;
+  const controller = new AbortController();
   await assert.rejects(runSurvey(f.root, f.config, 'contracts', async args => {
-    first = answer(args); first.result.items[0].evidence = 'case/A.cs:999'; return first;
-  }), /outside source lines/);
+    first = answer(args); first.result.items[0].evidence = 'case/A.cs:999'; controller.abort(); return first;
+  }, { signal: controller.signal }), /Interrupted|Survey stopped/);
   let calls = 0;
   await runSurvey(f.root, f.config, 'contracts', async args => {
     calls++;
@@ -214,18 +220,21 @@ test('a large census for one file is partitioned without dropping sites', async 
 
 test('a mixed valid/foreign citation cannot be rescued by the valid anchor', async t => {
   const f = fixture(t); f.config.maxAgentCalls = 1;
-  await assert.rejects(runSurvey(f.root, f.config, 'contracts', async args => {
+  await runSurvey(f.root, f.config, 'contracts', async args => {
     const r = answer(args); r.result.items[0].evidence += ' other/File.cs:5'; return r;
-  }), /outside source lines/);
+  });
+  const item = readJSON(safePath(f.root, 'migration/surveys/contracts/001-case.json')).items.find(i => i.file === 'case/A.cs');
+  assert.equal(item.uncited, true); assert.doesNotMatch(item.evidence, /other\/File/);
 });
 
 test('citation line 504 is not mistaken for a transient HTTP 504 retry', async t => {
   const f = fixture(t); f.config.transientRetryDelayMs = 1;
   let calls = 0;
-  await assert.rejects(runSurvey(f.root, f.config, 'contracts', async args => {
+  await runSurvey(f.root, f.config, 'contracts', async args => {
     calls++; const r = answer(args); r.result.items[0].evidence = `${r.result.items[0].file}:504`; return r;
-  }), /outside source lines/);
+  });
   assert.equal(calls, 2);
+  assert.equal(readJSON(safePath(f.root, 'migration/surveys/contracts/001-case.json')).items.find(i => i.file === 'case/A.cs').uncited, true);
 });
 
 test('numbered citations support spaces, Unicode and regex punctuation in file paths', async t => {
@@ -302,4 +311,18 @@ test('quiet commands report liveness without cancellation and clear their timer 
   const count = messages.length;
   await new Promise(resolve => setTimeout(resolve, 15));
   assert.equal(messages.length, count);
+});
+
+test('the default liveness notice keeps printing while the main thread is busy in synchronous checks', async () => {
+  // status and phase checks hash inputs synchronously; a main-thread timer stayed silent until they ended.
+  const { spawnSync } = await import('node:child_process');
+  const module = new URL('../lib/command-progress.mjs', import.meta.url).href;
+  const script = `import { commandProgress } from ${JSON.stringify(module)};
+await commandProgress('status', async () => { const end = Date.now() + 1500; while (Date.now() < end); }, { intervalMs: 100 });
+console.log('done');`;
+  const run = spawnSync(process.execPath, ['--input-type=module', '-e', script], { encoding: 'utf8', timeout: 30000 });
+  assert.equal(run.status, 0, run.stderr);
+  assert.match(run.stdout, /done/);
+  assert.match(run.stderr, /status: started/);
+  assert.match(run.stderr, /status: still running \(\d+s\); waiting is not a failure/);
 });

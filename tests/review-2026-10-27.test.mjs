@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { kitRoot } from '../scripts/install.mjs';
-import { atomicWrite, safePath, writeJSON } from '../lib/core.mjs';
+import { atomicWrite, safePath, writeJSON, readJSON } from '../lib/core.mjs';
 import { ignoredLimits } from '../lib/execution-policy.mjs';
 import { runProcess, processOutputLines, relativeProcessOutput } from '../lib/process.mjs';
 import { translate, runStage, approve, runCommand } from '../lib/pipeline.mjs';
@@ -148,14 +148,16 @@ test('ordinary evidence text with host:port or numbers is not a foreign citation
       items: input.files.map(file => ({ file: file.path, publicInterface: 'class A', inputsOutputsErrors: 'none',
         edgeCases: 'unknown', evidence: `${file.path}:2 calls api.example.com:8443, example.rs:8080 and https://example.sh:443 via self.r:5; ratio 0.5:3${extra}`, unknowns: 'unknown' })) } };
   };
-  await assert.rejects(runSurvey(f.root, f.config, 'contracts', answer(' and other/File.cs:5')), /outside source lines/);
-  // A foreign file with another source extension is still a citation.
-  await assert.rejects(runSurvey(f.root, f.config, 'contracts', answer(' and include/other.h:9')), /outside source lines/);
-  await assert.rejects(runSurvey(f.root, f.config, 'contracts', answer(' and Form1.frm:3')), /outside source lines/);
-  await assert.rejects(runSurvey(f.root, f.config, 'contracts', answer(' and src/lib.rs:3')), /outside source lines/);
-  // Extensions the kit has never heard of are still citations.
-  await assert.rejects(runSurvey(f.root, f.config, 'contracts', answer(' and Lib.adb:3')), /outside source lines/);
-  await assert.rejects(runSurvey(f.root, f.config, 'contracts', answer(' and /home/u/proj/Other.java:5')), /outside source lines/);
+  // A foreign citation is never accepted: after one correction the row is
+  // finished as uncited/unknown, and the foreign line is not kept as evidence.
+  for (const foreign of [' and other/File.cs:5', ' and include/other.h:9', ' and Form1.frm:3', ' and src/lib.rs:3', ' and Lib.adb:3', ' and /home/u/proj/Other.java:5']) {
+    fs.rmSync(safePath(f.root, 'migration/surveys'), { recursive: true, force: true });
+    const report = await runSurvey(f.root, f.config, 'contracts', answer(foreign));
+    assert.equal(report.done, 1);
+    const item = readJSON(safePath(f.root, 'migration/surveys/contracts/001-case.json')).items[0];
+    assert.equal(item.uncited, true); assert.ok(!item.evidence.includes(foreign.trim().slice(4)));
+  }
+  fs.rmSync(safePath(f.root, 'migration/surveys'), { recursive: true, force: true });
   const report = await runSurvey(f.root, f.config, 'contracts', answer(''));
   assert.equal(report.done, 1);
   assert.equal(surveyStatus(f.root, f.config, 'contracts').complete, true);

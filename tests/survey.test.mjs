@@ -6,7 +6,7 @@ import path from 'node:path';
 import { prepare } from './helpers.mjs';
 import { safePath, writeJSON, readJSON, atomicWrite, lockRun } from '../lib/core.mjs';
 import { planSurvey, runSurvey, mergeSurvey, surveyStatus } from '../lib/survey.mjs';
-import { initSourceSpec } from '../lib/source-spec.mjs';
+import { initSourceSpec, legacyContractsSkeleton, sourceSpecPlan } from '../lib/source-spec.mjs';
 import { loadConfig } from '../lib/core.mjs';
 import { createCopilotAdapter, copilotArgs } from '../scripts/copilot_adapter.mjs';
 import { decide } from '../scripts/migration_hook.mjs';
@@ -62,19 +62,29 @@ test('survey results are validated against their scope before they are written',
     [r => { r.items[0].evidence = 'no line cited'; }, /must cite PATH:LINE/],
     [r => { r.items[0].category = 'opinion'; }, /Unknown fact category/],
     [r => { r.target = 'ported/main.mjs'; }, /target mismatch/]]) {
-    const error = await runSurvey(f.root, f.config, 'facts', bad(mutate), { maxFiles: 1 }).catch(e => e);
-    assert.match(error.message, message);
-    assert.equal(fs.existsSync(safePath(f.root, 'migration/surveys/facts/001-src.json')), false);
+    // An invalid fact never reaches the result: after one correction it is
+    // dropped (facts are optional notes), and the survey still finishes.
+    fs.rmSync(safePath(f.root, 'migration/surveys'), { recursive: true, force: true });
+    const report = await runSurvey(f.root, f.config, 'facts', bad(mutate), { maxFiles: 1 });
+    assert.equal(report.done, report.total);
+    const runs = fs.readdirSync(safePath(f.root, 'migration/surveys/facts/runs')).filter(n => n.endsWith('-rejected.json'));
+    assert.match(readJSON(safePath(f.root, `migration/surveys/facts/runs/${runs[0]}`)).error, message);
+    const items = readJSON(safePath(f.root, 'migration/surveys/facts/001-src.json')).items;
+    assert.ok(items.every(i => i.file !== 'src/elsewhere.py' && i.category !== 'opinion' && /:\d/.test(i.evidence)));
   }
   const g = failureGuidanceList('Survey stopped: 001-src: Survey item outside its scope: src/elsewhere.py', { root: f.root });
   assert.equal(g[0].guidance.id, 'survey-result');
 });
 
-test('contracts survey fills the source-as-spec skeleton but never overwrites edited contracts', async t => {
+test('contracts survey fills only a pre-0.10.0 skeleton and never overwrites edited contracts', async t => {
   const f = fixture(t);
   initSourceSpec(f.root, f.config, { apply: true });
   const config = loadConfig(f.root);
   await runSurvey(f.root, config, 'contracts', async args => answer(args));
+  // New projects have no memo: the optional merge only writes a draft.
+  assert.equal(mergeSurvey(f.root, config, 'contracts').out, 'migration/surveys/contracts.draft.md');
+  assert.equal(fs.existsSync(safePath(f.root, 'migration/source-spec/contracts.md')), false);
+  atomicWrite(safePath(f.root, 'migration/source-spec/contracts.md'), `${legacyContractsSkeleton(config, sourceSpecPlan(f.root, config).sources)}\n`);
   const merged = mergeSurvey(f.root, config, 'contracts');
   assert.equal(merged.out, 'migration/source-spec/contracts.md');
   const text = fs.readFileSync(safePath(f.root, merged.out), 'utf8');
@@ -100,7 +110,14 @@ test('inventory survey classifies a mechanical census per scope and publishes th
   const g = fixture(t);
   atomicWrite(safePath(g.root, 'migration/inventory-sites.tsv'), 'file\tsymbol\tsource_construct\nsrc/math_ops.py\tdivide\tfloor division\nsrc/math_ops.py\tmod\tremainder\n');
   const partial = async args => { const r = answer(args); r.result.items.pop(); return r; };
-  await assert.rejects(runSurvey(g.root, g.config, 'inventory', partial, { sitesFile: 'migration/inventory-sites.tsv' }), /covered 1 of 2 scope sites/);
+  // After one correction the missing site is finished as an explicit UNKNOWN
+  // instead of stopping; the answered site keeps its classification.
+  await runSurvey(g.root, g.config, 'inventory', partial, { sitesFile: 'migration/inventory-sites.tsv' });
+  const rows = readJSON(safePath(g.root, 'migration/surveys/inventory/001-src.json')).items;
+  assert.equal(rows.length, 2);
+  const missing = rows.find(r => r.uncited);
+  assert.equal(missing.classification, 'UNKNOWN'); assert.match(missing.target_translation, /TODO\(port\)/);
+  assert.equal(mergeSurvey(g.root, g.config, 'inventory', { sitesFile: 'migration/inventory-sites.tsv' }).unknown, 1);
 });
 
 test('CLI surveyors run as fresh tool-free Copilot processes on the surveyor profile', async t => {

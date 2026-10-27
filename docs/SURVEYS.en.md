@@ -20,19 +20,28 @@ Frozen sources include original line numbers and final-line bounds. Validation
 checks every cited start/end line against the actual supplied excerpt. Each part
 gets at most one focused correction of an invalid response: preserve validated rows and send only unfinished
 files/sites to the fresh worker. Rejected answers remain in run records; the
-coordinator never rewrites citations to make them pass. Resume reuses valid
+coordinator never rewrites citations to make them pass. Rows still uncited
+after that correction do not stop the survey: they finish as UNKNOWN/TODO(port)
+marked `uncited` (facts drop only the invalid items), with evidence naming the
+original file range and the rejected-answer record, never the worker's citation.
+The scope record counts them under `uncited`; report that count in the review
+package. Resume reuses valid
 partial rows and legacy results when current source/citations still validate,
 and retains the saved max-files setting if it is omitted.
 
-All three survey kinds split oversized file sets, site lists and individual
-source bodies into fitting requests without renaming scopes. Even a minified
+All three survey kinds split oversized file sets and site lists into fitting
+requests without renaming scopes. Facts and contracts also split individual
+source bodies. An inventory file whose body exceeds the input capacity is
+recorded as UNKNOWN/TODO(port) for every site without model calls (its fragment
+answers were always merged as UNKNOWN, after hours of calls), and the scope
+record lists it under `unsurveyedOversizedFiles`. Even a minified
 single line is split by character position without breaking Unicode pairs or
 losing source characters. Original line/column ranges and validated part results
 are saved under `<scope-id>.parts/`; unchanged completed parts are reused on
 resume. Serialized JSON bytes are checked before dispatch, and no scope is done
 until every part/file/site is covered. Contracts concatenate source-anchored
-observations and retain cross-fragment unknowns. Inventory visits all fragments
-for each site and retains UNKNOWN/TODO(port) for cross-fragment data flow.
+observations and retain cross-fragment unknowns. The inventory review traces
+the sites of oversized files.
 Required metadata that cannot fit with even one source character gets a precise
 capacity error; source text is never silently removed.
 
@@ -50,12 +59,12 @@ This view is explicitly not revalidated and cannot authorize a gate. Quiet
 output, CPU at 100% or low CPU, elapsed time (including 600 seconds), and log
 volume are never reasons to interrupt or relaunch work. A status wait returning
 never terminates the worker. The runner emits liveness messages on stderr.
-See [all interruption conditions and source index](INTERRUPTION-POLICY.md).
+See [all interruption conditions and source index](INTERRUPTION-POLICY.en.md).
 
 | Kind | Phase | What a surveyor returns | Merged into |
 |---|---|---|---|
 | `facts` | 00 feasibility (optional; by default the parent samples the source itself) | Entry points, data formats, external dependencies, platform code, generated code, pain points, risky constructs and tests, each with PATH:LINE | `migration/surveys/facts.md` (material for feasibility.md) |
-| `contracts` | 00b (source-as-spec) | Per file: public interface, inputs/outputs/errors, edge cases, evidence, unknowns | `migration/source-spec/contracts.md` (only while it is the untouched skeleton; otherwise `migration/surveys/contracts.draft.md`) |
+| `contracts` | Not used (kept for source-as-spec plans drafted before 0.10.0) | Per file: public interface, inputs/outputs/errors, edge cases, evidence, unknowns | Only an untouched legacy `migration/source-spec/contracts.md`; otherwise `migration/surveys/contracts.draft.md` |
 | `inventory` | 02 gap inventory | For each site of a mechanical census: classification, target translation, evidence, confirmed/unknown | Per-scope shards, then the existing inventory merge into `migration/inventory.tsv` |
 
 ## Commands
@@ -74,10 +83,10 @@ $R survey merge --kind inventory --sites migration/inventory-sites.tsv
 
 Scopes are mechanical: files of one directory together, at most `--max-files`
 each, with fitting work requests under `maxReviewInputBytes`. A single file
-over the limit is processed in source fragments.
+over the limit is processed in source fragments (inventory: UNKNOWN, as above).
 
 ## Quality
 
-- Answers are checked before they are saved: files outside the scope, missing PATH:LINE citations and omissions (every file for contracts, every census site for inventory) are rejected.
+- Answers are checked before they are saved: files outside the scope, missing PATH:LINE citations and omissions (every file for contracts, every census site for inventory) are rejected; after the one correction they become UNKNOWN as above.
 - Merged results are **drafts**. The phase's independent audits ([preparation audits](PREPARATION-AUDITS.md), or the single package review in source-as-spec) and the human review still apply; `survey merge` never records a phase.
 - The parent checks the merged draft and the cited lines before reporting. Surveyor answers are candidate facts, not decisions.
