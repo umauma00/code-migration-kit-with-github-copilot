@@ -7,7 +7,8 @@ based on time, CPU, silence or output volume.
   correction no longer stop the scope. They finish as UNKNOWN/TODO(port) marked
   `uncited`, with evidence naming only the original file range and the
   rejected-answer record (never the worker's citation); facts drop only the
-  invalid items. Scope and run records count them (`uncited`, `droppedFacts`).
+  invalid items. Scope records and the `survey merge` result count them
+  (`uncited`, `droppedFacts`, `droppedAnswers`).
 - Survey: an inventory file that does not fit in one input with the RULEBOOK
   and one census site is recorded as UNKNOWN/TODO(port) for every site without model calls and listed under
   `unsurveyedOversizedFiles`. Its fragment answers were always merged as
@@ -20,7 +21,8 @@ based on time, CPU, silence or output volume.
 - A `run.lock` or build-loop lock whose owner process is gone on this host is
   removed by the next command, under a short recovery claim so two recoverers
   never remove a fresh lock. Locks record their host; one from another host
-  still refuses and `unlock` can clear it. Release removes only its own lock.
+  still refuses and `unlock` can clear it (a pre-0.10.0 lock has no host and
+  is judged by its PID here). Release removes only its own lock.
 - A "request/connection/... timed out" reported by the service or network is
   retried as transient; only the kit's own explicit deadline stays final.
 - New installs default `maxReviewInputBytes` to 262144 (256 KiB). Existing

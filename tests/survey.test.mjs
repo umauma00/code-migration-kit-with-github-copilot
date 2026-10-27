@@ -72,7 +72,11 @@ test('survey results are validated against their scope before they are written',
     const record = readJSON(safePath(f.root, 'migration/surveys/facts/001-src.json')), items = record.items;
     assert.ok(items.every(i => i.file !== 'src/elsewhere.py' && i.category !== 'opinion' && /:\d/.test(i.evidence)));
     // The review package must be able to say how many facts were dropped.
-    if (message.source !== 'target mismatch') { assert.ok(record.droppedFacts >= 1, String(message)); assert.ok(report.droppedFacts >= record.droppedFacts); }
+    // A wrong envelope loses the whole answer: that is counted as well.
+    const lost = (record.droppedFacts ?? 0) + (record.droppedAnswers ?? 0);
+    assert.ok(lost >= 1, String(message));
+    const merged = mergeSurvey(f.root, f.config, 'facts', { maxFiles: 1 });
+    assert.ok((merged.droppedFacts ?? 0) + (merged.droppedAnswers ?? 0) >= lost, String(message));
   }
   const g = failureGuidanceList('Survey stopped: 001-src: Survey item outside its scope: src/elsewhere.py', { root: f.root });
   assert.equal(g[0].guidance.id, 'survey-result');

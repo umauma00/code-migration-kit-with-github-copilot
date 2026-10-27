@@ -6,8 +6,8 @@
 
 キットのファイル（lib・scripts）が変わるため、既存の承認・完了記録は一度だけ失効します。judgeから再検証してください。完了済みの出力と、完了済みのsurvey scopeは保持されます。
 
-1. survey は、1回の補正後も引用を確かめられない行を `uncited` 付きの UNKNOWN にして完了します。止まっていた scope は同じ `survey run` を再実行すれば最後まで進みます。件数は scope 記録と実行記録の `uncited` と、inventory の巨大ファイルは `unsurveyedOversizedFiles` で確認できます。
-2. 異常終了で残った `migration/run.lock` は、同じホストなら次のコマンドが自動で外します。別ホスト（共有フォルダ）のロックだけは、その実行が止まったことを確認してから `unlock --pid` で外します。
+1. survey は、1回の補正後も引用を確かめられない行を `uncited` 付きの UNKNOWN にして完了します。止まっていた scope は同じ `survey run` を再実行すれば最後まで進みます。件数は scope 記録と `survey merge` の結果の `uncited`・`droppedFacts` と、inventory の巨大ファイルは `unsurveyedOversizedFiles` で確認できます。
+2. 異常終了で残った `migration/run.lock` は、同じホストなら次のコマンドが自動で外します。別ホスト（共有フォルダ）のロックだけは、その実行が止まったことを確認してから `unlock --pid` で外します。旧版が残したロックはホストを記録していないため、このホストでのPIDで判断します。
 3. 新規導入の `maxReviewInputBytes` は 262144 です。既存の設定は変わりません。引き上げる場合は `migration/config.json` を書き換えます。設定の指紋に含まれるため、02以降の記録と承認は確認し直しになります。
 4. source-as-spec の新規計画では契約メモ（`contracts.md`）を作りません。既存の計画はそのまま使えます（`TODO(spec)` の確認も従来どおり）。ソース一覧の方式に移る場合は `migration/judge-plan.json` を削除して `source-spec init --apply` をやり直し、00b〜02 を一括で確認し直します。
 5. コピー導入では `migration-kit/` 全体と、`.github/agents/migration-orchestrator.agent.md`、`.github/skills/` の SKILL.md を一時導入先の内容に置き換えます。プラグインは更新だけで入ります。

@@ -149,7 +149,8 @@ output during build/smoke/parity makes the stage fail, even if its command exits
 The global run lock prevents simultaneous runners/validation stages. A lock
 whose owner PID no longer exists on this host is recovered by the next command
 under a short recovery claim. A lock from another host (shared folder) or a
-reused PID still refuses; unlock checks the exact owner PID.
+reused PID still refuses; unlock checks the exact owner PID. A lock written
+before 0.10.0 records no host and is judged by its PID on this host.
 Parallel workers operate on unique manifest outputs. The configured concurrency
 caps active agent calls; reviews cannot silently double the cap. Fatal input or
 scheduler failures stop new calls and cancel active adapters, but retain the lock

@@ -105,3 +105,21 @@ test('quick commands get the liveness notice without an opening line', async () 
   assert.ok(messages.length >= 1);
   assert.ok(messages.every(m => m.includes('still running')));
 });
+
+test('a recovery claim held by a live process names itself and unlock clears it', t => {
+  const f = prepare(t), lock = safePath(f.root, 'migration/run.lock'), claim = `${lock}.recover`;
+  writeJSON(lock, { pid: deadPid(), task: 'survey', startedAt: new Date().toISOString() });
+  // A reused PID: alive here, but no recoverer is at work.
+  writeJSON(claim, { pid: process.pid, host: os.hostname(), token: 'reused' });
+  assert.throws(() => lockRun(f.root, 'translation'), /recovery claim run\.lock\.recover is held by pid \d+.*unlock --pid/);
+  assert.equal(readJSON(claim).token, 'reused');
+});
+
+test('unlock reports a missing lock plainly and refuses a PID that owns nothing', async t => {
+  const f = prepare(t), log = console.log, out = [];
+  console.log = m => out.push(m);
+  try { await main(['unlock', '--root', f.root, '--pid', '12345']); } finally { console.log = log; }
+  assert.deepEqual(out, ['No migration lock to remove']);
+  writeJSON(safePath(f.root, 'migration/run.lock'), { pid: process.pid, task: 'survey' });
+  await assert.rejects(main(['unlock', '--root', f.root, '--pid', '12345']), /exact lock owner PID/);
+});

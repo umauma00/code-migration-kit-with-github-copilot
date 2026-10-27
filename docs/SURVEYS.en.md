@@ -24,8 +24,10 @@ coordinator never rewrites citations to make them pass. Rows still uncited
 after that correction do not stop the survey: they finish as UNKNOWN/TODO(port)
 marked `uncited` (facts drop only the invalid items), with evidence naming the
 original file range and the rejected-answer record, never the worker's citation.
-The scope and run records count them under `uncited` (dropped facts
-under `droppedFacts`); report those counts in the review
+Scope records and the `survey merge` result count them under `uncited`
+(dropped facts under `droppedFacts`, facts answers lost to a wrong envelope
+under `droppedAnswers`; a run record counts only the scopes that run finished);
+report those counts in the review
 package. Resume reuses valid
 partial rows and legacy results when current source/citations still validate,
 and retains the saved max-files setting if it is omitted.

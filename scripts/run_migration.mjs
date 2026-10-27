@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { lockRun, loadConfig, unsetModels, readManifest, contextHash, unitState, done, safePath, readJSON, verificationFiles, loadReviewDependencies, reviewSources, reviewDependencyPath } from '../lib/core.mjs';
+import { lockRun, readLock, loadConfig, unsetModels, readManifest, contextHash, unitState, done, safePath, readJSON, verificationFiles, loadReviewDependencies, reviewSources, reviewDependencyPath } from '../lib/core.mjs';
 import { strictPhases, phaseRecorded } from '../lib/phases.mjs';
 import { validateWorkerProfile, assistedReviewerRoles } from '../lib/review.mjs';
 import { runProcess } from '../lib/process.mjs';
@@ -209,14 +209,22 @@ export async function main(argv = process.argv.slice(2)) {
   if (!cmd || cmd === 'help' || args.help) { console.log(usage); return; }
   const root = fs.realpathSync(path.resolve(args.root ?? '.'));
   if (cmd === 'unlock') {
-    const file = safePath(root, 'migration/run.lock'), lock = readJSON(file), pid = Number(args.pid);
-    if (!Number.isInteger(pid) || pid < 1 || lock.pid !== pid) throw new Error('Specify the exact lock owner PID');
+    const file = safePath(root, 'migration/run.lock'), claim = `${file}.recover`, pid = Number(args.pid);
+    // The recovery claim is cleared the same way when its owner (reused PID or another host) blocks recovery.
+    const target = [file, claim].find(f => readLock(f)?.pid === pid);
+    if (!Number.isInteger(pid) || pid < 1 || !target) {
+      if (readLock(file) === undefined && readLock(claim) === undefined) { console.log('No migration lock to remove'); return; }
+      throw new Error('Specify the exact lock owner PID');
+    }
+    const lock = readLock(target);
     // A PID from another host (shared folder) says nothing about this host's
     // processes; the person confirmed that run stopped by naming its PID.
     let alive = !lock.host || lock.host === os.hostname();
     if (alive) try { process.kill(pid, 0); } catch (e) { if (e.code === 'ESRCH') alive = false; else throw e; }
     if (alive) throw new Error('Lock owner is still running; refusing to unlock');
-    fs.unlinkSync(file); console.log('Removed stale migration lock'); return;
+    // Remove it only if no other command took it in the meantime.
+    if (JSON.stringify(readLock(target)) === JSON.stringify(lock)) fs.rmSync(target, { force: true });
+    console.log(target === claim ? 'Removed stale lock recovery claim' : 'Removed stale migration lock'); return;
   }
   if (cmd === 'preferences') {
     console.log(JSON.stringify(args.language || args['original-runtime'] ? setPreferences(root, { language: args.language, originalRuntime: args['original-runtime'] }) : preferencesReport(root), null, 2));
