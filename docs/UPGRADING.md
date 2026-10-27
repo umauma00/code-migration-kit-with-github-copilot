@@ -1,6 +1,15 @@
-# 更新手順（0.6.0 と以前の版）
+# 更新手順（0.6.1 と以前の版）
 
 日本語 | [English](UPGRADING.en.md)
+
+## 0.6.1（0.6.0 のレビュー修正）
+
+キットのファイル（lib・scripts）が変わるため、既存の承認・完了記録は一度だけ失効します。judgeから再検証してください。完了済みの出力は保持されます。
+
+1. 時間・CPU・無出力で止める処理は追加していません。continuous のまま動きます。
+2. `doctor` が、設定に書かれていても continuous では効かない上限（テンプレートの既定値と違う `maxAgentCalls`・`maxAiCreditsPerCall`・`maxRunInputBytes` など）を `execution limits` に表示します。効かせたい場合は `"executionMode": "bounded"` を設定し、不要なら削除してください。
+3. build-loop でエラー数が3回続けて減らない場合、止まらずに `stalled` として記録し、status にルールブック修正の提案を表示します。
+4. 退避したログのパスは相対パスで記録されます。0.6.0 の絶対パスの記録も同じ場所なら読めます。
 
 ## 0.6.0（継続実行と巨大survey）
 

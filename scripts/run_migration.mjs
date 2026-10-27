@@ -25,7 +25,7 @@ import { buildLoop } from '../lib/build-loop.mjs';
 import { readPreferences, setPreferences, preferencesReport } from '../lib/preferences.mjs';
 import { readGuardrails, cliFolderTrust, guardrailsProposal, installGuardrails } from '../lib/guardrails.mjs';
 import { listAvailableModels, modelsMarkdown, setRoleModels, readConfigIfPresent, currentAssignments } from '../lib/models.mjs';
-import { processTimeout } from '../lib/execution-policy.mjs';
+import { ignoredLimits, processTimeout } from '../lib/execution-policy.mjs';
 
 export const usage = `Usage: node migration-kit/scripts/run_migration.mjs COMMAND [options]
   doctor [--check-cli] [--copilot /path/to/copilot]
@@ -79,6 +79,9 @@ export async function doctor(root, config, { checkCLI = false, command = 'copilo
   if (signal?.aborted) throw new Error('Interrupted');
   const timeoutMs = processTimeout(config, 'commandTimeoutSeconds');
   const checks = [{ check: 'configuration', ok: true }];
+  const ignored = ignoredLimits(config);
+  checks.push({ check: 'execution limits', ok: true, executionMode: config.executionMode ?? 'continuous', ...(ignored.length ? { ignored,
+    note: `Continuous mode does not enforce ${ignored.join(', ')}. Set "executionMode": "bounded" to enforce them, or delete them; per-command --max-calls / --max-rounds still apply.` } : {}) });
   const unset = unsetModels(config);
   checks.push(unset.length ? { check: 'worker models chosen', ok: false, missing: unset, note: 'Choose them with models list and models set; the other checks run without them.' } : { check: 'worker models chosen', ok: true });
   const layout = runtimeLayout(root, config);

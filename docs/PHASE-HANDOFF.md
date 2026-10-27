@@ -209,7 +209,8 @@ they revalidate source evidence and are not required between survey scopes.
 
 Ask only when recovery is exhausted or the next action requires a missing
 decision, a new budget/model/limit, a changed scope or a human gate. Reuse an
-answer already given for that action. In that case follow the report below.
+answer already given for that same in-phase recovery action; a gate approval or
+phase sign-off is never reused for another gate. In that case follow the report below.
 
 Every failed command, failed phase check, blocked unit or refused gate ends with
 a **failure report**, never with a bare error or a silent retry. Runner commands
