@@ -155,6 +155,7 @@ test('ordinary evidence text with host:port or numbers is not a foreign citation
   await assert.rejects(runSurvey(f.root, f.config, 'contracts', answer(' and src/lib.rs:3')), /outside source lines/);
   // Extensions the kit has never heard of are still citations.
   await assert.rejects(runSurvey(f.root, f.config, 'contracts', answer(' and Lib.adb:3')), /outside source lines/);
+  await assert.rejects(runSurvey(f.root, f.config, 'contracts', answer(' and /home/u/proj/Other.java:5')), /outside source lines/);
   const report = await runSurvey(f.root, f.config, 'contracts', answer(''));
   assert.equal(report.done, 1);
   assert.equal(surveyStatus(f.root, f.config, 'contracts').complete, true);
