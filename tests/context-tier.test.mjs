@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { ready, fake, cliDouble } from './helpers.mjs';
+import { ready, prepare, fake, cliDouble } from './helpers.mjs';
 import { contextHash, done, readJSON, safePath, loadConfig, workerContext, validateContextTiers } from '../lib/core.mjs';
-import { translate } from '../lib/pipeline.mjs';
+import { translate, runStage, approve } from '../lib/pipeline.mjs';
 import { normalizeModels, parseAssignments, checkChoice, setRoleModels, modelsMarkdown, currentAssignments } from '../lib/models.mjs';
 import { copilotArgs, requiredCopilotFlags, createCopilotAdapter } from '../scripts/copilot_adapter.mjs';
 import { humanGate, interactiveDecision } from '../lib/guardrails.mjs';
@@ -130,4 +130,30 @@ test('recording a context tier goes through the same human gate', () => {
     assert.equal(decision.decision, 'ask');
     assert.match(decision.reason, /context \(long_context costs more\)/);
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test('records name the requested tier; a host-chosen override and a leftover suffix stay clear', async t => {
+  const f = prepare(t), file = safePath(f.root, 'migration/config.json');
+  const config = { ...f.config, contextTiers: { implementer: 'long_context' } };
+  fs.writeFileSync(file, JSON.stringify({ ...readJSON(file), contextTiers: config.contextTiers }));
+  await runStage(f.root, config, 'judge');
+  approve(f.root, config, 'translation', 'Automated fixture approval for tests only');
+  const report = await translate(f.root, config, fake);
+  const runDir = safePath(f.root, `migration/runs/${report.runId}`);
+  const attempts = fs.readdirSync(runDir).filter(n => n.endsWith('.json') && n !== 'summary.json').map(n => readJSON(path.join(runDir, n)));
+  assert.equal(attempts.find(a => a.role === 'implementer').requestedContext, 'long_context');
+  assert.ok(attempts.filter(a => a.role !== 'implementer').every(a => a.requestedContext === undefined));
+  // A preparation audit's host-chosen model keeps that model's own default context.
+  const adapter = createCopilotAdapter(cliDouble(f));
+  const response = await adapter({ root: f.root, config, role: 'implementer', unit: f.units[0], model: 'audit-model' });
+  assert.equal(response.requestedContext, undefined);
+  const argv = fs.readFileSync(safePath(f.root, 'cli-double-calls.jsonl'), 'utf8').trim().split('\n').map(JSON.parse).at(-1).argv;
+  assert.equal(argv.includes('--context'), false);
+  assert.throws(() => setRoleModels(f.root, models, { assign: 'fixer=tiered:high:default' }), /tiered:high is not in your Copilot model list \(write ID\[:EFFORT\]\[:long_context\]/);
+  // --role all with a tier gives every role, the surveyor through the implementer, the same tier.
+  setRoleModels(f.root, models, { role: 'surveyor', model: 'declared' });
+  setRoleModels(f.root, models, { role: 'all', model: 'tiered', context: 'long_context' });
+  const all = loadConfig(f.root);
+  assert.equal(all.contextTiers.surveyor, undefined);
+  assert.deepEqual(currentAssignments(all).map(a => a.context), Array(6).fill('long_context'));
 });

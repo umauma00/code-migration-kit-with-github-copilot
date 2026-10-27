@@ -1124,7 +1124,7 @@
     },
     {
       "path": "lib/models.mjs",
-      "sha256": "fb0171ee81a909c86865ba35b0ea9d027214f3f94f1852f574c71e7912085a00",
+      "sha256": "7308b071a7c4796eb9c75bfbd00a4036b08ccfbda80bddf4844d30397e3dc895",
       "entries": [
         {
           "line": 16,
@@ -1212,82 +1212,82 @@
           "code": "throw new Error(`Copilot CLI could not list models: ${e.message}`);"
         },
         {
-          "line": 114,
+          "line": 118,
           "kind": "error-or-exit-candidate",
-          "code": "if (!found) throw new Error(`Model ${model} is not in your Copilot model list; run models list and pick one of its ids`);"
-        },
-        {
-          "line": 115,
-          "kind": "error-or-exit-candidate",
-          "code": "if (found.state !== 'enabled') throw new Error(`Model ${found.id} is ${found.state} for your account (an organization policy or terms decide this); pick an enabled model`);"
-        },
-        {
-          "line": 116,
-          "kind": "error-or-exit-candidate",
-          "code": "if (context !== undefined && !contextTiers.includes(context)) throw new Error(`Context must be one of ${contextTiers.join(', ')}`);"
-        },
-        {
-          "line": 117,
-          "kind": "error-or-exit-candidate",
-          "code": "if (context === 'long_context' && !found.contexts.includes('long_context')) throw new Error(`Model ${found.id} offers no long_context tier; use the default context`);"
+          "code": "throw new Error(`Model ${model} is not in your Copilot model list${hint}; run models list and pick one of its ids`);"
         },
         {
           "line": 120,
           "kind": "error-or-exit-candidate",
-          "code": "if (!effortLevels.includes(effort)) throw new Error(`Effort must be one of ${effortLevels.join(', ')} or default`);"
+          "code": "if (found.state !== 'enabled') throw new Error(`Model ${found.id} is ${found.state} for your account (an organization policy or terms decide this); pick an enabled model`);"
         },
         {
           "line": 121,
           "kind": "error-or-exit-candidate",
+          "code": "if (context !== undefined && !contextTiers.includes(context)) throw new Error(`Context must be one of ${contextTiers.join(', ')}`);"
+        },
+        {
+          "line": 122,
+          "kind": "error-or-exit-candidate",
+          "code": "if (context === 'long_context' && !found.contexts.includes('long_context')) throw new Error(`Model ${found.id} offers no long_context tier; use the default context`);"
+        },
+        {
+          "line": 125,
+          "kind": "error-or-exit-candidate",
+          "code": "if (!effortLevels.includes(effort)) throw new Error(`Effort must be one of ${effortLevels.join(', ')} or default`);"
+        },
+        {
+          "line": 126,
+          "kind": "error-or-exit-candidate",
           "code": "if (!found.efforts.includes(effort)) throw new Error(found.efforts.length ? `Model ${found.id} supports reasoning effort ${found.efforts.join(', ')}; not ${effort}` : `Model ${found.id} has no selectable reasoning effort; use default`);"
         },
         {
-          "line": 131,
+          "line": 136,
           "kind": "error-or-exit-candidate",
           "code": "if (found && a.context === 'long_context' && !found.contexts.includes('long_context')) throw new Error(`${a.role} would run ${found.id} with the long_context tier${a.inherits ? ' (inherited from implementer)' : ''}, which that model does not offer; choose ${a.role}'s context explicitly`);"
         },
         {
-          "line": 133,
+          "line": 138,
           "kind": "error-or-exit-candidate",
           "code": "if (!found.efforts.includes(a.effort)) throw new Error(`${a.role} would run ${found.id} with reasoning effort ${a.effort}${a.inherits ? ' (inherited from implementer)' : ''}, which that model does not support (${found.efforts.join(', ') || 'no selectable effort'}); choose ${a.role}'s effort explicitly`);"
         },
         {
-          "line": 143,
+          "line": 148,
           "kind": "error-or-exit-candidate",
           "code": "else throw new Error(`Unknown role ${r}: use ${effortRoles.join(', ')}, reviewers or all`);"
         },
         {
-          "line": 145,
+          "line": 150,
           "kind": "error-or-exit-candidate",
           "code": "if (!out.length) throw new Error('models set requires --role ROLE[,ROLE] (or reviewers, all)');"
         },
         {
-          "line": 155,
+          "line": 160,
           "kind": "error-or-exit-candidate",
           "code": "if (eq <= 0 || eq === part.length - 1) throw new Error(`Write each assignment as ROLE=MODEL_ID[:EFFORT][:long_context], not ${part}`);"
         },
         {
-          "line": 164,
+          "line": 169,
           "kind": "loop-exit-candidate",
           "code": "else break;"
         },
         {
-          "line": 169,
+          "line": 174,
           "kind": "error-or-exit-candidate",
           "code": "if (!entries.length) throw new Error('models set --assign needs ROLE=MODEL_ID[:EFFORT][:long_context] entries, for example implementer=ID:medium,reviewers=ID:high:long_context,arbiter=ID,fixer=ID');"
         },
         {
-          "line": 179,
+          "line": 184,
           "kind": "error-or-exit-candidate",
           "code": "if (assign !== undefined && (role !== undefined || model !== undefined || effort !== undefined || context !== undefined)) throw new Error('Use either models set --assign ROLE=ID[:EFFORT][:long_context],... or --role/--model/--effort/--context, not both');"
         },
         {
-          "line": 180,
+          "line": 185,
           "kind": "error-or-exit-candidate",
           "code": "if (assign === undefined && !model) throw new Error('models set requires --model ID from models list (or --assign ROLE=ID[:EFFORT][:long_context],... for several roles at once)');"
         },
         {
-          "line": 181,
+          "line": 186,
           "kind": "error-or-exit-candidate",
           "code": "if (!fs.existsSync(configPath(root))) throw new Error('migration/config.json is missing: initialize the project (install.mjs) before recording model choices');"
         }
