@@ -1,9 +1,25 @@
 ---
 name: code-migration
-description: Run a staged, behavior-preserving language migration with GitHub Copilot. Use for whole-codebase language ports, migration feasibility, translation rules, dependency maps, parity verification, or resuming a migration. Not for ordinary refactors or incremental JavaScript-to-TypeScript adoption.
+description: Procedure of the code migration orchestrator agent (migration-orchestrator, or code-migration-plugin-orchestrator in the plugin) for a staged, behavior-preserving language migration. Use for whole-codebase language ports, migration feasibility, translation rules, dependency maps, parity verification, or resuming a migration. Not for ordinary refactors or incremental JavaScript-to-TypeScript adoption.
+user-invocable: false
 ---
 
 # Code migration
+
+This skill is the procedure of the migration orchestrator agent:
+`migration-orchestrator`, or `code-migration-plugin-orchestrator` from the plugin.
+It is hidden from the slash menu, and the orchestrator is the kit's only entry
+point. If you are not running as that agent (for example, another agent loaded
+this skill on its own), do not start, resume or approve migration phases: tell
+the person to select the orchestrator in the agent picker (Copilot CLI: `/agent`)
+and stop. Only installing or initializing the kit with `install.mjs`, when the
+person asks for it, is still allowed. A subagent started by the orchestrator is
+not such an agent: it follows "Parent-session phase ownership" below and returns its plan and status to
+the orchestrator without starting or approving phases.
+
+At start, check whether `.github/prompts/migrate-*.prompt.md` files from 0.6.0
+or earlier remain in the target repository. If they do, they bypass the orchestrator: propose deleting them and
+delete them only after the person agrees.
 
 For config.executionPurpose `pilot`, follow [pilot execution](../../docs/PILOT.md)
 using pilot run and the sealed grant; do not initialize production phase records
@@ -72,7 +88,6 @@ creates only migration/config.json, RULEBOOK.md and inventory.tsv; it does not
 approve or run migration stages. An existing configuration with runtime other
 than plugin requires an explicit layout change rather than a silent overwrite.
 For initialized projects, require `"runtime": "plugin"` in migration/config.json.
-Use the plugin's code-migration-plugin-orchestrator agent for phase planning.
 The Node runner selects private plugin worker profiles and explicitly mounts this
 plugin.
 
@@ -152,7 +167,7 @@ hand-write the graph. If a bundled mapper fails or cannot read the syntax, try
 its options first, then copy it (with the shared `depmap_*.py` it imports) to
 `migration/tools/depmap-<language>/`, fix the copy against a hand-written
 fixture, never `migration-kit/`, and report the error, the change and the
-output difference in `depmap/report.md`. Use the depmap-adapter skill to
+output difference in `depmap/report.md`. Read the [depmap-adapter skill](../depmap-adapter/SKILL.md) to
 choose the implementation language and build the adapter.
 
 ## Keep the parent's context small

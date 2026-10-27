@@ -1,6 +1,7 @@
 ---
 name: depmap-adapter
 description: Write or fix a dependency-map adapter for phase 01 of a code migration when no bundled mapper covers the source language, or a bundled mapper fails or cannot read the project's syntax. Not for running or building the original application.
+user-invocable: false
 ---
 
 # Dependency-map adapter

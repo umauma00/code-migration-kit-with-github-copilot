@@ -33,7 +33,7 @@ Git配布が整った後はマーケットプレイスのGit URLを登録でき�
 
 ## 新しい案件を開始する
 
-移行対象リポジトリをVS Codeで開き、Copilotチャットで「code-migrationスキルを使ってPythonからJavaScriptへ移行を開始して」などと依頼します。利用できるモデルIDを指定してください。スキルは初期化と設定を確認し、事前調査から一工程ずつ進めます。
+移行対象リポジトリをVS Codeで開き、Copilotチャットのエージェント一覧から `code-migration-plugin-orchestrator` を選んで（Copilot CLIでは `/agent`）、「PythonからJavaScriptへ移行を開始して」などと依頼します。利用できるモデルIDを指定してください。オーケストレーターは初期化と設定を確認し、事前調査から一工程ずつ進めます。
 
 手動で初期化する場合は、対象リポジトリをcwdにして以下を実行します。`MODEL_ID` はアカウントで利用可能なモデルIDへ置き換えます。
 

@@ -1,3 +1,15 @@
+# 0.7.0 — 2026-10-27
+
+- Make the orchestrator agent the only entry point in VS Code and the Copilot
+  CLI. The `code-migration` and `depmap-adapter` skills set
+  `user-invocable: false` (not `disable-model-invocation`, which makes a skill
+  unreachable in the Copilot CLI, github/copilot-cli#4438), so they leave the
+  slash menu but stay loadable. The orchestrators link and read the skill first,
+  and the skill and repository instructions tell any other agent not to start
+  phases but to point the person to the orchestrator.
+- Remove the ten VS Code Local `/migrate-…` prompt files; the orchestrator
+  covers every phase in both session types. Upgrade notes are in UPGRADING.
+
 # 0.6.1 — 2026-10-27
 
 Fixes from the review of 0.6.0. Nothing here adds a stop based on time, CPU,

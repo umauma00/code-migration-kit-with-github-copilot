@@ -101,8 +101,8 @@ runner in a terminal and the runner starts the workers (the VS Code subagent
 backend was removed in 0.3.0). The person drives the migration from chat only:
 the agent runs every command, installs the CLI or starts `copilot login` after the
 person agrees, and the person's own acts are chat answers and host confirmations
-of human-gate commands. Use the shared skill with Copilot, or the skill/phase
-prompt files with Local.
+of human-gate commands. The only entry point is the orchestrator agent in the
+agent picker, with Copilot and Local alike; it reads the code-migration skill.
 
 ## VS Code orchestration and verification modes
 
