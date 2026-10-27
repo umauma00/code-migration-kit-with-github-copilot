@@ -390,7 +390,7 @@
     },
     {
       "path": "lib/core.mjs",
-      "sha256": "6b2c838031d2ddca1b1ca6713b831597ce4931802c990c1e7bd1cf389ba07920",
+      "sha256": "f1e81462a827658cf8440857ea100ebf25db4e059dbf929c803acb7e734dd29a",
       "entries": [
         {
           "line": 25,
@@ -763,77 +763,77 @@
           "code": "export const operationalConfigKeys = ['executionMode', 'concurrency', 'maxAgentCalls', 'maxFixRounds', 'timeoutSeconds', 'commandTimeoutSeconds',"
         },
         {
-          "line": 402,
+          "line": 406,
           "kind": "error-or-exit-candidate",
           "code": "if (!fileHash(safePath(root, p))) throw new Error(`Required artifact missing: ${p}`);"
         },
         {
-          "line": 405,
+          "line": 409,
           "kind": "error-or-exit-candidate",
           "code": "if (!fs.existsSync(safePath(root, dir))) throw new Error(`Input root missing: ${dir}`);"
         },
         {
-          "line": 430,
+          "line": 434,
           "kind": "error-or-exit-candidate",
           "code": "catch (e) { if (e instanceof SyntaxError) return null; throw e; }"
         },
         {
-          "line": 433,
+          "line": 437,
           "kind": "error-or-exit-candidate",
           "code": "if (!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(id)) throw new Error('Invalid repair intent ID');"
         },
         {
-          "line": 438,
+          "line": 442,
           "kind": "error-or-exit-candidate",
           "code": "if (!checksum || fileHash(file) !== checksum) throw new Error('Repair intent receipt missing or changed; restore its bound evidence before resuming');"
         },
         {
-          "line": 443,
+          "line": 447,
           "kind": "error-or-exit-candidate",
           "code": "j.diagnosticHash !== hash(j.diagnostic) || !/^[a-f0-9]{24}$/.test(j.unitId))) throw new Error('Invalid repair intent receipt');"
         },
         {
-          "line": 451,
+          "line": 455,
           "kind": "error-or-exit-candidate",
           "code": "if (ref.schemaVersion !== 1 || ref.kind !== 'repair-intent-reference') throw new Error('Invalid active repair reference');"
         },
         {
-          "line": 515,
+          "line": 519,
           "kind": "pid-probe",
           "code": "const pidAlive = pid => { try { process.kill(pid, 0); return true; } catch (e) { return e.code !== 'ESRCH'; } };"
         },
         {
-          "line": 546,
+          "line": 550,
           "kind": "error-or-exit-candidate",
           "code": "} catch (e) { if (e.code !== 'EEXIST') throw e; }"
         },
         {
-          "line": 548,
+          "line": 552,
           "kind": "error-or-exit-candidate",
           "code": "if (owner && Number.isInteger(owner.pid) && pidAlive(owner.pid)) throw new Error(`A build-loop (grant ${owner.grantId}, pid ${owner.pid}) is already running; wait for it to finish or interrupt that process`);"
         },
         {
-          "line": 551,
+          "line": 555,
           "kind": "error-or-exit-candidate",
           "code": "try { fs.renameSync(lock, aside); } catch (e) { if (e.code === 'ENOENT') continue; throw e; }"
         },
         {
-          "line": 556,
+          "line": 560,
           "kind": "error-or-exit-candidate",
           "code": "throw new Error('Another build-loop started while a stale build-loop lock was being recovered');"
         },
         {
-          "line": 560,
+          "line": 564,
           "kind": "error-or-exit-candidate",
           "code": "throw new Error('Could not take the build-loop lock');"
         },
         {
-          "line": 565,
+          "line": 569,
           "kind": "error-or-exit-candidate",
           "code": "if (loop) throw new Error(`A build-loop (grant ${loop.id}, pid ${loop.pid}) is running; wait for it to finish or interrupt that process before other runner commands`);"
         },
         {
-          "line": 574,
+          "line": 578,
           "kind": "error-or-exit-candidate",
           "code": "catch (e) { if (e.code === 'EEXIST') throw new Error('Migration locked. Check the owner process, then use unlock --pid OWNER_PID if it has stopped.'); throw e; }"
         }
@@ -2409,7 +2409,7 @@
     },
     {
       "path": "lib/run-settings.mjs",
-      "sha256": "ad50ff7958bf3df44c1193c763839950586b4fac90828fb7bb0ed6e4f907c96c",
+      "sha256": "9ae0b59d0cefd31107c4288ed95acd1ac261e92f4ff9a6631d06293b42f86656",
       "entries": [
         {
           "line": 20,
@@ -4255,7 +4255,7 @@
     },
     {
       "path": "scripts/run_migration.mjs",
-      "sha256": "d6ecc352a7f83753ef6372c58eac1bdf1e3afa77ee79cf98ace770d4cc648f0a",
+      "sha256": "6fe9e0e74216e86b0d4a3de0955a9521e5157d89260db3066379d92f7540787c",
       "entries": [
         {
           "line": 77,
@@ -4408,72 +4408,77 @@
           "code": "if (errors.length) process.exitCode = 1;"
         },
         {
-          "line": 267,
+          "line": 264,
+          "kind": "error-or-exit-candidate",
+          "code": "if (action !== 'apply') throw new Error('Use settings init | check | apply');"
+        },
+        {
+          "line": 268,
           "kind": "error-or-exit-candidate",
           "code": "if (!result.applied) process.exitCode = 1;"
         },
         {
-          "line": 273,
+          "line": 274,
           "kind": "error-or-exit-candidate",
           "code": "if (args.format && !['json', 'markdown', 'todo', 'checklist'].includes(args.format)) throw new Error('status format must be json, markdown, todo or checklist');"
         },
         {
-          "line": 275,
+          "line": 276,
           "kind": "error-or-exit-candidate",
           "code": "if (!report.ok) process.exitCode = 1;"
         },
         {
-          "line": 286,
+          "line": 287,
           "kind": "error-or-exit-candidate",
           "code": "if (typeof args.message !== 'string' || !args.message.trim()) throw new Error('guidance requires --message TEXT (the error to explain)');"
         },
         {
-          "line": 292,
+          "line": 293,
           "kind": "cancellation",
           "code": "const abort = () => controller.abort();"
         },
         {
-          "line": 316,
+          "line": 317,
           "kind": "error-or-exit-candidate",
           "code": "else if (cmd === 'source-spec') throw new Error('Use source-spec init [--apply] | check');"
         },
         {
-          "line": 327,
+          "line": 328,
           "kind": "error-or-exit-candidate",
           "code": "} else throw new Error('Use survey plan|run|status|merge --kind facts|contracts|inventory [--max-files N] [--sites migration/PATH.tsv]');"
         },
         {
-          "line": 341,
+          "line": 342,
           "kind": "error-or-exit-candidate",
           "code": "else throw new Error('Use sessions status | prune [--run RUN_ID]');"
         },
         {
-          "line": 349,
+          "line": 350,
           "kind": "error-or-exit-candidate",
           "code": "} else throw new Error('Use guardrails show | install [--add CSV] [--remove CSV] [--deny CSV] [--waiver NOTE] [--replace]');"
         },
         {
-          "line": 354,
+          "line": 355,
           "kind": "error-or-exit-candidate",
           "code": "process.exitCode = 1;"
         },
         {
-          "line": 365,
+          "line": 366,
           "kind": "error-or-exit-candidate",
           "code": "if (args._[1] !== 'translation' || args['complete-phase'] !== '03') throw new Error('--complete-phase applies only as approve translation --complete-phase 03');"
         },
         {
-          "line": 372,
+          "line": 373,
           "kind": "error-or-exit-candidate",
           "code": "if (cmd === 'repair' && !args.target && !args.queue) throw new Error('repair requires --target or --queue');"
         },
         {
-          "line": 377,
+          "line": 378,
           "kind": "error-or-exit-candidate",
           "code": "} else throw new Error(`Unknown command ${cmd}\\n${usage}`);"
         },
         {
-          "line": 395,
+          "line": 396,
           "kind": "error-or-exit-candidate",
           "code": "process.exitCode = 1;"
         }
@@ -4554,5 +4559,5 @@
       ]
     }
   ],
-  "candidateLines": 826
+  "candidateLines": 827
 }

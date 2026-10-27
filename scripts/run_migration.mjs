@@ -261,6 +261,7 @@ export async function main(argv = process.argv.slice(2)) {
       console.log(JSON.stringify({ ok: !errors.length, file: runSettingsFile, errors }, null, 2));
       return;
     }
+    if (action !== 'apply') throw new Error('Use settings init | check | apply');
     const release = lockRun(root, 'settings-apply');
     try {
       const result = applyRunSettings(root, models);

@@ -1,4 +1,4 @@
-# 0.9.0 — 2026-10-28
+# 0.9.0 — 2026-10-27
 
 - Decide run settings in one file instead of one question per setting.
   `run_migration.mjs settings init` writes `migration/run-settings.json` from
@@ -12,8 +12,11 @@
   nothing unless all pass; the host asks the person to confirm once, like
   `models set`. Values land in `migration/config.json` and
   `migration/preferences.json` as before, so the report language still never
-  revokes approvals, and an unchanged empty `phaseModels`/`reasoningEfforts`
-  map is left as written. `settings check` validates without writing.
+  revokes approvals. An empty `phaseModels`/`reasoningEfforts`/`contextTiers`
+  map is left out as `models set` leaves it, and the reviewed configuration now
+  treats an empty map and an absent one alike, so neither command revokes
+  reviews by tidying one. Applying needs the Copilot CLI's model list (sign in first), since
+  every model entry is checked. `settings check` validates without writing.
 - `status` (full and `--fast`) reports whether the file still matches the
   configuration, and lists the entries changed but not applied yet.
 - Only the report language is asked before initialization. `models set` stays

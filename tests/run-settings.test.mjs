@@ -8,7 +8,7 @@ import { ready, prepare, fake, modelCatalogCli } from './helpers.mjs';
 import { install, kitRoot } from '../scripts/install.mjs';
 import { contextHash, done, readJSON, writeJSON, safePath, loadConfig } from '../lib/core.mjs';
 import { translate, runStage, approve } from '../lib/pipeline.mjs';
-import { normalizeModels } from '../lib/models.mjs';
+import { normalizeModels, setRoleModels } from '../lib/models.mjs';
 import { initRunSettings, checkRunSettings, applyRunSettings, runSettingsState, runSettingsFile } from '../lib/run-settings.mjs';
 import { migrationStatus, statusMarkdown } from '../lib/status.mjs';
 import { statusSnapshot } from '../lib/status-snapshot.mjs';
@@ -319,4 +319,29 @@ test('each role\'s context size is chosen in the file and checked against the mo
   assert.deepEqual(runSettingsState(root, loadConfig(root)).differs, ['models.reviewer-semantics']);
   assert.equal(applyRunSettings(root, models).applied, true);
   assert.equal(loadConfig(root).contextTiers?.['reviewer-semantics'], undefined);
+});
+
+test('final review of 2edc8bf: emptied maps match models set, and runner checks join other errors', t => {
+  const root = fresh(t);
+  initRunSettings(root, models);
+  const s = filled(root);
+  s.models.implementer = { model: 'big-model', effort: 'high', context: 'long_context' };
+  writeSettings(root, s);
+  assert.equal(applyRunSettings(root, models).applied, true);
+  assert.deepEqual(loadConfig(root).contextTiers, { implementer: 'long_context' });
+  s.models.implementer = { model: 'big-model', effort: 'default', context: 'default' };
+  writeSettings(root, s);
+  assert.equal(applyRunSettings(root, models).applied, true);
+  const config = readJSON(safePath(root, 'migration/config.json'));
+  assert.equal(Object.hasOwn(config, 'contextTiers'), false, 'an emptied map is left out, as models set leaves it');
+  // The same choice recorded through models set changes nothing more.
+  setRoleModels(root, models, { role: 'implementer', model: 'big-model', effort: 'default' });
+  assert.deepEqual(readJSON(safePath(root, 'migration/config.json')), config);
+  // A configuration error and a model error are returned together.
+  s.mode = 'migrate';
+  s.models.fixer = { model: 'no-such-model', effort: 'default' };
+  writeSettings(root, s);
+  const text = applyRunSettings(root, models).errors.join('\n');
+  assert.match(text, /models\.fixer: Model no-such-model is not in your Copilot model list/);
+  assert.match(text, /mode must be preserve or redesign/);
 });
