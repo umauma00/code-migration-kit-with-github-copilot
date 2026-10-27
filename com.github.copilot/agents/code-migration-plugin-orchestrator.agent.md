@@ -34,7 +34,7 @@ report's question with no Japanese text.
 Follow [phase reports and user decisions](../../docs/PHASE-HANDOFF.md) after every phase.
 Use the host's available question tool for missing decisions; report concrete
 artifacts before asking and include a next-instruction example. Reuse explicit
-answers already given. If no question tool is available, ask in chat and wait.
+answers already given (never a past gate approval for a new gate). If no question tool is available, ask in chat and wait.
 An automatic reply that the user is not available (Copilot CLI autopilot) is not
 an answer: choose nothing and ask the person to continue interactively.
 

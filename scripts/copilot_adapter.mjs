@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import http from 'node:http';
-import { runProcess, processOutputLines } from '../lib/process.mjs';
+import { runProcess, processOutputLines, relativeProcessOutput } from '../lib/process.mjs';
 import { roles, workerModel, workerEffort, safePath } from '../lib/core.mjs';
 import { executionLimits, processTimeout } from '../lib/execution-policy.mjs';
 import { parseResult, validateResult } from '../lib/results.mjs';
@@ -323,7 +323,7 @@ export function createCopilotAdapter({ command = 'copilot', prefixArgs = [], ver
       return { result: value, requestedModel: model, ...(effort ? { requestedEffort: effort } : {}), promptBytes, responseBytes: Buffer.byteLength(JSON.stringify(value)),
         observedModel, tokens: usage ? usage.inputTokens + usage.outputTokens : null, aiCredits: null,
         ...(cliUsage || usage ? { cliUsage: { ...cliUsage, ...usage } } : {}), ...(modelWarning ? { modelWarning } : {}),
-        ...(worker !== role ? { workerProfile: worker } : {}), ...(result.outputSpooled ? { processOutput: { stdoutFile: result.stdoutFile, stderrFile: result.stderrFile, stdoutBytes: result.stdoutBytes, stderrBytes: result.stderrBytes, stdoutHash: result.stdoutHash, stderrHash: result.stderrHash } } : {}), ...versionFields };
+        ...(worker !== role ? { workerProfile: worker } : {}), ...(result.outputSpooled ? { processOutput: { stdoutFile: relativeProcessOutput(result, root).stdoutFile, stderrFile: relativeProcessOutput(result, root).stderrFile, stdoutBytes: result.stdoutBytes, stderrBytes: result.stderrBytes, stdoutHash: result.stdoutHash, stderrHash: result.stderrHash } } : {}), ...versionFields };
     } catch (e) { e.result = result; Object.assign(e, versionFields, usageFields(usage)); throw e; }
   };
 }

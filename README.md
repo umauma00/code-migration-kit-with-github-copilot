@@ -135,7 +135,7 @@ node migration-kit/scripts/run_migration.mjs doctor --check-cli
 | `dependencyOrder` | `auto`（新規導入）: 単位型チェックがあるときだけ、依存先のレビュー完了まで依存元を待たせる。型チェックがなければ上流と同じく承認範囲を一斉に展開する。`reviewed`（省略時・既存設定）: 常に待つ。`none`: 待たない（型チェックとは併用不可） |
 | `fixPolicy` | `single-pass`（新規導入の既定）: 上流Step 3と同じく、確定指摘の修正は1回で完了とし、build/smoke/parityが判定する。呼び出し数と停止する単位が減る。`rereview`（キーのない既存設定）: 修正後に再レビューし、確定した指摘がなくなるまで繰り返す |
 | `reviewFocus` | `shared`（新規導入）: 2人のレビュアーがそれぞれ自分の観点を先に、両方の観点（元の動作・ルール順守）を確認し、見つけた欠陥をすべて報告する。互いの結果は見ない。`specialized`（省略時・既存設定）: 上流と同じく1人1観点 |
-| `executionMode` | 既定・未指定は `continuous`。旧設定の時間・呼び出し数・修正回数・累計入力・リトライ回数で打ち切らず、終了まで継続する。利用者が明示的に `bounded` を選んだ場合だけ以下の上限を適用する。[停止条件一覧](docs/INTERRUPTION-POLICY.md) |
+| `executionMode` | 既定・未指定は `continuous`。旧設定の時間・呼び出し数・修正回数・累計入力・リトライ回数で打ち切らず、終了まで継続する。利用者が明示的に `bounded` を選んだ場合だけ以下の上限を適用する。continuous で効かない値が書かれていれば `doctor` が表示する。[停止条件一覧](docs/INTERRUPTION-POLICY.md) |
 | `maxFixRounds`, `maxAgentCalls` | boundedモードだけで使う1単位の修正回数・1実行のAI呼び出し数上限。continuousでは適用しない。`translate --max-calls N` を利用者が明示した場合は、その実行の有限上限として扱う |
 | `maxRunInputBytes` | boundedモードだけで使う入力累計bytesの上限。通常実行は量だけで打ち切らず、`usageEstimate` とCLIの使用量を記録する |
 | `maxAiCreditsPerCall` | boundedモードだけで各workerへ渡す任意の `--max-ai-credits`（CLIの最小値30）。continuousでは渡さない。サービス側の残高・組織上限は外部制約 |

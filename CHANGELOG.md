@@ -1,3 +1,30 @@
+# 0.6.1 — 2026-10-27
+
+Fixes from the review of 0.6.0. Nothing here adds a stop based on time, CPU,
+silence or output volume; continuous execution stays continuous.
+
+- Name limits that continuous mode does not enforce instead of ignoring them
+  silently: doctor reports `execution limits` (a warning, not a failed check)
+  and run/survey summaries carry `ignoredLimits` for configured values that
+  differ from the template defaults.
+- Keep upstream rule 6 visible in continuous build-loops: when the error count
+  has not fallen for three rounds the loop keeps going but records `stalled`,
+  and status and the result say to propose a rulebook amendment.
+- Record spilled process logs relative to the migration root, so a moved or
+  copied checkout can still diagnose them and no local path is recorded.
+  Records written by 0.6.0 with absolute paths still read in place.
+- Keep benchmark check output inside the scratch folder that is removed.
+- Survey citations: only names with a scope file's extension count as foreign
+  citations, so evidence such as `api.example.com:8443` or `0.5:3` is accepted.
+  A file with no census sites in an oversized inventory request no longer
+  crashes the split, and is still surveyed.
+- C/C++ mapper: string and character literals end at the line, so `#error
+  don't` no longer exposes a commented-out `#include`. JS/TS scanner: a regex
+  literal after `}` no longer swallows later imports.
+- Docs: a call budget applies only when chosen; reusing an answer never reuses a
+  past gate approval for a new gate; guidance names bounded mode for the
+  maxFixRounds/maxAgentCalls options.
+
 # 0.6.0 — 2026-10-26
 
 - Exercise large legacy C# sources from three pinned OSS releases with a
