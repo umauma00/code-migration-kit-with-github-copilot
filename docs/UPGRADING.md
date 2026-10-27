@@ -1,6 +1,15 @@
-# 更新手順（0.6.0 と以前の版）
+# 更新手順（0.7.0 と以前の版）
 
 日本語 | [English](UPGRADING.en.md)
+
+## 0.7.0（入口はオーケストレーターだけ）
+
+オーケストレーターの定義が変わるため、既存の承認・完了記録は一度だけ失効します。judgeから再検証してください。完了済みの出力は保持されます。
+
+1. 移行はエージェント一覧のオーケストレーター（コピー導入は `migration-orchestrator`、プラグインは `code-migration-plugin-orchestrator`。Copilot CLIでは `/agent`）から始めます。`/code-migration` は `/` メニューに出なくなりました。オーケストレーターが最初にスキルを読みます。
+2. `code-migration`・`depmap-adapter` スキルは `user-invocable: false` です。AIは引き続き読み込めます。ほかのエージェントがスキルを読み込んでも、工程は始めずオーケストレーターへの切り替えを案内します。この案内はAIへの指示で、ホストが強制するものではありません。
+3. VS Code Local用の `/migrate-…` prompt files（10個）を削除しました。コピー導入の案件に残る `.github/prompts/migrate-*.prompt.md` はinstallerが削除しません。チャットで削除を依頼してください。
+4. コピー導入では `migration-kit/` 全体を更新し、`.github/agents/migration-orchestrator.agent.md`、`.github/skills/` の2つのSKILL.md、`.github/copilot-instructions.md` の管理ブロックを一時導入先の内容に置き換えます（管理ブロックの置き換えは0.3.0の手順6と同じです）。プラグインは更新だけで入ります。
 
 ## 0.6.0（継続実行と巨大survey）
 

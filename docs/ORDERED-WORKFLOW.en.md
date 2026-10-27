@@ -1,4 +1,4 @@
-# Running the ten phases in order from /code-migration
+# Running the ten phases in order from the orchestrator
 
 [日本語](ORDERED-WORKFLOW.md) | English
 

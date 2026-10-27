@@ -31,8 +31,8 @@ Check permissions in a disposable directory. Confirm that reviewers cannot use t
 
 When using VS Code, separately check the entry points and that hooks really run for the chosen session type.
 
-- **Copilot (Agent Host):** confirm that the agent and the shared `/code-migration` skill are visible and can start the requested phase. Prompt files are not loaded, so do not expect the ten `/migrate-…` commands to be registered.
-- **Local:** install with `--harness vscode-local` and switch the VS Code chat's session type to Local too. Besides the agent/skill, confirm that the phase `/migrate-…` prompt files are visible and start, and that the Local hooks are actually called. The `--harness` option alone does not change the chat's session type.
+- **Copilot (Agent Host):** confirm that only the orchestrator is visible in the agent picker and can start the requested phase, that the `code-migration` and `depmap-adapter` skills are not in the `/` menu, and that no worker is in the picker.
+- **Local:** install with `--harness vscode-local` and switch the VS Code chat's session type to Local too. Besides the same entry-point checks as Copilot (Agent Host), confirm that the Local hooks are actually called. The `--harness` option alone does not change the chat's session type.
 
 Before trying Dynamic Workflows, add its [specific checks](DYNAMIC-WORKFLOWS.md).
 

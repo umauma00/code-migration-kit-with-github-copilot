@@ -3751,7 +3751,7 @@
     },
     {
       "path": "scripts/install.mjs",
-      "sha256": "ab6bea32e85516503c6dbcb6f0a1840fb2b5aed3d4949e5c96ef4198e1868c1d",
+      "sha256": "0c645ed38577bd72efb1e9853ff34667ca74bb70fa6aed153f62b3c019ca416a",
       "entries": [
         {
           "line": 24,

@@ -1,4 +1,4 @@
-# /code-migrationから10工程を順番に進める
+# オーケストレーターから10工程を順番に進める
 
 日本語 | [English](ORDERED-WORKFLOW.en.md)
 
