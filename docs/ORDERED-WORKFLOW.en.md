@@ -4,7 +4,7 @@
 
 The ten phases below are kept, following [the six macro stages and their internal phases](EXECUTION-SCOPES.md). 00b has a lightweight path that reuses an adequate existing judge and records its early validation. See [preparation audits](PREPARATION-AUDITS.md) and [isolated pilots](PILOT.md). A pilot is not completion of production 03; it runs under its own limited grant.
 
-The phases are `00 → 00b → 01 → 02 → 03 → 04 → 05 → 05b → 05c → 06`. New configurations use phasePolicy strict. Existing configurations are kept; at skill start the following enables phase records. For plugin installations, replace migration-kit/ with the actual plugin root.
+The phases are `00 → 00b → 01 → 02 → 03 → 04 → 05 → 05b → 05c → 06`. New configurations use phasePolicy strict. Existing configurations are kept; at orchestrator start the following enables phase records. For plugin installations, replace migration-kit/ with the actual plugin root.
 
 ```sh
 node migration-kit/scripts/run_migration.mjs phase init

@@ -13,7 +13,13 @@ point. If you are not running as that agent (for example, another agent loaded
 this skill on its own), do not start, resume or approve migration phases: tell
 the person to select the orchestrator in the agent picker (Copilot CLI: `/agent`)
 and stop. Only installing or initializing the kit with `install.mjs`, when the
-person asks for it, is still allowed.
+person asks for it, is still allowed. A subagent started by the orchestrator is
+not such an agent: it follows "Parent-session phase ownership" below and returns its plan and status to
+the orchestrator without starting or approving phases.
+
+At start, check whether `.github/prompts/migrate-*.prompt.md` files from 0.6.0
+or earlier remain in the target repository. If they do, they bypass the orchestrator: propose deleting them and
+delete them only after the person agrees.
 
 For config.executionPurpose `pilot`, follow [pilot execution](../../docs/PILOT.md)
 using pilot run and the sealed grant; do not initialize production phase records

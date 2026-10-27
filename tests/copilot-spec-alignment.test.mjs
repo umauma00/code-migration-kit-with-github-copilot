@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { ready, prepare, fake } from './helpers.mjs';
 import { kitRoot, install } from '../scripts/install.mjs';
-import { safePath, writeJSON, readJSON, loadConfig } from '../lib/core.mjs';
+import { safePath, writeJSON, readJSON, loadConfig, filesUnder } from '../lib/core.mjs';
 import { translate } from '../lib/pipeline.mjs';
 import { reviewInput } from '../lib/review.mjs';
 import { agentPrompt } from '../scripts/copilot_adapter.mjs';
@@ -42,6 +42,8 @@ test('the orchestrator is the only entry point: skills leave the slash menu but 
     const depmap = text.match(/\[depmap-adapter skill\]\(([^)]+)\)/)?.[1];
     assert.ok(depmap && fs.existsSync(path.join(kitRoot, path.dirname(file), depmap)), `${file} must link the hidden depmap-adapter skill`);
     assert.doesNotMatch(text, /Use the plugin's code-migration-plugin-orchestrator agent/, file);
+    assert.match(text.replace(/\s+/g, ' '), /A subagent started by the orchestrator is not such an agent/, file);
+    assert.match(text.replace(/\s+/g, ' '), /`\.github\/prompts\/migrate-\*\.prompt\.md` files .* propose deleting them/, file);
   }
   assert.equal(fs.existsSync(path.join(kitRoot, '.github/prompts')), false, 'phase prompt files would add slash commands');
   const skillLink = (text, file) => {
@@ -57,7 +59,8 @@ test('the orchestrator is the only entry point: skills leave the slash menu but 
     ['com.github.copilot/agents/code-migration-plugin-orchestrator.agent.md', 'skills/code-migration/SKILL.md']]) {
     assert.equal(path.normalize(skillLink(fs.readFileSync(path.join(kitRoot, file), 'utf8'), file)), path.normalize(skill), file);
   }
-  assert.match(fs.readFileSync(path.join(kitRoot, '.github/copilot-instructions.md'), 'utf8'), /`migration-orchestrator`/);
+  const guarded = text => assert.match(text.replace(/\s+/g, ' '), /only in the `migration-orchestrator` agent.*Other agents never start, resume or approve phases\. A subagent the orchestrator starts returns its plan and status to it/);
+  guarded(fs.readFileSync(path.join(kitRoot, '.github/copilot-instructions.md'), 'utf8'));
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'entry-point-')), plugin = fs.mkdtempSync(path.join(os.tmpdir(), 'entry-plugin-'));
   t.after(() => { fs.rmSync(root, { recursive: true, force: true }); fs.rmSync(plugin, { recursive: true, force: true }); });
   install(root, { apply: true, model: 'test-double' });
@@ -70,8 +73,19 @@ test('the orchestrator is the only entry point: skills leave the slash menu but 
   }
   assert.ok(fs.existsSync(path.join(root, '.github/skills/depmap-adapter/SKILL.md')), 'installed skill must reach the installed depmap-adapter skill');
   assert.match(install(root, {}).next, /migration-orchestrator/);
-  assert.match(fs.readFileSync(path.join(root, '.github/copilot-instructions.md'), 'utf8'), /`migration-orchestrator`/);
+  guarded(fs.readFileSync(path.join(root, '.github/copilot-instructions.md'), 'utf8'));
   assert.match(install(plugin, { layout: 'plugin' }).next, /code-migration-plugin-orchestrator/);
+});
+
+test('current documents no longer offer the removed slash entry points', () => {
+  // History (CHANGELOG, reviews, plans, validation) and upgrade notes may name them.
+  const history = /^(CHANGELOG\.md|docs\/(reviews|plans|validation)\/|docs\/UPGRADING(\.en)?\.md$)/;
+  const files = ['README.md', 'README.en.md', ...filesUnder(kitRoot, 'docs'), ...filesUnder(kitRoot, '.github'), ...filesUnder(kitRoot, 'skills'), ...filesUnder(kitRoot, 'com.github.copilot')]
+    .filter(f => /\.(md|json)$/.test(f) && !history.test(f));
+  for (const file of files) {
+    const text = fs.readFileSync(path.join(kitRoot, file), 'utf8');
+    assert.doesNotMatch(text, /`\/code-migration`|\/migrate-0/, file);
+  }
 });
 
 test('hook configurations allow 30 seconds because Copilot hooks fail open on timeout', () => {

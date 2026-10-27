@@ -16,13 +16,14 @@ expire once. Revalidate from the judge. Completed outputs are kept.
    phases and points the person to the orchestrator. This is an instruction to the
    AI, not something the host enforces.
 3. The ten VS Code Local `/migrate-…` prompt files were removed. The installer does
-   not delete a repository copy's `.github/prompts/migrate-*.prompt.md`; ask in chat
-   to delete them.
-4. For a repository copy, update the whole `migration-kit/` and replace
+   not delete a repository copy's `.github/prompts/migrate-*.prompt.md`; the
+   orchestrator proposes deleting any it finds and deletes them after the person agrees.
+4. For a repository copy, replace the whole `migration-kit/`,
    `.github/agents/migration-orchestrator.agent.md`,
    the two SKILL.md files under `.github/skills/` and the managed block of
-   `.github/copilot-instructions.md` with a temporary install's content (the managed
-   block as in step 6 of 0.3.0). The plugin picks the change up on update.
+   `.github/copilot-instructions.md` with a temporary install's content by hand (the
+   managed block as in step 6 of 0.3.0): re-running the installer stops on files
+   whose content differs instead of overwriting them. The plugin picks the change up on update.
 
 ## 0.6.0 (continuous execution and large surveys)
 
