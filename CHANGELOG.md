@@ -1,3 +1,24 @@
+# 0.9.0 — 2026-10-28
+
+- Decide run settings in one file instead of one question per setting.
+  `run_migration.mjs settings init` writes `migration/run-settings.json` from
+  the current configuration (report language, whether the original can run,
+  migration languages, mode, roots, verification mode, execution mode,
+  concurrency, stage commands, and every role's model and effort), with the
+  account's models and efforts under `_choices` and `FILL_IN` where nothing was
+  chosen. The orchestrator asks one question: filled in, or a question?
+- `settings apply` checks every entry against the account's model list and the
+  runner's configuration checks, reports every problem at once and writes
+  nothing unless all pass; the host asks the person to confirm once, like
+  `models set`. Values land in `migration/config.json` and
+  `migration/preferences.json` as before, so the report language still never
+  revokes approvals, and an unchanged empty `phaseModels`/`reasoningEfforts`
+  map is left as written. `settings check` validates without writing.
+- `status` (full and `--fast`) reports whether the file still matches the
+  configuration, and lists the entries changed but not applied yet.
+- Only the report language is asked before initialization. `models set` stays
+  for changing models alone from chat.
+
 # 0.6.0 — 2026-10-26
 
 - Exercise large legacy C# sources from three pinned OSS releases with a

@@ -89,6 +89,16 @@ node migration-kit/scripts/run_migration.mjs models set --role reviewers --model
 
 `--models implementer=ID,reviewers=ID,arbiter=ID,fixer=ID` still sets per-role models (unlisted roles use `--model`). As in the upstream model plan, choose by blast radius: reviewers on the largest or a mid model, high-volume implementers on a mid or small model, fixers and the arbiter on a mid model.
 
+**Run settings are decided in one file.** After installation the AI runs `settings init`, which writes `migration/run-settings.json`: migration languages, folders, verification mode, whether the original can run, execution mode, concurrency, stage commands, and each role's model and effort, with your account's models and efforts under `_choices` and explanations under `_help`. Open entries read `FILL_IN`. Instead of answering one question per setting, fill in the file and answer the AI's single question ("filled in, or do you have a question?"). "Filled in" runs `settings apply`, which checks every entry and, if any is wrong, writes nothing and returns every problem (the host asks you to confirm once).
+
+```bash
+node migration-kit/scripts/run_migration.mjs settings init
+node migration-kit/scripts/run_migration.mjs settings check
+node migration-kit/scripts/run_migration.mjs settings apply
+```
+
+The values are recorded where they always were, `migration/config.json` (languages, folders, models...) and `migration/preferences.json` (report language, whether the original can run), so changing the report language never revokes approvals. The file stays as the record of the conditions a run used; while an edit is not applied, `status` says so.
+
 `--language ja|en` sets the language of phase reports, questions and `status --format markdown`. It is stored in `migration/preferences.json` and never affects approvals or completion. If omitted, the skill asks Japanese or English at the start. Change it later with `run_migration.mjs preferences --language ja`. Until it is set, the hook denies any other question; with `ja` it checks each question's text and choices (`ask_user`, VS Code askQuestions) and asks for a Japanese rewrite. Headers, other questions and \`backticked\` text do not count. Text with hiragana passes as Japanese, even with a path joined to it (`src/main.pyを移行しますか？`); without hiragana, whitespace-separated paths and file names are set aside first, so `Should we migrate 売上集計.java next?` is denied; a choice of two or more English words with no Japanese is denied (a one-word name such as `Java` passes). This is a character-class check, not language detection: an English sentence containing a name with hiragana still passes.
 
 Scripts and documents go to `migration-kit/` in the target, and the Copilot entry points to `.github/`. A managed block is appended to existing Copilot instructions. Existing files with different content are never overwritten (the installer stops), and an existing `migration/config.json` is kept. Re-running with the same content changes nothing.

@@ -53,9 +53,37 @@ the preference after a compaction. Write every user-facing report, question, TOD
 and next-instruction example in that language, and link the matching documents:
 `X.md` for Japanese, `X.en.md` for English (for example [README](../README.md) /
 [README.en](../README.en.md)). Worker prompts and JSON stay in English. Before
-initialization, ask the language, the model IDs and the migration languages
-(one question per call with Copilot CLI `ask_user`; VS Code `vscode/askQuestions`
-takes them together) and pass `--language ja|en` to the installer.
+initialization, ask only the report language and pass `--language ja|en` to the
+installer; everything else is decided in the [run settings file](#run-settings-file-instead-of-one-question-per-setting).
+
+## Run settings file (instead of one question per setting)
+
+After initialization, run `run_migration.mjs settings init`. It writes
+`migration/run-settings.json` from the current configuration: report language,
+whether the original can still run, migration languages, preserve or redesign,
+source/output/test roots, verification mode, execution mode, concurrency, stage
+commands, and every role's model and effort. The account's models and efforts
+(read live from the CLI) are listed under `_choices`, explanations under
+`_help`, and `FILL_IN` marks what is still open. Link the file and ask **one**
+question with the question tool: has the person finished filling it in, or do
+they have a question? Offer two choices, "filled in" and "I have a question"
+(free text), in the report language.
+
+- Filled in: run `run_migration.mjs settings apply`. It checks every entry
+  (the account's model list, each model's efforts and the runner's own
+  configuration checks), writes nothing unless all pass, and records the values
+  in migration/config.json and migration/preferences.json; the host asks the
+  person to confirm once. If it returns `errors`, show every error and ask the
+  same question again.
+- A question: answer it, then ask the same question again. Edit the file only
+  when the person asks you to; never choose a value for them. You may explain
+  the upstream model plan as information, never as a preselected answer.
+
+`settings check` validates without writing. Running `settings init` again keeps
+the person's values and refreshes the explanations and choices. The file stays
+as the record of the conditions a run used: `status` reports whether it still
+matches the configuration, and after an edit says it is not applied yet. To
+change settings later, the person edits the file and the same question follows.
 
 Follow [phase reports and user decisions](../docs/PHASE-HANDOFF.md) at every
 phase boundary. Show the actual artifacts, review points and a copyable next
@@ -82,8 +110,10 @@ for review; they do not route directly to a later phase. Respect redesign mode.
 
 ## No runnable original or no specification
 
-Before choosing a verification mode (at initialization, and whenever runtime 00b
-blocks), ask two yes/no questions with the question tool, one per call: can the original
+At initialization, take whether the original can run and the verification mode
+from the run settings file instead of asking; if it says the original cannot run,
+ask only whether a specification or portable test suite exists. Whenever runtime
+00b blocks later, ask two yes/no questions with the question tool, one per call: can the original
 implementation still run here, and does a specification or portable test suite
 exist? Record the first answer with `run_migration.mjs preferences --original-runtime
 available|unavailable` (presentation only; failure guidance uses it to pick its

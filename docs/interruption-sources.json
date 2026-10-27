@@ -329,60 +329,60 @@
     },
     {
       "path": "lib/cli.mjs",
-      "sha256": "5bc50bd90da61422541fccf54dccf18b16e10cf971439a2a561bdbe8a081c8f8",
+      "sha256": "9ccdfe50aca23a93de853be44495ecbf0aa497219dbb31ab6f19016abb9106ef",
       "entries": [
         {
-          "line": 95,
+          "line": 96,
           "kind": "error-or-exit-candidate",
           "code": "throw new Error(`Missing command. Commands: ${known.join(', ')}`);"
         },
         {
-          "line": 98,
+          "line": 99,
           "kind": "error-or-exit-candidate",
           "code": "if (!entry) throw new Error(`Unknown command ${cmd}. Commands: ${known.join(', ')}`);"
         },
         {
-          "line": 101,
+          "line": 102,
           "kind": "error-or-exit-candidate",
           "code": "if (!entry.sub[sub]) throw new Error(`${sub === undefined ? `Missing action for ${cmd}` : `Unknown ${cmd} action ${sub}`}. Use ${cmd} ${subs.join(' | ')}`);"
         },
         {
-          "line": 131,
+          "line": 132,
           "kind": "error-or-exit-candidate",
           "code": "if (key.includes('=')) throw new Error(`Write ${arg.slice(0, arg.indexOf('='))} VALUE as two words, not ${arg}`);"
         },
         {
-          "line": 136,
+          "line": 137,
           "kind": "error-or-exit-candidate",
           "code": "throw new Error(`Unknown option ${arg}.${accepted} Add --help for usage.`);"
         },
         {
-          "line": 139,
+          "line": 140,
           "kind": "error-or-exit-candidate",
           "code": "if (argv[i + 1] === undefined || argv[i + 1].startsWith('--')) throw new Error(`Missing value for ${arg} (expected ${arg} ${known[key]})`);"
         },
         {
-          "line": 146,
+          "line": 147,
           "kind": "error-or-exit-candidate",
           "code": "if (key !== '_' && !(key in target.options)) throw new Error(`Option --${key} does not apply to ${target.name}. Options for ${target.name}: ${describe(target.options)}. Add --help for usage.`);"
         },
         {
-          "line": 149,
+          "line": 150,
           "kind": "error-or-exit-candidate",
           "code": "if (extra.length < target.args.length) throw new Error(`${target.name} needs ${target.args.join(' ')}`);"
         },
         {
-          "line": 150,
+          "line": 151,
           "kind": "error-or-exit-candidate",
           "code": "if (extra.length > target.args.length) throw new Error(`Unexpected ${extra.slice(target.args.length).join(' ')} after ${target.name}${target.args.length ? ` ${target.args.join(' ')}` : ''}. Add --help for usage.`);"
         },
         {
-          "line": 155,
+          "line": 156,
           "kind": "error-or-exit-candidate",
           "code": "for (const v of allowed ? values(value) : []) if (!allowed.includes(v)) throw new Error(`--${key} must be one of ${allowed.join(', ')}, not ${v}`);"
         },
         {
-          "line": 160,
+          "line": 161,
           "kind": "error-or-exit-candidate",
           "code": "for (const v of values(extra[i], /[|,]/)) if (!allowed.includes(v)) throw new Error(`${target.name} ${target.args[i]} must be one of ${allowed.join(', ')}, not ${v}`);"
         }
@@ -395,7 +395,7 @@
     },
     {
       "path": "lib/core.mjs",
-      "sha256": "5b981684345a061ada3f44f13d339c265788a5cc9a8189cc3f057e1144961a56",
+      "sha256": "a179061d8afbe4bd5d58d7024b28c7569fa9acacbce7898188ccddce33140831",
       "entries": [
         {
           "line": 25,
@@ -950,7 +950,7 @@
     },
     {
       "path": "lib/guardrails.mjs",
-      "sha256": "33a73bdfee3d434dbc1a35891b6b31c57cdd60abf70a766d6f26256b8e2ab240",
+      "sha256": "da7a6ff4b0f99906c5cc60dc3c8423a2a9b17bafe021b54c4279025b5aaa4fca",
       "entries": [
         {
           "line": 44,
@@ -2358,6 +2358,72 @@
       ]
     },
     {
+      "path": "lib/run-settings.mjs",
+      "sha256": "6da883cf695362026a9c80afe6bb2408cea1ede44d6d96dd4ee308059ada61bd",
+      "entries": [
+        {
+          "line": 20,
+          "kind": "error-or-exit-candidate",
+          "code": "const modes = ['preserve', 'redesign'], verificationModes = ['runtime', 'source-only'], executionModes = ['continuous', 'bounded'];"
+        },
+        {
+          "line": 23,
+          "kind": "error-or-exit-candidate",
+          "code": "const configKeys = ['sourceLanguage', 'targetLanguage', 'mode', 'sourceRoots', 'outputRoots', 'verificationRoots', 'verificationMode', 'executionMode', 'concurrency', 'commands'];"
+        },
+        {
+          "line": 39,
+          "kind": "error-or-exit-candidate",
+          "code": "executionMode: 'continuous は終わるまで続ける、bounded は config.json の上限で止める。', concurrency: '同時に動かすワーカーの数（1〜64）。',"
+        },
+        {
+          "line": 51,
+          "kind": "error-or-exit-candidate",
+          "code": "executionMode: 'continuous runs until done; bounded stops at the limits in config.json.', concurrency: 'Workers running at once (1-64).',"
+        },
+        {
+          "line": 73,
+          "kind": "error-or-exit-candidate",
+          "code": "verificationMode: config.verificationMode ?? 'runtime', executionMode: config.executionMode ?? 'continuous', concurrency: config.concurrency,"
+        },
+        {
+          "line": 81,
+          "kind": "error-or-exit-candidate",
+          "code": "reportLanguage: userLanguages, originalRuntime: originalRuntimes, mode: modes, verificationMode: verificationModes, executionMode: executionModes,"
+        },
+        {
+          "line": 94,
+          "kind": "error-or-exit-candidate",
+          "code": "if (!config) throw new Error('migration/config.json is missing: initialize the project (install.mjs) before writing run settings');"
+        },
+        {
+          "line": 98,
+          "kind": "error-or-exit-candidate",
+          "code": "try { values = readJSON(file); } catch (e) { throw new Error(`${runSettingsFile} is not valid JSON (${e.message}); correct it or delete it and run settings init again`); }"
+        },
+        {
+          "line": 99,
+          "kind": "error-or-exit-candidate",
+          "code": "if (!values || typeof values !== 'object' || Array.isArray(values)) throw new Error(`${runSettingsFile} must be a JSON object; correct it or delete it and run settings init again`);"
+        },
+        {
+          "line": 122,
+          "kind": "error-or-exit-candidate",
+          "code": "if (!fs.existsSync(file)) throw new Error(`${runSettingsFile} is missing: run settings init first`);"
+        },
+        {
+          "line": 124,
+          "kind": "error-or-exit-candidate",
+          "code": "try { value = readJSON(file); } catch (e) { throw new Error(`${runSettingsFile} is not valid JSON: ${e.message}`); }"
+        },
+        {
+          "line": 125,
+          "kind": "error-or-exit-candidate",
+          "code": "if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${runSettingsFile} must be a JSON object`);"
+        }
+      ]
+    },
+    {
       "path": "lib/runtime.mjs",
       "sha256": "7cdf16b16575aee953cef69eeb4d27c4d7496bbb6f905931aeddebc9a0365745",
       "entries": [
@@ -2503,10 +2569,10 @@
     },
     {
       "path": "lib/status-snapshot.mjs",
-      "sha256": "88127e854e3f635cbf1735cfedbec6ff2c04b261158e68416b507ca9e058fb7f",
+      "sha256": "004832a0d88c70a87b6d26c8fc2b92e5d851b21bae91cf4591cc9b27a56db720",
       "entries": [
         {
-          "line": 36,
+          "line": 38,
           "kind": "pid-probe",
           "code": "try { process.kill(report.lock.pid, 0); report.running = true; } catch {}"
         }
@@ -2514,20 +2580,20 @@
     },
     {
       "path": "lib/status.mjs",
-      "sha256": "847db5cea171a9a114ef5b5b6894decf3399615c28a82138b81469d8399d697b",
+      "sha256": "1fa3fc89b89d17e6769a3f17773d0dc869282da4430a4a0fe7798b75c0e4a5eb",
       "entries": [
         {
-          "line": 73,
+          "line": 75,
           "kind": "error-or-exit-candidate",
           "code": "if (!Number.isInteger(report.lock.pid) || report.lock.pid < 1) throw new Error('Invalid lock owner PID');"
         },
         {
-          "line": 74,
+          "line": 76,
           "kind": "pid-probe",
           "code": "try { process.kill(report.lock.pid, 0); report.running = true; }"
         },
         {
-          "line": 75,
+          "line": 77,
           "kind": "error-or-exit-candidate",
           "code": "catch (e) { if (e.code !== 'ESRCH') throw e; }"
         }
@@ -4134,190 +4200,215 @@
     },
     {
       "path": "scripts/run_migration.mjs",
-      "sha256": "6eb0c3660b8b2568d4c1222d646cfbb79aa2143de91f6100fac16429bb1dc5e8",
+      "sha256": "14a1330ebd0dd3d40de3b8a7fdcc9a240e001964e1cbed605730544d7051b58d",
       "entries": [
         {
-          "line": 73,
+          "line": 77,
           "kind": "error-or-exit-candidate",
           "code": "limits apply only when explicitly chosen or executionMode is bounded"
         },
         {
-          "line": 79,
+          "line": 83,
           "kind": "error-or-exit-candidate",
           "code": "if (signal?.aborted) throw new Error('Interrupted');"
         },
         {
-          "line": 80,
+          "line": 84,
           "kind": "deadline-or-observation",
           "code": "const timeoutMs = processTimeout(config, 'commandTimeoutSeconds');"
         },
         {
-          "line": 109,
+          "line": 113,
           "kind": "deadline-or-observation",
           "code": "// Copilot hooks fail open on timeout: a slow start silently disables the"
         },
         {
-          "line": 118,
+          "line": 122,
           "kind": "deadline-or-observation",
           "code": "limit = entry?.timeoutSec ?? entry?.timeout ?? null;"
         },
         {
-          "line": 126,
+          "line": 130,
           "kind": "deadline-or-observation",
           "code": "signal, timeoutMs, env: { ...process.env, ...(role ? { MIGRATION_KIT_ROLE: role } : {}) } }).catch(e => {"
         },
         {
-          "line": 127,
+          "line": 131,
           "kind": "error-or-exit-candidate",
           "code": "if (signal?.aborted) throw new Error('Interrupted');"
-        },
-        {
-          "line": 136,
-          "kind": "deadline-or-observation",
-          "code": "checks.push({ check: 'hook responds before its timeout', ok: Boolean(worker && parent) && worker.code === 0 && parent.code === 0 &&"
-        },
-        {
-          "line": 139,
-          "kind": "deadline-or-observation",
-          "code": "command: line ?? null, durationMs: slowest, timeoutSec: limit,"
         },
         {
           "line": 140,
           "kind": "deadline-or-observation",
+          "code": "checks.push({ check: 'hook responds before its timeout', ok: Boolean(worker && parent) && worker.code === 0 && parent.code === 0 &&"
+        },
+        {
+          "line": 143,
+          "kind": "deadline-or-observation",
+          "code": "command: line ?? null, durationMs: slowest, timeoutSec: limit,"
+        },
+        {
+          "line": 144,
+          "kind": "deadline-or-observation",
           "code": "note: 'Runs the configured hook command. Copilot CLI and VS Code let a tool call through when a hook times out; keep the measured time well under half the configured timeout.' });"
         },
         {
-          "line": 159,
+          "line": 163,
           "kind": "deadline-or-observation",
           "code": "const version = await runProcess(command, ['--version'], { cwd: root, env, signal, timeoutMs });"
         },
         {
-          "line": 160,
+          "line": 164,
           "kind": "deadline-or-observation",
           "code": "const help = await runProcess(command, ['--help'], { cwd: root, env, signal, timeoutMs });"
         },
         {
-          "line": 166,
+          "line": 170,
           "kind": "deadline-or-observation",
           "code": "const agents = await probeWorkerAgents(command, [], { cwd: root, layout, signal, timeoutMs });"
         },
         {
-          "line": 168,
+          "line": 172,
           "kind": "deadline-or-observation",
           "code": "if (agents.ok) checks.push({ check: 'tool-assisted reviewer hook loads in prompt mode', ...await probeReviewerHook(command, [], { cwd: root, layout, signal, timeoutMs }),"
         },
         {
-          "line": 170,
+          "line": 174,
           "kind": "deadline-or-observation",
           "code": "checks.push({ check: 'file descriptor limit', ...await fileLimits({ signal, timeoutMs }), minimum: fileLimitMinimum,"
         },
         {
-          "line": 173,
+          "line": 177,
           "kind": "error-or-exit-candidate",
           "code": "if (signal?.aborted) throw new Error('Interrupted');"
         },
         {
-          "line": 190,
+          "line": 194,
           "kind": "error-or-exit-candidate",
           "code": "if (!Number.isInteger(seconds) || seconds < 1 || seconds > 1800) throw new Error('--wait must be a number of seconds from 1 to 1800');"
         },
         {
-          "line": 198,
+          "line": 202,
           "kind": "loop-exit-candidate",
           "code": "if (progressKey(report) !== start) break;"
         },
         {
-          "line": 209,
+          "line": 213,
           "kind": "error-or-exit-candidate",
           "code": "if (!Number.isInteger(pid) || pid < 1 || lock.pid !== pid) throw new Error('Specify the exact lock owner PID');"
         },
         {
-          "line": 211,
+          "line": 215,
           "kind": "pid-probe",
           "code": "try { process.kill(pid, 0); } catch (e) { if (e.code === 'ESRCH') alive = false; else throw e; }"
         },
         {
-          "line": 212,
+          "line": 216,
           "kind": "error-or-exit-candidate",
           "code": "if (alive) throw new Error('Lock owner is still running; refusing to unlock');"
         },
         {
-          "line": 223,
+          "line": 227,
           "kind": "error-or-exit-candidate",
           "code": "if (!['list', 'set'].includes(args._[1])) throw new Error('Use models list [--format json|markdown] | models set --assign ROLE=ID[:EFFORT],... | models set --role ROLE --model ID [--effort LEVEL|default]');"
         },
         {
-          "line": 224,
+          "line": 228,
           "kind": "error-or-exit-candidate",
           "code": "if (args.format !== undefined && !['json', 'markdown'].includes(args.format)) throw new Error('models list format must be json or markdown');"
         },
         {
-          "line": 227,
+          "line": 231,
           "kind": "error-or-exit-candidate",
           "code": "if (!readConfigIfPresent(root)) throw new Error('migration/config.json is missing: initialize the project (install.mjs) before recording model choices');"
         },
         {
-          "line": 238,
+          "line": 245,
+          "kind": "error-or-exit-candidate",
+          "code": "if (!readConfigIfPresent(root)) throw new Error('migration/config.json is missing: initialize the project (install.mjs) before run settings');"
+        },
+        {
+          "line": 253,
+          "kind": "error-or-exit-candidate",
+          "code": "if (!fs.existsSync(file)) throw new Error(`${runSettingsFile} is missing: run settings init first`);"
+        },
+        {
+          "line": 255,
+          "kind": "error-or-exit-candidate",
+          "code": "try { settings = readJSON(file); } catch (e) { throw new Error(`${runSettingsFile} is not valid JSON: ${e.message}`); }"
+        },
+        {
+          "line": 257,
+          "kind": "error-or-exit-candidate",
+          "code": "if (errors.length) process.exitCode = 1;"
+        },
+        {
+          "line": 264,
+          "kind": "error-or-exit-candidate",
+          "code": "if (!result.applied) process.exitCode = 1;"
+        },
+        {
+          "line": 270,
           "kind": "error-or-exit-candidate",
           "code": "if (args.format && !['json', 'markdown', 'todo', 'checklist'].includes(args.format)) throw new Error('status format must be json, markdown, todo or checklist');"
         },
         {
-          "line": 240,
+          "line": 272,
           "kind": "error-or-exit-candidate",
           "code": "if (!report.ok) process.exitCode = 1;"
         },
         {
-          "line": 251,
+          "line": 283,
           "kind": "error-or-exit-candidate",
           "code": "if (typeof args.message !== 'string' || !args.message.trim()) throw new Error('guidance requires --message TEXT (the error to explain)');"
         },
         {
-          "line": 257,
+          "line": 289,
           "kind": "cancellation",
           "code": "const abort = () => controller.abort();"
         },
         {
-          "line": 281,
+          "line": 313,
           "kind": "error-or-exit-candidate",
           "code": "else if (cmd === 'source-spec') throw new Error('Use source-spec init [--apply] | check');"
         },
         {
-          "line": 292,
+          "line": 324,
           "kind": "error-or-exit-candidate",
           "code": "} else throw new Error('Use survey plan|run|status|merge --kind facts|contracts|inventory [--max-files N] [--sites migration/PATH.tsv]');"
         },
         {
-          "line": 306,
+          "line": 338,
           "kind": "error-or-exit-candidate",
           "code": "else throw new Error('Use sessions status | prune [--run RUN_ID]');"
         },
         {
-          "line": 314,
+          "line": 346,
           "kind": "error-or-exit-candidate",
           "code": "} else throw new Error('Use guardrails show | install [--add CSV] [--remove CSV] [--deny CSV] [--waiver NOTE] [--replace]');"
         },
         {
-          "line": 319,
+          "line": 351,
           "kind": "error-or-exit-candidate",
           "code": "process.exitCode = 1;"
         },
         {
-          "line": 330,
+          "line": 362,
           "kind": "error-or-exit-candidate",
           "code": "if (args._[1] !== 'translation' || args['complete-phase'] !== '03') throw new Error('--complete-phase applies only as approve translation --complete-phase 03');"
         },
         {
-          "line": 337,
+          "line": 369,
           "kind": "error-or-exit-candidate",
           "code": "if (cmd === 'repair' && !args.target && !args.queue) throw new Error('repair requires --target or --queue');"
         },
         {
-          "line": 342,
+          "line": 374,
           "kind": "error-or-exit-candidate",
           "code": "} else throw new Error(`Unknown command ${cmd}\\n${usage}`);"
         },
         {
-          "line": 360,
+          "line": 392,
           "kind": "error-or-exit-candidate",
           "code": "process.exitCode = 1;"
         }
@@ -4398,5 +4489,5 @@
       ]
     }
   ],
-  "candidateLines": 796
+  "candidateLines": 813
 }

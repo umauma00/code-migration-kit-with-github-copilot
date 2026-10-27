@@ -91,6 +91,16 @@ node migration-kit/scripts/run_migration.mjs models set --role reviewers --model
 
 従来どおり `--models implementer=ID,reviewers=ID,arbiter=ID,fixer=ID` で担当ごとのモデルを指定することもできます（未指定の担当は `--model`）。上流キットのモデル計画と同じく、影響範囲で選びます：レビュー担当は最大または中規模、大量に動く実装担当は中または小規模、修正・裁定担当は中規模。
 
+**実行設定は1つのファイルで決めます。** 導入後、AIは `settings init` で `migration/run-settings.json` を作ります。移行元・移行先の言語、フォルダー、検証方式、元のコードが動くか、実行モード、同時実行数、各段階のコマンド、担当ごとのモデルとエフォートが1ファイルに並び、使えるモデルとエフォートは `_choices`、説明は `_help` に入ります。未記入の欄は `FILL_IN` です。質問を1つずつ受ける代わりに、このファイルを埋めて、AIの「記入しましたか？それとも質問がありますか？」に答えます。「記入した」と答えると `settings apply` が全項目をまとめて確かめ、1つでも誤りがあれば何も書き込まずに誤りを全部返します（ホストが1回だけ確認を求めます）。
+
+```bash
+node migration-kit/scripts/run_migration.mjs settings init
+node migration-kit/scripts/run_migration.mjs settings check
+node migration-kit/scripts/run_migration.mjs settings apply
+```
+
+値は従来どおり `migration/config.json`（言語・フォルダー・モデルなど）と `migration/preferences.json`（報告言語・元のコードが動くか）に記録され、報告言語を変えても承認は失効しません。ファイルはどの条件で実行したかの記録として残ります。書き換えて反映していない間は、`status` が「未反映の変更あり」と表示します。
+
 `--language ja|en` は、工程報告・質問・`status --format markdown` の言語です。`migration/preferences.json` に保存され、承認・完了判定には影響しません。省略した場合は、スキルが開始時に日本語・英語のどちらにするかを質問します。後から `run_migration.mjs preferences --language en` で変更できます。言語が未設定の間、フックは言語以外の質問を止めます。`ja` のときは、質問ごとに本文と選択肢を確かめ、日本語で書き直させます（`ask_user` と VS Code の askQuestions）。見出しや別の質問、\`バッククォート\` 内の日本語は数えません。ひらがなを含む文は日本語として通します（`src/main.pyを移行しますか？` のようにパスと続けて書いても構いません）。ひらがながない文では、空白で区切られたパス・ファイル名を除いてから判定するため、`Should we migrate 売上集計.java next?` は止まります。選択肢は、英単語2語以上で日本語を含まないものを止めます（`Java` のような1語の名前は通します）。文字種による簡易判定で、言語判定ではありません。ひらがなを含む名前を入れた英文はすり抜けます。
 
 スクリプト・文書は対象の `migration-kit/`、Copilotの入口は `.github/` に入ります。既存のCopilot指示には管理ブロックを追記します。内容が異なる既存ファイルは上書きせず停止し、既存の `migration/config.json` は保持します。同じ内容での再実行は変更を作りません。

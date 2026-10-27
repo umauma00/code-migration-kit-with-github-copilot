@@ -31,6 +31,9 @@ Write all user-facing text in that language; worker prompts and JSON stay Englis
 Re-read it after every compaction; English docs and tool output never switch it.
 The hook rejects a question before the language is recorded, and a Japanese
 report's question with no Japanese text.
+After initialization, decide the other settings through `migration/run-settings.json`
+(`settings init`, one question "filled in, or a question?", then `settings apply`),
+not one question per setting; see the skill's run settings section.
 Follow [phase reports and user decisions](../../docs/PHASE-HANDOFF.md) after every phase.
 Use the host's available question tool for missing decisions; report concrete
 artifacts before asking and include a next-instruction example. Reuse explicit

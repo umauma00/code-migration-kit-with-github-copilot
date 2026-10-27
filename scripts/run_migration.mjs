@@ -25,6 +25,7 @@ import { buildLoop } from '../lib/build-loop.mjs';
 import { readPreferences, setPreferences, preferencesReport } from '../lib/preferences.mjs';
 import { readGuardrails, cliFolderTrust, guardrailsProposal, installGuardrails } from '../lib/guardrails.mjs';
 import { listAvailableModels, modelsMarkdown, setRoleModels, readConfigIfPresent, currentAssignments } from '../lib/models.mjs';
+import { initRunSettings, checkRunSettings, applyRunSettings, runSettingsFile } from '../lib/run-settings.mjs';
 import { processTimeout } from '../lib/execution-policy.mjs';
 
 export const usage = `Usage: node migration-kit/scripts/run_migration.mjs COMMAND [options]
@@ -43,6 +44,9 @@ export const usage = `Usage: node migration-kit/scripts/run_migration.mjs COMMAN
                               Record one choice; both forms are checked against that list before writing
   preferences [--language ja|en] [--original-runtime available|unavailable]
                               Report language; whether the original can still run (guides recommendations)
+  settings init | check | apply
+                              migration/run-settings.json: write it with your account's models as choices (init),
+                              check every entry (check), or check and record it in config.json and preferences.json (apply)
   sessions status | prune [--run RUN_ID]
                              Report / delete the local Copilot CLI transcripts of the kit's own workers
   guardrails show | install [--add CSV] [--remove CSV] [--deny CSV] [--waiver NOTE] [--replace]
@@ -234,6 +238,34 @@ export async function main(argv = process.argv.slice(2)) {
       : JSON.stringify({ models, ...(config ? { assignments: currentAssignments(config) } : {}) }, null, 2));
     return;
   }
+  if (cmd === 'settings') {
+    // One file instead of one question per setting; every entry is checked
+    // before anything is written, and every problem is reported at once.
+    const action = args._[1];
+    if (!readConfigIfPresent(root)) throw new Error('migration/config.json is missing: initialize the project (install.mjs) before run settings');
+    // A file that cannot be read still gets written (init) or checked (the
+    // other fields); the model entries then report why.
+    let models;
+    try { models = await listAvailableModels({ command: args.copilot ?? 'copilot', cwd: root }); } catch (e) { models = e.message; }
+    if (action === 'init') { console.log(JSON.stringify(initRunSettings(root, models), null, 2)); return; }
+    if (action === 'check') {
+      const file = safePath(root, runSettingsFile);
+      if (!fs.existsSync(file)) throw new Error(`${runSettingsFile} is missing: run settings init first`);
+      let settings;
+      try { settings = readJSON(file); } catch (e) { throw new Error(`${runSettingsFile} is not valid JSON: ${e.message}`); }
+      const { errors } = checkRunSettings(root, settings && typeof settings === 'object' && !Array.isArray(settings) ? settings : {}, models);
+      if (errors.length) process.exitCode = 1;
+      console.log(JSON.stringify({ ok: !errors.length, file: runSettingsFile, errors }, null, 2));
+      return;
+    }
+    const release = lockRun(root, 'settings-apply');
+    try {
+      const result = applyRunSettings(root, models);
+      if (!result.applied) process.exitCode = 1;
+      console.log(JSON.stringify(result, null, 2));
+    } finally { release(); }
+    return;
+  }
   if (cmd === 'status') {
     if (args.format && !['json', 'markdown', 'todo', 'checklist'].includes(args.format)) throw new Error('status format must be json, markdown, todo or checklist');
     const report = args.wait === undefined ? (args.fast ? statusSnapshot(root) : migrationStatus(root)) : await waitForProgress(root, Number(args.wait), { fast: args.fast });
@@ -345,7 +377,7 @@ export async function main(argv = process.argv.slice(2)) {
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
   const argv = process.argv.slice(2);
-  const progress = !argv.includes('--help') && (['status', 'survey', 'models', 'doctor', 'translate', 'repair', 'repair-round', 'build-loop', 'pilot', 'judge-prepare', 'judge', 'build', 'smoke', 'parity', 'handoff'].includes(argv[0]) || (argv[0] === 'phase' && argv[1] === 'next'));
+  const progress = !argv.includes('--help') && (['status', 'survey', 'models', 'settings', 'doctor', 'translate', 'repair', 'repair-round', 'build-loop', 'pilot', 'judge-prepare', 'judge', 'build', 'smoke', 'parity', 'handoff'].includes(argv[0]) || (argv[0] === 'phase' && argv[1] === 'next'));
   (progress ? commandProgress(argv.slice(0, argv[0] === 'phase' ? 2 : 1).join(' '), () => main()) : main()).catch(e => {
     console.error(`ERROR: ${e.message}`);
     // Every failure ends with its cause and the user's choices (docs/PHASE-HANDOFF.md).
