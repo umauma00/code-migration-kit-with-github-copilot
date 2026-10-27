@@ -11,11 +11,13 @@ silence or output volume; continuous execution stays continuous.
   has not fallen for three rounds the loop keeps going but records `stalled`,
   and status and the result say to propose a rulebook amendment.
 - Record spilled process logs relative to the migration root, so a moved or
-  copied checkout can still diagnose them and no local path is recorded.
+  copied checkout can still diagnose them and no local path is recorded,
+  including the record of a command or worker that failed after spilling.
   Records written by 0.6.0 with absolute paths still read in place.
 - Keep benchmark check output inside the scratch folder that is removed.
-- Survey citations: only names with a scope file's extension count as foreign
-  citations, so evidence such as `api.example.com:8443` or `0.5:3` is accepted.
+- Survey citations: only names with a source, build or text file extension count
+  as foreign citations, so evidence such as `api.example.com:8443` or `0.5:3` is
+  accepted while `other.h:9` from a `.c` scope is still rejected.
   A file with no census sites in an oversized inventory request no longer
   crashes the split, and is still surveyed.
 - C/C++ mapper: string and character literals end at the line, so `#error

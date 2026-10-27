@@ -16,6 +16,7 @@ import { runSurvey, surveyStatus } from '../lib/survey.mjs';
 import { surveyRequests } from '../lib/survey-parts.mjs';
 import { moduleSpecifiers } from '../scripts/depmap_js_scan.mjs';
 import { doctor } from '../scripts/run_migration.mjs';
+import { createCopilotAdapter } from '../scripts/copilot_adapter.mjs';
 import { prepare, fake, python } from './helpers.mjs';
 
 test('limits written in a continuous configuration are named, not silently ignored', async t => {
@@ -49,6 +50,7 @@ if (n < 5) { console.error('ported/math_ops.mjs:1:1: error: still broken'); proc
   assert.equal(report.stopped, 'clean'); assert.equal(report.rounds.length, 5);
   assert.equal(report.stalled.sinceRound, 1); assert.equal(report.stalled.latestRound, 4);
   assert.match(report.stalled.next, /rulebook amendment/);
+  assert.equal(report.stalled.resolvedRound, 5, 'a loop that went clean marks the stall resolved');
   assert.ok(progress.some(s => /error count not falling since round 1; continuing/.test(s)));
 });
 
@@ -80,6 +82,23 @@ test('spilled process output is recorded relative to the root and still readable
   assert.equal([...processOutputLines(legacy, 'stdout', moved)].filter(Boolean).at(-1), 'last line');
 });
 
+test('a worker that fails after spilling its output records the log relative to the root', async t => {
+  const f = prepare(t, { executionMode: 'continuous' });
+  const file = safePath(f.root, 'failing-cli.mjs');
+  fs.writeFileSync(file, `
+if (process.argv.includes('--version')) { console.log('1.0.103'); process.exit(0); }
+for await (const chunk of process.stdin) {}
+const line = JSON.stringify({type:'progress', data:'x'.repeat(1000)}) + '\\n';
+for (let i=0;i<18000;i++) process.stdout.write(line);
+process.exitCode = 3;
+`);
+  const error = await createCopilotAdapter({ command: process.execPath, prefixArgs: [file] })({ root: f.root, config: f.config, role: 'implementer', unit: f.units[0] }).catch(e => e);
+  assert.match(error.message, /exit 3/);
+  assert.ok(error.result.outputSpooled);
+  assert.match(error.result.stdoutFile, /^migration\/runs\/process-output\//);
+  assert.ok(fs.existsSync(path.join(f.root, error.result.stdoutFile)));
+});
+
 test('runCommand keeps a small result unchanged', async t => {
   const f = prepare(t, { executionMode: 'continuous' });
   f.config.commands.build = [process.execPath, '-e', "console.log('ok')"];
@@ -99,6 +118,8 @@ test('ordinary evidence text with host:port or numbers is not a foreign citation
         edgeCases: 'unknown', evidence: `${file.path}:2 calls api.example.com:8443; ratio 0.5:3${extra}`, unknowns: 'unknown' })) } };
   };
   await assert.rejects(runSurvey(f.root, f.config, 'contracts', answer(' and other/File.cs:5')), /outside source lines/);
+  // A foreign file with another source extension is still a citation.
+  await assert.rejects(runSurvey(f.root, f.config, 'contracts', answer(' and include/other.h:9')), /outside source lines/);
   const report = await runSurvey(f.root, f.config, 'contracts', answer(''));
   assert.equal(report.done, 1);
   assert.equal(surveyStatus(f.root, f.config, 'contracts').complete, true);

@@ -324,6 +324,6 @@ export function createCopilotAdapter({ command = 'copilot', prefixArgs = [], ver
         observedModel, tokens: usage ? usage.inputTokens + usage.outputTokens : null, aiCredits: null,
         ...(cliUsage || usage ? { cliUsage: { ...cliUsage, ...usage } } : {}), ...(modelWarning ? { modelWarning } : {}),
         ...(worker !== role ? { workerProfile: worker } : {}), ...(result.outputSpooled ? { processOutput: { stdoutFile: relativeProcessOutput(result, root).stdoutFile, stderrFile: relativeProcessOutput(result, root).stderrFile, stdoutBytes: result.stdoutBytes, stderrBytes: result.stderrBytes, stdoutHash: result.stdoutHash, stderrHash: result.stderrHash } } : {}), ...versionFields };
-    } catch (e) { e.result = result; Object.assign(e, versionFields, usageFields(usage)); throw e; }
+    } catch (e) { e.result = relativeProcessOutput(result, root); Object.assign(e, versionFields, usageFields(usage)); throw e; }
   };
 }
