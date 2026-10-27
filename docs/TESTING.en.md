@@ -2,6 +2,13 @@
 
 [日本語](TESTING.md) | English
 
+## 2026-10-27 Fixes from the 0.6.0 review (0.6.1)
+
+- `npm test`: 452 tests, 450 passed, 0 failed, 2 skipped (Windows only). `npm run demo` passed: 12 comparisons, 0 differences, 0 skipped. `git diff --check` passed.
+- `tests/review-2026-10-27.test.mjs` (12 tests) checks that continuous mode names configured limits it does not enforce (doctor and run summaries; no stop), that a build-loop whose error count stops falling records `stalled` and keeps going, that an explicit `--max-rounds` still applies, that spilled logs (including failed and cancelled workers' records) are recorded relative to the root and read after the checkout moves (0.6.0 absolute records still read, also through a symlinked root), that evidence with host:port or numbers is accepted while a foreign source citation (also with another extension) is rejected, that a file with no census sites is split, that `#error don't` cannot expose a commented-out C include, and that a regex literal after `}` keeps later imports.
+- No stop based on time, CPU, silence or output volume was added. The stop-candidate index was regenerated: 70 files, 801 lines, matching the code.
+- The 0.6.0 records (continuous execution, large surveys, legacy C# corpus) are in the [Japanese record](TESTING.md).
+
 ## 2026-10-25 Benchmark for folding workers
 
 - `tests/review-benchmark.test.mjs`: with canned workers, checks the miss-rate, false-finding and fix pass-rate totals, the list of changed cases, refusal below the call bound, the stop when three calls fail before any works, refusal of output inside the root (also through a symlink), and that setup leaves no correct fixture code in the root, and that seeded cases fail their checks while controls pass.

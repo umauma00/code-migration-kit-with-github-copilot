@@ -102,7 +102,7 @@ first. A changed model or effort makes reviewed units be reviewed again.
 Follow [phase reports and user decisions](../../../docs/PHASE-HANDOFF.md) at every
 phase boundary. Show the actual artifacts, review points and a copyable next
 instruction before asking. Use the available question tool for missing decisions;
-otherwise present the choices in chat and wait. Reuse answers already given.
+otherwise present the choices in chat and wait. Reuse answers already given (never a past gate approval for a new gate).
 An automatic reply that the user is not available (Copilot CLI autopilot) is not
 an answer: choose nothing and ask the person to continue interactively.
 After a phase, resolve the next step from the user's instruction and current
@@ -175,7 +175,7 @@ retry/survey correction and read-only diagnostics, preserving validated rows;
 report that recovery without asking again. Ask and wait only when it is
 exhausted or a new scope/model/budget/limit or human gate needs a missing
 choice. Then report cause, impact, at least two choices plus pause, one
-recommended first with a reason for each. Reuse answers already given.
+recommended first with a reason for each. Reuse answers already given (never a past gate approval for a new gate).
 Never route around a guardrail or change citation evidence by hand.
 A TypeError/SyntaxError in a coordinator-owned preparation/report helper is
 technical recovery: inspect the parser/caller contract, fix the helper, run

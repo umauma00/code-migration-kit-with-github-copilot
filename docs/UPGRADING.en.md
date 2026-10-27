@@ -25,6 +25,15 @@ expire once. Revalidate from the judge. Completed outputs are kept.
    managed block as in step 6 of 0.3.0): re-running the installer stops on files
    whose content differs instead of overwriting them. The plugin picks the change up on update.
 
+## 0.6.1 (fixes from the 0.6.0 review)
+
+Existing approvals and completion records are revoked once because the kit's files (lib, scripts) change. Re-validate from judge. Completed outputs are kept.
+
+1. No stop based on time, CPU or silence was added; execution stays continuous.
+2. `doctor` lists, under `execution limits`, configured limits that continuous mode does not enforce (values of `maxAgentCalls`, `maxAiCreditsPerCall`, `maxRunInputBytes` and similar that differ from the template). Set `"executionMode": "bounded"` to enforce them, or delete them.
+3. When a build-loop's error count has not fallen for three rounds, it keeps going, records `stalled` and status suggests a rulebook amendment.
+4. Spilled log paths are recorded relative to the root; 0.6.0 records with absolute paths still read in place.
+
 ## 0.6.0 (continuous execution and large surveys)
 
 The mapper fixes make every Python mapper depend on depmap_common.py, add

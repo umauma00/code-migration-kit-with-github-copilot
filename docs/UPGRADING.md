@@ -11,6 +11,15 @@
 3. VS Code Local用の `/migrate-…` prompt files（10個）を削除しました。コピー導入の案件に残る `.github/prompts/migrate-*.prompt.md` はinstallerが削除しません。オーケストレーターが残っているファイルを見つけると削除を提案し、同意を得てから削除します。
 4. コピー導入では `migration-kit/` 全体と、`.github/agents/migration-orchestrator.agent.md`、`.github/skills/` の2つのSKILL.md、`.github/copilot-instructions.md` の管理ブロックを一時導入先の内容に手で置き換えます（管理ブロックの置き換えは0.3.0の手順6と同じです）。内容が違うファイルがあるとinstallerの再実行は上書きせず停止するためです。プラグインは更新だけで入ります。
 
+## 0.6.1（0.6.0 のレビュー修正）
+
+キットのファイル（lib・scripts）が変わるため、既存の承認・完了記録は一度だけ失効します。judgeから再検証してください。完了済みの出力は保持されます。
+
+1. 時間・CPU・無出力で止める処理は追加していません。continuous のまま動きます。
+2. `doctor` が、設定に書かれていても continuous では効かない上限（テンプレートの既定値と違う `maxAgentCalls`・`maxAiCreditsPerCall`・`maxRunInputBytes` など）を `execution limits` に表示します。効かせたい場合は `"executionMode": "bounded"` を設定し、不要なら削除してください。
+3. build-loop でエラー数が3回続けて減らない場合、止まらずに `stalled` として記録し、status にルールブック修正の提案を表示します。
+4. 退避したログのパスは相対パスで記録されます。0.6.0 の絶対パスの記録も同じ場所なら読めます。
+
 ## 0.6.0（継続実行と巨大survey）
 
 依存解析の追加修正では、Python版はすべてdepmap_common.pyを使い、JS/TS版はdepmap_js_scan.mjsを読みます。source-specの生成コマンドは全8mapperの--source-rootとmake_manifest.pyの新しい--map-rootを使います。単一スクリプトだけでなくキット全体を更新し、既存の期待結果と未解決情報を確認して依存マップ・manifest・依存宣言を再生成してください。

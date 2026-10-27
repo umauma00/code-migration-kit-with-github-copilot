@@ -168,7 +168,9 @@ process.stdout.write(${JSON.stringify(cliOutput(result('implementer', f.units[0]
   const response = await createCopilotAdapter({ command: process.execPath, prefixArgs: [file] })({ root: f.root, config: f.config, role: 'implementer', unit: f.units[0] });
   assert.equal(response.result.kind, 'implementation'); assert.equal(response.observedModel, 'test-double');
   assert.ok(response.processOutput.stdoutBytes > 16 * 1024 * 1024);
-  assert.equal(fs.statSync(response.processOutput.stdoutFile).size, response.processOutput.stdoutBytes);
+  // Recorded relative to the root (0.6.1), so the record holds no local path.
+  assert.match(response.processOutput.stdoutFile, /^migration\/runs\/process-output\//);
+  assert.equal(fs.statSync(path.join(f.root, response.processOutput.stdoutFile)).size, response.processOutput.stdoutBytes);
 });
 
 test('manual cancellation still terminates an unbounded child and preserves its output', async t => {
