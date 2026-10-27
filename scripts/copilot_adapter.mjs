@@ -299,6 +299,7 @@ export function createCopilotAdapter({ command = 'copilot', prefixArgs = [], ver
     } catch (e) {
       // A killed or timed-out CLI may still have written its usage.
       usage = readUsageFile(usageFile);
+      if (e.result) e.result = relativeProcessOutput(e.result, root);
       Object.assign(e, versionFields, usageFields(usage)); throw e;
     }
     finally { fs.rmSync(usageDir, { recursive: true, force: true }); }

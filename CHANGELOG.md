@@ -17,7 +17,9 @@ silence or output volume; continuous execution stays continuous.
 - Keep benchmark check output inside the scratch folder that is removed.
 - Survey citations: only names with a source, build or text file extension count
   as foreign citations, so evidence such as `api.example.com:8443` or `0.5:3` is
-  accepted while `other.h:9` from a `.c` scope is still rejected.
+  accepted while `other.h:9` from a `.c` scope or `Form1.frm:3` is still
+  rejected. Extensions that are also country domains (`.rs`, `.md`, `.sh`, ...)
+  count only with a directory, unless the scope itself uses them.
   A file with no census sites in an oversized inventory request no longer
   crashes the split, and is still surveyed.
 - C/C++ mapper: string and character literals end at the line, so `#error

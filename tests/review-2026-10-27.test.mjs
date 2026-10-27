@@ -99,6 +99,26 @@ process.exitCode = 3;
   assert.ok(fs.existsSync(path.join(f.root, error.result.stdoutFile)));
 });
 
+test('a worker cancelled after spilling its output records the log relative to the root', async t => {
+  const f = prepare(t, { executionMode: 'continuous' });
+  const file = safePath(f.root, 'slow-cli.mjs'), controller = new AbortController();
+  fs.writeFileSync(file, `import fs from 'node:fs';
+if (process.argv.includes('--version')) { console.log('1.0.103'); process.exit(0); }
+for await (const chunk of process.stdin) {}
+const line = JSON.stringify({type:'progress', data:'x'.repeat(1000)}) + '\\n';
+for (let i=0;i<18000;i++) process.stdout.write(line);
+process.stdout.write('', () => fs.writeFileSync('migration/written.flag', ''));
+setInterval(() => {}, 1000);
+`);
+  const flag = safePath(f.root, 'migration/written.flag');
+  const watcher = setInterval(() => { if (fs.existsSync(flag)) { clearInterval(watcher); controller.abort(); } }, 50);
+  t.after(() => clearInterval(watcher));
+  const error = await createCopilotAdapter({ command: process.execPath, prefixArgs: [file] })({ root: f.root, config: f.config, role: 'implementer', unit: f.units[0], signal: controller.signal }).catch(e => e);
+  assert.ok(error.result?.outputSpooled, error.message);
+  assert.match(error.result.stdoutFile, /^migration\/runs\/process-output\//);
+  assert.ok(fs.existsSync(path.join(f.root, error.result.stdoutFile)));
+});
+
 test('runCommand keeps a small result unchanged', async t => {
   const f = prepare(t, { executionMode: 'continuous' });
   f.config.commands.build = [process.execPath, '-e', "console.log('ok')"];
@@ -115,11 +135,13 @@ test('ordinary evidence text with host:port or numbers is not a foreign citation
     const input = JSON.parse(args.reviewInput);
     return { result: { schemaVersion: 1, kind: 'survey', survey: 'contracts', target: args.unit.target,
       items: input.files.map(file => ({ file: file.path, publicInterface: 'class A', inputsOutputsErrors: 'none',
-        edgeCases: 'unknown', evidence: `${file.path}:2 calls api.example.com:8443; ratio 0.5:3${extra}`, unknowns: 'unknown' })) } };
+        edgeCases: 'unknown', evidence: `${file.path}:2 calls api.example.com:8443 and example.rs:8080; ratio 0.5:3${extra}`, unknowns: 'unknown' })) } };
   };
   await assert.rejects(runSurvey(f.root, f.config, 'contracts', answer(' and other/File.cs:5')), /outside source lines/);
   // A foreign file with another source extension is still a citation.
   await assert.rejects(runSurvey(f.root, f.config, 'contracts', answer(' and include/other.h:9')), /outside source lines/);
+  await assert.rejects(runSurvey(f.root, f.config, 'contracts', answer(' and Form1.frm:3')), /outside source lines/);
+  await assert.rejects(runSurvey(f.root, f.config, 'contracts', answer(' and src/lib.rs:3')), /outside source lines/);
   const report = await runSurvey(f.root, f.config, 'contracts', answer(''));
   assert.equal(report.done, 1);
   assert.equal(surveyStatus(f.root, f.config, 'contracts').complete, true);
