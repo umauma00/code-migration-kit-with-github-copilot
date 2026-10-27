@@ -9,10 +9,11 @@ lapse once; rerun judge. Completed outputs and completed survey scopes are kept.
 
 1. Survey rows whose citations cannot be verified after the one correction
    finish as UNKNOWN marked `uncited`. A scope that stopped before finishes when
-   you rerun the same `survey run`. Counts are in the scope record (`uncited`,
+   you rerun the same `survey run`. Counts are in the scope and run records (`uncited`,
    and `unsurveyedOversizedFiles` for oversized inventory files).
-2. A `migration/run.lock` left by a crashed run is removed by the next command;
-   `unlock` is not needed.
+2. A `migration/run.lock` left by a crashed run on the same host is removed by
+   the next command. Only a lock from another host (shared folder) needs
+   `unlock --pid` after you confirm that run stopped.
 3. New installs set `maxReviewInputBytes` to 262144. Existing configs are not
    changed. Raising it in `migration/config.json` changes the config
    fingerprint, so phase 02 onward and approvals are reviewed again.

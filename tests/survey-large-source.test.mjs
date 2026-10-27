@@ -123,6 +123,18 @@ test('a dense census on a large file finishes without model calls while small fi
   assert.equal(items.filter(i => i.classification === 'UNKNOWN').length, 628);
 });
 
+test('a source that fits alone but not with a large rulebook is recorded as UNKNOWN, and the run reports it', async t => {
+  // Splitting it would only produce excerpt answers that merge as UNKNOWN.
+  const f = fixture(t, '// source create change escape\n'.repeat(40)), sitesFile = 'migration/sites.tsv';
+  atomicWrite(safePath(f.root, 'migration/RULEBOOK.md'), 'rule text\n'.repeat(175));
+  atomicWrite(safePath(f.root, sitesFile), 'file\tsymbol\tsource_construct\nhuge/Large.cs\tA\tnullable\n');
+  assert.ok(Buffer.byteLength(fs.readFileSync(safePath(f.root, 'huge/Large.cs'))) < 4096 / 2);
+  const report = await runSurvey(f.root, f.config, 'inventory', async () => assert.fail('no model call'), { sitesFile });
+  assert.equal(report.agentCalls, 0);
+  assert.deepEqual(report.unsurveyedOversizedFiles, ['huge/Large.cs']);
+  assert.equal(readJSON(safePath(f.root, 'migration/surveys/inventory/001-huge.json')).items[0].classification, 'UNKNOWN');
+});
+
 test('oversized required metadata reports its real capacity problem without dispatching oversized input', async t => {
   const f = fixture(t, '// source\n'), sitesFile = 'migration/sites.tsv';
   atomicWrite(safePath(f.root, 'migration/RULEBOOK.md'), 'required rule\n'.repeat(1000));

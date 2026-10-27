@@ -69,8 +69,10 @@ test('survey results are validated against their scope before they are written',
     assert.equal(report.done, report.total);
     const runs = fs.readdirSync(safePath(f.root, 'migration/surveys/facts/runs')).filter(n => n.endsWith('-rejected.json'));
     assert.match(readJSON(safePath(f.root, `migration/surveys/facts/runs/${runs[0]}`)).error, message);
-    const items = readJSON(safePath(f.root, 'migration/surveys/facts/001-src.json')).items;
+    const record = readJSON(safePath(f.root, 'migration/surveys/facts/001-src.json')), items = record.items;
     assert.ok(items.every(i => i.file !== 'src/elsewhere.py' && i.category !== 'opinion' && /:\d/.test(i.evidence)));
+    // The review package must be able to say how many facts were dropped.
+    if (message.source !== 'target mismatch') { assert.ok(record.droppedFacts >= 1, String(message)); assert.ok(report.droppedFacts >= record.droppedFacts); }
   }
   const g = failureGuidanceList('Survey stopped: 001-src: Survey item outside its scope: src/elsewhere.py', { root: f.root });
   assert.equal(g[0].guidance.id, 'survey-result');

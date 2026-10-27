@@ -20,7 +20,7 @@ CPU使用率、無出力、経過時間、呼び出し数、修正回数、入�
 | モデル一覧・バージョン確認・doctorの20/30/60秒 | 暗黙の時間切れを撤廃。応答を待つ。doctorの各プローブにも利用者の明示キャンセルを伝え、後続プローブは開始しない | `models.mjs`, CLIとadapterの診断 |
 | 子プロセスstdout+stderrが16MiB超 | 終了せず全出力をログファイルへ退避。メモリには末尾だけ保持。モデルJSONLと診断パーサーは全ログを順に読む | `process.mjs`, `copilot_adapter.mjs`, `diagnostics.mjs`, `diagnostic_queue.mjs` |
 | surveyのファイル集合・censusが入力上限超 | ファイル・箇所の集合を分割。scope IDと既存結果を維持 | `survey-parts.mjs` |
-| surveyの単一ファイル本文が入力上限超 | facts・contractsは行範囲に分割（1行自体が巨大でも文字位置で分割し、Unicodeのペアを切らない。入力は実際のJSON化後bytesで検査）。inventoryはモデルを呼ばずに全箇所をUNKNOWN / TODO(port)で記録し、`unsurveyedOversizedFiles` に残す（2万行・1,000箇所の1ファイルで148回の呼び出しが同じUNKNOWNに結合されていた） | `survey-parts.mjs`, `survey.mjs` |
+| surveyの単一ファイル本文が入力上限超 | facts・contractsは行範囲に分割（1行自体が巨大でも文字位置で分割し、Unicodeのペアを切らない。入力は実際のJSON化後bytesで検査）。inventoryは、RULEBOOKと1箇所と一緒に1回の入力に収まらないファイルについて、モデルを呼ばずに全箇所をUNKNOWN / TODO(port)で記録し、`unsurveyedOversizedFiles` に残す（2万行・1,000箇所の1ファイルで148回の呼び出しが同じUNKNOWNに結合されていた） | `survey-parts.mjs`, `survey.mjs` |
 | 入力上限の既定64KB | 新規導入の既定を256KB（262144 bytes）に引き上げ、断片化そのものを減らす。既存設定の値は変えない（設定の指紋に含まれるため） | `templates/migration-config.json` |
 | 大きい本文に大量のcensus箇所 | 入力容量を本文と箇所に配分し、全箇所で全断片を維持しながら同一断片の重複送信を減らす | `survey-parts.mjs` |
 | 巨大ファイルの途中で手動中断・外部障害 | 検証済み断片を入力ハッシュ付きで保存。再開時に同じ断片を呼び直さない。全断片が揃うまでファイル・scopeは未完了 | `survey.mjs`の `.parts/` 記録 |
@@ -31,7 +31,7 @@ CPU使用率、無出力、経過時間、呼び出し数、修正回数、入�
 | benchmarkの生成コード検査20秒 | 通常モードは時間で打ち切らない。明示的なboundedモードの検査のみ20秒 | `bench.mjs` |
 | `status --wait 600`の待機終了 | 状態表示を返すだけ。worker・runnerに終了信号を送らない。引き続き同じ実行を監視 | `run_migration.mjs` |
 | 準備工程の定期確認が重い・status や phase next が無言のまま打ち切られる | 生存通知は別スレッドから15秒ごとに出す（検証は同期処理なので、従来のタイマーは処理が終わるまで鳴らなかった）。status・phase・approve・diagnose・source-spec を含む全コマンドが対象。manifest検証は保護パスの解決を1回にまとめ、2,000ファイルで約5.5秒→約2.2秒。`status --fast` と断片進捗も使える。全ソース再検証は工程の境界で実施 | `command-progress.mjs`, `command-progress-heartbeat.mjs`, `core.mjs`, `run_migration.mjs` |
-| 異常終了した実行の run.lock | 所有PIDが存在しなければ、次のコマンドがロックを自動で外して続行する（build-loopロックと同じ方式。外す直前に内容が変わっていないか確認する）。手動の `unlock` は不要 | `core.mjs` の `lockRun` |
+| 異常終了した実行の run.lock | 同じホストで所有PIDが存在しなければ、次のコマンドがロックを自動で外して続行する（build-loopロックも同じ。短い回収用の印を取り、外す直前に内容が変わっていないか確認する）。別ホストのロック（共有フォルダ）と、PIDが無関係のプロセスに再利用された場合だけは止まり、実行が止まったことを確認して `unlock --pid` を使う | `core.mjs` の `lockRun` |
 | サービス・通信側の「timed out」 | 一時障害として再試行する。キット自身が明示的な期限（boundedモード）で止めた場合だけ最終扱い | `failures.mjs` |
 | surveyの範囲外引用・取りこぼしが1回の補正後も残る | 止めない。その行を `uncited` 付きのUNKNOWN / TODO(port)にしてscopeを完了する。根拠欄は元ファイルの範囲と却下記録だけで、担当の引用は残さない。factsは不正な項目だけを捨てる。件数をレビュー報告に含める | `survey.mjs` |
 | coordinatorの準備・報告helperのTypeError/SyntaxError | 実装と呼び出しの契約を照合し、同じ許可範囲で修正・機械的検証・候補生成から再開。標準inventory-previewを使い、再surveyや検証省略を選択肢にしない | preparation・PHASE-HANDOFF・全親skill/agent |
@@ -57,6 +57,7 @@ inventoryの巨大ファイルは断片をまたぐデータフローを確定�
 | 同時実行と記録の整合性 | 生存する所有者のrun/build-loopロック（所有者がいないロックは自動で外す）、破損した台帳・ハッシュ・レビュー証跡、未完了依存先、typecheck付きの循環依存 |
 | 起動不能・認証・残高 | CLIや言語ランタイムがない、agentが見つからない、モデルが利用不可、認証切れ、403、サービス側のquota/credits/billing制限。新規起動を止め原因を報告 |
 | 実際に壊れた応答 | 不正JSON/JSONL、不完全なterminal event、誤target/schema、範囲外引用、取りこぼし・重複、裁定漏れ、レビューとverdictの矛盾。surveyでは正常終了したCLIストリーム内の不正なモデルJSON/schema/項目/引用を保存し、不正箇所だけ1回補正する。再び不正なら、その行を `uncited` 付きのUNKNOWNにして完了する（止めない）。CLIストリーム自体の破損やsession.errorは障害の分類に従って扱う |
+| 準備監査の入力が上限超 | 監査の依頼は切り詰めずに止まる。AIがより小さい batch を選び直して続ける（ユーザーの判断は不要） |
 | 本当に処理できない必須データ | 不正UTF-8・NUL・読取権限、rulebookやcensusの1項目など必須メタデータだけでモデル容量を超える。ソース本文の大きさによる停止とは区別して報告 |
 | 変換結果・テストの失敗 | typecheck・original・mutation・build・smoke・parityの非ゼロ終了、比較差分、未確定のマーカー。build-loop内の修正可能な失敗はレビュー付き修正へ進む |
 | 修正の所有先を決められない | manifestに対応しないコンパイラ診断、16000文字を超える1修正用診断、元テストの失敗、比較器自身の欠陥。元ソースや比較器を勝手に直さない |

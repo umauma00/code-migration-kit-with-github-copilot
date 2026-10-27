@@ -4,11 +4,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { prepare } from './helpers.mjs';
 import { safePath, writeJSON, readJSON, lockRun, readManifest, atomicWrite } from '../lib/core.mjs';
 import { isTransientFailure } from '../lib/failures.mjs';
 import { migrationStatus } from '../lib/status.mjs';
+import { acquireBuildLoop } from '../lib/core.mjs';
+import { commandProgress } from '../lib/command-progress.mjs';
+import { main } from '../scripts/run_migration.mjs';
 
 const deadPid = () => {
   // A child that has exited and been reaped: its PID no longer exists.
@@ -66,4 +70,38 @@ test('manifest checks still reject overlaps after resolving each protected path 
   assert.throws(() => readManifest(f.root, f.config), /outside outputRoots|overlaps protected|Duplicate manifest mapping/);
   atomicWrite(manifest, text);
   assert.equal(readManifest(f.root, f.config).length, 3);
+});
+
+test('a lock written on another host is never recovered automatically, and unlock can clear it', async t => {
+  const f = prepare(t), lock = safePath(f.root, 'migration/run.lock');
+  // On a shared folder the other host's live PID is invisible here.
+  writeJSON(lock, { pid: deadPid(), host: `${os.hostname()}-other`, task: 'survey', startedAt: new Date().toISOString() });
+  assert.throws(() => lockRun(f.root, 'translation'), /on host .*-other.*unlock --pid/s);
+  assert.equal(readJSON(lock).task, 'survey');
+  const log = console.log; console.log = () => {};
+  try { await main(['unlock', '--root', f.root, '--pid', String(readJSON(lock).pid)]); } finally { console.log = log; }
+  assert.equal(fs.existsSync(lock), false);
+});
+
+test('a recovery claim left by a dead recoverer is cleared, and the build-loop lock recovers the same way', t => {
+  const f = prepare(t), lock = safePath(f.root, 'migration/run.lock');
+  writeJSON(lock, { pid: deadPid(), task: 'survey', startedAt: new Date().toISOString() });
+  writeJSON(`${lock}.recover`, { pid: deadPid(), host: os.hostname(), token: 'dead' });
+  lockRun(f.root, 'translation')();
+  assert.equal(fs.existsSync(lock), false);
+  assert.equal(fs.existsSync(`${lock}.recover`), false);
+  const loop = safePath(f.root, 'migration/build-loop.lock');
+  writeJSON(loop, { pid: deadPid(), grantId: 'old', startedAt: new Date().toISOString() });
+  const release = acquireBuildLoop(f.root, 'new');
+  assert.equal(readJSON(loop).grantId, 'new');
+  assert.equal(readJSON(loop).host, os.hostname());
+  release();
+  assert.equal(fs.existsSync(loop), false);
+});
+
+test('quick commands get the liveness notice without an opening line', async () => {
+  const messages = [];
+  await commandProgress('phase check', async () => new Promise(resolve => setTimeout(resolve, 30)), { intervalMs: 5, write: m => messages.push(m), announce: false });
+  assert.ok(messages.length >= 1);
+  assert.ok(messages.every(m => m.includes('still running')));
 });

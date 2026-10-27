@@ -7,9 +7,9 @@ based on time, CPU, silence or output volume.
   correction no longer stop the scope. They finish as UNKNOWN/TODO(port) marked
   `uncited`, with evidence naming only the original file range and the
   rejected-answer record (never the worker's citation); facts drop only the
-  invalid items. Scope records count them under `uncited`.
-- Survey: an inventory file whose body exceeds the input capacity is recorded
-  as UNKNOWN/TODO(port) for every site without model calls and listed under
+  invalid items. Scope and run records count them (`uncited`, `droppedFacts`).
+- Survey: an inventory file that does not fit in one input with the RULEBOOK
+  and one census site is recorded as UNKNOWN/TODO(port) for every site without model calls and listed under
   `unsurveyedOversizedFiles`. Its fragment answers were always merged as
   UNKNOWN; one 20k-line, 1,000-site file took 148 serial calls for that result.
 - Liveness notices now come from a separate thread, so synchronous checks
@@ -17,8 +17,10 @@ based on time, CPU, silence or output volume.
   `diagnose` and `source-spec` get the notice too (without an opening line, so
   a failure still starts with `ERROR:`). Manifest checks resolve each protected
   path once per check: about 5.5 s to 2.2 s for 2,000 files.
-- A `run.lock` whose owner process is gone is removed by the next command, as
-  the build-loop lock already was; release removes only the caller's own lock.
+- A `run.lock` or build-loop lock whose owner process is gone on this host is
+  removed by the next command, under a short recovery claim so two recoverers
+  never remove a fresh lock. Locks record their host; one from another host
+  still refuses and `unlock` can clear it. Release removes only its own lock.
 - A "request/connection/... timed out" reported by the service or network is
   retried as transient; only the kit's own explicit deadline stays final.
 - New installs default `maxReviewInputBytes` to 262144 (256 KiB). Existing

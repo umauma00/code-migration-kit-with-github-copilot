@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { lockRun, loadConfig, unsetModels, readManifest, contextHash, unitState, done, safePath, readJSON, verificationFiles, loadReviewDependencies, reviewSources, reviewDependencyPath } from '../lib/core.mjs';
@@ -210,8 +211,10 @@ export async function main(argv = process.argv.slice(2)) {
   if (cmd === 'unlock') {
     const file = safePath(root, 'migration/run.lock'), lock = readJSON(file), pid = Number(args.pid);
     if (!Number.isInteger(pid) || pid < 1 || lock.pid !== pid) throw new Error('Specify the exact lock owner PID');
-    let alive = true;
-    try { process.kill(pid, 0); } catch (e) { if (e.code === 'ESRCH') alive = false; else throw e; }
+    // A PID from another host (shared folder) says nothing about this host's
+    // processes; the person confirmed that run stopped by naming its PID.
+    let alive = !lock.host || lock.host === os.hostname();
+    if (alive) try { process.kill(pid, 0); } catch (e) { if (e.code === 'ESRCH') alive = false; else throw e; }
     if (alive) throw new Error('Lock owner is still running; refusing to unlock');
     fs.unlinkSync(file); console.log('Removed stale migration lock'); return;
   }

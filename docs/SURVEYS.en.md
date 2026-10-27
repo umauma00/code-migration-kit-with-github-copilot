@@ -24,15 +24,16 @@ coordinator never rewrites citations to make them pass. Rows still uncited
 after that correction do not stop the survey: they finish as UNKNOWN/TODO(port)
 marked `uncited` (facts drop only the invalid items), with evidence naming the
 original file range and the rejected-answer record, never the worker's citation.
-The scope record counts them under `uncited`; report that count in the review
+The scope and run records count them under `uncited` (dropped facts
+under `droppedFacts`); report those counts in the review
 package. Resume reuses valid
 partial rows and legacy results when current source/citations still validate,
 and retains the saved max-files setting if it is omitted.
 
 All three survey kinds split oversized file sets and site lists into fitting
 requests without renaming scopes. Facts and contracts also split individual
-source bodies. An inventory file whose body exceeds the input capacity is
-recorded as UNKNOWN/TODO(port) for every site without model calls (its fragment
+source bodies. An inventory file that does not fit in one input together
+with the RULEBOOK and one census site is recorded as UNKNOWN/TODO(port) for every site without model calls (its fragment
 answers were always merged as UNKNOWN, after hours of calls), and the scope
 record lists it under `unsurveyedOversizedFiles`. Even a minified
 single line is split by character position without breaking Unicode pairs or
