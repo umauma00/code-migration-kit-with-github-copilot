@@ -62,8 +62,8 @@ After initialization, run `run_migration.mjs settings init`. It writes
 `migration/run-settings.json` from the current configuration: report language,
 whether the original can still run, migration languages, preserve or redesign,
 source/output/test roots, verification mode, execution mode, concurrency, stage
-commands, and every role's model and effort. The account's models and efforts
-(read live from the CLI) are listed under `_choices`, explanations under
+commands, and every role's model, effort and context size. The account's models,
+efforts and context tiers (read live from the CLI) are listed under `_choices`, explanations under
 `_help`, and `FILL_IN` marks what is still open. Link the file and ask **one**
 question with the question tool: has the person finished filling it in, or do
 they have a question? Offer two choices, "filled in" and "I have a question"
@@ -88,7 +88,7 @@ change settings later, the person edits the file and the same question follows.
 Follow [phase reports and user decisions](../docs/PHASE-HANDOFF.md) at every
 phase boundary. Show the actual artifacts, review points and a copyable next
 instruction before asking. Use the available question tool for missing decisions;
-otherwise present the choices in chat and wait. Reuse answers already given.
+otherwise present the choices in chat and wait. Reuse answers already given (never a past gate approval for a new gate).
 An automatic reply that the user is not available (Copilot CLI autopilot) is not
 an answer: choose nothing and ask the person to continue interactively.
 After a phase, resolve the next step from the user's instruction and current
@@ -158,7 +158,7 @@ retry/survey correction and read-only diagnostics, preserving validated rows;
 report that recovery without asking again. Ask and wait only when it is
 exhausted or a new scope/model/budget/limit or human gate needs a missing
 choice. Then report cause, impact, at least two choices plus pause, one
-recommended first with a reason for each. Reuse answers already given.
+recommended first with a reason for each. Reuse answers already given (never a past gate approval for a new gate).
 Never route around a guardrail or change citation evidence by hand.
 A TypeError/SyntaxError in a coordinator-owned preparation/report helper is
 technical recovery: inspect the parser/caller contract, fix the helper, run

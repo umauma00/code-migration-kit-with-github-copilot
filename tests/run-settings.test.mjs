@@ -15,7 +15,8 @@ import { statusSnapshot } from '../lib/status-snapshot.mjs';
 import { humanGate, interactiveDecision } from '../lib/guardrails.mjs';
 
 const catalog = [
-  { id: 'big-model', name: 'Big Model', supportedReasoningEfforts: ['low', 'medium', 'high', 'xhigh'], defaultReasoningEffort: 'medium' },
+  { id: 'big-model', name: 'Big Model', supportedReasoningEfforts: ['low', 'medium', 'high', 'xhigh'], defaultReasoningEffort: 'medium',
+    billing: { tokenPrices: { inputPrice: 2, outputPrice: 8, batchSize: 1000, maxPromptTokens: 272000, longContext: { inputPrice: 4, outputPrice: 12 } } } },
   { id: 'small-model', name: 'Small Model', supportedReasoningEfforts: ['low', 'medium', 'high'] },
   { id: 'plain-model', name: 'Plain Model' },
   { id: 'blocked-model', name: 'Blocked Model', policy: { state: 'disabled' } }
@@ -50,7 +51,8 @@ test('settings init writes one file with the account\'s models as choices and pl
   assert.equal(s.reportLanguage, 'ja', 'the language asked first is already filled in');
   assert.equal(s.sourceLanguage, 'FILL_IN', 'template example languages are not presented as a choice');
   assert.equal(s.models.implementer.model, 'FILL_IN');
-  assert.deepEqual(s.models.surveyor, { model: 'same-as-implementer', effort: 'default' });
+  assert.deepEqual(s.models.surveyor, { model: 'same-as-implementer', effort: 'default', context: 'default' });
+  assert.deepEqual(s._choices.models.map(m => m.contexts), [['default', 'long_context'], ['default'], ['default']]);
   assert.deepEqual(s._choices.models.map(m => m.id), ['big-model', 'small-model', 'plain-model'], 'only enabled models are offered');
   assert.deepEqual(s._choices.models[0].efforts, ['low', 'medium', 'high', 'xhigh']);
   assert.match(s._about, /記入した/);
@@ -293,4 +295,28 @@ test('re-review of 4eadc77: null commands, inherited efforts on a recorded spell
   const result = applyRunSettings(root, models);
   assert.deepEqual(result.changed, []);
   assert.deepEqual(Object.keys(readJSON(safePath(root, 'migration/config.json')).commands), Object.keys(config.commands));
+});
+
+test('each role\'s context size is chosen in the file and checked against the model', t => {
+  const root = fresh(t);
+  initRunSettings(root, models);
+  const s = filled(root);
+  s.models['reviewer-semantics'] = { model: 'big-model', effort: 'high', context: 'long_context' };
+  s.models.fixer = { model: 'small-model', effort: 'default', context: 'long_context' };
+  s.models.arbiter = { model: 'small-model', context: 'huge' };
+  writeSettings(root, s);
+  const text = applyRunSettings(root, models).errors.join('\n');
+  assert.match(text, /models\.fixer: Model small-model offers no long_context tier/);
+  assert.match(text, /models\.arbiter\.context: must be one of default, long_context/);
+  s.models.fixer = { model: 'small-model', effort: 'default', context: 'default' };
+  s.models.arbiter = { model: 'small-model', effort: 'default' };
+  writeSettings(root, s);
+  assert.equal(applyRunSettings(root, models).applied, true);
+  assert.deepEqual(loadConfig(root).contextTiers, { 'reviewer-semantics': 'long_context' });
+  assert.equal(runSettingsState(root, loadConfig(root)).state, 'applied');
+  s.models['reviewer-semantics'].context = 'default';
+  writeSettings(root, s);
+  assert.deepEqual(runSettingsState(root, loadConfig(root)).differs, ['models.reviewer-semantics']);
+  assert.equal(applyRunSettings(root, models).applied, true);
+  assert.equal(loadConfig(root).contextTiers?.['reviewer-semantics'], undefined);
 });

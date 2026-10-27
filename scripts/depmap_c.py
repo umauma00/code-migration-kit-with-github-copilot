@@ -35,7 +35,9 @@ INCLUDE_RE = re.compile(r'^[ \t]*#[ \t]*include\b[ \t]*(.*)', re.MULTILINE)
 QUOTED_INCLUDE = re.compile(r'^"([^"]+)"')
 # Keep include path strings, but remove comments and C++ raw literals before
 # looking for directives. Otherwise a comment can invent a migration cycle.
-C_TEXT = re.compile(r'''R"(?P<delimiter>[^ ()\\\t\r\n]{0,16})\([\s\S]*?\)(?P=delimiter)"|"(?:\\[\s\S]|[^"\\])*"|'(?:\\[\s\S]|[^'\\])*'|//[^\r\n]*|/\*[\s\S]*?(?:\*/|$)''')
+# Ordinary string and character literals end at the line (continuations are
+# joined first), so a stray apostrophe such as #error don't cannot hide code.
+C_TEXT = re.compile(r'''R"(?P<delimiter>[^ ()\\\t\r\n]{0,16})\([\s\S]*?\)(?P=delimiter)"|"(?:\\.|[^"\\\r\n])*"|'(?:\\.|[^'\\\r\n])*'|//[^\r\n]*|/\*[\s\S]*?(?:\*/|$)''')
 SKIP_DIRS = {".git", "build", "vendor", "third_party", "node_modules"}
 
 

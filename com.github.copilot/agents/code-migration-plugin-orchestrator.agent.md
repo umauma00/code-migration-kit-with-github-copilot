@@ -1,11 +1,18 @@
 ---
 name: code-migration-plugin-orchestrator
-description: Plan a migration and guide one approved phase at a time.
-tools: ["read", "search", "edit", "execute", "agent", "ask_user", "vscode/askQuestions", "todo", "grep", "glob", "update_todo"]
+description: Entry point of the code migration kit. Start or resume a language migration and guide one approved phase at a time.
+tools: ["read", "search", "edit", "execute", "agent", "ask_user", "vscode/askQuestions", "todo", "grep", "glob", "update_todo", "skill"]
 ---
 
 <!-- grep, glob and update_todo: Copilot CLI 1.0.98 does not map the search and todo aliases for custom agents (fixed in 1.0.99). -->
+<!-- skill loads the hidden code-migration skill in the Copilot CLI. -->
 <!-- ask_user is the Copilot CLI question tool and vscode/askQuestions the VS Code one; a host ignores tool names it does not provide. -->
+
+You are the `code-migration-plugin-orchestrator` agent. Before anything else, read [the code-migration skill](../../skills/code-migration/SKILL.md) and follow it:
+it is this agent's procedure, and it comes before the report-language check below.
+The host may not load it for you because it is hidden from the slash menu; read
+it yourself. If that link does not open, load the `code-migration` skill with the
+skill tool; it gives the skill's directory. Re-read it after every compaction.
 
 Use the phase prompts. Draft artifacts outside worker loops. Use the runner for translation and validation. Never claim a gate was approved from your own recommendation.
 
@@ -28,7 +35,7 @@ or start `copilot login` only after the person agrees, as the skill describes.
 First read the report language with `run_migration.mjs preferences`; if unset, ask
 日本語 / English with the question tool and record it with `preferences --language`.
 Write all user-facing text in that language; worker prompts and JSON stay English.
-Re-read it after every compaction; English docs and tool output never switch it.
+Re-read the report language after every compaction; English docs and tool output never switch it.
 The hook rejects a question before the language is recorded, and a Japanese
 report's question with no Japanese text.
 After initialization, decide the other settings through `migration/run-settings.json`
@@ -37,7 +44,7 @@ not one question per setting; see the skill's run settings section.
 Follow [phase reports and user decisions](../../docs/PHASE-HANDOFF.md) after every phase.
 Use the host's available question tool for missing decisions; report concrete
 artifacts before asking and include a next-instruction example. Reuse explicit
-answers already given. If no question tool is available, ask in chat and wait.
+answers already given (never a past gate approval for a new gate). If no question tool is available, ask in chat and wait.
 An automatic reply that the user is not available (Copilot CLI autopilot) is not
 an answer: choose nothing and ask the person to continue interactively.
 

@@ -6,7 +6,7 @@ Anthropicの[Code Migration Kit](https://github.com/anthropics/code-migration-ki
 
 **0.3.0** ではVS Codeのサブエージェント方式（native）を削除しました。ワーカーは常にCopilot CLIで動き、VS Codeから進める場合も同じです。利用者はAIチャットだけで移行を完遂でき、CLIの導入・サインインの開始、guardrailsの設置などのコマンドはAIが実行します。**0.2.0** はVS Code / Copilot CLIのAgent Plugins形式に対応しました。キット本体をプラグインとして導入し、案件側では設定と成果物を管理できます。[プラグイン導入手順](docs/PLUGIN.md)、[従来版の修正と再レビュー](docs/reviews/2026-10-10-copilot-rereview-fixes.md)、[既存版からの更新](docs/UPGRADING.md)を参照してください。
 
-参照したCLIは **1.0.98**（1.0.93・1.0.95でも疑似プロバイダーとの通信を確認。1.0.98ではrepository/plugin両構成の全ロールの往復、hookの読み込み、エラー出力の形式も確認）、VS Codeは **1.142** です。VS Code 1.142ではCopilot harnessが新規セッションの既定になりつつあり、prompt filesはLocal harness専用（`chat.promptFilesLocations` は非推奨）です（出典：[1.142リリースノート](https://code.visualstudio.com/updates/v1_142)、[Prompt files](https://code.visualstudio.com/docs/agent-customization/prompt-files)、[AI settings reference](https://code.visualstudio.com/docs/agents/reference/ai-settings)。2026-10-18確認）。VS Codeでは共通スキル `/code-migration` を入口にしてください。固定した元コミットとSDK参照版は [UPSTREAM.json](UPSTREAM.json) に記録しています。Anthropic/GitHubの公式配布物ではありません。
+参照したCLIは **1.0.98**（1.0.93・1.0.95でも疑似プロバイダーとの通信を確認。1.0.98ではrepository/plugin両構成の全ロールの往復、hookの読み込み、エラー出力の形式も確認）、VS Codeは **1.142** です。VS Code 1.142ではCopilot harnessが新規セッションの既定になりつつあり、prompt filesはLocal harness専用（`chat.promptFilesLocations` は非推奨）です（出典：[1.142リリースノート](https://code.visualstudio.com/updates/v1_142)、[Prompt files](https://code.visualstudio.com/docs/agent-customization/prompt-files)、[AI settings reference](https://code.visualstudio.com/docs/agents/reference/ai-settings)。2026-10-18確認）。入口はVS Code・Copilot CLIとも、エージェント一覧に出る移行オーケストレーター1つです（0.7.0から。スキルとワーカーはスラッシュメニューや一覧に出さない設定です）。固定した元コミットとSDK参照版は [UPSTREAM.json](UPSTREAM.json) に記録しています。Anthropic/GitHubの公式配布物ではありません。
 
 **検証状況：自動テスト、オフライン題材、macOSでの実CLIと疑似プロバイダー間の通信は検証済みです。実際のCopilot認証・AIによる移植品質、VS Code上の操作、Dynamic Workflowsの実セッションは未検証です。** 実案件の前に [LIVE-SMOKE.md](docs/LIVE-SMOKE.md) の小規模確認を実施してください。
 
@@ -18,7 +18,7 @@ Anthropicの[Code Migration Kit](https://github.com/anthropics/code-migration-ki
 
 | 項目 | この版の動作 |
 |---|---|
-| 指示・スキル | プラグインの `skills/code-migration/SKILL.md`、またはコピー導入の `.github/skills/code-migration/SKILL.md`。ワーカーは暗黙の指示読み込みを無効化 |
+| 入口・スキル | 入口はオーケストレーター（コピー導入は `migration-orchestrator`、プラグインは `code-migration-plugin-orchestrator`）だけ。手順はプラグインの `skills/code-migration/SKILL.md`、またはコピー導入の `.github/skills/code-migration/SKILL.md` にあり、オーケストレーターが最初に読む。スキルは `/` メニューに出さない設定（`user-invocable: false`）。ワーカーは暗黙の指示読み込みを無効化 |
 | 役割分担 | orchestrator / implementer / 独立reviewer 2種 / arbiter / fixerに、準備監査用のtool-free profileを追加 |
 | モデル | 5種類のワーカーに明示指定。利用できるモデルIDをユーザーが設定 |
 | 変換 | Copilot CLIのワーカーは `view,grep,glob` のみ。JSON応答を検証し、Nodeの調整役が対象ファイルだけを書き込む |
@@ -26,16 +26,16 @@ Anthropicの[Code Migration Kit](https://github.com/anthropics/code-migration-ki
 | 完了判定 | 出力、入力、2件のレビュー、必要な裁定結果のハッシュを保存。ファイルが存在するだけでは完了にしない |
 | 再開 | 中断した工程から再開。失われたレビューや変更された出力は再レビュー |
 | 工程の承認 | 入力・出力・前工程の実行IDに結び付ける。上流の再実行で下流結果・承認は失効 |
-| VS Code | Copilot harness（1.142で既定化が進行中）は共通スキル、Localは10工程のprompt files（Local専用・移行先はskill）とLocal用hooksを利用 |
+| VS Code | Copilot harness（1.142で既定化が進行中）・Localとも、エージェント一覧からオーケストレーターを選ぶ。Localは `--harness vscode-local` でLocal用hooksを利用 |
 | Dynamic Workflows | 共通実行エンジンを使う任意の実験的アダプター |
 
 ## チャットだけで進める
 
 利用者はコマンドを打たず、VS Code（またはCopilot CLI）のAIチャットだけで移行を完遂できます。対象リポジトリを開き、Copilot Chatで次のように依頼してください。
 
-> https://github.com/umauma00/code-migration-kit-with-github-copilot の `feat/github-copilot-migration-kit` ブランチを `../code-migration-kit` にcloneし、`scripts/install.mjs` でこのリポジトリへ導入して、`code-migration` スキルでPythonからTypeScriptへの移行を始めて
+> https://github.com/umauma00/code-migration-kit-with-github-copilot の `feat/github-copilot-migration-kit` ブランチを `../code-migration-kit` にcloneし、`scripts/install.mjs` でこのリポジトリへ導入して
 
-導入後は新しいチャットで `/code-migration` を呼ぶか、「移行の続きを進めて」と依頼します。AIは次をすべて自分で実行し、結果をチャットで報告します。
+導入後は新しいチャットを開き、エージェント一覧から `migration-orchestrator`（プラグイン導入では `code-migration-plugin-orchestrator`、Copilot CLIでは `/agent` で選択）を選んで、「PythonからTypeScriptへの移行を始めて」「移行の続きを進めて」などと依頼します。ほかのエージェントでは工程を始めず、オーケストレーターへの切り替えを案内します。AIは次をすべて自分で実行し、結果をチャットで報告します。
 
 - Copilot CLIの確認。未導入なら理由を説明し、同意を得てから `npm install -g @github/copilot` を実行します。サインインが必要なら `copilot login` を始め、表示されたURLとワンタイムコードをチャットに出します。VS Codeのサインインとは別に一度だけ必要です。
 - 初期化・設定・各工程のコマンド、長時間の変換（バックグラウンドのターミナルで実行し、進捗を報告）、失敗時の原因と選択肢の提示。
@@ -79,19 +79,21 @@ node scripts/install.mjs --target /path/to/your-project --model MODEL_ID --langu
 node scripts/install.mjs --target /path/to/your-project --model MODEL_ID --language ja --apply
 ```
 
-**モデルとエフォートは利用者が選びます。** `--model` を省略して導入し、対象リポジトリで次を実行すると、利用するアカウントで使えるモデルと、モデルごとに選べるエフォート（既定値）・料金をCLIから取得して表示します。AIはこの一覧をもとに、全担当のモデルとエフォートを**1回の質問**でまとめて聞き、回答を1回の `models set --assign` で記録します（ホストが利用者に1回だけ確認を求めます）。
+**モデル・エフォート・コンテキストサイズは利用者が選びます。** `--model` を省略して導入し、対象リポジトリで次を実行すると、利用するアカウントで使えるモデルと、モデルごとに選べるエフォート（既定値）・コンテキストサイズ（入力上限）・料金をCLIから取得して表示します。AIはこの一覧をもとに、全担当のモデル・エフォート・コンテキストを**1回の質問**でまとめて聞き、回答を1回の `models set --assign` で記録します（ホストが利用者に1回だけ確認を求めます）。
 
 ```bash
 node migration-kit/scripts/run_migration.mjs models list --format markdown
-node migration-kit/scripts/run_migration.mjs models set --assign "implementer=MODEL_ID:medium,reviewers=MODEL_ID:high,arbiter=MODEL_ID,fixer=MODEL_ID"
+node migration-kit/scripts/run_migration.mjs models set --assign "implementer=MODEL_ID:medium,reviewers=MODEL_ID:high:long_context,arbiter=MODEL_ID,fixer=MODEL_ID"
 node migration-kit/scripts/run_migration.mjs models set --role reviewers --model MODEL_ID --effort high
 ```
 
-`--assign` は `担当=モデルID:エフォート` をカンマで並べた1つの回答です（エフォートを省くと既定、`all=ID` を先に書くと全担当をまとめて指定し、後ろの担当で上書き）。全項目を確認してから書き込むので、1つでも不正なら何も変わりません。`--role` は担当名、`reviewers`（2人のレビュー担当）、`all`（全担当。surveyor は個別設定を解除して implementer と同じ設定に戻す）。surveyor は自分のモデルを持たない間だけ implementer のモデルとエフォートを引き継ぎ、自分のモデルを選んだ後は引き継ぎません。料金はCLIが公開する単価を、AI Credits の100万トークンあたりに換算して表示します。`--effort default` でモデルの既定に戻します。一覧にない・組織の設定で無効なモデルや、そのモデルが対応しないエフォートは記録しません。一覧の取得にはCopilot CLIのサインインが必要です。
+`--assign` は `担当=モデルID:エフォート` をカンマで並べた1つの回答です（エフォートを省くと既定、`all=ID` を先に書くと全担当をまとめて指定し、後ろの担当で上書き）。全項目を確認してから書き込むので、1つでも不正なら何も変わりません。`--role` は担当名、`reviewers`（2人のレビュー担当）、`all`（全担当。surveyor は個別設定を解除して implementer と同じ設定に戻す）。surveyor は自分のモデルを持たない間だけ implementer のモデルとエフォートを引き継ぎ、自分のモデルを選んだ後は引き継ぎません。料金はCLIが公開する単価を、AI Credits の100万トークンあたりに換算して表示します。`--effort default` でモデルの既定に戻します。一覧にない・組織の設定で無効なモデルや、そのモデルが対応しないエフォートは記録しません。
+
+コンテキストサイズは、エフォートの後ろに `:long_context` を付けた担当だけ長いコンテキスト（Copilot CLI の `--context long_context`）になります。付けられるのは、一覧のコンテキスト列に long_context があるモデルだけです。料金が上がるので、必要な担当に限ってください。付けなければ既定のコンテキストで、ワーカーに `--context` は渡しません（CLI 自身の設定 `contextTier` に従います）。1人の担当だけなら `--role 担当 --model ID --context long_context|default` も使えます。モデル・エフォートと同じく、変えるとレビュー済みの単位は次の実行で再レビューされます。一覧の取得にはCopilot CLIのサインインが必要です。
 
 従来どおり `--models implementer=ID,reviewers=ID,arbiter=ID,fixer=ID` で担当ごとのモデルを指定することもできます（未指定の担当は `--model`）。上流キットのモデル計画と同じく、影響範囲で選びます：レビュー担当は最大または中規模、大量に動く実装担当は中または小規模、修正・裁定担当は中規模。
 
-**実行設定は1つのファイルで決めます。** 導入後、AIは `settings init` で `migration/run-settings.json` を作ります。移行元・移行先の言語、フォルダー、検証方式、元のコードが動くか、実行モード、同時実行数、各段階のコマンド、担当ごとのモデルとエフォートが1ファイルに並び、使えるモデルとエフォートは `_choices`、説明は `_help` に入ります。未記入の欄は `FILL_IN` です。質問を1つずつ受ける代わりに、このファイルを埋めて、AIの「記入しましたか？それとも質問がありますか？」に答えます。「記入した」と答えると `settings apply` が全項目をまとめて確かめ、1つでも誤りがあれば何も書き込まずに誤りを全部返します（ホストが1回だけ確認を求めます）。
+**実行設定は1つのファイルで決めます。** 導入後、AIは `settings init` で `migration/run-settings.json` を作ります。移行元・移行先の言語、フォルダー、検証方式、元のコードが動くか、実行モード、同時実行数、各段階のコマンド、担当ごとのモデル・エフォート・コンテキストサイズが1ファイルに並び、使えるモデル・エフォート・コンテキストは `_choices`、説明は `_help` に入ります。未記入の欄は `FILL_IN` です。質問を1つずつ受ける代わりに、このファイルを埋めて、AIの「記入しましたか？それとも質問がありますか？」に答えます。「記入した」と答えると `settings apply` が全項目をまとめて確かめ、1つでも誤りがあれば何も書き込まずに誤りを全部返します（ホストが1回だけ確認を求めます）。
 
 ```bash
 node migration-kit/scripts/run_migration.mjs settings init
@@ -145,7 +147,7 @@ node migration-kit/scripts/run_migration.mjs doctor --check-cli
 | `dependencyOrder` | `auto`（新規導入）: 単位型チェックがあるときだけ、依存先のレビュー完了まで依存元を待たせる。型チェックがなければ上流と同じく承認範囲を一斉に展開する。`reviewed`（省略時・既存設定）: 常に待つ。`none`: 待たない（型チェックとは併用不可） |
 | `fixPolicy` | `single-pass`（新規導入の既定）: 上流Step 3と同じく、確定指摘の修正は1回で完了とし、build/smoke/parityが判定する。呼び出し数と停止する単位が減る。`rereview`（キーのない既存設定）: 修正後に再レビューし、確定した指摘がなくなるまで繰り返す |
 | `reviewFocus` | `shared`（新規導入）: 2人のレビュアーがそれぞれ自分の観点を先に、両方の観点（元の動作・ルール順守）を確認し、見つけた欠陥をすべて報告する。互いの結果は見ない。`specialized`（省略時・既存設定）: 上流と同じく1人1観点 |
-| `executionMode` | 既定・未指定は `continuous`。旧設定の時間・呼び出し数・修正回数・累計入力・リトライ回数で打ち切らず、終了まで継続する。利用者が明示的に `bounded` を選んだ場合だけ以下の上限を適用する。[停止条件一覧](docs/INTERRUPTION-POLICY.md) |
+| `executionMode` | 既定・未指定は `continuous`。旧設定の時間・呼び出し数・修正回数・累計入力・リトライ回数で打ち切らず、終了まで継続する。利用者が明示的に `bounded` を選んだ場合だけ以下の上限を適用する。continuous で効かない値が書かれていれば `doctor` が表示する。[停止条件一覧](docs/INTERRUPTION-POLICY.md) |
 | `maxFixRounds`, `maxAgentCalls` | boundedモードだけで使う1単位の修正回数・1実行のAI呼び出し数上限。continuousでは適用しない。`translate --max-calls N` を利用者が明示した場合は、その実行の有限上限として扱う |
 | `maxRunInputBytes` | boundedモードだけで使う入力累計bytesの上限。通常実行は量だけで打ち切らず、`usageEstimate` とCLIの使用量を記録する |
 | `maxAiCreditsPerCall` | boundedモードだけで各workerへ渡す任意の `--max-ai-credits`（CLIの最小値30）。continuousでは渡さない。サービス側の残高・組織上限は外部制約 |
@@ -229,9 +231,7 @@ runnerのコマンドが失敗すると、`ERROR:` に続けて **原因・影�
 
 03の前に、コマンド制限 `migration/guardrails.json` を設置します。上流の `.claude/settings.json` の deny ルールに相当し、hookがすべてのエージェントの該当シェルコマンドを拒否します（runnerが実行するbuild等は対象外）。設置は人間の判断です。AIが `run_migration.mjs guardrails show` を基に、対象のビルド・テストコマンドに合わせた禁止リスト（または免除理由）をチャットで提案します。合意後にAIが `guardrails install` を実行すると、ホストが利用者に確認を求めます。この許可が人間の設置行為です。AIがファイルを直接書くことはhookが拒否します。`phase start 03` / `04` は、このファイル（または免除の記録）がないと停止します。対話型のCopilot CLIで進める場合、コピー導入方式のhookは信頼済みのフォルダでしか読み込まれません。`doctor` で確認できます（runnerが起動するワーカーは常に読み込みます）。
 
-Copilotに該当プロンプトを読ませ、各工程の成果物を確認します。VS Codeの **Local** では、対応する `/migrate-…` のprompt fileを使えます。
-
-VS Codeの **Copilot（Agent Host）** はprompt filesを読み込みません。既存の共通スキル `/code-migration` を呼び出し、「比較器の設計を進める」など、下表の工程を指定してください。スキルは全工程のプロンプトへリンクしており、工程別スキルの追加は不要です。Local用の10個の `/migrate-…` コマンドは、この実行方式では登録されません。
+オーケストレーターに「比較器の設計を進める」など下表の工程を指定し、各工程の成果物を確認します。オーケストレーターが読む手順（スキル）は全工程のプロンプトへリンクしています。VS CodeのCopilot（Agent Host）・Localのどちらでも同じ入口です。0.6.0以前のLocal用 `/migrate-…` prompt filesは0.7.0で削除しました。
 
 開始・再開時には、親の調整エージェントがCopilotのTODOに下表の10工程を登録し、実行中・承認待ち・修正中・停止を表示します。初期設定は別枠です。工程末には「5/10工程完了、次は04の承認待ち」のように進捗を報告し、再開時は実際の成果物・検証記録に合わせて一覧を更新します。TODOが使えない環境では同じ一覧をチャットに表示します。詳細は [工程のTODO表示](docs/PHASE-HANDOFF.md#track-the-ten-phases-in-the-host-todo-list) を参照してください。
 
@@ -347,6 +347,6 @@ npm run demo
 
 ## 工程順序と利用量の記録
 
-`/code-migration` は [10工程の順序チェック](docs/ORDERED-WORKFLOW.md) を有効にし、最初の未完了工程から進めます。新規設定はphasePolicy=strictです。00〜03のレビュー記録が不足していると、正式judgeや本実装へ進めません。既存案件は実際の成果物を順番に確認して工程記録を作成します。
+オーケストレーターは [10工程の順序チェック](docs/ORDERED-WORKFLOW.md) を有効にし、最初の未完了工程から進めます。新規設定はphasePolicy=strictです。00〜03のレビュー記録が不足していると、正式judgeや本実装へ進めません。既存案件は実際の成果物を順番に確認して工程記録を作成します。
 
 mainと同じ [migration/cost-log.tsv](docs/COST-LOG.md) を出力します。取得できない利用量・実績モデルはunknownです。現在のmodels設定は5つのワーカー役割ごとにモデルを指定し、レビュー担当は独立2プロファイルです。01・02などの調査担当や任意のレビュープロファイルを工程別に選ぶ設定は、現在の自動runnerにはありません。

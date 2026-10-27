@@ -31,8 +31,8 @@ VS Codeから進める場合も、ワーカーは同じCopilot CLIです。チ�
 
 VS Codeを使う場合は、選択した実行方式で入口とhooksの実動作を別途確認してください。
 
-- **Copilot（Agent Host）**：agentと共通の `/code-migration` スキルが見え、指定した工程を起動できることを確認します。prompt filesは読み込まれないため、10個の `/migrate-…` が登録されることは期待しません。
-- **Local**：導入時に `--harness vscode-local` を指定し、VS Codeのチャットでも実行方式をLocalへ切り替えます。agent/skillに加え、工程の `/migrate-…` prompt filesが見えて起動できること、Local用hooksが実際に呼ばれることを確認します。導入時の `--harness` 指定だけではチャットの実行方式は変わりません。
+- **Copilot（Agent Host）**：エージェント一覧にオーケストレーターだけが見え、指定した工程を起動できることを確認します。`code-migration`・`depmap-adapter` スキルが `/` メニューに出ないこと、ワーカーが一覧に出ないことも確認します。
+- **Local**：導入時に `--harness vscode-local` を指定し、VS Codeのチャットでも実行方式をLocalへ切り替えます。Copilot（Agent Host）と同じ入口の確認に加え、Local用hooksが実際に呼ばれることを確認します。導入時の `--harness` 指定だけではチャットの実行方式は変わりません。
 
 Dynamic Workflowsは [専用の確認事項](DYNAMIC-WORKFLOWS.md) を追加してから試してください。
 

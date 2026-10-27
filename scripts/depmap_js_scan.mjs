@@ -5,7 +5,7 @@
 function nonCode(text, jsxEnabled) {
   const ranges = [], comments = [], holes = [], parens = [];
   let i = 0, previous = '', template = false, segment = 0, jsx = null;
-  const regexAfter = new Set(['', '=', '(', '[', '{', ',', ':', ';', '!', '?', '+', '-', '*', '/', '%', '~', '&', '|', '^', '<', '>', '=>', '&&', '||', '??', 'return', 'throw', 'case', 'yield', 'else', 'do', 'control-close']);
+  const regexAfter = new Set(['', '=', '(', '[', '{', ',', ':', ';', '!', '?', '+', '-', '*', '/', '%', '~', '&', '|', '^', '<', '>', '=>', '&&', '||', '??', '}', 'return', 'throw', 'case', 'yield', 'else', 'do', 'control-close']);
   const controls = new Set(['if', 'while', 'for', 'with', 'switch', 'catch']);
   const tagAt = at => text.slice(at).match(/^<([A-Za-z_$][\w$.:-]*)(?=[\s/>])|^<(?=>)/);
   const beginJSX = at => {

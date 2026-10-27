@@ -251,8 +251,8 @@ conditions. status --wait is a reporting wait only. See
 
 runProcess spills output over its memory threshold to private files under
 migration/runs/process-output. Result stdout/stderr then contain display tails;
-stdoutFile/stderrFile, stdoutBytes/stderrBytes and stdoutHash/stderrHash identify
-the complete output; diagnostic reads reject altered logs or non-runner paths.
+stdoutFile/stderrFile (recorded relative to the migration root since 0.6.1),
+stdoutBytes/stderrBytes and stdoutHash/stderrHash identify the complete output; diagnostic reads reject altered logs or non-runner paths.
 The CLI JSONL and build diagnostic consumers iterate full logs, not the tails.
 A write failure is real evidence loss and remains an error.
 

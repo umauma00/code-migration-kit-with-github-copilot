@@ -1,9 +1,25 @@
 ---
 name: code-migration
-description: Run a staged, behavior-preserving language migration with GitHub Copilot. Use for whole-codebase language ports, migration feasibility, translation rules, dependency maps, parity verification, or resuming a migration. Not for ordinary refactors or incremental JavaScript-to-TypeScript adoption.
+description: Procedure of the code migration orchestrator agent (migration-orchestrator, or code-migration-plugin-orchestrator in the plugin) for a staged, behavior-preserving language migration. Use for whole-codebase language ports, migration feasibility, translation rules, dependency maps, parity verification, or resuming a migration. Not for ordinary refactors or incremental JavaScript-to-TypeScript adoption.
+user-invocable: false
 ---
 
 # Code migration
+
+This skill is the procedure of the migration orchestrator agent:
+`migration-orchestrator`, or `code-migration-plugin-orchestrator` from the plugin.
+It is hidden from the slash menu, and the orchestrator is the kit's only entry
+point. If you are not running as that agent (for example, another agent loaded
+this skill on its own), do not start, resume or approve migration phases: tell
+the person to select the orchestrator in the agent picker (Copilot CLI: `/agent`)
+and stop. Only installing or initializing the kit with `install.mjs`, when the
+person asks for it, is still allowed. A subagent started by the orchestrator is
+not such an agent: it follows "Parent-session phase ownership" below and returns its plan and status to
+the orchestrator without starting or approving phases.
+
+At start, check whether `.github/prompts/migrate-*.prompt.md` files from 0.6.0
+or earlier remain in the target repository. If they do, they bypass the orchestrator: propose deleting them and
+delete them only after the person agrees.
 
 For config.executionPurpose `pilot`, follow [pilot execution](../../docs/PILOT.md)
 using pilot run and the sealed grant; do not initialize production phase records
@@ -70,7 +86,6 @@ creates only migration/config.json, RULEBOOK.md and inventory.tsv; it does not
 approve or run migration stages. An existing configuration with runtime other
 than plugin requires an explicit layout change rather than a silent overwrite.
 For initialized projects, require `"runtime": "plugin"` in migration/config.json.
-Use the plugin's code-migration-plugin-orchestrator agent for phase planning.
 The Node runner selects private plugin worker profiles and explicitly mounts this
 plugin.
 
@@ -87,7 +102,11 @@ everything in one answer" section shows:
 `implementer=ID:EFFORT, reviewers=ID:EFFORT, arbiter=ID:EFFORT, fixer=ID:EFFORT`
 (effort left out = default; `all=ID` first, then overrides; roles are
 implementer, reviewer-semantics, reviewer-rules, reviewers, arbiter, fixer,
-surveyor, all; surveyor follows the implementer unless named). You may explain
+surveyor, all; surveyor follows the implementer unless named). The same answer
+picks the context size: `:long_context` after the effort (`ID:EFFORT:long_context`)
+selects the long context tier, only for models whose Context column lists it;
+left out, the role runs the default context. Say that long_context costs more,
+and never add it on their behalf. You may explain
 the upstream model plan — tier by blast radius: reviewers on the largest or a
 mid model, high-volume implementers on a mid or small model, fixers and the
 arbiter on a mid model; higher effort costs more tokens — as information, never
@@ -95,10 +114,10 @@ as a preselected answer, and never choose for them. Record the whole answer with
 one `run_migration.mjs models set --assign "ROLE=ID:EFFORT,..."` (a single
 choice for everyone may use `--role all --model ID --effort LEVEL|default`);
 the host asks them to confirm once. Every entry is checked before anything is
-written: if one is refused (unlisted model, unsupported effort), nothing
+written: if one is refused (unlisted model, unsupported effort or context), nothing
 changes, so ask again about that entry only and record the full answer again.
 If `models list` reports that the CLI is not signed in, start `copilot login`
-first. A changed model or effort makes reviewed units be reviewed again.
+first. A changed model, effort or context makes reviewed units be reviewed again.
 
 ## Run settings file (instead of one question per setting)
 
@@ -106,8 +125,8 @@ After initialization, run `run_migration.mjs settings init`. It writes
 `migration/run-settings.json` from the current configuration: report language,
 whether the original can still run, migration languages, preserve or redesign,
 source/output/test roots, verification mode, execution mode, concurrency, stage
-commands, and every role's model and effort. The account's models and efforts
-(read live from the CLI) are listed under `_choices`, explanations under
+commands, and every role's model, effort and context size. The account's models,
+efforts and context tiers (read live from the CLI) are listed under `_choices`, explanations under
 `_help`, and `FILL_IN` marks what is still open. Link the file and ask **one**
 question with the question tool: has the person finished filling it in, or do
 they have a question? Offer two choices, "filled in" and "I have a question"
@@ -132,7 +151,7 @@ change settings later, the person edits the file and the same question follows.
 Follow [phase reports and user decisions](../../docs/PHASE-HANDOFF.md) at every
 phase boundary. Show the actual artifacts, review points and a copyable next
 instruction before asking. Use the available question tool for missing decisions;
-otherwise present the choices in chat and wait. Reuse answers already given.
+otherwise present the choices in chat and wait. Reuse answers already given (never a past gate approval for a new gate).
 An automatic reply that the user is not available (Copilot CLI autopilot) is not
 an answer: choose nothing and ask the person to continue interactively.
 After a phase, resolve the next step from the user's instruction and current
@@ -181,7 +200,7 @@ hand-write the graph. If a bundled mapper fails or cannot read the syntax, try
 its options first, then copy it (with the shared `depmap_*.py` it imports) to
 `migration/tools/depmap-<language>/`, fix the copy against a hand-written
 fixture, never `migration-kit/`, and report the error, the change and the
-output difference in `depmap/report.md`. Use the depmap-adapter skill to
+output difference in `depmap/report.md`. Read the [depmap-adapter skill](../depmap-adapter/SKILL.md) to
 choose the implementation language and build the adapter.
 
 ## Keep the parent's context small
@@ -207,7 +226,7 @@ retry/survey correction and read-only diagnostics, preserving validated rows;
 report that recovery without asking again. Ask and wait only when it is
 exhausted or a new scope/model/budget/limit or human gate needs a missing
 choice. Then report cause, impact, at least two choices plus pause, one
-recommended first with a reason for each. Reuse answers already given.
+recommended first with a reason for each. Reuse answers already given (never a past gate approval for a new gate).
 Never route around a guardrail or change citation evidence by hand.
 A TypeError/SyntaxError in a coordinator-owned preparation/report helper is
 technical recovery: inspect the parser/caller contract, fix the helper, run

@@ -102,7 +102,7 @@ models and efforts) are not asked one by one: `settings init` writes them to
 filled it in or has a question; "filled in" runs `settings apply` (see the
 skill's run settings section). Only the report language is asked before
 initialization. A later change of models alone, asked for in chat, is one
-question for every role, answered in the `role=ID:EFFORT, ...` form that
+question for every role, answered in the `role=ID:EFFORT[:long_context], ...` form that
 `models list` shows and recorded with one `models set --assign`. A
 free-text reply that does not clearly pick a choice is a new instruction, not
 consent: clarify it before acting on a gate.
@@ -211,7 +211,8 @@ they revalidate source evidence and are not required between survey scopes.
 
 Ask only when recovery is exhausted or the next action requires a missing
 decision, a new budget/model/limit, a changed scope or a human gate. Reuse an
-answer already given for that action. In that case follow the report below.
+answer already given for that same in-phase recovery action; a gate approval or
+phase sign-off is never reused for another gate. In that case follow the report below.
 
 Every failed command, failed phase check, blocked unit or refused gate ends with
 a **failure report**, never with a bare error or a silent retry. Runner commands

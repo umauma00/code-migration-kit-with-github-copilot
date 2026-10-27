@@ -33,7 +33,7 @@ Once Git distribution is in place, the marketplace Git URL can be registered. Af
 
 ## Starting a new migration
 
-Open the target repository in VS Code and ask Copilot Chat something like "use the code-migration skill to start migrating from Python to JavaScript", naming a model ID available to you. The skill asks which language to report in (Japanese or English), checks initialization and configuration, and proceeds one phase at a time from feasibility.
+Open the target repository in VS Code, select `code-migration-plugin-orchestrator` in Copilot Chat's agent picker (`/agent` in the Copilot CLI), and ask something like "start migrating from Python to JavaScript", naming a model ID available to you. The orchestrator asks which language to report in (Japanese or English), checks initialization and configuration, and proceeds one phase at a time from feasibility.
 
 To initialize manually, run the following with the target repository as the working directory. Replace `MODEL_ID` with a model ID available to your account.
 

@@ -6,6 +6,50 @@
 
 Kit files (lib, scripts) change, so existing approvals and completion records lapse once; revalidate from judge. Completed outputs are kept. Nothing in an existing `migration/config.json` changes until you run `settings apply`. To move an existing project to the file, run `run_migration.mjs settings init`: it writes `migration/run-settings.json` from the current configuration, and `status` shows whether the file matches it. `models set` and `preferences` keep working.
 
+## 0.8.0 (choosing the context size)
+
+Kit files (lib, scripts) change, so existing approvals and completion records
+lapse once; rerun judge. Completed outputs are kept.
+
+1. Each role's context size is chosen in the same single answer as its model
+   and effort: add `:long_context` only for the roles that need it, as in
+   `models set --assign "reviewers=ID:high:long_context,..."`. The Context column
+   of `models list` shows which models offer it.
+2. Roles without it start as before, with no `--context` flag. Existing
+   configurations keep working.
+
+## 0.7.0 (the orchestrator is the only entry point)
+
+The orchestrator profile changes, so existing approvals and completion records
+expire once. Revalidate from the judge. Completed outputs are kept.
+
+1. Start the migration from the orchestrator in the agent picker
+   (`migration-orchestrator` for a repository copy, `code-migration-plugin-orchestrator`
+   for the plugin; `/agent` in the Copilot CLI). `/code-migration` is no longer in
+   the `/` menu; the orchestrator reads the skill first.
+2. The `code-migration` and `depmap-adapter` skills set `user-invocable: false`.
+   The AI can still load them. If another agent loads the skill, it does not start
+   phases and points the person to the orchestrator. This is an instruction to the
+   AI, not something the host enforces.
+3. The ten VS Code Local `/migrate-…` prompt files were removed. The installer does
+   not delete a repository copy's `.github/prompts/migrate-*.prompt.md`; the
+   orchestrator proposes deleting any it finds and deletes them after the person agrees.
+4. For a repository copy, replace the whole `migration-kit/`,
+   `.github/agents/migration-orchestrator.agent.md`,
+   the two SKILL.md files under `.github/skills/` and the managed block of
+   `.github/copilot-instructions.md` with a temporary install's content by hand (the
+   managed block as in step 6 of 0.3.0): re-running the installer stops on files
+   whose content differs instead of overwriting them. The plugin picks the change up on update.
+
+## 0.6.1 (fixes from the 0.6.0 review)
+
+Existing approvals and completion records are revoked once because the kit's files (lib, scripts) change. Re-validate from judge. Completed outputs are kept.
+
+1. No stop based on time, CPU or silence was added; execution stays continuous.
+2. `doctor` lists, under `execution limits`, configured limits that continuous mode does not enforce (values of `maxAgentCalls`, `maxAiCreditsPerCall`, `maxRunInputBytes` and similar that differ from the template). Set `"executionMode": "bounded"` to enforce them, or delete them.
+3. When a build-loop's error count has not fallen for three rounds, it keeps going, records `stalled` and status suggests a rulebook amendment.
+4. Spilled log paths are recorded relative to the root; 0.6.0 records with absolute paths still read in place.
+
 ## 0.6.0 (continuous execution and large surveys)
 
 The mapper fixes make every Python mapper depend on depmap_common.py, add

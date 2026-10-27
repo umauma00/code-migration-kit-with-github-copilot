@@ -82,7 +82,7 @@ export function install(target, { apply = false, model, harness = 'copilot', wit
     if (preferences) files.set('migration/preferences.json', preferences);
     if (apply) for (const [name, content] of files) atomicWrite(safePath(root, name), content);
     return { applied: apply, target: root, layout, changes: [...files.keys()],
-      next: 'Edit migration/config.json (languages, paths, models and commands), then invoke the code-migration skill from the installed plugin. Existing configuration is retained.' };
+      next: 'Edit migration/config.json (languages, paths, models and commands), then select the code-migration-plugin-orchestrator agent from the installed plugin. Existing configuration is retained.' };
   }
   const files = new Map();
   for (const dir of ['lib', 'scripts', 'prompts', 'templates', 'docs']) for (const rel of filesUnder(kitRoot, dir)) {
@@ -125,7 +125,7 @@ export function install(target, { apply = false, model, harness = 'copilot', wit
   }
   if (apply) for (const rel of changes) atomicWrite(safePath(root, rel), files.get(rel));
   return { applied: apply, target: root, harness, changes,
-    next: 'Edit migration/config.json, draft the rulebook and inventory, then follow migration-kit/README.md. Existing configuration is retained.' };
+    next: 'Edit migration/config.json, then select the migration-orchestrator agent in a new chat to draft the rulebook and inventory. Existing configuration is retained.' };
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
   try {

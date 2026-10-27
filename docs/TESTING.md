@@ -2,6 +2,12 @@
 
 日本語 | [English](TESTING.en.md)
 
+## 2026-10-27 0.6.0 のレビュー修正（0.6.1）
+
+- `npm test` は452件中450成功、失敗0、Windows専用skip 2。`npm run demo` は成功し、比較12件・差分0・skip 0。`git diff --check` も成功。
+- `tests/review-2026-10-27.test.mjs` の12件で、continuous で効かない設定上限の表示（doctor・実行結果。停止はしない）、エラー数が減らない build-loop の `stalled` 記録と継続、明示的な `--max-rounds` の適用、退避ログの相対パス（失敗・キャンセルしたワーカーの記録を含む）とリポジトリ移動後の読み取り（0.6.0 の絶対パス記録もシンボリックリンク経由のルートで読める）、host:port や数値を含む証拠の受理と他ファイル（別の拡張子を含む）引用の拒否、census 0件のファイルの分割、C の `#error don't` による偽の include、`}` 直後の正規表現リテラルを確認。
+- 時間・CPU・無出力・出力量による停止は追加していない。停止候補の索引は70ファイル・801行で再生成し、現コードと一致。
+
 ## 2026-10-26 大規模C# OSSでの準備処理検証
 
 - `npm test` は440件中438成功、失敗0、Windows専用skip 2。`npm run demo` は成功し、比較12件・差分0・skip 0。追加したsurvey・停止索引の重点35件も成功。
@@ -14,7 +20,7 @@
 - 最終 `npm test`：435件中433成功、失敗0、skip 2（Windows専用）。`npm run demo` はcontinuousでoriginal・mutation・変換・build・smoke・parity成功、比較12件・差分0・skip 0。`git diff --check` 成功。元のfixture期待出力は変更なし。
 - Astraが全作業差分・新規ファイルをレビューし、P2を6件検出。全件修正後の再レビューは追加の確定指摘なし。[指摘と対応・検証範囲](reviews/2026-10-26-astra-full-review.md)。
 - `tests/astra-full-review.test.mjs` の新9件で、実adapterの不正JSON/schema/target/itemsの保存・1回補正、doctorの3プローブへのcancel伝播、実mainへのSIGINT、SIGTERM後の両ストリームの完全保存を確認。JSX後のimport、全8mapperの未選択ソース・不正選択、quota+429の優先分類、bounded/continuousのversion確認切替も検証。
-- 停止候補の索引は70ファイル・795行で現コードと一致。CPU・無出力・600秒による自動中断を戻さず、明示キャンセルと復旧不能な障害を正しく扱う。認証済みモデル・実案件・Windows実機の結果とは区別する。
+- 停止候補の索引は70ファイル・796行で現コードと一致。CPU・無出力・600秒による自動中断を戻さず、明示キャンセルと復旧不能な障害を正しく扱う。認証済みモデル・実案件・Windows実機の結果とは区別する。
 
 ## 2026-10-26 言語別依存解析の精査
 

@@ -4,8 +4,8 @@
   `run_migration.mjs settings init` writes `migration/run-settings.json` from
   the current configuration (report language, whether the original can run,
   migration languages, mode, roots, verification mode, execution mode,
-  concurrency, stage commands, and every role's model and effort), with the
-  account's models and efforts under `_choices` and `FILL_IN` where nothing was
+  concurrency, stage commands, and every role's model, effort and context
+  size), with the account's models, efforts and context tiers under `_choices` and `FILL_IN` where nothing was
   chosen. The orchestrator asks one question: filled in, or a question?
 - `settings apply` checks every entry against the account's model list and the
   runner's configuration checks, reports every problem at once and writes
@@ -18,6 +18,60 @@
   configuration, and lists the entries changed but not applied yet.
 - Only the report language is asked before initialization. `models set` stays
   for changing models alone from chat.
+# 0.8.0 — 2026-10-27
+
+- Let the person choose each worker's context size with its model and effort,
+  in the same single answer: `models set --assign "reviewers=ID:high:long_context,..."`
+  (or `--role ROLE --model ID --context long_context|default`). `models list`
+  shows each model's tiers and prompt limits from the CLI's `models.list`
+  (`billing.tokenPrices.longContext`, `supportedContextTiers`). A model without
+  a long tier is refused. Only roles that chose `long_context` get the CLI's
+  `--context long_context`; other workers get no new flag. The choice is
+  stored as `contextTiers` in `migration/config.json`, the surveyor inherits
+  it like its effort, and a change makes reviewed units be reviewed again.
+
+# 0.7.0 — 2026-10-27
+
+- Make the orchestrator agent the only entry point in VS Code and the Copilot
+  CLI. The `code-migration` and `depmap-adapter` skills set
+  `user-invocable: false` (not `disable-model-invocation`, which makes a skill
+  unreachable in the Copilot CLI, github/copilot-cli#4438), so they leave the
+  slash menu but stay loadable. The orchestrators link and read the skill first,
+  and the skill and repository instructions tell any other agent not to start
+  phases but to point the person to the orchestrator.
+- Remove the ten VS Code Local `/migrate-…` prompt files; the orchestrator
+  covers every phase in both session types. Upgrade notes are in UPGRADING.
+
+# 0.6.1 — 2026-10-27
+
+Fixes from the review of 0.6.0. Nothing here adds a stop based on time, CPU,
+silence or output volume; continuous execution stays continuous.
+
+- Name limits that continuous mode does not enforce instead of ignoring them
+  silently: doctor reports `execution limits` (a warning, not a failed check)
+  and run/survey summaries carry `ignoredLimits` for configured values that
+  differ from the template defaults.
+- Keep upstream rule 6 visible in continuous build-loops: when the error count
+  has not fallen for three rounds the loop keeps going but records `stalled`,
+  and status and the result say to propose a rulebook amendment.
+- Record spilled process logs relative to the migration root, so a moved or
+  copied checkout can still diagnose them and no local path is recorded,
+  including the record of a command or worker that failed after spilling.
+  Records written by 0.6.0 with absolute paths still read in place.
+- Keep benchmark check output inside the scratch folder that is removed.
+- Survey citations: a foreign `NAME.EXT:LINE` is still rejected for any
+  extension, but a URL (`https://example.sh:443`), a name without a directory
+  whose extension is a common domain (`api.example.com:8443`, `example.rs:8080`)
+  or one/two letters (`self.r:5`), and numbers (`0.5:3`) stay plain evidence,
+  unless the scope itself uses that extension.
+  A file with no census sites in an oversized inventory request no longer
+  crashes the split, and is still surveyed.
+- C/C++ mapper: string and character literals end at the line, so `#error
+  don't` no longer exposes a commented-out `#include`. JS/TS scanner: a regex
+  literal after `}` no longer swallows later imports.
+- Docs: a call budget applies only when chosen; reusing an answer never reuses a
+  past gate approval for a new gate; guidance names bounded mode for the
+  maxFixRounds/maxAgentCalls options.
 
 # 0.6.0 — 2026-10-26
 
