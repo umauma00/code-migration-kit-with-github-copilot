@@ -79,7 +79,7 @@ node scripts/install.mjs --target /path/to/your-project --model MODEL_ID --langu
 node scripts/install.mjs --target /path/to/your-project --model MODEL_ID --language ja --apply
 ```
 
-**モデル・エフォート・コンテキストサイズは利用者が選びます。** `--model` を省略して導入し、対象リポジトリで次を実行すると、利用するアカウントで使えるモデルと、モデルごとに選べるエフォート（既定値）・コンテキストサイズ（入力上限）・料金をCLIから取得して表示します。AIはこの一覧をもとに、全担当のモデル・エフォート・コンテキストを**1回の質問**でまとめて聞き、回答を1回の `models set --assign` で記録します（ホストが利用者に1回だけ確認を求めます）。
+**モデル・エフォート・コンテキストサイズは利用者が選びます。** `--model` を省略して導入し、対象リポジトリで次を実行すると、利用するアカウントで使えるモデルと、モデルごとに選べるエフォート（既定値）・コンテキストサイズ（入力上限）・料金をCLIから取得して表示します。導入直後は、AIがこの一覧から全担当のモデルを**1回の質問**で聞き、`models set --role all` で記録します（ホストが利用者に1回だけ確認を求めます）。担当ごとのエフォート・コンテキストは下の実行設定ファイルで変えます。あとからチャットでモデルを変えるときは、全担当のモデル・エフォート・コンテキストを1回の質問で聞き、1回の `models set --assign` で記録します。`models set` と `preferences` で変えた値は、実行設定ファイルにも反映されます。
 
 ```bash
 node migration-kit/scripts/run_migration.mjs models list --format markdown
@@ -92,6 +92,16 @@ node migration-kit/scripts/run_migration.mjs models set --role reviewers --model
 コンテキストサイズは、エフォートの後ろに `:long_context` を付けた担当だけ長いコンテキスト（Copilot CLI の `--context long_context`）になります。付けられるのは、一覧のコンテキスト列に long_context があるモデルだけです。料金が上がるので、必要な担当に限ってください。付けなければ既定のコンテキストで、ワーカーに `--context` は渡しません（CLI 自身の設定 `contextTier` に従います）。1人の担当だけなら `--role 担当 --model ID --context long_context|default` も使えます。モデル・エフォートと同じく、変えるとレビュー済みの単位は次の実行で再レビューされます。一覧の取得にはCopilot CLIのサインインが必要です。
 
 従来どおり `--models implementer=ID,reviewers=ID,arbiter=ID,fixer=ID` で担当ごとのモデルを指定することもできます（未指定の担当は `--model`）。上流キットのモデル計画と同じく、影響範囲で選びます：レビュー担当は最大または中規模、大量に動く実装担当は中または小規模、修正・裁定担当は中規模。
+
+**実行設定は1つのファイルで決めます。** 導入後、AIはまず全担当のモデルを1問で聞き（選択肢はアカウントで使えるモデル、`models set --role all` で記録）、続けて `settings init` で `migration/run-settings.json` を作ります。移行元の言語はキットがファイルの拡張子から判定し、「移行元は C#（src 配下、120 ファイル）と判定しました。移行先はどの言語にしますか？」の1問で移行先を聞きます（判定が違うときは自由記入で訂正）。答えは `settings init --source C# --target TypeScript` で記録され、移行元のフォルダーも判定結果で埋まります。移行できる移行元の言語は1つです。同じくらいの量の別の言語があれば質問で知らせ、主言語を選んでもらいます。少しだけ混ざる言語（SQL など）は移行元の言語として扱いません（同梱の依存解析器が読むのは移行元の言語のファイルだけです）。移行元・移行先の言語、フォルダー、検証方式、元のコードが動くか、実行モード、同時実行数、各段階のコマンド、担当ごとのモデル・エフォート・コンテキストサイズが1ファイルに並び、使えるモデル・エフォート・コンテキストは `_choices`、説明は `_help` に入ります。モデル欄は全担当とも選んだモデルで埋まっているので、担当ごとに変えたいときだけ書き換えます。未記入の欄は `FILL_IN` です。質問を1つずつ受ける代わりに、このファイルを埋めて、AIの「記入しましたか？それとも質問がありますか？」に答えます。「記入した」と答えると `settings apply` が全項目をまとめて確かめ、1つでも誤りがあれば何も書き込まずに誤りを全部返します（ホストが1回だけ確認を求めます）。モデルを確かめるため、反映にはCopilot CLIのサインインが必要です。
+
+```bash
+node migration-kit/scripts/run_migration.mjs settings init
+node migration-kit/scripts/run_migration.mjs settings check
+node migration-kit/scripts/run_migration.mjs settings apply
+```
+
+値は従来どおり `migration/config.json`（言語・フォルダー・モデルなど）と `migration/preferences.json`（報告言語・元のコードが動くか）に記録され、報告言語を変えても承認は失効しません。ファイルはどの条件で実行したかの記録として残ります。書き換えて反映していない間は、`status` が「未反映の変更あり」と表示します。
 
 `--language ja|en` は、工程報告・質問・`status --format markdown` の言語です。`migration/preferences.json` に保存され、承認・完了判定には影響しません。省略した場合は、スキルが開始時に日本語・英語のどちらにするかを質問します。後から `run_migration.mjs preferences --language en` で変更できます。言語が未設定の間、フックは言語以外の質問を止めます。`ja` のときは、質問ごとに本文と選択肢を確かめ、日本語で書き直させます（`ask_user` と VS Code の askQuestions）。見出しや別の質問、\`バッククォート\` 内の日本語は数えません。ひらがなを含む文は日本語として通します（`src/main.pyを移行しますか？` のようにパスと続けて書いても構いません）。ひらがながない文では、空白で区切られたパス・ファイル名を除いてから判定するため、`Should we migrate 売上集計.java next?` は止まります。選択肢は、英単語2語以上で日本語を含まないものを止めます（`Java` のような1語の名前は通します）。文字種による簡易判定で、言語判定ではありません。ひらがなを含む名前を入れた英文はすり抜けます。
 

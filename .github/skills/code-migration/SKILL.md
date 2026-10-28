@@ -69,12 +69,12 @@ the preference after a compaction. Write every user-facing report, question, TOD
 and next-instruction example in that language, and link the matching documents:
 `X.md` for Japanese, `X.en.md` for English (for example [README](../../../README.md) /
 [README.en](../../../README.en.md)). Worker prompts and JSON stay in English. Before
-initialization, ask the language and the migration languages
-(one question per call with Copilot CLI `ask_user`; VS Code `vscode/askQuestions`
-takes them together) and pass `--language ja|en` to the installer.
+initialization, ask only the report language and pass `--language ja|en` to the
+installer; everything else is decided in the [run settings file](#run-settings-file-instead-of-one-question-per-setting).
 
-**Models and reasoning effort are the person's choice.** After initialization,
-and whenever they ask to change models, run
+**Models and reasoning effort are the person's choice.** At setup, one question
+picks the model for every role and the run settings file takes per-role changes
+(below). When the person asks in chat to change models later, run
 `run_migration.mjs models list --format markdown`: it lists the models and
 reasoning efforts their own Copilot account offers (read live from the CLI) and
 the current assignment. Show it, then ask **one** question that covers every
@@ -103,6 +103,67 @@ changes, so ask again about that entry only and record the full answer again.
 If `models list` reports that the CLI is not signed in, start `copilot login`
 first. A changed model, effort or context makes reviewed units be reviewed again.
 
+## Run settings file (instead of one question per setting)
+
+After initialization, choose the models first with **one** question for every
+role: run `run_migration.mjs models list --format markdown`, show it, and offer
+each enabled model as a choice ("every role on MODEL"). Record the answer with
+`run_migration.mjs models set --role all --model ID` (the host asks the person
+to confirm once; every role then runs the model's default effort and context).
+If the list cannot be read, offer no models: sign the CLI in first. Then run `run_migration.mjs settings init`. It writes
+`migration/run-settings.json` from the current configuration: report language,
+whether the original can still run, migration languages, preserve or redesign,
+source/output/test roots, verification mode, execution mode, concurrency, stage
+commands, and every role's model, effort and context size. The account's models,
+efforts and context tiers (read live from the CLI) are listed under `_choices`, explanations under
+`_help`, and `FILL_IN` marks what is still open; every role already holds the
+model just chosen, and the person edits a role only to give it another model,
+effort or context.
+
+While the languages are open, the result also carries `languages`: a guess of
+the source language from the project's files (counted by extension, leaving out
+dependencies, build output, hidden folders and the output and test roots) and
+a ready question in the report language. Ask it as **one** question: the
+choices are `languages.choices` (target languages), and free text names
+another target or corrects the source. Record the answer with
+`run_migration.mjs settings init --source SOURCE --target TARGET` (the guessed
+source unless the answer corrected it). The file then holds both languages and,
+while the folders are still the template's, the source language's detected
+folders as `sourceRoots`. The kit migrates one source language: when
+`languages.detected.mixed` lists another language of comparable size, the
+question says so and the person names the main one; smaller languages
+(`minor`) are not treated as the source language (the bundled dependency
+mapper reads only its files). A typed name such as `csharp` or `VB` is
+recorded as the name the mappers recognize. If no folder outside the test
+folders holds the source language, the result has `sourceRootsUnchosen`: say
+so and ask the person to write the source folders in the file. If nothing was
+found, the question asks for both languages as free text.
+
+Then link the file and ask **one**
+question with the question tool: has the person finished filling it in, or do
+they have a question? Offer two choices, "filled in" and "I have a question"
+(free text), in the report language.
+
+- Filled in: run `run_migration.mjs settings apply`. It checks every entry
+  (the account's model list, each model's efforts and the runner's own
+  configuration checks), writes nothing unless all pass, and records the values
+  in migration/config.json and migration/preferences.json; the host asks the
+  person to confirm once. If it returns `errors`, show every error and ask the
+  same question again.
+- A question: answer it, then ask the same question again. Edit the file only
+  when the person asks you to; never choose a value for them. You may explain
+  the upstream model plan as information, never as a preselected answer.
+
+`settings check` validates without writing. Running `settings init` again keeps
+the person's values, fills entries still `FILL_IN` from what was chosen since
+(such as the models), and refreshes the explanations and choices. The file stays
+as the record of the conditions a run used: `status` reports whether it still
+matches the configuration, and after an edit says it is not applied yet. To
+change settings later, the person edits the file and the same question follows.
+`models set` and `preferences` also write what they set (the named roles'
+model, effort and context; the given preferences) into the file, so apply never
+writes an older choice back; the person's other unapplied edits stay.
+
 Follow [phase reports and user decisions](../../../docs/PHASE-HANDOFF.md) at every
 phase boundary. Show the actual artifacts, review points and a copyable next
 instruction before asking. Use the available question tool for missing decisions;
@@ -128,8 +189,10 @@ for review; they do not route directly to a later phase. Respect redesign mode.
 
 ## No runnable original or no specification
 
-Before choosing a verification mode (at initialization, and whenever runtime 00b
-blocks), ask two yes/no questions with the question tool, one per call: can the original
+At initialization, take whether the original can run and the verification mode
+from the run settings file instead of asking; if it says the original cannot run,
+ask only whether a specification or portable test suite exists. Whenever runtime
+00b blocks later, ask two yes/no questions with the question tool, one per call: can the original
 implementation still run here, and does a specification or portable test suite
 exist? Record the first answer with `run_migration.mjs preferences --original-runtime
 available|unavailable` (presentation only; failure guidance uses it to pick its

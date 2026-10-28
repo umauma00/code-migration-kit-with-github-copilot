@@ -96,13 +96,19 @@ when a required answer or phase authorization is missing. Do not repeat a
 question whose answer is already clear. Give choices for every finite set of
 answers (language, proceed/revise/pause, failure options). Model IDs are free
 text: never guess an account's available models or offer invented ones as
-choices. `ask_user` takes one question per call, so ask related setup questions
-such as the migration languages one after another; group them only where the
-host takes several questions in one call (`vscode/askQuestions`). Models and
-efforts are the exception: ask them as one question for every role, answered
-in the `role=ID:EFFORT[:long_context], ...` form that `models list` shows (the
-context size rides in the same answer), and record it with
-one `models set --assign`. A
+choices. Setup settings are not asked one by one. After initialization, one question
+picks the model for every role (`models set --role all --model ID`); then
+one question asks the target language with the source language the kit
+guessed from the files shown (`settings init` returns it; the answer is
+recorded with `settings init --source SOURCE --target TARGET`), and
+`settings init` writes the rest (migration languages, roots, verification mode,
+commands, and per-role model, effort and context changes) to
+`migration/run-settings.json`, and one question asks whether the person has
+filled it in or has a question; "filled in" runs `settings apply` (see the
+skill's run settings section). Only the report language is asked before
+initialization. A later change of models alone, asked for in chat, is one
+question for every role, answered in the `role=ID:EFFORT[:long_context], ...` form that
+`models list` shows and recorded with one `models set --assign`. A
 free-text reply that does not clearly pick a choice is a new instruction, not
 consent: clarify it before acting on a gate.
 

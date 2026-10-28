@@ -52,7 +52,7 @@ For large files with many census sites, capacity is shared between the source
 and site batches to reduce duplicate requests while retaining every site's full
 fragment coverage. Legacy encodings (Shift_JIS, EUC-JP,
 Latin-1, UTF-16) are decoded by the bundled mappers' rules and each input file
-names its `encoding`; the original is never changed and, since 0.10.1, the
+names its `encoding`; the original is never changed and, since 0.11.1, the
 survey never stops to ask for a conversion. When non-UTF-8 sources are
 kanji-only, set `sourceEncoding` in `migration/config.json`. Binaries under a source root are
 left out of the survey and counted in `binaryFilesLeftOut`. Missing or
