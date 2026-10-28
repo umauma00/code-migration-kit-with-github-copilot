@@ -308,3 +308,34 @@ test('review (Sonnet): a gate runs unasked only on its own; switching auto on ou
   writeJSON(safePath(f.root, 'migration/preferences.json'), { schemaVersion: 1, phaseMode: 'auto' });
   assert.equal(decide(f, gateCommands[0])?.decision, 'ask');
 });
+
+test('review of 6e26d89: guardrails.json matching is unchanged in every mode; the record is matched from the working directory; notes stay one gate', t => {
+  const f = fixture(t);
+  // Unrelated guardrails.json files after a cd: allowed as before 0.13.0.
+  for (const command of ['cd frontend && cp ../tpl/guardrails.json config/guardrails.json', "cd tools && echo '{}' > ../policy/guardrails.json",
+    'cd app && npm run gen -- --out ./guardrails.json', 'cd src && touch sub/guardrails.json'])
+    assert.equal(decide(f, command), null, command);
+  // A commit message with the word auto is not a switch to auto mode.
+  assert.equal(decide(f, 'cp migration/preferences.json backups/prefs-auto-backup.json'), null);
+  // The record and preferences.json named relative to the session's working directory.
+  const inside = (dir, command) => interactiveDecision({ toolName: 'bash', toolArgs: { command }, cwd: safePath(f.root, dir) }, f.root);
+  fs.mkdirSync(safePath(f.root, 'migration/phases'), { recursive: true });
+  for (const [dir, command] of [['migration', 'cp x phases/auto-mode.json'], ['migration', 'cp x ./phases/auto-mode.json'], ['migration/phases', 'echo {} > ../phases/auto-mode.json'],
+    ['migration', 'cp x ./phases/../phases/auto-mode.json']]) assert.equal(inside(dir, command)?.decision, 'deny', `${dir}: ${command}`);
+  assert.equal(inside('migration', `echo '{"phaseMode":"auto"}' > ./preferences.json`)?.decision, 'ask');
+  // In auto mode, notes with literal $ or backticks in single quotes and notes naming the runner are one gate.
+  setPreferences(f.root, { phaseMode: 'auto' });
+  for (const note of ["'Reviewed `RULEBOOK.md` and costs $5'", '"ran run_migration.mjs status first"']) assert.equal(decide(f, `${kit} phase complete 02 --note ${note}`), null, note);
+  // Double quotes still expand, so they ask.
+  assert.equal(decide(f, `${kit} phase complete 02 --note "costs \`id\`"`)?.decision, 'ask');
+  // A record retired by another reader first never makes reading fail.
+  setPreferences(f.root, { phaseMode: 'auto' });
+  writeJSON(safePath(f.root, 'migration/preferences.json'), { ...readPreferences(f.root), phaseMode: 'normal' });
+  readPreferences(f.root);
+  assert.doesNotThrow(() => readPreferences(f.root));
+  // A record with no preferences file is retired too.
+  setPreferences(f.root, { phaseMode: 'auto' });
+  fs.rmSync(safePath(f.root, 'migration/preferences.json'));
+  readPreferences(f.root);
+  assert.equal(fs.existsSync(safePath(f.root, autoModeFile)), false);
+});

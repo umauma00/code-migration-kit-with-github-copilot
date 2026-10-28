@@ -308,8 +308,10 @@ those options. Never write the file any other way (the hook denies it). Outside
 auto mode the host asks the person to confirm every `approve` / `phase complete` /
 `guardrails install` command; if it cannot ask (autopilot denies the request),
 tell the person to leave autopilot and retry instead of working around it. In
-auto mode these run unasked (see the auto mode paragraph below), one command per
-call: a gate chained with anything else still asks. Outside auto mode, run gate commands only in an
+auto mode these run unasked (see the auto mode paragraph below) only as one
+command per call, run from the target repository: no `cd`, pipe or other
+command with it, and a `--note` in single quotes when it contains `$` or
+backticks; anything else still asks, and autopilot then stops. Outside auto mode, run gate commands only in an
 interactive session without autopilot, which denies them. The Copilot CLI may show
 its own permission prompt after the hook's question, so the person can be asked
 twice. An explicit

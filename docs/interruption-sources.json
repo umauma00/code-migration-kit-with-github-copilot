@@ -1005,7 +1005,7 @@
     },
     {
       "path": "lib/guardrails.mjs",
-      "sha256": "962d48a4d1f2a1ff81ef4750585edc715fdd5ec2db6bff05e8b5e0027af4e88b",
+      "sha256": "ab06352c14dd53dc178969cd8b27a7396946e7139966d45646d00f29be7110b8",
       "entries": [
         {
           "line": 46,
@@ -2053,40 +2053,40 @@
     },
     {
       "path": "lib/preferences.mjs",
-      "sha256": "9df140f39577e71bc70d1f0a6b125fd77e445cb9a210f762ffe7a5547d487d15",
+      "sha256": "526d6699ecaa8252f0a73e37c9fde52e3d9ce7c6c1906b1a0b524571452af7d2",
       "entries": [
         {
-          "line": 41,
+          "line": 44,
           "kind": "error-or-exit-candidate",
           "code": "if (value?.schemaVersion !== 1 || (value.userLanguage !== null && !userLanguages.includes(value.userLanguage))) throw new Error(`${preferencesFile} must have schemaVersion 1 and userLanguage ja or en`);"
         },
         {
-          "line": 42,
+          "line": 45,
           "kind": "error-or-exit-candidate",
           "code": "if (value.originalRuntime !== undefined && value.originalRuntime !== null && !originalRuntimes.includes(value.originalRuntime)) throw new Error(`${preferencesFile}: originalRuntime must be available or unavailable`);"
         },
         {
-          "line": 43,
+          "line": 46,
           "kind": "error-or-exit-candidate",
           "code": "if (value.phaseMode !== undefined && value.phaseMode !== null && !phaseModes.includes(value.phaseMode)) throw new Error(`${preferencesFile}: phaseMode must be normal, relaxed or auto`);"
         },
         {
-          "line": 49,
+          "line": 52,
           "kind": "error-or-exit-candidate",
           "code": "if (language === undefined && originalRuntime === undefined && phaseMode === undefined) throw new Error('Set --language ja|en, --original-runtime available|unavailable and/or --phase-mode normal|relaxed|auto');"
         },
         {
-          "line": 50,
+          "line": 53,
           "kind": "error-or-exit-candidate",
           "code": "if (language !== undefined && !userLanguages.includes(language)) throw new Error('language must be ja or en');"
         },
         {
-          "line": 51,
+          "line": 54,
           "kind": "error-or-exit-candidate",
           "code": "if (originalRuntime !== undefined && !originalRuntimes.includes(originalRuntime)) throw new Error('original-runtime must be available or unavailable');"
         },
         {
-          "line": 52,
+          "line": 55,
           "kind": "error-or-exit-candidate",
           "code": "if (phaseMode !== undefined && !phaseModes.includes(phaseMode)) throw new Error('phase-mode must be normal, relaxed or auto');"
         }

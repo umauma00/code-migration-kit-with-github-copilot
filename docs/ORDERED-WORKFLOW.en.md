@@ -71,7 +71,7 @@ node migration-kit/scripts/run_migration.mjs phase waive 03 --note "See the over
 Autopilot refuses every confirmation (a hook ask), so `normal` and `relaxed` stop at the gates. `auto` lets those gates through without asking the person.
 
 - Run unasked: `approve` (with `--complete-phase` too), `phase complete`, `phase waive`, `build-loop`, and a plain `guardrails install` (the template as is) while no guardrails file exists.
-- A gate runs unasked only as a command of its own: chained with anything else (`&&`, `;`, a pipe, `$(...)`) it asks.
+- A gate runs unasked only as a command of its own: chained with anything else (`cd`, `&&`, `;`, a pipe, `$(...)`) it asks. Put a `--note` containing `$` or backticks in single quotes.
 - Still asked: `models set`, `settings apply`, `sessions prune`, `pilot prepare`, `source-spec init --apply`, `guardrails install` with `--add`, `--remove`, `--deny`, `--waiver` or `--replace` or when a file exists, and kit calls the hook cannot read. Writing `guardrails.json` directly stays denied.
 - Switching to `auto` (`preferences --phase-mode auto`, or a `settings apply` carrying `phaseMode: "auto"`, whose confirmation then names the switch) needs the person's confirmation in every mode, also when the `--phase-mode` value is anything but a literal `normal` or `relaxed` (a variable, `$(...)`). Leaving `auto` is unasked.
 - `auto` is in effect only with the record the runner writes, `migration/phases/auto-mode.json`; the hook denies agents writing it, and leaving `auto` moves it to `migration/phases/retired/`. A preferences.json edited to `auto` by hand is not in effect: gates ask as in relaxed mode, and status says so.

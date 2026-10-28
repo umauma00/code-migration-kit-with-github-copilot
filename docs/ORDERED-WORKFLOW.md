@@ -88,7 +88,7 @@ node migration-kit/scripts/run_migration.mjs phase waive 03 --note "全体の形
 autopilot は確認（フックの ask）を自動で拒否するため、`normal` と `relaxed` では関門で止まります。`auto` はその関門だけを人に聞かずに通します。
 
 - 確認なしで実行できるもの：`approve`（`--complete-phase` 付きも）、`phase complete`、`phase waive`、`build-loop`、guardrails が未設置のときのオプションなしの `guardrails install`（テンプレートのまま）。
-- 確認なしになるのは、関門コマンドを単独で実行したときだけです（`&&`・`;`・パイプ・`$(...)` で他のコマンドとつなぐと確認します）。
+- 確認なしになるのは、関門コマンドを単独で実行したときだけです（`cd`・`&&`・`;`・パイプ・`$(...)` で他のコマンドとつなぐと確認します）。`--note` に `$` やバッククォートを含めるときは単一引用符で囲みます。
 - 今までどおり確認するもの：`models set`、`settings apply`、`sessions prune`、`pilot prepare`、`source-spec init --apply`、`--add`・`--remove`・`--deny`・`--waiver`・`--replace` 付きか既に設置済みのときの `guardrails install`、読み取れない形のキット呼び出し。`guardrails.json` を直接書くことも拒否のままです。
 - `auto` に切り替える操作（`preferences --phase-mode auto` と、`phaseMode: "auto"` を含む `settings apply`。後者は確認の理由に自動モードへの切り替えと書かれます）は、どのモードでも人の確認が必要です。`--phase-mode` の値が文字どおりの `normal`・`relaxed` 以外（変数・`$(...)` など）のときも確認します。`auto` から抜ける操作は確認なしです。
 - `auto` が効くのは、runner が書く記録 `migration/phases/auto-mode.json` があるときだけです。エージェントがこのファイルを直接書くことはフックが拒否します。`auto` から抜けるとこの記録は `migration/phases/retired/` へ移ります。preferences.json を手で `auto` にしただけでは無効で、関門は緩和モードと同じく確認し、status がその旨を表示します。
