@@ -2597,7 +2597,7 @@
     },
     {
       "path": "lib/source-spec.mjs",
-      "sha256": "1f4520aabaf0f886f49a937bf6a0e0ed29eb33bdbb2bf5255f81765f8660b8ad",
+      "sha256": "83bc4d49606dc7b8c6c8cb9cdcb2534f45b4f9954bf6fef5b2a367612fab59c8",
       "entries": [
         {
           "line": 97,
@@ -4115,7 +4115,7 @@
     },
     {
       "path": "scripts/phase_cli.mjs",
-      "sha256": "1950273ccf22555515840ffb399e2edc07abdc13475df2e08ff08ea0ca5d6949",
+      "sha256": "2e4cd61393cda390e370a1f31825809bb7d0171de367a04e4a2002c45107799b",
       "entries": [
         {
           "line": 13,

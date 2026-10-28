@@ -90,15 +90,15 @@ test('a source-as-spec package starts 01 and 02 before 00b is recorded, checks t
   const alone = run(root, 'phase', 'complete', '01', '--note', 'x');
   assert.notEqual(alone.status, 0); assert.match(alone.stderr, /Phase 00b is not reviewed/);
   // With 00b already recorded, a lone check names only what is left.
-  atomicWrite(safePath(root, 'migration/phases/00b.json'), '{}');
+  ok(run(root, 'phase', 'complete', '00b', '--note', '00b reviewed first'), 'phase complete 00b');
   const partial = ['02', '01'].map(id => run(root, 'phase', 'check', id));
   partial.forEach((r, i) => ok(r, `phase check ${['02', '01'][i]} after 00b`));
   assert.equal(partial[0].json.recordWith, 'phase complete 01,02');
   assert.equal(partial[1].json.recordWith, undefined);
-  fs.rmSync(safePath(root, 'migration/phases/00b.json'));
-  ok(run(root, 'phase', 'complete', '00b,01,02', '--note', 'package reviewed'), 'phase complete 00b,01,02');
+  ok(run(root, 'phase', 'complete', '01,02', '--note', 'package reviewed'), 'phase complete 01,02');
   const after = run(root, 'phase', 'check', '02');
-  if (!after.status) assert.equal(after.json.recordWith, undefined, 'nothing to name once recorded');
+  ok(after, 'phase check 02 once recorded');
+  assert.equal(after.json.recordWith, undefined, 'nothing to name once recorded');
   ok(run(root, 'judge'), 'judge');
 });
 
@@ -297,7 +297,7 @@ test('Sonnet review: distinct blockers stay listed; missing source roots get no 
 test('C spellings get real manifest extensions before the map exists', t => {
   const root = project(t, { files: { 'app/a.c': 'int a;\n' } });
   const { sourceSpecReadiness } = loadReadiness;
-  for (const language of ['C', 'C ', 'ANSI C', 'C (C89)', 'Embedded C', 'C/C++', 'Visual C++']) {
+  for (const language of ['C', 'C ', 'ANSI C', 'C (C89)', 'Embedded C', 'C99', 'C/C++', 'Visual C++']) {
     const manifest = sourceSpecReadiness(root, { ...loadConfig(root), sourceLanguage: language }).commands.manifest;
     assert.doesNotMatch(manifest, /SOURCE_EXT/, language);
   }

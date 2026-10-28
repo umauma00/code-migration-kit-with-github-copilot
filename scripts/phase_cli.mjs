@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { lockRun, contextHash, readManifest, done } from '../lib/core.mjs';
 import { currentRecord, requireGate } from '../lib/pipeline.mjs';
-import { initializePhases, checkPreparation, startPhase, completePhase, requirePhase, orderedPhases, phaseRecorded } from '../lib/phases.mjs';
+import { initializePhases, checkPreparation, startPhase, completePhase, requirePhase, orderedPhases, currentPhase } from '../lib/phases.mjs';
 import { migrationStatus } from '../lib/status.mjs';
 import { requireGuardrails } from '../lib/guardrails.mjs';
 
@@ -57,8 +57,8 @@ export function phaseCommand(root, config, action, phase, options = {}) {
       if (['00','00b','01','02','03'].includes(id)) completePhase(root,config,id,'check',{},{dryRun:true,assumePredecessor:i > 0 || packaged(id),confirmNoDependencies:Boolean(options['confirm-no-dependencies'])});
     });
     // A single packaged 01/02 is ready for its own evidence only; while an
-    // earlier package phase is unrecorded, say which phases record together.
-    const unrecorded = ['00b','01','02'].filter(id => !phaseRecorded(root, id));
+    // earlier package phase is not current, say which phases record together.
+    const unrecorded = ['00b','01','02'].filter(id => !currentPhase(root, config, id));
     const recordWith = ids.length === 1 && packaged(phase) && unrecorded.includes(phase) && unrecorded[0] !== phase ? { recordWith: `phase complete ${unrecorded.join(',')}` } : {};
     return ids.length > 1 ? ids.map(id => ({phase:id,ready:true})) : {phase,ready:true,...recordWith};
   }
