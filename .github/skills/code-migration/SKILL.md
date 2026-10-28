@@ -176,6 +176,23 @@ so; tell the person. When the answer is available but the file says
 original; set `runtime` in the file only on their yes. Then run `settings init`
 again.
 
+Fifth, only when the original does not run, `settings init` returns
+`specificationQuestion`: is there a specification or a test suite the target can
+use too? Ask it as **one** question and record the answer with
+`run_migration.mjs preferences --specification available|unavailable`, then run
+`settings init` again. Unavailable means the source is the only specification:
+after `settings apply`, its `next` has you run `source-spec init`, show the
+changes, and run `source-spec init --apply` (the host asks once) during setup,
+so phase 00b never stops on that switch.
+
+Whenever a `settings init`, `settings apply` or `source-spec init` result
+carries `setupNotice` (auto mode is chosen and setup is not done), put it first
+in the question you ask, as written, so the person knows the run is still manual.
+When a result carries `autoHandoff`, setup is done: show it as written and end
+the turn without starting phase 00. If a setup question is answered by the host
+itself (autopilot), it is not an answer: say that setup is still manual and ask
+the person to leave autopilot and answer.
+
 Then link the file and the help file and ask **one**
 question with the question tool: has the person finished filling it in, or do
 they have a question? Offer two choices, "filled in" and "I have a question"
@@ -229,7 +246,8 @@ for review; they do not route directly to a later phase. Respect redesign mode.
 
 At initialization, whether the original can run is the run settings' fourth
 question (above); take the verification mode from the file. If the original cannot run,
-ask only whether a specification or portable test suite exists. Whenever runtime
+the fifth question asks whether a specification or portable test suite exists, and
+without one setup switches to source-as-spec before phase 00 (above). Whenever runtime
 00b blocks later, ask two yes/no questions with the question tool, one per call: can the original
 implementation still run here, and does a specification or portable test suite
 exist? Record the first answer with `run_migration.mjs preferences --original-runtime
@@ -374,7 +392,10 @@ one that blocked. Missing guardrails are installed from the template
 automatically. Everything else still stops: safety checks, sign-in and credits,
 unfilled run settings, and the commands the hook still asks about (models set,
 settings apply, sessions prune, pilot prepare, source-spec init --apply); report
-them and stop. Never switch auto mode on yourself, neither with `preferences --phase-mode
+them and stop. If phase 00 finds that a setup answer was wrong (the original does
+not run after all, or a specification turns up), say which answer and why, and
+ask the person to leave autopilot and decide in chat; never switch the profile
+yourself. Never switch auto mode on yourself, neither with `preferences --phase-mode
 auto` nor by writing `phaseMode: "auto"` into run-settings.json or
 preferences.json: it is the person's act (the hook asks for the command, and a
 hand edit is not in effect). Every report and the handoff list the

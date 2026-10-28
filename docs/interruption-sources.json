@@ -47,7 +47,7 @@
     },
     {
       "path": "lib/auto-mode.mjs",
-      "sha256": "b4832bb09ee9055bf068ee01386c6dfceb210015c52ae512861c89dba2e65f72",
+      "sha256": "446010d0cdc2533946713fae26b149cc586ea87df6faa2b2d3d3399d41cba4ac",
       "entries": []
     },
     {
@@ -329,7 +329,7 @@
     },
     {
       "path": "lib/cli.mjs",
-      "sha256": "ca028c3fb6d4397e4873615da8da8c1677f71abc3914e57e7ddbff76c9eb3ca1",
+      "sha256": "d3ca0b770f7ac90f0d9bedbb6cab8d41fc654d2900f5985ef1038d222f72a156",
       "entries": [
         {
           "line": 97,
@@ -2053,40 +2053,50 @@
     },
     {
       "path": "lib/preferences.mjs",
-      "sha256": "526d6699ecaa8252f0a73e37c9fde52e3d9ce7c6c1906b1a0b524571452af7d2",
+      "sha256": "5155ca5c723cb9a8a7f89e72cc3cbfc72dd16c4f9254cbdf563b92fa51f35111",
       "entries": [
         {
-          "line": 44,
+          "line": 48,
           "kind": "error-or-exit-candidate",
           "code": "if (value?.schemaVersion !== 1 || (value.userLanguage !== null && !userLanguages.includes(value.userLanguage))) throw new Error(`${preferencesFile} must have schemaVersion 1 and userLanguage ja or en`);"
         },
         {
-          "line": 45,
+          "line": 49,
           "kind": "error-or-exit-candidate",
           "code": "if (value.originalRuntime !== undefined && value.originalRuntime !== null && !originalRuntimes.includes(value.originalRuntime)) throw new Error(`${preferencesFile}: originalRuntime must be available or unavailable`);"
         },
         {
-          "line": 46,
+          "line": 50,
+          "kind": "error-or-exit-candidate",
+          "code": "if (value.specification !== undefined && value.specification !== null && !specifications.includes(value.specification)) throw new Error(`${preferencesFile}: specification must be available or unavailable`);"
+        },
+        {
+          "line": 51,
           "kind": "error-or-exit-candidate",
           "code": "if (value.phaseMode !== undefined && value.phaseMode !== null && !phaseModes.includes(value.phaseMode)) throw new Error(`${preferencesFile}: phaseMode must be normal, relaxed or auto`);"
         },
         {
-          "line": 52,
+          "line": 57,
           "kind": "error-or-exit-candidate",
-          "code": "if (language === undefined && originalRuntime === undefined && phaseMode === undefined) throw new Error('Set --language ja|en, --original-runtime available|unavailable and/or --phase-mode normal|relaxed|auto');"
+          "code": "if (language === undefined && originalRuntime === undefined && phaseMode === undefined && specification === undefined) throw new Error('Set --language ja|en, --original-runtime available|unavailable, --phase-mode normal|relaxed|auto and/or --specification available|unavailable');"
         },
         {
-          "line": 53,
+          "line": 58,
+          "kind": "error-or-exit-candidate",
+          "code": "if (specification !== undefined && !specifications.includes(specification)) throw new Error('specification must be available or unavailable');"
+        },
+        {
+          "line": 59,
           "kind": "error-or-exit-candidate",
           "code": "if (language !== undefined && !userLanguages.includes(language)) throw new Error('language must be ja or en');"
         },
         {
-          "line": 54,
+          "line": 60,
           "kind": "error-or-exit-candidate",
           "code": "if (originalRuntime !== undefined && !originalRuntimes.includes(originalRuntime)) throw new Error('original-runtime must be available or unavailable');"
         },
         {
-          "line": 55,
+          "line": 61,
           "kind": "error-or-exit-candidate",
           "code": "if (phaseMode !== undefined && !phaseModes.includes(phaseMode)) throw new Error('phase-mode must be normal, relaxed or auto');"
         }
@@ -2504,7 +2514,7 @@
     },
     {
       "path": "lib/run-settings.mjs",
-      "sha256": "1578731a934533a8ffa6703bc7499c56acb877f53d2afb90e4b448ef9b9be907",
+      "sha256": "7cf53312ef6e7058430abace935bc65bc0f99102a10bdb3effb237661e92b4e6",
       "entries": [
         {
           "line": 24,
@@ -2587,17 +2597,17 @@
           "code": "if (empty.length) throw new Error(`--source-roots: ${empty.join(', ')} ${empty.length > 1 ? 'hold' : 'holds'} no files; ask for the source folders again`);"
         },
         {
-          "line": 264,
+          "line": 310,
           "kind": "error-or-exit-candidate",
           "code": "if (!fs.existsSync(file)) throw new Error(`${runSettingsFile} is missing: run settings init first`);"
         },
         {
-          "line": 266,
+          "line": 312,
           "kind": "error-or-exit-candidate",
           "code": "try { value = readJSON(file); } catch (e) { throw new Error(`${runSettingsFile} is not valid JSON: ${e.message}`); }"
         },
         {
-          "line": 267,
+          "line": 313,
           "kind": "error-or-exit-candidate",
           "code": "if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${runSettingsFile} must be a JSON object`);"
         }
@@ -4425,7 +4435,7 @@
     },
     {
       "path": "scripts/run_migration.mjs",
-      "sha256": "551c8c2337cbf898e00b095ebd1ca093656499f8556765b0ab041816612d8fc9",
+      "sha256": "a1f0c9f738c9de4629d8b170adbfa98bb637855938f79761b765faae7e0c1223",
       "entries": [
         {
           "line": 81,
@@ -4608,47 +4618,47 @@
           "code": "const abort = () => controller.abort();"
         },
         {
-          "line": 353,
+          "line": 358,
           "kind": "error-or-exit-candidate",
           "code": "else if (cmd === 'source-spec') throw new Error('Use source-spec init [--apply] | check');"
         },
         {
-          "line": 366,
+          "line": 371,
           "kind": "error-or-exit-candidate",
           "code": "} else throw new Error('Use survey plan|run|status|merge --kind facts|contracts|inventory [--max-files N] [--sites migration/PATH.tsv]');"
         },
         {
-          "line": 380,
+          "line": 385,
           "kind": "error-or-exit-candidate",
           "code": "else throw new Error('Use sessions status | prune [--run RUN_ID]');"
         },
         {
-          "line": 388,
+          "line": 393,
           "kind": "error-or-exit-candidate",
           "code": "} else throw new Error('Use guardrails show | install [--add CSV] [--remove CSV] [--deny CSV] [--waiver NOTE] [--replace]');"
         },
         {
-          "line": 393,
+          "line": 398,
           "kind": "error-or-exit-candidate",
           "code": "process.exitCode = 1;"
         },
         {
-          "line": 404,
+          "line": 409,
           "kind": "error-or-exit-candidate",
           "code": "if (args._[1] !== 'translation' || args['complete-phase'] !== '03') throw new Error('--complete-phase applies only as approve translation --complete-phase 03');"
         },
         {
-          "line": 411,
+          "line": 416,
           "kind": "error-or-exit-candidate",
           "code": "if (cmd === 'repair' && !args.target && !args.queue) throw new Error('repair requires --target or --queue');"
         },
         {
-          "line": 416,
+          "line": 421,
           "kind": "error-or-exit-candidate",
           "code": "} else throw new Error(`Unknown command ${cmd}\\n${usage}`);"
         },
         {
-          "line": 437,
+          "line": 442,
           "kind": "error-or-exit-candidate",
           "code": "process.exitCode = 1;"
         }
@@ -4729,5 +4739,5 @@
       ]
     }
   ],
-  "candidateLines": 858
+  "candidateLines": 860
 }

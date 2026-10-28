@@ -26,7 +26,7 @@ import { buildLoop } from '../lib/build-loop.mjs';
 import { readPreferences, setPreferences, preferencesReport } from '../lib/preferences.mjs';
 import { readGuardrails, cliFolderTrust, guardrailsProposal, installGuardrails } from '../lib/guardrails.mjs';
 import { listAvailableModels, modelsMarkdown, setRoleModels, readConfigIfPresent, currentAssignments } from '../lib/models.mjs';
-import { initRunSettings, checkRunSettings, applyRunSettings, syncRunSettings, runSettingsFile } from '../lib/run-settings.mjs';
+import { initRunSettings, checkRunSettings, applyRunSettings, syncRunSettings, runSettingsFile, setupEnd } from '../lib/run-settings.mjs';
 import { ignoredLimits, processTimeout } from '../lib/execution-policy.mjs';
 
 export const usage = `Usage: node migration-kit/scripts/run_migration.mjs COMMAND [options]
@@ -43,7 +43,7 @@ export const usage = `Usage: node migration-kit/scripts/run_migration.mjs COMMAN
                               Record every role's model, effort and context from one answer (all=ID first, then overrides)
   models set --role ROLE[,ROLE]|reviewers|all --model ID [--effort LEVEL|default] [--context default|long_context]
                               Record one choice; both forms are checked against that list before writing
-  preferences [--language ja|en] [--original-runtime available|unavailable] [--phase-mode normal|relaxed|auto]
+  preferences [--language ja|en] [--original-runtime available|unavailable] [--phase-mode normal|relaxed|auto] [--specification available|unavailable]
                               Report language; whether the original can still run (guides recommendations)
   settings init [--source LANGUAGE] [--target LANGUAGE] [--source-roots CSV] | check | apply
                               migration/run-settings.json: write it (values only; explanations and your account's models
@@ -235,8 +235,8 @@ export async function main(argv = process.argv.slice(2)) {
     console.log(`Removed stale ${target.endsWith('.recover') ? 'lock recovery claim' : 'lock'}: migration/${path.basename(target)}`); return;
   }
   if (cmd === 'preferences') {
-    const setting = args.language || args['original-runtime'] || args['phase-mode'];
-    const result = setting ? setPreferences(root, { language: args.language, originalRuntime: args['original-runtime'], phaseMode: args['phase-mode'] }) : preferencesReport(root);
+    const setting = args.language || args['original-runtime'] || args['phase-mode'] || args.specification;
+    const result = setting ? setPreferences(root, { language: args.language, originalRuntime: args['original-runtime'], phaseMode: args['phase-mode'], specification: args.specification }) : preferencesReport(root);
     if (setting) {
       const report = {};
       const synced = syncRunSettings(root, { keys: [...(args.language ? ['reportLanguage'] : []), ...(args['original-runtime'] ? ['originalRuntime'] : []), ...(args['phase-mode'] ? ['phaseMode'] : [])], report });
@@ -346,6 +346,11 @@ export async function main(argv = process.argv.slice(2)) {
         if (result.applied && result.changes.some(c => c.path === 'migration/config.json')) {
           const synced = syncRunSettings(root, { keys: ['verificationMode'] });
           if (synced) result.runSettings = `${synced} updated to match`;
+          // Switched during setup: phase 00 comes first, and auto mode stops here for autopilot.
+          if (!fs.existsSync(path.join(root, 'migration/phases/00.json'))) {
+            result.next = 'The source-as-spec profile is set as part of setup. Phase 00 comes first; the drafts listed in readiness are phase 00b-02 work.';
+            Object.assign(result, setupEnd(root, config));
+          }
         }
       } finally { release(); }
     }

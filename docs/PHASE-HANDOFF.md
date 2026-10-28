@@ -103,7 +103,11 @@ guessed from the files shown (`settings init` returns it; the answer is
 recorded with `settings init --source SOURCE --target TARGET`), one question
 asks how phases advance (normal, recommended; relaxed; or auto, for autopilot;
 recorded with `preferences --phase-mode`, see [relaxed mode](ORDERED-WORKFLOW.en.md#relaxed-mode)
-and [auto mode](ORDERED-WORKFLOW.en.md#auto-mode)), and
+and [auto mode](ORDERED-WORKFLOW.en.md#auto-mode)); whether the original runs and,
+only when it does not, whether a specification exists are asked next (without one,
+setup switches to source-as-spec before phase 00). In auto mode every setup question
+starts with `setupNotice` (setup is still manual), and `autoHandoff` ends setup:
+show it and stop before phase 00 so the person can switch to autopilot. Then
 `settings init` writes the rest (migration languages, roots, verification mode,
 commands, and per-role model, effort and context changes) to
 `migration/run-settings.json`, and one question asks whether the person has
