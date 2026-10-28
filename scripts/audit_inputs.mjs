@@ -59,7 +59,7 @@ function currentRequest(root, config, directory) {
   const request = readJSON(safePath(root, `${directory}/request.json`));
   if (request.schemaVersion !== 1 || request.kind !== 'preparation-audit-request' || !Object.hasOwn(models, request.type) || request.requestedModel !== auditModel(config, request.type) ||
         !request.input || !Array.isArray(request.input.files) || request.snapshot !== snapshot(root, config) || hash(JSON.stringify(request.input)) !== request.inputHash ||
-        request.input.files.some(f => typeof f.content !== 'string' || hash(f.content) !== f.hash || hash(readReviewText(root, f.path)) !== f.hash)) throw new Error(`Preparation audit inputs changed; use fresh contexts and requests: freeze a replacement, then retire --directory ${directory} --superseded-by NEW --reason TEXT`);
+        request.input.files.some(f => typeof f.content !== 'string' || hash(f.content) !== f.hash || currentHash(root, f.path) !== f.hash)) throw new Error(`Preparation audit inputs changed; use fresh contexts and requests: freeze a replacement, then retire --directory ${directory} --superseded-by NEW --reason TEXT`);
   return request;
 }
 export async function runAudit(root, config, adapter, { directory, signal } = {}) {

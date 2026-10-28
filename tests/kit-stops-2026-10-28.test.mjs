@@ -240,6 +240,11 @@ test('re-review fixes: legacy audit inputs freeze, a wrong root stays a blocker,
   fs.rmSync(safePath(root, 'app/A.php'));
   const { runAudit } = await import('../scripts/audit_inputs.mjs');
   await assert.rejects(runAudit(root, loadConfig(root), async () => { throw new Error('not called'); }, { directory: frozen.directory }), /Preparation audit inputs changed/);
+  // Also for an input outside the source roots, which the snapshot does not cover.
+  atomicWrite(safePath(root, 'migration/notes.md'), 'note\n');
+  const outside = freezeAudit(root, loadConfig(root), { type: 'judge', files: ['migration/notes.md'] });
+  fs.rmSync(safePath(root, 'migration/notes.md'));
+  await assert.rejects(runAudit(root, loadConfig(root), async () => { throw new Error('not called'); }, { directory: outside.directory }), /Preparation audit inputs changed/);
 });
 
 test('a legacy-encoded unit source over the input budget is named, not inlined', async t => {
@@ -251,4 +256,10 @@ test('a legacy-encoded unit source over the input budget is named, not inlined',
   const [entry] = legacySources(root, config, { source: 'app/K.php' });
   assert.equal(entry.encoding, 'cp932'); assert.equal(entry.content, undefined);
   assert.equal(legacySources(root, { ...config, maxReviewInputBytes: 65536 }, { source: 'app/K.php' })[0].content.length, 305);
+  // The unit's own source takes the budget before a dependency that sorts first.
+  fs.writeFileSync(safePath(root, 'app/A.php'), Buffer.from([0x3c, 0x3f, 0x0a, ...Array(300).fill([0x93, 0xfa]).flat(), 0x82, 0xa0, 0x0a]));
+  fs.writeFileSync(safePath(root, 'app/K.php'), Buffer.from([0x3c, 0x3f, 0x0a, 0x93, 0xfa, 0x82, 0xa0, 0x0a]));
+  writeJSON(deps, { schemaVersion: 1, dependencies: { 'app/K.php': ['app/A.php'], 'app/A.php': [] } });
+  const ordered = legacySources(root, { ...config, maxReviewInputBytes: 600 }, { source: 'app/K.php' });
+  assert.deepEqual(ordered.map(e => [e.path, typeof e.content]), [['app/K.php', 'string'], ['app/A.php', 'undefined']]);
 });

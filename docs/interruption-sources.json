@@ -2383,7 +2383,7 @@
     },
     {
       "path": "lib/review.mjs",
-      "sha256": "b20edbdab3900a199bc89e82e0bb2cd4a2d5a044bfe7f6232bcdad3028bfb303",
+      "sha256": "58d8481b717cb4276aca7bc10e3742667f573316200e8f4f59b6cbfb41dc1299",
       "entries": [
         {
           "line": 22,
@@ -2406,57 +2406,57 @@
           "code": "const limit = config.maxReviewInputBytes ?? 65536, out = [];"
         },
         {
-          "line": 63,
+          "line": 64,
           "kind": "error-or-exit-candidate",
           "code": "if (!Array.isArray(front?.tools) || front.tools.length || Object.hasOwn(front, 'model')) throw new Error('Preparation auditor requires tools: [] and explicit host model selection without a profile override');"
         },
         {
-          "line": 76,
+          "line": 77,
           "kind": "error-or-exit-candidate",
           "code": "if (cells[0] !== 'file' || cells.length < 2 || cells.some(c => !c) || new Set(cells).size !== cells.length) throw new Error('Inventory header must begin with file<TAB> and have unique column names');"
         },
         {
-          "line": 79,
+          "line": 80,
           "kind": "error-or-exit-candidate",
           "code": "if (cells.length !== columns.length) throw new Error(`Malformed inventory row at line ${i + 1}`);"
         },
         {
-          "line": 83,
+          "line": 84,
           "kind": "error-or-exit-candidate",
           "code": "if (!columns) throw new Error('Inventory header missing');"
         },
         {
-          "line": 100,
+          "line": 101,
           "kind": "error-or-exit-candidate",
           "code": "const limit = config.maxReviewInputBytes ?? 65536;"
         },
         {
-          "line": 109,
+          "line": 110,
           "kind": "error-or-exit-candidate",
           "code": "if (fs.statSync(file).size > limit - bytes) throw tooLarge(`Review input exceeds maxReviewInputBytes (${limit}) at ${name}; reduce the audited unit or raise the limit after checking model capacity`);"
         },
         {
-          "line": 116,
+          "line": 117,
           "kind": "error-or-exit-candidate",
           "code": "if (bytes > limit) throw tooLarge(`Review input exceeds maxReviewInputBytes (${limit}) at ${name}; no content was truncated`);"
         },
         {
-          "line": 120,
+          "line": 121,
           "kind": "error-or-exit-candidate",
           "code": "if (Buffer.byteLength(text) > limit) throw tooLarge(`Review input exceeds maxReviewInputBytes (${limit}); no content was truncated`);"
         },
         {
-          "line": 130,
+          "line": 131,
           "kind": "error-or-exit-candidate",
           "code": "if (e.code !== 'REVIEW_INPUT_TOO_LARGE') throw e;"
         },
         {
-          "line": 131,
+          "line": 132,
           "kind": "error-or-exit-candidate",
           "code": "const sources = reviewSources(root, config, unit.source), limit = config.maxReviewInputBytes ?? 65536;"
         },
         {
-          "line": 142,
+          "line": 143,
           "kind": "error-or-exit-candidate",
           "code": "if (Buffer.byteLength(text) > limit) throw tooLarge(`Even the tool-assisted file list exceeds maxReviewInputBytes (${limit}) for ${unit.target}; raise the limit or split the unit`);"
         }
@@ -2929,7 +2929,7 @@
     },
     {
       "path": "scripts/audit_inputs.mjs",
-      "sha256": "0f03278d648c8f409d8672d22a8ae11490f82f98e7b148e8d63f0a3761a971ac",
+      "sha256": "358f199abe386afa70a5dd4e75a927f0a781728821dc02bab178711dc4f1a589",
       "entries": [
         {
           "line": 29,
@@ -2974,7 +2974,7 @@
         {
           "line": 62,
           "kind": "error-or-exit-candidate",
-          "code": "request.input.files.some(f => typeof f.content !== 'string' || hash(f.content) !== f.hash || hash(readReviewText(root, f.path)) !== f.hash)) throw new Error(`Preparation audit inputs changed; use fresh contexts and requests: freeze a replacement, then retire --directory ${directory} --superseded-by NEW --reason TEXT`);"
+          "code": "request.input.files.some(f => typeof f.content !== 'string' || hash(f.content) !== f.hash || currentHash(root, f.path) !== f.hash)) throw new Error(`Preparation audit inputs changed; use fresh contexts and requests: freeze a replacement, then retire --directory ${directory} --superseded-by NEW --reason TEXT`);"
         },
         {
           "line": 67,
