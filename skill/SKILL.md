@@ -92,9 +92,9 @@ the person's values, fills entries still `FILL_IN` from what was chosen since
 as the record of the conditions a run used: `status` reports whether it still
 matches the configuration, and after an edit says it is not applied yet. To
 change settings later, the person edits the file and the same question follows.
-`models set` and `preferences` also write the entries they change (models,
-report language, original runtime) into the file, so apply never writes an
-older choice back; the person's other unapplied edits stay.
+`models set` and `preferences` also write what they set (the named roles'
+model, effort and context; the given preferences) into the file, so apply never
+writes an older choice back; the person's other unapplied edits stay.
 
 Follow [phase reports and user decisions](../docs/PHASE-HANDOFF.md) at every
 phase boundary. Show the actual artifacts, review points and a copyable next
