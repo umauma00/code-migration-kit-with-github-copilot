@@ -43,7 +43,7 @@ test('survey input provides original CRLF line numbers and validates range ends'
   // of stopping the survey, and the rejected line 235 is not kept.
   assert.equal(report.done, 1);
   const item = readJSON(safePath(f.root, 'migration/surveys/contracts/001-case.json')).items.find(i => i.file === 'case/A.cs');
-  assert.equal(item.uncited, true); assert.match(item.evidence, /^case\/A\.cs:1-2 \(no verified citation/); assert.doesNotMatch(item.evidence, /235/);
+  assert.equal(item.uncited, true); assert.match(item.evidence, /^case\/A\.cs:1-2 \(no verified citation/); assert.doesNotMatch(item.evidence, /:235\b/, "the rejected citation is not kept (run ids may contain the digits)");
   assert.equal(item.publicInterface, 'unknown');
 });
 
