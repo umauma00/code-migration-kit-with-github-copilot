@@ -24,9 +24,10 @@ import { diagnoseBuild } from './diagnostic_queue.mjs';
 import { sessionsStatus, pruneSessions } from '../lib/sessions.mjs';
 import { buildLoop } from '../lib/build-loop.mjs';
 import { readPreferences, setPreferences, preferencesReport } from '../lib/preferences.mjs';
+import { autoModeOn } from '../lib/auto-mode.mjs';
 import { readGuardrails, cliFolderTrust, guardrailsProposal, installGuardrails } from '../lib/guardrails.mjs';
 import { listAvailableModels, modelsMarkdown, setRoleModels, readConfigIfPresent, currentAssignments } from '../lib/models.mjs';
-import { initRunSettings, checkRunSettings, applyRunSettings, syncRunSettings, runSettingsFile } from '../lib/run-settings.mjs';
+import { initRunSettings, checkRunSettings, applyRunSettings, syncRunSettings, runSettingsFile, runSettingsState, setupEnd, phase00Started } from '../lib/run-settings.mjs';
 import { ignoredLimits, processTimeout } from '../lib/execution-policy.mjs';
 
 export const usage = `Usage: node migration-kit/scripts/run_migration.mjs COMMAND [options]
@@ -43,7 +44,7 @@ export const usage = `Usage: node migration-kit/scripts/run_migration.mjs COMMAN
                               Record every role's model, effort and context from one answer (all=ID first, then overrides)
   models set --role ROLE[,ROLE]|reviewers|all --model ID [--effort LEVEL|default] [--context default|long_context]
                               Record one choice; both forms are checked against that list before writing
-  preferences [--language ja|en] [--original-runtime available|unavailable] [--phase-mode normal|relaxed|auto]
+  preferences [--language ja|en] [--original-runtime available|unavailable] [--phase-mode normal|relaxed|auto] [--specification available|unavailable]
                               Report language; whether the original can still run (guides recommendations)
   settings init [--source LANGUAGE] [--target LANGUAGE] [--source-roots CSV] | check | apply
                               migration/run-settings.json: write it (values only; explanations and your account's models
@@ -235,14 +236,24 @@ export async function main(argv = process.argv.slice(2)) {
     console.log(`Removed stale ${target.endsWith('.recover') ? 'lock recovery claim' : 'lock'}: migration/${path.basename(target)}`); return;
   }
   if (cmd === 'preferences') {
-    const setting = args.language || args['original-runtime'] || args['phase-mode'];
-    const result = setting ? setPreferences(root, { language: args.language, originalRuntime: args['original-runtime'], phaseMode: args['phase-mode'] }) : preferencesReport(root);
+    const setting = args.language || args['original-runtime'] || args['phase-mode'] || args.specification;
+    // In effect, not just chosen: a hand-edited auto (no record) chosen properly
+    // now is a new choice and hands over.
+    const wasAuto = setting ? autoModeOn(root) : false;
+    const result = setting ? setPreferences(root, { language: args.language, originalRuntime: args['original-runtime'], phaseMode: args['phase-mode'], specification: args.specification }) : preferencesReport(root);
     if (setting) {
       const report = {};
       const synced = syncRunSettings(root, { keys: [...(args.language ? ['reportLanguage'] : []), ...(args['original-runtime'] ? ['originalRuntime'] : []), ...(args['phase-mode'] ? ['phaseMode'] : [])], report });
       if (synced) result.runSettings = `${synced} updated to match`;
       if (report.verificationMode) result.verificationMode = 'The original does not run, so verificationMode in the run settings file is now source-only (runtime verification runs the original). Tell the person.';
       if (report.verificationModeKept) result.verificationMode = 'The original runs, but verificationMode in the run settings file is source-only. Ask the person whether to verify by running the original (runtime); on yes, set verificationMode to runtime in the file and run settings apply.';
+      // Auto chosen after setup was applied but before phase 00: the handoff
+      // to autopilot comes now, since no later apply would show it.
+      if (args['phase-mode'] === 'auto' && !wasAuto && !phase00Started(root)) {
+        let config = null;
+        try { config = loadConfig(root, { requireModels: false }); } catch {}
+        if (config && runSettingsState(root, config)?.state === 'applied') Object.assign(result, setupEnd(root, config));
+      }
     }
     console.log(JSON.stringify(result, null, 2));
     return;
@@ -346,6 +357,14 @@ export async function main(argv = process.argv.slice(2)) {
         if (result.applied && result.changes.some(c => c.path === 'migration/config.json')) {
           const synced = syncRunSettings(root, { keys: ['verificationMode'] });
           if (synced) result.runSettings = `${synced} updated to match`;
+          // Switched during setup: phase 00 comes first, and auto mode stops here for autopilot.
+          if (!phase00Started(root)) {
+            result.next = 'The source-as-spec profile is set as part of setup. Phase 00 comes first; the drafts listed in readiness are phase 00b-02 work.';
+            // Setup ends here only once the run settings are applied; before
+            // that, setup goes on and settings apply ends it.
+            if (runSettingsState(root, config)?.state === 'applied') Object.assign(result, setupEnd(root, config));
+            else result.next = 'The source-as-spec profile is set as part of setup, which is not finished: run settings init and follow its next (settings apply ends setup). Phase 00 comes after it.';
+          }
         }
       } finally { release(); }
     }

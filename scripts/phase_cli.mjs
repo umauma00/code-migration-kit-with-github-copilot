@@ -4,6 +4,7 @@ import { currentRecord, requireGate } from '../lib/pipeline.mjs';
 import { initializePhases, checkPreparation, startPhase, completePhase, requirePhase, orderedPhases, currentPhase, phaseWaiver, gateError, waivePhase } from '../lib/phases.mjs';
 import { migrationStatus } from '../lib/status.mjs';
 import { requireGuardrails } from '../lib/guardrails.mjs';
+import { setupBlocker } from '../lib/run-settings.mjs';
 
 function validate(root, config, phase, completing = false) {
   checkPreparation(root, config, phase, { completing });
@@ -79,6 +80,9 @@ export function phaseCommand(root, config, action, phase, options = {}) {
   const release = lockRun(root,`phase-${action}-${phase ?? 'policy'}`);
   try {
     if (action === 'init') return initializePhases(root);
+    // The first phase record waits for setup to settle the verification
+    // method (a phase out of order would end setup without it).
+    if (['start','complete','waive'].includes(action)) { const blocker = setupBlocker(root, config); if (blocker) throw new Error(blocker); }
     // The person chose to proceed past an unfinished phase (relaxed mode).
     // What the phase still lacks is recorded with their reason.
     if (action === 'waive') {

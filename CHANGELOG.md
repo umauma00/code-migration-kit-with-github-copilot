@@ -1,3 +1,36 @@
+# 0.15.0 — 2026-10-28
+
+Setup settles the verification method, and auto mode hands over to autopilot
+at a clear point.
+
+- When the original does not run, `settings init` asks a fifth question
+  (`specificationQuestion`): is there a specification or a test suite the
+  target can use? It is recorded with `preferences --specification`. Without
+  one, `settings apply` returns the source-as-spec switch as its `next`, and
+  `source-spec init --apply` runs during setup (one host confirmation), so
+  phase 00b no longer stops on it. Run during setup, its `next` says phase 00
+  comes first.
+- Auto mode: once auto is chosen, setup results carry `setupNotice` (setup is
+  still manual, about how many confirmations remain), which the orchestrator
+  puts first in each setup question. When setup is done, `settings apply` (or
+  the setup-time `source-spec init --apply`) returns `autoHandoff`, and the
+  orchestrator shows it and ends the turn before phase 00 for the person to
+  switch to autopilot. A setup question answered by autopilot itself is not an
+  answer.
+  The handoff is shown once per choice of auto (marked in the auto-mode
+  record); choosing auto after setup is applied but before phase 00 returns it
+  from `preferences --phase-mode auto`. Once any phase has started, completed
+  or been waived (or the handoff was shown) there is no fifth question, notice or handoff.
+- The first phase command (`phase start`, `complete` or `waive`) refuses while
+  that verification method is still open, with the step to take
+  (`setup-unfinished` guidance), so an out-of-order phase 00 cannot skip it.
+  A setup answer changed after the handoff still settles it before phase 00
+  (only the handoff is not repeated), and `source-spec init --apply` ends
+  setup only once the run settings are applied.
+- Auto mode: if phase 00 finds a setup answer wrong, the orchestrator says
+  which and stops for the person to decide in chat.
+- Normal and relaxed mode: only the setup-time source-as-spec switch changes.
+
 # 0.14.0 — 2026-10-28
 
 First choices are questions; the run settings file holds values only.

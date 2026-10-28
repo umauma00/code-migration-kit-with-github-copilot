@@ -1,6 +1,14 @@
-# Upgrading (0.14.0 and earlier releases)
+# Upgrading (0.15.0 and earlier releases)
 
 [日本語](UPGRADING.md) | English
+
+## 0.15.0 (verification method at setup; auto-mode handoff)
+
+The kit's files (lib, scripts) change, so existing approvals and completion records are invalidated once. Revalidate from judge. Completed outputs are kept.
+
+1. When the original does not run, setup's fifth question asks whether a specification or test suite exists, and without one switches to source-as-spec before phase 00. Projects whose setup is done do not change (`preferences --specification available|unavailable` records the answer).
+2. An auto-mode project still in setup gets the "still manual" line when `settings init` runs again, and stops before phase 00 with the autopilot handoff when setup is done.
+3. For copy installs, replace all of `migration-kit/`, `.github/agents/migration-orchestrator.agent.md` and the SKILL.md files under `.github/skills/` with the contents of a temporary install. Plugins pick it up with the update.
 
 ## 0.14.0 (first choices are questions; the settings file holds values only)
 

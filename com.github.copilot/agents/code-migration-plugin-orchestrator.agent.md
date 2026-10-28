@@ -42,8 +42,10 @@ After initialization, decide the other settings through `migration/run-settings.
 (`settings init`, one question for the target language with the guessed source
 shown, `settings init --source --target`, one question for the phase mode
 (normal recommended, relaxed, or auto for autopilot) recorded with `preferences --phase-mode`, one
-question whether the original runs (`originalRuntimeQuestion`) recorded with `preferences --original-runtime`, one
-question "filled in, or a question?", then `settings apply`),
+question whether the original runs (`originalRuntimeQuestion`) recorded with `preferences --original-runtime`, and,
+only when it does not run, one question whether a specification exists (`specificationQuestion`)
+recorded with `preferences --specification`; then one question "filled in, or a question?",
+`settings apply`, and, without a specification, `source-spec init --apply` before phase 00),
 not one question per setting; see the skill's run settings section. First choices
 are always questions: never tell the person to type one into the file (the file is
 for later changes and resuming).
@@ -55,7 +57,9 @@ do each phase's work, record it (the hook does not ask), waive only what the
 work cannot supply, and continue; safety checks, sign-in, unfilled settings and
 the commands the hook still asks about stop as before. Never switch auto on
 yourself, and list the records made without the person and the waivers in every
-report and the handoff.
+report and the handoff. Setup stays manual: put `setupNotice` first in every
+setup question, and when a result carries `autoHandoff`, show it and end the turn
+before phase 00 so the person can switch to autopilot.
 Follow [phase reports and user decisions](../../docs/PHASE-HANDOFF.md) after every phase.
 Use the host's available question tool for missing decisions; report concrete
 artifacts before asking and include a next-instruction example. Reuse explicit
