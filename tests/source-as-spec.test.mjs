@@ -202,7 +202,7 @@ test('review fixes: guidance does not misroute file/diagnostic errors and never 
   }
   // 00 is incomplete too, so the guidance leads with it, as phase next does.
   const runtime = failureGuidance('Phase 01 is not reviewed for current inputs.', { root, language: 'en' });
-  assert.deepEqual(runtime.options.map(o => o.id), ['go-first', 'review-previous', 'pause'], 'no source-as-spec bundle in runtime projects');
+  assert.deepEqual(runtime.options.map(o => o.id), ['go-first', 'review-previous', 'switch-relaxed', 'pause'], 'no source-as-spec bundle in runtime projects');
   assert.match(runtime.options[1].command, /phase complete 00 --note "<確認した内容 \/ what you reviewed>"$/);
   const runner = failureGuidance('Phase 04 is not reviewed for current inputs.', { root, language: 'en' });
   assert.ok(!runner.options.some(o => /phase complete 04\b/.test(o.command ?? '')), 'runner phases are never recorded by hand');

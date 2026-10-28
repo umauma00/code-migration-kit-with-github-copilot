@@ -1,6 +1,14 @@
-# 更新手順（0.11.0 と以前の版）
+# 更新手順（0.12.0 と以前の版）
 
 日本語 | [English](UPGRADING.en.md)
+
+## 0.12.0（緩和モード）
+
+キットのファイル（lib・scripts）が変わるため、既存の承認・完了記録は一度だけ失効します。judgeから再検証してください。完了済みの出力は保持されます。
+
+1. 何もしなければ普通モード（今までどおり）です。緩和モードにするには `run_migration.mjs preferences --phase-mode relaxed` を実行するか、run-settings.json の `phaseMode` を `relaxed` にして `settings apply` します。詳しくは[緩和モード](ORDERED-WORKFLOW.md#relaxed-mode)。
+2. 0.11.0 で作った run-settings.json に `phaseMode` がなくても、そのまま `settings apply` できます（モードは変わりません）。`settings init` をやり直すと `originalRuntime` の次に `phaseMode` の欄が加わります。
+3. コピー導入では `migration-kit/` 全体と、`.github/agents/migration-orchestrator.agent.md`、`.github/skills/` の SKILL.md を一時導入先の内容に置き換えます。プラグインは更新だけで入ります。
 
 ## 0.11.0（実行設定ファイル）
 

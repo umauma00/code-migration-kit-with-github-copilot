@@ -1,3 +1,34 @@
+# 0.12.0 — 2026-10-28
+
+Relaxed phase mode: when a phase's prerequisite is missing, the person decides
+whether to fix it first or proceed, instead of the kit always stopping. Normal
+mode (the default) keeps every gate as it was.
+
+- `migration/preferences.json` gains `phaseMode` (`normal` or `relaxed`), set
+  with `preferences --phase-mode` or `phaseMode` in run-settings.json. Setup
+  asks it as the third question, after the models and the languages. It is not
+  part of the configuration fingerprint, so switching revokes nothing.
+- In relaxed mode a gate failure (a phase record, a judge/build/smoke/parity
+  record, unreviewed translation units, or the reports translation approval
+  reads) ends with `Relaxed mode: ... phase waive ID`, and the failure
+  guidance adds "proceed without finishing ID" after the fixes. On the
+  person's answer, `phase waive ID --note TEXT` records a waiver with the
+  reason and what was missing; the hook asks the person to confirm it.
+- A waived phase is never counted complete: `status` lists it under
+  `waivers`, the checklist marks it 【見送り】 / [waived], and `phase next`
+  moves past it. Records made on a waiver bind to it, so finishing the phase
+  later (or switching back to normal) has them recorded again. Finishing a
+  waived phase for real retires its waiver to `waivers/retired/`, and a
+  phase's own record (such as 03's judge) is never stood in for by its own
+  waiver. Pilots never use production waivers. Nothing is
+  deleted; switching back to relaxed restores them.
+- Never relaxed: guardrails, protected paths and source overwrites, approval
+  commands themselves, sign-in and credits, and pilots.
+- In normal mode the failure guidance for those gates adds "switch to relaxed
+  mode and proceed" before pause; it is never the recommendation.
+- A 0.11.0 run-settings.json without `phaseMode` still applies unchanged;
+  `settings init` adds the entry in place.
+
 # 0.11.1 — 2026-10-28
 
 Remove stops caused by the kit itself: a phase no longer asks the person about

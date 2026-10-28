@@ -57,3 +57,26 @@ node migration-kit/scripts/run_migration.mjs phase complete 05c --note "source-o
 この制御はキットの入口とrunnerに適用する。VS Code自体の任意の編集を禁止する機能ではない。
 工程TODOも現在の記録に合わせ、完了を確認できない工程をチェック済みにしない。
 利用量の記録は[main形式のcost-log](COST-LOG.md)を参照。
+
+<a id="relaxed-mode"></a>
+## 緩和モード（前提が足りないときに「直す／進む」を選ぶ）
+
+工程の進め方は `migration/preferences.json` の `phaseMode` で決めます。最初の設定で1問だけ聞き、
+`preferences --phase-mode normal|relaxed`（または run-settings.json の `phaseMode`）で記録します。
+
+| モード | 前提が足りないとき |
+|---|---|
+| `normal`（推奨・既定） | 今までどおり止まります。失敗時の選択肢の最後に「緩和モードに切り替えて進む」が出ます（推奨にはなりません） |
+| `relaxed` | 止まった理由の末尾に `Relaxed mode: ... phase waive ID` が付きます。親は質問ツールで「直す（推奨）／このまま進む」を聞き、「進む」を選んだときだけ `phase waive ID --note "理由"` を実行してからやり直します |
+
+```sh
+node migration-kit/scripts/run_migration.mjs phase waive 03 --note "全体の形を先に見たいので事前試行を見送る"
+```
+
+- 見送りは `migration/phases/waivers/ID.json` に、理由と「その時足りなかったもの」と一緒に残ります。`phase waive` はフックが人間の確認を求めます。
+- 見送った工程は完了扱いになりません。status の `waivers` と、チェックリストの【見送り】で残り続けます。各工程の報告と最終の引き継ぎ報告に一覧を書きます。
+- 見送りで通るのは工程の関門だけです。工程記録（00〜03）、正式 judge・ビルド・smoke の実行記録、変換単位のレビュー（04）、翻訳承認が求める feasibility.md・stress-test/report.md・judge の成功が対象です。
+- 緩めないもの：guardrails、保護パス・元ソースの上書き、承認コマンドそのもの（`approve` は今までどおり人間の確認つき）、サインイン・残高、pilot。
+- 後で正規に戻す：見送った工程を普通に終えて記録すると（00〜03・05c は phase complete、04 は全単位のレビューが揃ったとき、05・05b・05c は実行の成功）、見送りは `migration/phases/waivers/retired/` へ移り、二度と使われません。その工程が後で失効したときは、もう一度「直す／進む」を聞きます。工程自身の記録（03 の judge など）を見送りで代わりにすることはできません。見送りの上で作った後続の記録（工程記録・ビルド等の実行記録）は、前提が変わったので記録し直しになります。
+- `normal` に戻すと見送りは使われなくなり、見送りの上で作った記録は未完了に戻ります。`relaxed` に戻せば復活します（何も削除しません）。
+- モードは設定の指紋（contextHash）に含めません。切り替えても承認やレビュー済みの記録は失効しません。
