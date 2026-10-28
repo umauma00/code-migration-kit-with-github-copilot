@@ -535,7 +535,11 @@ test('typed language names are recorded as the mappers recognize them, and missi
   // and a source folder named env is source.
   root = fresh(t);
   touch(root, ['src/index.ts', 'main.py']);
-  assert.equal(initRunSettings(root, models, { source: 'Python', target: 'Go' }).sourceRootsUnchosen, true);
-  touch(root, many('env', '.ts', 3));
+  setRoleModels(root, models, { role: 'all', model: 'big-model' });
+  const other = initRunSettings(root, models, { source: 'Python', target: 'Go' });
+  assert.equal(other.sourceRootsUnchosen, true);
+  assert.match(other.next, /write the source folders/);
+  touch(root, [...many('env', '.ts', 3), 'venvs/a/pyvenv.cfg', ...many('venvs/a/lib', '.py', 9), 'conda/env/conda-meta/history', ...many('conda/env/lib/python3.12', '.py', 9)]);
+  assert.equal(detectSourceLanguages(root).languages.find(l => l.language === 'Python').files, 1, 'pyvenv.cfg and conda-meta mark environments, whatever the folder\'s name');
   assert.deepEqual(detectSourceLanguages(root).languages.find(l => l.language === 'TypeScript').roots, ['env', 'src']);
 });
