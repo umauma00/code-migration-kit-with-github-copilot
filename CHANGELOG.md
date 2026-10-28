@@ -21,6 +21,14 @@
   every model entry is checked. `settings check` validates without writing.
 - `status` (full and `--fast`) reports whether the file still matches the
   configuration, and lists the entries changed but not applied yet.
+- Setup guesses the source language from the project's files (counted by
+  extension, leaving out dependencies, build output, hidden folders and the
+  output and test roots) and asks one question for the target with the guess
+  shown; free text corrects the source. `settings init --source --target`
+  records the answer and, while the folders are the template's, fills
+  `sourceRoots` with the guessed language's folders. The runner migrates one
+  source language: another of comparable size is pointed out so the person
+  names the main one, and a language with only a few files is left out.
 - Only the report language is asked before initialization. `models set` stays
   for changing models alone from chat.
 

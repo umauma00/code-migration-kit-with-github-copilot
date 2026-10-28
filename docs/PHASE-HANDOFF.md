@@ -98,6 +98,9 @@ answers (language, proceed/revise/pause, failure options). Model IDs are free
 text: never guess an account's available models or offer invented ones as
 choices. Setup settings are not asked one by one. After initialization, one question
 picks the model for every role (`models set --role all --model ID`); then
+one question asks the target language with the source language the kit
+guessed from the files shown (`settings init` returns it; the answer is
+recorded with `settings init --source SOURCE --target TARGET`), and
 `settings init` writes the rest (migration languages, roots, verification mode,
 commands, and per-role model, effort and context changes) to
 `migration/run-settings.json`, and one question asks whether the person has

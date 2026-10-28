@@ -13,6 +13,7 @@ import { initRunSettings, checkRunSettings, applyRunSettings, runSettingsState, 
 import { migrationStatus, statusMarkdown } from '../lib/status.mjs';
 import { statusSnapshot } from '../lib/status-snapshot.mjs';
 import { humanGate, interactiveDecision } from '../lib/guardrails.mjs';
+import { detectSourceLanguages, languageQuestion } from '../lib/source-detect.mjs';
 
 const catalog = [
   { id: 'big-model', name: 'Big Model', supportedReasoningEfforts: ['low', 'medium', 'high', 'xhigh'], defaultReasoningEffort: 'medium',
@@ -352,7 +353,7 @@ test('models come from one question first; the file then only needs the language
   setRoleModels(root, models, { role: 'all', model: 'big-model' });
   const result = initRunSettings(root, models);
   assert.deepEqual(result.pending, ['originalRuntime', 'sourceLanguage', 'targetLanguage']);
-  assert.match(result.next, /filled in/);
+  assert.match(result.next, /Ask languages\.question as one question/, 'the languages come from one question next');
   const s = settingsOf(root);
   for (const role of ['implementer', 'reviewer-semantics', 'reviewer-rules', 'arbiter', 'fixer']) assert.deepEqual(s.models[role], { model: 'big-model', effort: 'default', context: 'default' });
   assert.equal(s.models.surveyor.model, 'same-as-implementer');
@@ -419,4 +420,77 @@ test('an original that cannot run rules out runtime verification', t => {
   const result = applyRunSettings(root, models);
   assert.equal(result.applied, true, JSON.stringify(result.errors));
   assert.equal(loadConfig(root).verificationMode, 'source-only');
+});
+
+const touch = (root, files) => { for (const f of files) { fs.mkdirSync(path.dirname(path.join(root, f)), { recursive: true }); fs.writeFileSync(path.join(root, f), ''); } };
+const many = (dir, ext, n) => Array.from({ length: n }, (_, i) => `${dir}/f${i}${ext}`);
+
+test('the source language is guessed from the files, leaving out dependencies, build output, tests and helper languages', t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'source-detect-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  touch(root, [...many('App/Core', '.cs', 12), ...many('Lib', '.cs', 3), ...many('wwwroot/js', '.js', 4), 'App/types.d.ts', 'db/schema.sql', 'Program.cs',
+    ...many('node_modules/pkg', '.js', 50), ...many('bin/Debug', '.cs', 50), ...many('.git/hooks', '.py', 50), ...many('tests', '.cs', 5), ...many('ported', '.ts', 30)]);
+  const d = detectSourceLanguages(root, { exclude: ['ported'] });
+  assert.equal(d.primary, 'C#');
+  assert.deepEqual(d.languages.map(l => [l.language, l.files]), [['C#', 21], ['JavaScript', 4], ['SQL', 1]], 'tests count toward the language; skipped folders and .d.ts do not');
+  assert.deepEqual(d.languages[0].roots, ['App', 'Lib'], 'test folders and files at the root name no source folder');
+  assert.deepEqual(d.mixed, []);
+  assert.deepEqual(d.minor, ['JavaScript', 'SQL']);
+  const q = languageQuestion(d, 'ja');
+  assert.match(q.question, /^移行元は C#（App、Lib 配下、21 ファイル）と判定しました。JavaScript、SQLのファイルは移行の対象外になります。移行先はどの言語にしますか？$/);
+  assert.deepEqual(q.choices, ['TypeScript', 'Java', 'Go', 'Python'], 'the source itself is not offered as the target');
+  assert.match(languageQuestion(d, 'en').question, /^The source looks like C# \(21 files in App, Lib\)\./);
+});
+
+test('two languages of comparable size are reported as mixed; a helper language never becomes the guess', t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'source-detect-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  touch(root, [...many('Cs', '.cs', 20), ...many('Vb', '.vb', 10), ...many('Sql', '.sql', 40)]);
+  const d = detectSourceLanguages(root);
+  assert.equal(d.primary, 'C#', 'SQL has the most files but accompanies the program');
+  assert.deepEqual(d.mixed, ['VB.NET']);
+  assert.deepEqual(d.minor, ['SQL']);
+  assert.match(languageQuestion(d, 'ja').question, /VB\.NET（Vb 配下、10 ファイル）も同じくらいあります。キットが一度に移行できる移行元の言語は1つです。/);
+  const empty = fs.mkdtempSync(path.join(os.tmpdir(), 'source-detect-'));
+  t.after(() => fs.rmSync(empty, { recursive: true, force: true }));
+  const none = detectSourceLanguages(empty);
+  assert.equal(none.primary, null);
+  assert.deepEqual(languageQuestion(none, 'en').choices, [], 'with nothing found, the question asks for both languages as free text');
+});
+
+test('the language answer fills both languages and, over the template folders, the detected source folders', t => {
+  const root = fresh(t);
+  touch(root, many('Legacy/App', '.cs', 6));
+  setRoleModels(root, models, { role: 'all', model: 'big-model' });
+  const asked = initRunSettings(root, models);
+  assert.equal(asked.languages.detected.primary, 'C#');
+  assert.match(asked.languages.question, /移行元は C#（Legacy 配下、6 ファイル）/);
+  assert.match(asked.next, /settings init --source SOURCE --target TARGET/);
+  const answered = initRunSettings(root, models, { source: 'c#', target: 'TypeScript' });
+  assert.equal(answered.languages, undefined);
+  assert.deepEqual(answered.pending, ['originalRuntime']);
+  assert.match(answered.next, /filled in/);
+  const s = settingsOf(root);
+  assert.equal(s.sourceLanguage, 'C#', 'the detected spelling is kept, which the bundled mapper recognizes');
+  assert.equal(s.targetLanguage, 'TypeScript');
+  assert.deepEqual(s.sourceRoots, ['Legacy']);
+  assert.deepEqual(readJSON(safePath(root, 'migration/config.json')).sourceRoots, ['src'], 'nothing is applied until settings apply');
+  // A folder the person wrote is theirs: a later answer changes only the languages.
+  writeSettings(root, { ...s, sourceRoots: ['Legacy/App'] });
+  initRunSettings(root, models, { source: 'VB.NET', target: 'Go' });
+  assert.deepEqual([settingsOf(root).sourceLanguage, settingsOf(root).targetLanguage, settingsOf(root).sourceRoots], ['VB.NET', 'Go', ['Legacy/App']]);
+  assert.throws(() => initRunSettings(root, models, { source: ' ' }), /--source must name a language/);
+});
+
+test('the runner takes the language answer on settings init', t => {
+  const root = fresh(t);
+  touch(root, many('Legacy', '.java', 3));
+  const copilot = modelCatalogCli(root, catalog);
+  const run = (...args) => spawnSync(process.execPath, [path.join(kitRoot, 'scripts/run_migration.mjs'), ...args, '--copilot', copilot], { cwd: root, encoding: 'utf8' });
+  let out = run('settings', 'init');
+  assert.equal(out.status, 0, out.stderr);
+  assert.equal(JSON.parse(out.stdout).languages.detected.primary, 'Java');
+  out = run('settings', 'init', '--source', 'Java', '--target', 'Kotlin');
+  assert.equal(out.status, 0, out.stderr);
+  assert.deepEqual([settingsOf(root).sourceLanguage, settingsOf(root).targetLanguage, settingsOf(root).sourceRoots], ['Java', 'Kotlin', ['Legacy']]);
 });

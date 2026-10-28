@@ -118,7 +118,24 @@ commands, and every role's model, effort and context size. The account's models,
 efforts and context tiers (read live from the CLI) are listed under `_choices`, explanations under
 `_help`, and `FILL_IN` marks what is still open; every role already holds the
 model just chosen, and the person edits a role only to give it another model,
-effort or context. Link the file and ask **one**
+effort or context.
+
+While the languages are open, the result also carries `languages`: a guess of
+the source language from the project's files (counted by extension, leaving out
+dependencies, build output, hidden folders and the output and test roots) and
+a ready question in the report language. Ask it as **one** question: the
+choices are `languages.choices` (target languages), and free text names
+another target or corrects the source. Record the answer with
+`run_migration.mjs settings init --source SOURCE --target TARGET` (the guessed
+source unless the answer corrected it). The file then holds both languages and,
+while the folders are still the template's, the source language's detected
+folders as `sourceRoots`. The kit migrates one source language: when
+`languages.detected.mixed` lists another language of comparable size, the
+question says so and the person names the main one; smaller languages
+(`minor`) are left out of the migration. If nothing was found, the question
+asks for both languages as free text.
+
+Then link the file and ask **one**
 question with the question tool: has the person finished filling it in, or do
 they have a question? Offer two choices, "filled in" and "I have a question"
 (free text), in the report language.

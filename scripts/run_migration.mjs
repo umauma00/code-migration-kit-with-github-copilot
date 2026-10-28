@@ -45,8 +45,9 @@ export const usage = `Usage: node migration-kit/scripts/run_migration.mjs COMMAN
                               Record one choice; both forms are checked against that list before writing
   preferences [--language ja|en] [--original-runtime available|unavailable]
                               Report language; whether the original can still run (guides recommendations)
-  settings init | check | apply
-                              migration/run-settings.json: write it with your account's models as choices (init),
+  settings init [--source LANGUAGE] [--target LANGUAGE] | check | apply
+                              migration/run-settings.json: write it with your account's models as choices and a guess
+                              of the source language (init; --source/--target record the answer to the language question),
                               check every entry (check), or check and record it in config.json and preferences.json (apply)
   sessions status | prune [--run RUN_ID]
                              Report / delete the local Copilot CLI transcripts of the kit's own workers
@@ -268,7 +269,7 @@ export async function main(argv = process.argv.slice(2)) {
     // other fields); the model entries then report why.
     let models;
     try { models = await listAvailableModels({ command: args.copilot ?? 'copilot', cwd: root }); } catch (e) { models = e.message; }
-    if (action === 'init') { console.log(JSON.stringify(initRunSettings(root, models), null, 2)); return; }
+    if (action === 'init') { console.log(JSON.stringify(initRunSettings(root, models, { source: args.source, target: args.target }), null, 2)); return; }
     if (action === 'check') {
       const file = safePath(root, runSettingsFile);
       if (!fs.existsSync(file)) throw new Error(`${runSettingsFile} is missing: run settings init first`);
