@@ -1076,7 +1076,7 @@
     },
     {
       "path": "lib/guidance.mjs",
-      "sha256": "3d693bac283d81a6c594d918205637d628f1d1f0f2e2374c1794f8ae102f07da",
+      "sha256": "177d378ec9f24a43f29b9e75ec28131110c804b2dba0c428edb70560f5ec7435",
       "entries": [
         {
           "line": 73,
@@ -1089,52 +1089,52 @@
           "code": "// prompt timed out stays a timeout)."
         },
         {
-          "line": 337,
+          "line": 354,
           "kind": "deadline-or-observation",
           "code": "impact: t('hook は時間切れや失敗の時に素通りするため、制限と承認の確認が効かない可能性があります。', 'Hooks let calls through on timeout or failure, so guardrails and approval confirmation may be off.'),"
         },
         {
-          "line": 341,
+          "line": 358,
           "kind": "deadline-or-observation",
           "code": "investigate('Node の起動が遅い環境なら、timeoutSec を長くするか、マシン負荷を確認します。', 'If Node starts slowly here, raise timeoutSec or check machine load.'),"
         },
         {
-          "line": 366,
+          "line": 383,
           "kind": "error-or-exit-candidate",
           "code": "{ id: 'raise-breaker', label: t('失敗が互いに無関係と確認できたら maxConsecutiveFailures を増やして再実行する', 'If the failures are unrelated, raise maxConsecutiveFailures and rerun'),"
         },
         {
-          "line": 478,
+          "line": 495,
           "kind": "error-or-exit-candidate",
           "code": "{ id: 'raise-budget', label: t('合意した回数で translate --max-calls N を実行する（bounded モードなら maxAgentCalls を増やす）', 'Run translate --max-calls N with an agreed number (in bounded mode, raise maxAgentCalls)'), command: k => `node ${k}/scripts/run_migration.mjs translate --max-calls N`,"
         },
         {
-          "line": 504,
+          "line": 521,
           "kind": "error-or-exit-candidate",
           "code": "{ id: 'lower-concurrency', label: t('concurrency を下げるか transientRetryDelayMs を上げる', 'Lower concurrency or raise transientRetryDelayMs'),"
         },
         {
-          "line": 511,
+          "line": 528,
           "kind": "error-or-exit-candidate",
           "code": "{ id: 'check-billing', label: t('GitHub の課金・予算の設定で残量を確認し、追加・引き上げ後に再実行する', 'Check credits and budget in GitHub billing, add or raise them, then rerun'),"
         },
         {
-          "line": 548,
+          "line": 565,
           "kind": "deadline-or-observation",
           "code": "{ id: 'timeout', match: /timed out|\\btimeout\\b(?!Seconds)/i,"
         },
         {
-          "line": 553,
+          "line": 570,
           "kind": "deadline-or-observation",
           "code": "{ id: 'raise-timeout', label: t('選択済みの時間制限を見直す', 'Review an explicitly selected deadline'), reason: t('利用者が継続実行を望んだ場合はcontinuousへ戻すか0（期限なし）を選びます。', 'When the person wants continuous work, use continuous mode or an explicitly unlimited deadline of 0.') },"
         },
         {
-          "line": 624,
+          "line": 641,
           "kind": "loop-exit-candidate",
           "code": "for (const r of rules) { m = message.match(r.match); if (m) { rule = r; break; } }"
         },
         {
-          "line": 730,
+          "line": 747,
           "kind": "deadline-or-observation",
           "code": "[/^hook responds before its timeout$/, c => `Hook check failed: ${c.command ?? 'no hook command'} took ${c.durationMs ?? '?'} ms (timeout ${c.timeoutSec ?? '?'} s)`],"
         }
@@ -2514,7 +2514,7 @@
     },
     {
       "path": "lib/run-settings.mjs",
-      "sha256": "9a3015ae7a5480a3612cdd0a08f0eb144a695f7fe787e7d7450db22c88fb0885",
+      "sha256": "213cc4d8f2630ca159b0333d29218c2c084fd34b0b8050f27541ee5a663da635",
       "entries": [
         {
           "line": 26,
@@ -4271,55 +4271,60 @@
     },
     {
       "path": "scripts/phase_cli.mjs",
-      "sha256": "17e8ff9186320902d4b3f41698471a9981cbb11b45baca0e497386a22884fd71",
+      "sha256": "6e4596b8ed92c1831d7388f06d263645e2b1f444c4e5137908a3885edd11fa94",
       "entries": [
         {
-          "line": 19,
+          "line": 20,
           "kind": "error-or-exit-candidate",
           "code": "throw gateError(root, `Run ${stage} successfully for current inputs before phase ${phase}`, stagePhase[stage] === phase ? null : stagePhase[stage]);"
         },
         {
-          "line": 28,
+          "line": 29,
           "kind": "error-or-exit-candidate",
           "code": "if ((!units.length || !units.every(u => done(root, u, context))) && !phaseWaiver(root, '04')) throw gateError(root, 'Current reviewed translation units are required', '04');"
         },
         {
-          "line": 41,
+          "line": 42,
           "kind": "error-or-exit-candidate",
           "code": "if (!Number.isSafeInteger(n) || n < 0) throw new Error('tokens/subagents must be a nonnegative integer or unknown');"
         },
         {
-          "line": 47,
+          "line": 48,
           "kind": "error-or-exit-candidate",
           "code": "if (!report.ok) throw new Error(report.blockers[0].reason);"
         },
         {
-          "line": 54,
+          "line": 55,
           "kind": "error-or-exit-candidate",
           "code": "if (ids.length > 1 && ids.some((id, i) => i && orderedPhases.indexOf(id) !== orderedPhases.indexOf(ids[i - 1]) + 1)) throw new Error('List consecutive phases in order, for example 00b,01,02');"
         },
         {
-          "line": 55,
+          "line": 56,
           "kind": "error-or-exit-candidate",
           "code": "if (ids.length > 1 && ids.some(id => !['00','00b','01','02'].includes(id))) throw new Error('Only preparation phases 00 through 02 can be checked together');"
         },
         {
-          "line": 78,
+          "line": 79,
           "kind": "error-or-exit-candidate",
           "code": "if (!['init','start','complete','waive'].includes(action)) throw new Error('Use phase init|next|check ID|start ID|complete ID --note TEXT|waive ID --note TEXT');"
         },
         {
-          "line": 100,
+          "line": 85,
+          "kind": "error-or-exit-candidate",
+          "code": "if (['start','complete','waive'].includes(action)) { const blocker = setupBlocker(root, config); if (blocker) throw new Error(blocker); }"
+        },
+        {
+          "line": 104,
           "kind": "error-or-exit-candidate",
           "code": "if (own) throw new Error(own === 'units' ? 'Current reviewed translation units are required' : `Run ${own} successfully for current inputs`);"
         },
         {
-          "line": 109,
+          "line": 113,
           "kind": "error-or-exit-candidate",
           "code": "if (ids.length > 1 && ids.some((id, i) => i && orderedPhases.indexOf(id) !== orderedPhases.indexOf(ids[i - 1]) + 1)) throw new Error('List consecutive phases in order, for example 00b,01,02');"
         },
         {
-          "line": 110,
+          "line": 114,
           "kind": "error-or-exit-candidate",
           "code": "if (ids.length > 1 && ids.some(id => !['00','00b','01','02'].includes(id))) throw new Error('Only preparation phases 00 through 02 can be completed together');"
         }
@@ -4435,7 +4440,7 @@
     },
     {
       "path": "scripts/run_migration.mjs",
-      "sha256": "8768d479b9356c715c17ab0dcd7a2f22e9217ea0b7eb5db4a20f31a384a7209e",
+      "sha256": "e78c1c587d7227dcda527fb0953cae38004b239beec13e3637469e7844a56170",
       "entries": [
         {
           "line": 82,
@@ -4618,47 +4623,47 @@
           "code": "const abort = () => controller.abort();"
         },
         {
-          "line": 369,
+          "line": 372,
           "kind": "error-or-exit-candidate",
           "code": "else if (cmd === 'source-spec') throw new Error('Use source-spec init [--apply] | check');"
         },
         {
-          "line": 382,
+          "line": 385,
           "kind": "error-or-exit-candidate",
           "code": "} else throw new Error('Use survey plan|run|status|merge --kind facts|contracts|inventory [--max-files N] [--sites migration/PATH.tsv]');"
         },
         {
-          "line": 396,
+          "line": 399,
           "kind": "error-or-exit-candidate",
           "code": "else throw new Error('Use sessions status | prune [--run RUN_ID]');"
         },
         {
-          "line": 404,
+          "line": 407,
           "kind": "error-or-exit-candidate",
           "code": "} else throw new Error('Use guardrails show | install [--add CSV] [--remove CSV] [--deny CSV] [--waiver NOTE] [--replace]');"
         },
         {
-          "line": 409,
+          "line": 412,
           "kind": "error-or-exit-candidate",
           "code": "process.exitCode = 1;"
         },
         {
-          "line": 420,
+          "line": 423,
           "kind": "error-or-exit-candidate",
           "code": "if (args._[1] !== 'translation' || args['complete-phase'] !== '03') throw new Error('--complete-phase applies only as approve translation --complete-phase 03');"
         },
         {
-          "line": 427,
+          "line": 430,
           "kind": "error-or-exit-candidate",
           "code": "if (cmd === 'repair' && !args.target && !args.queue) throw new Error('repair requires --target or --queue');"
         },
         {
-          "line": 432,
+          "line": 435,
           "kind": "error-or-exit-candidate",
           "code": "} else throw new Error(`Unknown command ${cmd}\\n${usage}`);"
         },
         {
-          "line": 453,
+          "line": 456,
           "kind": "error-or-exit-candidate",
           "code": "process.exitCode = 1;"
         }
@@ -4739,5 +4744,5 @@
       ]
     }
   ],
-  "candidateLines": 860
+  "candidateLines": 861
 }

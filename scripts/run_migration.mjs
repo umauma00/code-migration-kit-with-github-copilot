@@ -360,7 +360,10 @@ export async function main(argv = process.argv.slice(2)) {
           // Switched during setup: phase 00 comes first, and auto mode stops here for autopilot.
           if (!phase00Started(root)) {
             result.next = 'The source-as-spec profile is set as part of setup. Phase 00 comes first; the drafts listed in readiness are phase 00b-02 work.';
-            Object.assign(result, setupEnd(root, config));
+            // Setup ends here only once the run settings are applied; before
+            // that, setup goes on and settings apply ends it.
+            if (runSettingsState(root, config)?.state === 'applied') Object.assign(result, setupEnd(root, config));
+            else result.next = 'The source-as-spec profile is set as part of setup, which is not finished: run settings init and follow its next (settings apply ends setup). Phase 00 comes after it.';
           }
         }
       } finally { release(); }

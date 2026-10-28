@@ -203,3 +203,64 @@ test('the specification answer: validated everywhere, recorded unasked, and the 
   assert.throws(() => readPreferences(root), /specification must be available or unavailable/);
   assert.equal(autoModeOn(root), false);
 });
+
+test('a setup answer changed after the handoff still settles the verification method before phase 00', t => {
+  const root = fresh(t);
+  upToMode(root, 'auto'); runtime(root, 'available');
+  assert.ok(applyRunSettings(root, models).autoHandoff);
+  // The original turns out not to run.
+  runtime(root, 'unavailable');
+  const init = initRunSettings(root, models);
+  assert.ok(init.specificationQuestion);
+  assert.equal(init.setupNotice, undefined, 'handed off already');
+  assert.match(applyRunSettings(root, models).next, /specificationQuestion before phase 00/);
+  setPreferences(root, { specification: 'unavailable' });
+  const applied = applyRunSettings(root, models);
+  assert.match(applied.next, /switch to source-as-spec now, before phase 00/);
+  assert.equal(applied.autoHandoff, undefined);
+  const switched = JSON.parse(cli(root, 'source-spec', 'init', '--apply').stdout);
+  assert.match(switched.next, /Phase 00 comes first/);
+  assert.equal(switched.autoHandoff, undefined, 'the handoff is not repeated');
+  assert.equal(readJSON(safePath(root, 'migration/config.json')).preparationProfile, 'source-as-spec');
+});
+
+test('phase 00 cannot start, complete or be waived before setup settles the verification method', t => {
+  const root = fresh(t);
+  upToMode(root, 'relaxed'); runtime(root, 'unavailable');
+  assert.equal(applyRunSettings(root, models).applied, true);
+  for (const args of [['phase', 'start', '00'], ['phase', 'complete', '00', '--note', 'Reviewed setup'], ['phase', 'waive', '00', '--note', 'later']]) {
+    const out = cli(root, ...args);
+    assert.notEqual(out.status, 0, args.join(' '));
+    assert.match(out.stderr, /Setup is not finished: .*specificationQuestion/s, args.join(' '));
+    assert.match(out.stderr, /初期設定がまだ終わっていません.*仕様書・移行先でも使える自動テストの有無に答える/s, args.join(' '));
+  }
+  assert.equal(fs.existsSync(safePath(root, 'migration/phases/starts/00.json')), false);
+  setPreferences(root, { specification: 'unavailable' });
+  assert.match(cli(root, 'phase', 'start', '00').stderr, /Setup is not finished: there is no specification.*source-spec init --apply/s);
+  assert.equal(cli(root, 'source-spec', 'init', '--apply').status, 0);
+  const started = cli(root, 'phase', 'start', '00');
+  assert.equal(started.status, 0, started.stderr);
+  // A specification that exists, or an original that runs, never blocks.
+  for (const [rt, spec] of [['unavailable', 'available'], ['available', undefined]]) {
+    const r = fresh(t); upToMode(r, 'normal'); runtime(r, rt);
+    if (spec) setPreferences(r, { specification: spec });
+    applyRunSettings(r, models);
+    const out = cli(r, 'phase', 'start', '00');
+    assert.equal(out.status, 0, `${rt}/${spec}: ${out.stderr}`);
+  }
+});
+
+test('source-spec init --apply before settings apply does not end setup', t => {
+  const root = fresh(t);
+  upToMode(root, 'auto'); runtime(root, 'unavailable'); setPreferences(root, { specification: 'unavailable' });
+  // The file is not applied yet (a role still differs from it).
+  const file = safePath(root, runSettingsFile), settings = readJSON(file);
+  settings.models.fixer = { ...settings.models.fixer, effort: 'low' };
+  writeJSON(file, settings);
+  const out = cli(root, 'source-spec', 'init', '--apply');
+  assert.equal(out.status, 0, out.stderr);
+  const result = JSON.parse(out.stdout);
+  assert.equal(result.autoHandoff, undefined);
+  assert.match(result.next, /setup, which is not finished: run settings init/);
+  assert.match(applyRunSettings(root, models).autoHandoff, /初期設定が完了しました/);
+});

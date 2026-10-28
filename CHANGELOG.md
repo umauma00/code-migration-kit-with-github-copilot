@@ -21,6 +21,12 @@ at a clear point.
   record); choosing auto after setup is applied but before phase 00 returns it
   from `preferences --phase-mode auto`. Once any phase has started, completed
   or been waived (or the handoff was shown) there is no fifth question, notice or handoff.
+- The first phase command (`phase start`, `complete` or `waive`) refuses while
+  that verification method is still open, with the step to take
+  (`setup-unfinished` guidance), so an out-of-order phase 00 cannot skip it.
+  A setup answer changed after the handoff still settles it before phase 00
+  (only the handoff is not repeated), and `source-spec init --apply` ends
+  setup only once the run settings are applied.
 - Auto mode: if phase 00 finds a setup answer wrong, the orchestrator says
   which and stops for the person to decide in chat.
 - Normal and relaxed mode: only the setup-time source-as-spec switch changes.

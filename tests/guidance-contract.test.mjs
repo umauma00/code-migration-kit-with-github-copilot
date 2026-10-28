@@ -30,6 +30,7 @@ const samples = {
   'guardrails-write': "migration/guardrails.json is the human's decision. Do not write it directly",
   'phase-order': 'Phase 01 is not reviewed for current inputs. Use phase next',
   'runtime-judge': 'Prepare runtime judge inputs and original/mutation/parity commands before phase 00b review',
+  'setup-unfinished': 'Setup is not finished: the original does not run, and whether a specification or portable test suite exists is not answered yet.',
   'source-plan': 'Source-only judge plan requires scenarios',
   'spec-placeholder': 'Source-derived contracts still contain TODO(spec): migration/source-spec/contracts.md',
   'outside-roots': 'Source outside sourceRoots: tools/gen.py',
