@@ -2449,7 +2449,7 @@
     },
     {
       "path": "lib/run-settings.mjs",
-      "sha256": "6f21af1fd46e8ed8c6dcd4b3b968ab6cfc00f5eef1389e6b1f132f882e2fb879",
+      "sha256": "9a4c133e1cc638c2698f507204b0b42d58323ae033949e085876511430a19e98",
       "entries": [
         {
           "line": 21,
@@ -2658,7 +2658,7 @@
     },
     {
       "path": "lib/source-detect.mjs",
-      "sha256": "25a6f46c359ade677f50076c364851a83dd6bd121ccbf8d5ad59ab4ad07d6aa4",
+      "sha256": "bacfb791a6af942afe77b3d3b61d95b2821c10c8a82aa88976978806de1945af",
       "entries": []
     },
     {

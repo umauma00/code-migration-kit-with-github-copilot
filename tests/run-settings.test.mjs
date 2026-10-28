@@ -531,4 +531,11 @@ test('typed language names are recorded as the mappers recognize them, and missi
   assert.equal(result.sourceRootsUnchosen, true);
   assert.match(result.next, /ask the person to write the source folders/);
   assert.deepEqual(settingsOf(root).sourceRoots, ['src']);
+  // Re-review of 4ed07f5: a src/ holding another language is pointed out too,
+  // and a source folder named env is source.
+  root = fresh(t);
+  touch(root, ['src/index.ts', 'main.py']);
+  assert.equal(initRunSettings(root, models, { source: 'Python', target: 'Go' }).sourceRootsUnchosen, true);
+  touch(root, many('env', '.ts', 3));
+  assert.deepEqual(detectSourceLanguages(root).languages.find(l => l.language === 'TypeScript').roots, ['env', 'src']);
 });
