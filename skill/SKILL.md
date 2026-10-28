@@ -85,8 +85,12 @@ while the folders are still the template's, the source language's detected
 folders as `sourceRoots`. The kit migrates one source language: when
 `languages.detected.mixed` lists another language of comparable size, the
 question says so and the person names the main one; smaller languages
-(`minor`) are left out of the migration. If nothing was found, the question
-asks for both languages as free text.
+(`minor`) are not treated as the source language (the bundled dependency
+mapper reads only its files). A typed name such as `csharp` or `VB` is
+recorded as the name the mappers recognize. If no folder outside the test
+folders holds the source language, the result has `sourceRootsUnchosen`: say
+so and ask the person to write the source folders in the file. If nothing was
+found, the question asks for both languages as free text.
 
 Then link the file and ask **one**
 question with the question tool: has the person finished filling it in, or do

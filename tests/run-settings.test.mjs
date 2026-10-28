@@ -437,7 +437,7 @@ test('the source language is guessed from the files, leaving out dependencies, b
   assert.deepEqual(d.mixed, []);
   assert.deepEqual(d.minor, ['JavaScript', 'SQL']);
   const q = languageQuestion(d, 'ja');
-  assert.match(q.question, /^移行元は C#（App、Lib 配下、21 ファイル）と判定しました。JavaScript、SQLのファイルは移行の対象外になります。移行先はどの言語にしますか？$/);
+  assert.match(q.question, /^移行元は C#（App、Lib 配下、21 ファイル）と判定しました。JavaScript、SQLのファイルは移行元の言語として扱いません。移行先はどの言語にしますか？$/);
   assert.deepEqual(q.choices, ['TypeScript', 'Java', 'Go', 'Python'], 'the source itself is not offered as the target');
   assert.match(languageQuestion(d, 'en').question, /^The source looks like C# \(21 files in App, Lib\)\./);
 });
@@ -493,4 +493,42 @@ test('the runner takes the language answer on settings init', t => {
   out = run('settings', 'init', '--source', 'Java', '--target', 'Kotlin');
   assert.equal(out.status, 0, out.stderr);
   assert.deepEqual([settingsOf(root).sourceLanguage, settingsOf(root).targetLanguage, settingsOf(root).sourceRoots], ['Java', 'Kotlin', ['Legacy']]);
+});
+
+test('review of 46230fb: monorepos, virtual environments, case, helper-only sources and typed names', t => {
+  const tmp = () => { const d = fs.mkdtempSync(path.join(os.tmpdir(), 'source-detect-')); t.after(() => fs.rmSync(d, { recursive: true, force: true })); return d; };
+  let root = tmp();
+  touch(root, [...many('packages/app/src', '.ts', 4), ...many('packages/api/src', '.ts', 4)]);
+  assert.deepEqual(detectSourceLanguages(root).languages, [{ language: 'TypeScript', files: 8, roots: ['packages'] }], 'a monorepo\'s packages/ is source');
+  root = tmp();
+  touch(root, [...many('app', '.py', 2), ...many('env/lib/python3.12/site-packages/pkg', '.py', 20), ...many('myenv/lib/x', '.py', 20), 'myenv/pyvenv.cfg', ...many('Bin/Debug', '.py', 20)]);
+  assert.deepEqual(detectSourceLanguages(root).languages, [{ language: 'Python', files: 2, roots: ['app'] }], 'virtual environments and Bin/ are skipped');
+  root = tmp();
+  touch(root, many('db', '.sql', 5));
+  const sqlOnly = detectSourceLanguages(root);
+  assert.equal(sqlOnly.primary, null, 'SQL alone names no source');
+  assert.deepEqual(languageQuestion(sqlOnly, 'en').choices, []);
+  const big = languageQuestion({ languages: [{ language: 'C#', files: 9, roots: ['App'] }], primary: 'C#', mixed: [], minor: [], truncated: true }, 'ja');
+  assert.match(big.question, /先頭の 100000 件だけで判定しました/);
+});
+
+test('typed language names are recorded as the mappers recognize them, and missing source folders are pointed out', t => {
+  let root = fresh(t);
+  touch(root, many('Legacy', '.cs', 3));
+  setRoleModels(root, models, { role: 'all', model: 'big-model' });
+  initRunSettings(root, models, { source: 'csharp', target: 'TypeScript' });
+  assert.deepEqual([settingsOf(root).sourceLanguage, settingsOf(root).sourceRoots], ['C#', ['Legacy']]);
+  root = fresh(t);
+  touch(root, many('Forms', '.frm', 3));
+  initRunSettings(root, models, { source: 'Visual Basic', target: 'C#' });
+  assert.equal(settingsOf(root).sourceLanguage, 'VB6', 'Visual Basic over .frm files is VB6, which has no bundled mapper');
+  // Files only at the repository root: the template folder stays and the result says so.
+  root = fresh(t);
+  fs.rmSync(path.join(root, 'src'), { recursive: true });
+  touch(root, ['main.py', 'util.py']);
+  setRoleModels(root, models, { role: 'all', model: 'big-model' });
+  const result = initRunSettings(root, models, { source: 'Python', target: 'TypeScript' });
+  assert.equal(result.sourceRootsUnchosen, true);
+  assert.match(result.next, /ask the person to write the source folders/);
+  assert.deepEqual(settingsOf(root).sourceRoots, ['src']);
 });

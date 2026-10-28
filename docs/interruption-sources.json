@@ -2449,7 +2449,7 @@
     },
     {
       "path": "lib/run-settings.mjs",
-      "sha256": "fe34d4db152d582995b857459b2f3a9f13b52333170a452ee3200efe29ad9673",
+      "sha256": "6f21af1fd46e8ed8c6dcd4b3b968ab6cfc00f5eef1389e6b1f132f882e2fb879",
       "entries": [
         {
           "line": 21,
@@ -2507,17 +2507,17 @@
           "code": "for (const [key, value] of [['source', source], ['target', target]]) if (value !== undefined && (typeof value !== 'string' || !value.trim())) throw new Error(`--${key} must name a language`);"
         },
         {
-          "line": 162,
+          "line": 170,
           "kind": "error-or-exit-candidate",
           "code": "if (!fs.existsSync(file)) throw new Error(`${runSettingsFile} is missing: run settings init first`);"
         },
         {
-          "line": 164,
+          "line": 172,
           "kind": "error-or-exit-candidate",
           "code": "try { value = readJSON(file); } catch (e) { throw new Error(`${runSettingsFile} is not valid JSON: ${e.message}`); }"
         },
         {
-          "line": 165,
+          "line": 173,
           "kind": "error-or-exit-candidate",
           "code": "if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${runSettingsFile} must be a JSON object`);"
         }
@@ -2658,7 +2658,7 @@
     },
     {
       "path": "lib/source-detect.mjs",
-      "sha256": "c446e80ef5fa87289fb7b4ce2874989fa132cca6774c86c913ec71d19918f165",
+      "sha256": "25a6f46c359ade677f50076c364851a83dd6bd121ccbf8d5ad59ab4ad07d6aa4",
       "entries": []
     },
     {

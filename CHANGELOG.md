@@ -28,7 +28,9 @@
   records the answer and, while the folders are the template's, fills
   `sourceRoots` with the guessed language's folders. The runner migrates one
   source language: another of comparable size is pointed out so the person
-  names the main one, and a language with only a few files is left out.
+  names the main one, and a language with only a few files is not treated as
+  the source language. Typed names such as `csharp` or `VB` are recorded as the
+  names the bundled mappers recognize.
 - Only the report language is asked before initialization. `models set` stays
   for changing models alone from chat.
 
