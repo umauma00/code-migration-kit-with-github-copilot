@@ -1,10 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { prepare, fake, result } from './helpers.mjs';
+import { prepare, fake, result, finding } from './helpers.mjs';
 import { approve, runStage, translate } from '../lib/pipeline.mjs';
 import { safePath, atomicWrite, writeJSON, readJSON, contextHash, readManifest, done, loadConfig, unitState } from '../lib/core.mjs';
-import { reviewInput } from '../lib/review.mjs';
+import { reviewInput, reviewEvidence } from '../lib/review.mjs';
+import { agentPrompt } from '../scripts/copilot_adapter.mjs';
 
 const write = (root, name, content) => atomicWrite(safePath(root, name), content);
 const persist = f => writeJSON(safePath(f.root, 'migration/config.json'), f.config);
@@ -96,6 +97,27 @@ test('RR3: a non-UTF-8 source is decoded for workers, names its encoding and doe
   assert.match(file.content, /value = 'café'/);
   assert.equal(done(f.root, unit, contextHash(f.root, f.config)), true);
   assert.equal(fs.readFileSync(safePath(f.root, unit.source)).includes(0xe9), true, 'the original bytes are untouched');
+});
+
+// The arbiter and tool-assisted reviewers read files with tools (UTF-8): they
+// get the decoded legacy source or at least its encoding (Sonnet review).
+test('RR3: the arbiter and tool-assisted reviewers are told a source is legacy-encoded', async t => {
+  const f = prepare(t), unit = f.units[0], arbiter = [];
+  write(f.root, unit.source, Buffer.from("# coding: latin-1\nvalue = 'caf\xe9'\n", 'latin1'));
+  persist(f);
+  await runStage(f.root, f.config, 'judge');
+  approve(f.root, f.config, 'translation', 'Encoding fixture');
+  await translate(f.root, f.config, async args => {
+    if (args.role === 'reviewer-rules') return { result: result(args.role, args.unit, { findings: [finding] }) };
+    if (args.role === 'arbiter') { arbiter.push(args); return { result: result(args.role, args.unit, { decisions: args.extra.findings.map(x => ({ finding: x.reference, confirmed: false, reason: 'Rule already satisfied' })) }) }; }
+    return fake(args);
+  });
+  assert.equal(arbiter.length, 1);
+  assert.deepEqual(arbiter[0].extra.legacyEncodedSources.map(x => [x.path, x.encoding]), [[unit.source, 'windows-1252']]);
+  const assisted = reviewEvidence(f.root, { ...f.config, maxReviewInputBytes: 900 }, unit);
+  assert.equal(assisted.mode, 'tool-assisted');
+  assert.equal(JSON.parse(assisted.text).files.find(x => x.path === unit.source).encoding, 'windows-1252');
+  assert.match(agentPrompt({ role: 'reviewer-rules', unit, reviewInput: assisted.text, reviewMode: 'tool-assisted' }), /stored in that legacy encoding/);
 });
 
 test('RR3: a Shift_JIS repair diagnostic (a Japanese Windows compiler log) is decoded, not refused', async t => {

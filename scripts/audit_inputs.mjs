@@ -14,7 +14,7 @@ import { parseCommandLine, specs, usageText } from '../lib/cli.mjs';
 import { loadConfig, safePath, hash, fileHash, treeHash, readJSON, writeJSON, lockRun, semanticConfig, stamp } from '../lib/core.mjs';
 import { recordSession } from '../lib/sessions.mjs';
 import { createCopilotAdapter } from './copilot_adapter.mjs';
-import { readReviewText, validatePreparationProfile } from '../lib/review.mjs';
+import { readReviewText, readReviewSource, validatePreparationProfile } from '../lib/review.mjs';
 const models = { judge: 'judgeAudit', dependencies: 'dependencyAudit', inventory: 'inventoryAudit', design: 'designAudit' };
 // The person's phaseModels entry when they set one; otherwise the model they
 // chose for the semantic reviewer, an auditor's closest role. No kit setter
@@ -34,8 +34,8 @@ export function freezeAudit(root, config, { type, files, out } = {}) {
   try {
     const before = snapshot(root, config), input = files.map(p => {
       if (/^migration\/(?:audits|reviews|runs|state|results|gates|phases)\//.test(p)) throw new Error('Audit input cannot contain prior findings, approvals or worker outcomes');
-      const content = readReviewText(root, p);
-      return { path: p, content, hash: hash(content) };
+      const { content, encoding } = readReviewSource(root, p);
+      return { path: p, content, hash: hash(content), ...(encoding === 'utf-8' ? {} : { encoding }) };
     });
     const inputText = JSON.stringify({ schemaVersion: 1, type, files: input });
     if (Buffer.byteLength(inputText) > (config.maxReviewInputBytes ?? 65536)) throw new Error('Preparation audit input exceeds the configured bound; select an explicit batch, never truncate');

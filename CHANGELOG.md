@@ -48,6 +48,15 @@ running 00 to 02 on old open-source trees (NUnit v2, phpBB 3.0.0, MediaWiki 1.15
   blocker is listed once; `sourceEncoding` in `migration/config.json` names
   the encoding of non-UTF-8 sources (needed for kanji-only Shift_JIS or
   EUC-JP; `cp932` accepted) and is validated.
+- Sonnet review fixes: the arbiter gets legacy-encoded sources decoded like the
+  implementer; tool-assisted review file lists and preparation audit inputs
+  name the `encoding`; status lists every missing artifact again (blockers
+  are de-duplicated by path and reason); a lone `phase check 01`/`02` in a
+  source-as-spec package says it is recorded with `phase complete 00b,01,02`;
+  the missing-root guidance offers source-as-spec only for a missing
+  verification root; C/C++ manifest commands name real extensions before the
+  map exists; README, TESTING and DEPENDENCY-MAPPERS no longer say non-UTF-8
+  input stops the run.
 
 # 0.10.0 — 2026-10-27
 

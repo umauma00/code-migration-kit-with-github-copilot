@@ -213,11 +213,13 @@ for (const [language, ext, a, b] of sourceCases) test(`${language}: source-as-sp
   atomicWrite(safePath(f.root, `legacy code/unselected/B.${ext}`), b);
   if (language === 'Python') for (const root of f.config.sourceRoots) atomicWrite(safePath(f.root, `${root}/__init__.py`), '');
   const commands = sourceSpecReadiness(f.root, f.config).commands;
-  // The command names the extensions itself (target JavaScript: .js); only
-  // C/C++, whose .c/.h pairs need a project rule, keeps the placeholder.
-  const out = language === 'C/C++' ? 'mjs' : 'js';
-  assert.equal(commands.manifest.includes('SOURCE_EXT'), language === 'C/C++');
-  for (const command of [commands.dependencyMap, commands.manifest.replace('.SOURCE_EXT=.TARGET_EXT', `.${ext}=.mjs`), commands.reviewDependencies]) {
+  // The command names the extensions itself (target JavaScript: .js); a
+  // second extension keeps its name (a.h -> a.h.js), so pairs never collide.
+  // Before the map exists the language table decides: C/C++ ranks .cpp
+  // first, so a header-only tree keeps .h in the name.
+  const out = language === 'C/C++' ? 'h.js' : 'js';
+  assert.equal(commands.manifest.includes('SOURCE_EXT'), false);
+  for (const command of [commands.dependencyMap, commands.manifest, commands.reviewDependencies]) {
     const r = await runProcess('bash', ['-c', command], { cwd: f.root });
     assert.equal(r.code, 0, `${command}\n${r.stderr}`);
   }

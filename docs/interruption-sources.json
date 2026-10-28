@@ -1061,7 +1061,7 @@
     },
     {
       "path": "lib/guidance.mjs",
-      "sha256": "3afc88abcd6b72ae073f8788828ec8b4ed1fc5347ff6a9064f8cde12e27b7ffb",
+      "sha256": "867bcf5f5f715d32c649f6a3a24eedc1d8d4f7becbc13d1dd69b529e5dca6610",
       "entries": [
         {
           "line": 73,
@@ -1527,7 +1527,7 @@
     },
     {
       "path": "lib/pipeline.mjs",
-      "sha256": "84b63ac273a54019732c72bb6c341982790fcbfa8c8eb0731eb3d63115a8bf69",
+      "sha256": "e80a52d911c731f18af06bbfa20ad7a9da9b8512acd04dd3e568c52354d4f0b7",
       "entries": [
         {
           "line": 19,
@@ -2383,7 +2383,7 @@
     },
     {
       "path": "lib/review.mjs",
-      "sha256": "58d8481b717cb4276aca7bc10e3742667f573316200e8f4f59b6cbfb41dc1299",
+      "sha256": "9ad29bd36cf90534378a3be1b64693378cfc11b2505b7f0b6319faf36df1046e",
       "entries": [
         {
           "line": 22,
@@ -2597,7 +2597,7 @@
     },
     {
       "path": "lib/source-spec.mjs",
-      "sha256": "13106aaa9511b81295050d4c419866bc761d8243c21e838ff74233afe6ba3bee",
+      "sha256": "4b51ce91450ce8e185d996bdb173cdfd5db27febe45fdea1811bef07c5ce149d",
       "entries": [
         {
           "line": 97,
@@ -2619,7 +2619,7 @@
     },
     {
       "path": "lib/status.mjs",
-      "sha256": "b75a1044e0d065ff77f0ab16183d003958ec8228f1608ba4dd707e36a3426c27",
+      "sha256": "2fdf5d43c8f306b00507df0dbaf89d8141cb671a12a8446a6e1ab03bedbd0d83",
       "entries": [
         {
           "line": 73,
@@ -2929,7 +2929,7 @@
     },
     {
       "path": "scripts/audit_inputs.mjs",
-      "sha256": "358f199abe386afa70a5dd4e75a927f0a781728821dc02bab178711dc4f1a589",
+      "sha256": "ad630132fb0ac8fb250dfaca63525cd75784d89d4a19df151f934cbb26663efd",
       "entries": [
         {
           "line": 29,
@@ -3091,7 +3091,7 @@
     },
     {
       "path": "scripts/copilot_adapter.mjs",
-      "sha256": "785b85ce00451228800792efd9dd80e7ab14c5124e6eda0adfd12e399c6ac29b",
+      "sha256": "d674c796a342698ee3d76a96cb1383c46165a4cfc7a00c9aecc08bfcc3aa1ac5",
       "entries": [
         {
           "line": 9,
@@ -4115,7 +4115,7 @@
     },
     {
       "path": "scripts/phase_cli.mjs",
-      "sha256": "cb42c89f390f7ef8d19efac53e90701c99dfc9e7d7f0ee80065f91f594622b39",
+      "sha256": "f57b7acb773badd8e1f41a9bbd3803f8111af2fc86fafe6997fd3bc8b00c6d3e",
       "entries": [
         {
           "line": 13,
@@ -4148,17 +4148,17 @@
           "code": "if (ids.length > 1 && ids.some(id => !['00','00b','01','02'].includes(id))) throw new Error('Only preparation phases 00 through 02 can be checked together');"
         },
         {
-          "line": 61,
+          "line": 64,
           "kind": "error-or-exit-candidate",
           "code": "if (!['init','start','complete'].includes(action)) throw new Error('Use phase init|next|check ID|start ID|complete ID --note TEXT');"
         },
         {
-          "line": 69,
+          "line": 72,
           "kind": "error-or-exit-candidate",
           "code": "if (ids.length > 1 && ids.some((id, i) => i && orderedPhases.indexOf(id) !== orderedPhases.indexOf(ids[i - 1]) + 1)) throw new Error('List consecutive phases in order, for example 00b,01,02');"
         },
         {
-          "line": 70,
+          "line": 73,
           "kind": "error-or-exit-candidate",
           "code": "if (ids.length > 1 && ids.some(id => !['00','00b','01','02'].includes(id))) throw new Error('Only preparation phases 00 through 02 can be completed together');"
         }

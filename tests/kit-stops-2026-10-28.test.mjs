@@ -76,7 +76,9 @@ test('a source-as-spec package starts 01 and 02 before 00b is recorded, checks t
   }
   assert.match(fs.readFileSync(safePath(root, 'migration/manifest.tsv'), 'utf8'), /app\/A\.php\tported\/A\.ts/);
   atomicWrite(safePath(root, 'migration/depmap/report.md'), '# Map\n');
-  ok(run(root, 'phase', 'check', '01'), 'phase check 01 inside the package');
+  const one = run(root, 'phase', 'check', '01');
+  ok(one, 'phase check 01 inside the package');
+  assert.equal(one.json.recordWith, 'phase complete 00b,01,02', 'a lone package check says how it is recorded');
   ok(run(root, 'phase', 'start', '02'), 'phase start 02 inside the package');
   atomicWrite(safePath(root, 'migration/RULEBOOK.md'), '# PHP to TypeScript rules\n');
   atomicWrite(safePath(root, 'migration/inventory.tsv'), 'file\tissue\tdecision\napp/A.php\tinclude\tES import\n');
@@ -211,6 +213,7 @@ test('re-review fixes: legacy audit inputs freeze, a wrong root stays a blocker,
   const { freezeAudit } = await import('../scripts/audit_inputs.mjs');
   const frozen = freezeAudit(root, loadConfig(root), { type: 'judge', files: ['app/A.php'] });
   assert.match(frozen.request.input.files[0].content, /café/);
+  assert.equal(frozen.request.input.files[0].encoding, 'windows-1252');
   // Kanji without kana reads as Latin-1 by its bytes; a declared encoding decides.
   const { readReviewSource } = await import('../lib/review.mjs');
   assert.equal(readReviewSource(root, 'app/K.php').encoding, 'windows-1252');
@@ -267,4 +270,17 @@ test('a legacy-encoded unit source over the input budget is named, not inlined',
   writeJSON(deps, { schemaVersion: 1, dependencies: { 'app/K.php': ['app/A.php'], 'app/A.php': [] } });
   const ordered = legacySources(root, { ...config, maxReviewInputBytes: 600 }, { source: 'app/K.php' });
   assert.deepEqual(ordered.map(e => [e.path, typeof e.content]), [['app/K.php', 'string'], ['app/A.php', 'undefined']]);
+});
+
+test('Sonnet review: distinct blockers stay listed; missing source roots get no profile switch', async t => {
+  const root = project(t, { profile: null });
+  const file = safePath(root, 'migration/config.json');
+  writeJSON(file, { ...readJSON(file), phasePolicy: 'legacy' });
+  fs.rmSync(safePath(root, 'migration/phases/policy.json'), { force: true });
+  const missing = migrationStatus(root).blockers.filter(b => b.reason === 'Preparation artifact missing').map(b => b.path);
+  assert.ok(missing.length > 1, `every missing artifact is listed: ${missing}`);
+  const { failureGuidance } = await import('../lib/guidance.mjs');
+  const options = message => failureGuidance(new Error(message), { root }).options.map(o => o.id);
+  assert.ok(!options('Input root missing: nosuch (sourceRoots in migration/config.json must name existing source directories)').includes('source-as-spec'));
+  assert.ok(options('Input root missing: tests (verificationRoots in migration/config.json must name the existing directory)').includes('source-as-spec'));
 });

@@ -84,8 +84,8 @@ The before/after checks with a real C compiler were done on Linux with GCC 13.3.
 - Changes to commands and explicit settings inside migration revoke completion and approvals.
 - Using state/results/gates/runs/run.lock as direct verification inputs is rejected before the stage runs.
 - If explicit targets under node_modules, __pycache__ or .git change during verification, the stage fails even when the command exits 0.
-- A Latin-1 Python source is blocked with an error naming the file instead of reaching review garbled.
-- Non-UTF-8 repair diagnostics are rejected by the same check before any model call.
+- A Latin-1 Python source reaches review decoded and named with its `encoding`, never garbled; the original bytes are untouched.
+- A Shift_JIS repair diagnostic (a Japanese Windows compiler log) is decoded too; binary input still stops.
 - Valid UTF-8 Japanese, emoji, a BOM and a real U+FFFD are preserved.
 
 ## Regression checks added in 0.1.1

@@ -56,7 +56,10 @@ export function phaseCommand(root, config, action, phase, options = {}) {
       // by a refused completion after the person has reviewed it.
       if (['00','00b','01','02','03'].includes(id)) completePhase(root,config,id,'check',{},{dryRun:true,assumePredecessor:i > 0 || packaged(id),confirmNoDependencies:Boolean(options['confirm-no-dependencies'])});
     });
-    return ids.length > 1 ? ids.map(id => ({phase:id,ready:true})) : {phase,ready:true};
+    // A single packaged 01/02 is ready for its own evidence only; say how it
+    // is recorded, since phase complete 01 alone still needs 00b.
+    const recordWith = ids.length === 1 && packaged(phase) ? { recordWith: `phase complete 00b,01,02` } : {};
+    return ids.length > 1 ? ids.map(id => ({phase:id,ready:true})) : {phase,ready:true,...recordWith};
   }
   if (!['init','start','complete'].includes(action)) throw new Error('Use phase init|next|check ID|start ID|complete ID --note TEXT');
   const release = lockRun(root,`phase-${action}-${phase ?? 'policy'}`);

@@ -44,7 +44,7 @@ does not apply to automated workers, which keep their JSON-only contracts.
    JSON. The coordinator validates and writes only the manifest target.
    Never route around a tool denial or substitute an unrestricted agent session.
    Independent preparation audits run the same way: `audit_inputs.mjs run` sends
-   a frozen request to the tool-free auditor as a fresh CLI worker on its phaseModels entry
+   a frozen request to the tool-free auditor as a fresh CLI worker on its phaseModels entry (the reviewer-semantics model when unset)
    (`run-pending` for every unsubmitted request), never through a task/agent subagent.
 5. Two independent reviewers examine every output: source behavior and rule
    adherence (with `reviewFocus: shared`, the new-install default, each covers

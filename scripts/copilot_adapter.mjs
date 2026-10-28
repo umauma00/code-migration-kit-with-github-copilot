@@ -231,7 +231,7 @@ export function agentPrompt({ role, unit, extra = {}, reviewInput, frozenInput, 
   if (isReviewer(role) && typeof reviewInput !== 'string') throw new Error('Reviewer requires a frozen review input');
   const assisted = isReviewer(role) && reviewMode === 'tool-assisted';
   const inputs = assisted
-    ? 'The evidence exceeded the frozen-input limit, so the input below lists files with SHA-256 hashes instead of contents. Read EVERY listed file in full with view before judging (grep/glob only to locate code inside them). Review only those files; never open migration/runs, migration/state, migration/results or any other review or receipt. Do not request or infer other reviewers\' findings. If a file cannot be read, return a changes finding identifying that limitation.'
+    ? 'The evidence exceeded the frozen-input limit, so the input below lists files with SHA-256 hashes instead of contents. Read EVERY listed file in full with view before judging (grep/glob only to locate code inside them). Review only those files; never open migration/runs, migration/state, migration/results or any other review or receipt. Do not request or infer other reviewers\' findings. If a file cannot be read, return a changes finding identifying that limitation. A file entry with an encoding is stored in that legacy encoding and view reads it as UTF-8: its non-ASCII text is unreliable there, so do not report garbled characters in it as a defect.'
     : isReviewer(role)
     ? 'Use ONLY the frozen input below. No tools are available. Do not request or infer other reviewers\' findings. If required source evidence is missing, return a changes finding identifying that limitation.'
     : frozenInput !== undefined
