@@ -220,7 +220,18 @@ stays unverified; if the original runs, recommend runtime. The user chooses.
 In source-as-spec, draft 00b, 01 and 02 together from the source (no per-file
 contract memo: `source-spec init` writes a source index and reviewers read cited
 source lines), run one independent review of the package, show one report and record
-`phase complete 00b,01,02 --note TEXT` only after the user's OK.
+`phase complete 00b,01,02 --note TEXT` only after the user's OK. In a project
+already on source-as-spec, `source-spec init` writes its drafts without `--apply`
+(only a profile switch needs the person's consent). `phase start 01` and `02`
+work inside the package before 00b is recorded; check the package with
+`phase check 00b,01,02`.
+
+Status lists files a current or later phase has not written yet under "not
+written yet": that is the work ahead, never a reason to stop or ask. Legacy
+encodings (Shift_JIS, EUC-JP, Latin-1, UTF-16) are read decoded and named in
+worker input, and binaries under a source root are left out of surveys: never
+ask the person to convert the original's encoding. If decoded Japanese
+looks wrong (kanji-only files), set `sourceEncoding` in migration/config.json.
 
 ## Dependency map (01)
 

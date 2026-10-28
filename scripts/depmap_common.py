@@ -179,16 +179,23 @@ def read_source(path: Path, warnings):
         return data.decode("utf-8-sig")
     except UnicodeDecodeError:
         pass
-    try:
-        text = data.decode("cp932")
-        # Western text (a (c) or an accented letter in a comment) often
-        # decodes as cp932 too, into half-width katakana or a stray kanji;
-        # Japanese text has kana or full-width punctuation.
+    # Western text (a (c) or an accented letter in a comment) often decodes
+    # as cp932 or EUC-JP too, into half-width katakana or a stray kanji;
+    # Japanese text has kana or full-width punctuation. When both decode,
+    # the one with more kana wins (lib/text.mjs decodes worker input alike).
+    best = None
+    for codec in ("cp932", "euc_jp"):
+        try:
+            text = data.decode(codec)
+        except UnicodeDecodeError:
+            continue
         if any(0x3000 <= ord(c) <= 0x30FF or 0xFF01 <= ord(c) <= 0xFF5E for c in text):
-            warnings.append(f"decoded as cp932: {path}")
-            return text
-    except UnicodeDecodeError:
-        pass
+            score = sum(1 for c in text if 0x3040 <= ord(c) <= 0x30FF)
+            if best is None or score > best[0]:
+                best = (score, codec, text)
+    if best:
+        warnings.append(f"decoded as {best[1].replace('_', '-')}: {path}")
+        return best[2]
     warnings.append(f"decoded as latin-1: {path}")
     return data.decode("latin-1")
 

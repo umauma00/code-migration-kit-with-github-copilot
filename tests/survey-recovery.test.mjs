@@ -43,7 +43,7 @@ test('survey input provides original CRLF line numbers and validates range ends'
   // of stopping the survey, and the rejected line 235 is not kept.
   assert.equal(report.done, 1);
   const item = readJSON(safePath(f.root, 'migration/surveys/contracts/001-case.json')).items.find(i => i.file === 'case/A.cs');
-  assert.equal(item.uncited, true); assert.match(item.evidence, /^case\/A\.cs:1-2 \(no verified citation/); assert.doesNotMatch(item.evidence, /235/);
+  assert.equal(item.uncited, true); assert.match(item.evidence, /^case\/A\.cs:1-2 \(no verified citation/); assert.doesNotMatch(item.evidence, /:235\b/, "the rejected citation is not kept (run ids may contain the digits)");
   assert.equal(item.publicInterface, 'unknown');
 });
 
@@ -112,36 +112,28 @@ test('out-of-range cached answers are not merged or reused as successful', async
   assert.throws(() => mergeSurvey(f.root, f.config, 'contracts'), /Survey incomplete/);
 });
 
-test('unreadable sources block completion/merge, and repairing them preserves successful scope identities', async t => {
-  const f = fixture(t);
+// Legacy encodings are decoded (and named) instead of stopping the survey;
+// binaries under a source root are left out, not counted as unread sources.
+test('a Latin-1 source is surveyed decoded and a binary beside it does not block completion or merge', async t => {
+  const f = fixture(t), inputs = [];
   fs.writeFileSync(safePath(f.root, 'case/A.cs'), Buffer.from('class A {} // caf\xe9\n', 'latin1'));
-  const error = await runSurvey(f.root, f.config, 'contracts', async args => answer(args), { maxFiles: 1 }).catch(e => e);
-  assert.match(error.message, /valid UTF-8/);
-  assert.equal(error.report.complete, false); assert.equal(error.report.skipped.length, 1);
-  const before = surveyStatus(f.root, f.config, 'contracts');
-  assert.equal(before.done, 1); assert.equal(before.complete, false); assert.equal(before.skipped[0].file, 'case/A.cs');
-  assert.throws(() => mergeSurvey(f.root, f.config, 'contracts'), /source files could not be read/);
-  const scope = planSurvey(f.root, f.config, 'contracts').scopes.find(s => s.files.includes('case/B.cs'));
-  const record = safePath(f.root, `migration/surveys/contracts/${scope.id}.json`), digest = fileHash(record);
-  atomicWrite(safePath(f.root, 'case/A.cs'), 'class A {} // café\n');
-  const called = [];
-  const report = await runSurvey(f.root, f.config, 'contracts', async args => {
-    called.push(...JSON.parse(args.reviewInput).files.map(f => f.path)); return answer(args);
-  });
-  assert.deepEqual(called, ['case/A.cs']); assert.equal(report.complete, true);
-  assert.equal(planSurvey(f.root, f.config, 'contracts').scopes.find(s => s.files.includes('case/B.cs')).id, scope.id);
-  assert.equal(fileHash(record), digest);
+  fs.writeFileSync(safePath(f.root, 'case/logo.png'), Buffer.from([0x89, 0x50, 0x4e, 0x47, 0, 0, 0, 13]));
+  const report = await runSurvey(f.root, f.config, 'contracts', async args => { inputs.push(JSON.parse(args.reviewInput)); return answer(args); }, { maxFiles: 1 });
+  assert.equal(report.complete, true); assert.deepEqual(report.skipped, []); assert.equal(report.binaryFilesLeftOut, 1);
+  const a = inputs.flatMap(i => i.files).find(x => x.path === 'case/A.cs');
+  assert.equal(a.encoding, 'windows-1252'); assert.match(a.content, /café/);
+  assert.ok(!inputs.flatMap(i => i.files).some(x => x.path === 'case/logo.png'));
   assert.equal(mergeSurvey(f.root, f.config, 'contracts').items, 2);
 });
 
-test('an entirely unreadable survey cannot report zero-of-zero as complete or replace a draft', async t => {
+test('a survey whose source roots hold only binaries cannot report zero-of-zero as complete or replace a draft', async t => {
   const f = fixture(t);
   for (const file of ['case/A.cs', 'case/B.cs']) fs.writeFileSync(safePath(f.root, file), Buffer.from([0xff, 0x00, 0xfe]));
   atomicWrite(safePath(f.root, 'migration/source-spec/contracts.md'), '# Keep previous reviewed text\n');
   let calls = 0;
-  await assert.rejects(runSurvey(f.root, f.config, 'contracts', async () => { calls++; }), /valid UTF-8/);
+  await assert.rejects(runSurvey(f.root, f.config, 'contracts', async () => { calls++; }), /only binary files/);
   assert.equal(calls, 0); assert.equal(surveyStatus(f.root, f.config, 'contracts').complete, false);
-  assert.throws(() => mergeSurvey(f.root, f.config, 'contracts'), /source files could not be read/);
+  assert.throws(() => mergeSurvey(f.root, f.config, 'contracts'), /could not be read/);
   assert.equal(fs.readFileSync(safePath(f.root, 'migration/source-spec/contracts.md'), 'utf8'), '# Keep previous reviewed text\n');
 });
 

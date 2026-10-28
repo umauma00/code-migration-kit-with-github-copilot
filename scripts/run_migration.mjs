@@ -329,7 +329,7 @@ export async function main(argv = process.argv.slice(2)) {
       }
     }
     else if (cmd === 'source-spec' && args._[1] === 'init') {
-      const release = args.apply ? lockRun(root, 'source-spec-init') : () => {};
+      const release = lockRun(root, 'source-spec-init');
       try { result = initSourceSpec(root, config, { apply: args.apply }); } finally { release(); }
     }
     else if (cmd === 'source-spec' && args._[1] === 'check') result = sourceSpecReadiness(root, config);
@@ -340,7 +340,9 @@ export async function main(argv = process.argv.slice(2)) {
       const action = args._[1];
       if (action === 'plan') result = planSurvey(root, config, kind, options);
       else if (action === 'status') result = surveyStatus(root, config, kind, options);
-      else if (action === 'merge') { const release = lockRun(root, 'survey-merge'); try { result = mergeSurvey(root, config, kind, options); } finally { release(); } }
+      // The inventory merge takes the run lock itself; a second lock here
+      // made every inventory merge fail on its own lock.
+      else if (action === 'merge') { const release = kind === 'inventory' ? () => {} : lockRun(root, 'survey-merge'); try { result = mergeSurvey(root, config, kind, options); } finally { release(); } }
       else if (action === 'run') {
         result = await runSurvey(root, config, kind, createCopilotAdapter({ command: args.copilot }), { signal: controller.signal, ...options,
           onProgress: event => console.error(`${event.unit}: ${event.stage} (agent calls ${event.calls})`) });

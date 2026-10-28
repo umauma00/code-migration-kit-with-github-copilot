@@ -14,8 +14,12 @@ import { parseCommandLine, specs, usageText } from '../lib/cli.mjs';
 import { loadConfig, safePath, hash, fileHash, treeHash, readJSON, writeJSON, lockRun, semanticConfig, stamp } from '../lib/core.mjs';
 import { recordSession } from '../lib/sessions.mjs';
 import { createCopilotAdapter } from './copilot_adapter.mjs';
-import { readReviewText, validatePreparationProfile } from '../lib/review.mjs';
+import { readReviewText, readReviewSource, validatePreparationProfile } from '../lib/review.mjs';
 const models = { judge: 'judgeAudit', dependencies: 'dependencyAudit', inventory: 'inventoryAudit', design: 'designAudit' };
+// The person's phaseModels entry when they set one; otherwise the model they
+// chose for the semantic reviewer, an auditor's closest role. No kit setter
+// writes the audit keys, so requiring them stopped every first audit.
+const auditModel = (config, type) => config.phaseModels?.[models[type]] ?? config.models?.['reviewer-semantics'];
 // The configuration on disk counts too: run waits for a worker with the config it
 // loaded at the start, and a model or rule change meanwhile must void the result.
 // Run limits (semanticConfig) may change.
@@ -23,20 +27,19 @@ function snapshot(root, config) { return hash(JSON.stringify({ source: treeHash(
   config: hash(JSON.stringify(semanticConfig(config))), configFile: hash(JSON.stringify(semanticConfig(readJSON(safePath(root, 'migration/config.json'))))), profile: validatePreparationProfile(root, config) })); }
 export function freezeAudit(root, config, { type, files, out } = {}) {
   if (!Object.hasOwn(models, type) || !Array.isArray(files) || !files.length || new Set(files).size !== files.length) throw new Error('Select judge|dependencies|inventory|design and explicit unique input files');
-  const model = config.phaseModels?.[models[type]];
-  if (!model) throw new Error(`Set phaseModels.${models[type]} explicitly; do not inherit a default preparation model`);
+  const model = auditModel(config, type);
   const task = crypto.randomUUID(), directory = out ?? `migration/audits/${task}`;
   if (!/^migration\/audits\/[A-Za-z0-9_-]+$/.test(directory) || fs.existsSync(safePath(root, directory))) throw new Error('Use a new audit directory under migration/audits/');
   const release = lockRun(root, 'audit-freeze');
   try {
     const before = snapshot(root, config), input = files.map(p => {
       if (/^migration\/(?:audits|reviews|runs|state|results|gates|phases)\//.test(p)) throw new Error('Audit input cannot contain prior findings, approvals or worker outcomes');
-      const content = readReviewText(root, p);
-      return { path: p, content, hash: hash(content) };
+      const { content, encoding } = readReviewSource(root, p);
+      return { path: p, content, hash: hash(content), ...(encoding === 'utf-8' ? {} : { encoding }) };
     });
     const inputText = JSON.stringify({ schemaVersion: 1, type, files: input });
     if (Buffer.byteLength(inputText) > (config.maxReviewInputBytes ?? 65536)) throw new Error('Preparation audit input exceeds the configured bound; select an explicit batch, never truncate');
-    if (snapshot(root, config) !== before || input.some(f => fileHash(safePath(root, f.path)) !== f.hash)) throw new Error('Audit inputs changed while freezing');
+    if (snapshot(root, config) !== before || input.some(f => currentHash(root, f.path) !== f.hash)) throw new Error('Audit inputs changed while freezing');
     const request = { schemaVersion: 1, kind: 'preparation-audit-request', task, type, requestedModel: model, observedModel: null,
       snapshot: before, inputHash: hash(inputText), input: JSON.parse(inputText),
       responseContract: { schemaVersion: 1, kind: 'preparation-audit', task, inputHash: hash(inputText), verdict: 'pass|changes', findings: [{ id: 'ID', message: 'specific problem', evidence: 'source/assertion/rule:line proof', proposedFix: 'proposal only' }] } };
@@ -47,14 +50,16 @@ export function freezeAudit(root, config, { type, files, out } = {}) {
 }
 const auditDirectory = /^migration\/audits\/[A-Za-z0-9_-]+$/;
 const retirement = (root, directory) => fs.existsSync(safePath(root, `${directory}/retired.json`)) ? readJSON(safePath(root, `${directory}/retired.json`)) : null;
+// A deleted input or one that became binary is a changed input, not a crash.
+const currentHash = (root, name) => { try { return hash(readReviewText(root, name)); } catch { return null; } };
 function currentRequest(root, config, directory) {
   if (!auditDirectory.test(directory ?? '')) throw new Error('Invalid audit directory');
   const retired = retirement(root, directory);
   if (retired) throw new Error(`Audit request ${directory} is retired${retired.supersededBy ? `, superseded by ${retired.supersededBy}` : ''}; run its replacement instead`);
   const request = readJSON(safePath(root, `${directory}/request.json`));
-  if (request.schemaVersion !== 1 || request.kind !== 'preparation-audit-request' || !Object.hasOwn(models, request.type) || request.requestedModel !== config.phaseModels?.[models[request.type]] ||
+  if (request.schemaVersion !== 1 || request.kind !== 'preparation-audit-request' || !Object.hasOwn(models, request.type) || request.requestedModel !== auditModel(config, request.type) ||
         !request.input || !Array.isArray(request.input.files) || request.snapshot !== snapshot(root, config) || hash(JSON.stringify(request.input)) !== request.inputHash ||
-        request.input.files.some(f => typeof f.content !== 'string' || hash(f.content) !== f.hash || fileHash(safePath(root, f.path)) !== f.hash)) throw new Error(`Preparation audit inputs changed; use fresh contexts and requests: freeze a replacement, then retire --directory ${directory} --superseded-by NEW --reason TEXT`);
+        request.input.files.some(f => typeof f.content !== 'string' || hash(f.content) !== f.hash || currentHash(root, f.path) !== f.hash)) throw new Error(`Preparation audit inputs changed; use fresh contexts and requests: freeze a replacement, then retire --directory ${directory} --superseded-by NEW --reason TEXT`);
   return request;
 }
 export async function runAudit(root, config, adapter, { directory, signal } = {}) {

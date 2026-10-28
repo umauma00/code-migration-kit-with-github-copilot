@@ -1124,6 +1124,23 @@ def mapper(root, warnings, args):
             continue
         files = sorted(files)
         unresolved.add((files[0], name, EXTERNAL + str(len(files))))
+    # Legacy trees build most include paths from a root variable and an
+    # extension variable ($phpbb_root_path . 'common.' . $phpEx). Name the
+    # variables that block the most includes, so the run that follows can
+    # pass their values with --include-var instead of leaving the graph thin.
+    blocking = {}
+    for src, ref, why in unresolved:
+        if why == "include path computed at run time":
+            for var in set(re.findall(r"\$(\w+)", ref)):
+                blocking[var] = blocking.get(var, 0) + 1
+    computed = sum(1 for *_, why in unresolved if why == "include path computed at run time")
+    top = [v for v, n in sorted(blocking.items(), key=lambda c: (-c[1], c[0]))
+           if n >= max(5, computed / 4) and v not in include_vars][:4]
+    if top:
+        warnings.append(f"{computed} includes compute their path; "
+                        f"most use ${', $'.join(top)} ({', '.join(f'${v}: {blocking[v]}' for v in top)}). If those hold fixed values "
+                        f"(a root directory, the extension php), rerun with --include-var {','.join(f'{v}=VALUE' for v in top)}, "
+                        "for example a root of '' (relative to --root) and an extension of php")
     return rels, edges, unresolved
 
 

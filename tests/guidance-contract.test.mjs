@@ -34,6 +34,7 @@ const samples = {
   'spec-placeholder': 'Source-derived contracts still contain TODO(spec): migration/source-spec/contracts.md',
   'outside-roots': 'Source outside sourceRoots: tools/gen.py',
   artifact: 'Nonempty phase artifact required: migration/feasibility.md',
+  'input-root': 'Judge input root missing: tests (verificationRoots in migration/config.json must name the existing directory of the judge and its scenarios; "tests" is only the installer\'s default)',
   'no-dependencies': 'Review dependency map declares no dependencies between 3 manifest files',
   'template-rules': 'migration/RULEBOOK.md is still the installed template',
   'untrusted-folder': 'Repository hooks are not loaded: the Copilot CLI folder is untrusted',

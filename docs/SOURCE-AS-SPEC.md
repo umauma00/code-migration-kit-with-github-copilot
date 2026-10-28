@@ -44,6 +44,9 @@ node migration-kit/scripts/run_migration.mjs source-spec init --apply  # ユー�
 
 方式の切り替えは設定変更なので、以前の承認・記録は失効します（00bから確認し直し）。
 
+最初から source-as-spec で導入した案件では、設定は変わらないので `source-spec init`（`--apply` なし）がそのまま下書きを作ります。キットが用意する下書きのために利用者へ同意を求めることはありません。
+00b〜02 は一括で記録するので、00b の記録前でも `phase start 01`・`phase start 02` を実行でき、`phase check 00b,01,02` でまとめて確認できます（記録は `phase complete 00b,01,02` で順番どおりに行います）。
+
 ## AIが作るもの（00b〜02を一括）
 
 `source-spec check` が、残っている成果物と推奨コマンド（依存解析・manifest・依存宣言）を表示します。
@@ -55,7 +58,7 @@ node migration-kit/scripts/run_migration.mjs source-spec init --apply  # ユー�
 | 02 | `RULEBOOK.md`、`inventory.tsv`、`gap-report.md` | ソースの実際の使われ方から方針を決める。判断できない箇所はinventoryにUNKNOWNとして残し、最も保守的な訳とTODO(port)を指定 |
 
 0.10.0 より前に作った judge-plan が `contracts.md` を指している場合は、従来どおり `TODO(spec)` が残っている間は00bを記録できません。
-新しい方式に移るには、`migration/judge-plan.json` を削除してから `source-spec init --apply` をやり直します（設定は変わらないので00の記録は残り、00b〜02は一括確認をやり直します）。
+新しい方式に移るには、`migration/judge-plan.json` を削除してから `source-spec init` をやり直します（設定は変わらないので00の記録は残り、00b〜02は一括確認をやり直します）。
 
 ### 準備監査を軽くする
 

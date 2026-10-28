@@ -52,8 +52,8 @@ over up to three rounds mostly repeats the parser's own output. Instead:
    TSV and run `dependency-diff --files LIST --audit migration/observed-edges.tsv`
    on the same files. The selection stays within `maxReviewInputBytes`; files left
    out for size are listed (`skippedForInputSize`): lower `--size` or raise the
-   limit only if you want them too. Files that are not UTF-8 text are left out
-   too (`skippedNotUtf8Text`); check those by hand. A named `--unresolved` file
+   limit only if you want them too. Binary files are left out
+   too (`skippedNotUtf8Text`); legacy encodings are read decoded. A named `--unresolved` file
    must exist; rows it cannot place are listed under `unmatchedUnresolvedFiles`.
 4. Confirm each difference against source. Fix the mapper copy or add the
    declaration, regenerate the whole map/order/manifest/review declaration, and
@@ -184,10 +184,11 @@ aliases, before changing inventory or the protected input.
 
 ## Frozen audit requests and models
 
-Configure explicit phaseModels.judgeAudit, dependencyAudit, inventoryAudit or
-designAudit for the host in use; default inheritance is not explicit selection.
-Other plan keys are rulebook, stressA, stressB and stressInspector. No model ID
-normalization, automatic fallback or availability claim is performed.
+An audit runs on phaseModels.judgeAudit, dependencyAudit, inventoryAudit or
+designAudit when the person set it, otherwise on the model they chose for
+reviewer-semantics (an auditor's closest role); the request records the model
+it froze. Other plan keys are rulebook, stressA, stressB and stressInspector. No
+model ID normalization or availability claim is performed.
 
 ```bash
 node migration-kit/scripts/audit_inputs.mjs freeze --type inventory \

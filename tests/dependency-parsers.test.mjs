@@ -213,13 +213,19 @@ for (const [language, ext, a, b] of sourceCases) test(`${language}: source-as-sp
   atomicWrite(safePath(f.root, `legacy code/unselected/B.${ext}`), b);
   if (language === 'Python') for (const root of f.config.sourceRoots) atomicWrite(safePath(f.root, `${root}/__init__.py`), '');
   const commands = sourceSpecReadiness(f.root, f.config).commands;
-  for (const command of [commands.dependencyMap, commands.manifest.replace('.SOURCE_EXT=.TARGET_EXT', `.${ext}=.mjs`), commands.reviewDependencies]) {
+  // The command names the extensions itself (target JavaScript: .js); a
+  // second extension keeps its name (a.h -> a.h.js), so pairs never collide.
+  // Before the map exists the language table decides: C/C++ ranks .cpp
+  // first, so a header-only tree keeps .h in the name.
+  const out = language === 'C/C++' ? 'h.js' : 'js';
+  assert.equal(commands.manifest.includes('SOURCE_EXT'), false);
+  for (const command of [commands.dependencyMap, commands.manifest, commands.reviewDependencies]) {
     const r = await runProcess('bash', ['-c', command], { cwd: f.root });
     assert.equal(r.code, 0, `${command}\n${r.stderr}`);
   }
   const units = readManifest(f.root, f.config);
-  assert.ok(units.some(u => u.source === `legacy code/shared/B.${ext}` && u.target === 'ported/shared/B.mjs'));
-  assert.ok(units.some(u => u.source === `legacy code/app/A.${ext}` && u.target === 'ported/app/A.mjs'));
+  assert.ok(units.some(u => u.source === `legacy code/shared/B.${ext}` && u.target === `ported/shared/B.${out}`));
+  assert.ok(units.some(u => u.source === `legacy code/app/A.${ext}` && u.target === `ported/app/A.${out}`));
   assert.ok(units.every(u => !u.source.includes('/unselected/')));
   assert.doesNotMatch(fs.readFileSync(safePath(f.root, 'migration/depmap/order.txt'), 'utf8'), /unselected/);
   assert.deepEqual(readJSON(safePath(f.root, 'migration/review-dependencies.json')).dependencies[`legacy code/app/A.${ext}`], [`legacy code/shared/B.${ext}`]);

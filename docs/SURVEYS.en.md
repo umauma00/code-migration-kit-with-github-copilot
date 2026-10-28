@@ -50,11 +50,15 @@ capacity error; source text is never silently removed.
 
 For large files with many census sites, capacity is shared between the source
 and site batches to reduce duplicate requests while retaining every site's full
-fragment coverage. Unreadable sources, missing or out-of-root census files,
-empty source roots and empty censuses are reported as incomplete and cannot be
-merged. Readable scopes are preserved, and repaired inputs resume without
-re-running completed scopes. Confirm source encoding before preparing UTF-8
-input; the runner does not silently guess or convert it.
+fragment coverage. Legacy encodings (Shift_JIS, EUC-JP,
+Latin-1, UTF-16) are decoded by the bundled mappers' rules and each input file
+names its `encoding`; the original is never changed and, since 0.11.1, the
+survey never stops to ask for a conversion. When non-UTF-8 sources are
+kanji-only, set `sourceEncoding` in `migration/config.json`. Binaries under a source root are
+left out of the survey and counted in `binaryFilesLeftOut`. Missing or
+out-of-root census files, a census naming a binary, empty source roots and
+empty censuses are reported as incomplete and cannot be merged. Readable scopes
+are preserved, and repaired inputs resume without re-running completed scopes.
 
 Monitor the existing terminal with `status --fast --format markdown` (optionally
 `--wait 600`), which reads recorded progress without walking the source tree.

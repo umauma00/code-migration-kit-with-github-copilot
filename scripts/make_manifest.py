@@ -10,6 +10,9 @@ substitutions (repeatable, applied in order, simple string replacement), and
 writes a TSV with header `source\ttarget`, preserving batch order —
 dependencies first, so queue_runner.mjs hands out work in migration order.
 
+--ext .OLD=.NEW (repeatable) replaces a file extension at the end of the
+path only; source-spec check fills it in from the source and target languages.
+
 --map-root SOURCE=TARGET (repeatable) remaps only a leading directory prefix,
 longest match first, before --sub. Use it for generated multi-root suggestions;
 the old --sub behavior remains a global text substitution.
@@ -43,6 +46,9 @@ def main():
                     help="manifest TSV to write (header: source\\ttarget)")
     ap.add_argument("--sub", action="append", default=[], metavar="OLD=NEW",
                     help="substitution old=new, repeatable, applied in order")
+    ap.add_argument("--ext", action="append", default=[], metavar=".OLD=.NEW",
+                    help="replace the file extension .OLD at the end of a path with .NEW (repeatable); "
+                         "applied after --map-root, before --sub")
     ap.add_argument("--map-root", action="append", default=[], metavar="SOURCE=TARGET",
                     help="map a source directory prefix to a target directory (repeatable, longest prefix first); applied before --sub")
     ap.add_argument("--prefix", default="", metavar="DIR/",
@@ -53,6 +59,19 @@ def main():
                          "use when the parser walked more than the source roots")
     args = ap.parse_args()
 
+    for value in args.sub + args.ext:
+        if "SOURCE_EXT" in value or "TARGET_EXT" in value:
+            print(f"ERROR: {value!r} still holds the placeholder; name the real extensions, "
+                  "for example --ext '.cs=.ts'", file=sys.stderr)
+            sys.exit(1)
+    exts = []
+    for value in args.ext:
+        old, sep, new = value.partition("=")
+        if not sep or not old.startswith(".") or "/" in old + new:
+            print(f"ERROR: --ext must look like '.old=.new', got: {value!r}", file=sys.stderr)
+            sys.exit(1)
+        exts.append((old, new))
+    exts.sort(key=lambda e: -len(e[0]))
     subs = []
     for s in args.sub:
         old, sep, new = s.partition("=")
@@ -100,6 +119,10 @@ def main():
                     raise SystemExit(f"ERROR: no --map-root mapping for source: {source!r}")
                 suffix = source if selected == '.' else source[len(selected) + 1:]
                 target = suffix if root_maps[selected] == '.' else root_maps[selected] + '/' + suffix
+            for old, new in exts:
+                if target.lower().endswith(old.lower()):
+                    target = target[:-len(old)] + new
+                    break
             for old, new in subs:
                 target = target.replace(old, new)
             if target == source:

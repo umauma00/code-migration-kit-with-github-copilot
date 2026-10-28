@@ -57,8 +57,12 @@ test('source-only rejects empty, inferred-as-observed, missing and protected pla
   }
   for (const p of ['missing.py', 'migration/state/fake.json', 'ported/math_ops.mjs', 'tests/missing.py']) {
     writeJSON(file, {...good, scenarios: [{...good.scenarios[0], path: p}]});
-    await assert.rejects(runStage(f.root, f.config, 'judge'), /input path|Missing or empty/);
+    await assert.rejects(runStage(f.root, f.config, 'judge'), /input path|Missing (?:or empty )?scenario/);
   }
+  // An empty scenario says nothing; an empty source file is still source.
+  atomicWrite(safePath(f.root, 'tests/empty.md'), '');
+  writeJSON(file, {...good, scenarios: [{...good.scenarios[0], path: 'tests/empty.md'}]});
+  await assert.rejects(runStage(f.root, f.config, 'judge'), /Missing or empty scenario input/);
   writeJSON(file, {...good, scenarios: [{...good.scenarios[0], expectationBasis: 'original-observed'}]});
   await assert.rejects(runStage(f.root, f.config, 'judge'), /source-inferred/);
   const link = safePath(f.root, 'tests/link.py'); fs.symlinkSync('judge.py', link);
@@ -100,8 +104,13 @@ test('status after initialization reads candidates and blockers without dispatch
   const before = fs.readFileSync(safePath(root, 'migration/config.json'));
   const report = migrationStatus(root);
   assert.equal(report.total, 0); assert.equal(report.running, false); assert.equal(report.implementationReady, false);
-  assert.equal(report.phases.length, 10); assert.ok(report.blockers.length);
+  // Artifacts the current or later phases write are pending work, not
+  // blockers (a blocker makes the agent stop and ask the person).
+  assert.equal(report.phases.length, 10); assert.deepEqual(report.blockers, []);
+  assert.ok(report.pendingArtifacts.includes('migration/feasibility.md') && report.pendingArtifacts.includes('migration/manifest.tsv'));
+  assert.match(report.inputsPending, /Required artifact missing: migration\/manifest\.tsv/);
   assert.match(statusMarkdown(report), /time not calculated/);
+  assert.match(statusMarkdown(report), /Not written yet \(produced by the current or a later phase; not a problem\)/);
   assert.deepEqual(fs.readFileSync(safePath(root, 'migration/config.json')), before);
   assert.equal(fs.existsSync(safePath(root, 'migration/run.lock')), false);
   atomicWrite(safePath(root, 'migration/config.json'), '{');

@@ -35,7 +35,7 @@ Windows では `python3` の代わりに `py` または `python` を使います
 - `cycles.txt`：2ファイル以上の循環
 - `unresolved.tsv`（全言語）：結び付けられない参照や解析できなかったファイルと理由。Pythonの構文・文字コード・AST上限、Cの未解決quoted include・マクロinclude、JS/TSの未解決相対import・読めないファイルも残します。型付き言語などでは動的include・CALL・リフレクション・未解決型も記録します。
 
-同じ入力なら毎回バイト単位で同じ出力になります。PythonソースはPython自身の規則でUTF-8 BOM・coding宣言（cp932・Latin-1など）を読み、読めない構文・文字コードはファイル全体を未解析として記録します。C/C++・C#・Java・VB.NET・PHP・COBOLは共通のデコーダーでUTF-8、BOM付きUTF-16/32、cp932、Latin-1を扱います。cp932にかな・全角記号がない場合は欧文としてLatin-1を選びます。BOMなしUTF-16は1バイトおきのNULで判定します。それ以外のNULや読取失敗は `(whole file)` として記録し、独立したファイルの解析を続けます。JS/TS版はUTF-8専用で、不正UTF-8・NULを未解析として記録します。
+同じ入力なら毎回バイト単位で同じ出力になります。PythonソースはPython自身の規則でUTF-8 BOM・coding宣言（cp932・Latin-1など）を読み、読めない構文・文字コードはファイル全体を未解析として記録します。C/C++・C#・Java・VB.NET・PHP・COBOLは共通のデコーダーでUTF-8、BOM付きUTF-16/32、cp932、EUC-JP、Latin-1を扱います。cp932・EUC-JPはかなの多い方を選び、かな・全角記号がない場合は欧文としてLatin-1を選びます。依存解析は import/include の名前（ASCII）を読むため、`migration/config.json` の `sourceEncoding` は解析器には渡しません（ワーカーへの入力にだけ使います）。BOMなしUTF-16は1バイトおきのNULで判定します。それ以外のNULや読取失敗は `(whole file)` として記録し、独立したファイルの解析を続けます。JS/TS版はUTF-8専用で、不正UTF-8・NULを未解析として記録します（ワーカーには読み替えて渡すため、このファイルは依存の宣言を手で補ってください）。
 
 ### 調査で修正したケース（2026-10-26）
 

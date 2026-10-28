@@ -1,3 +1,63 @@
+# 0.11.1 — 2026-10-28
+
+Remove stops caused by the kit itself: a phase no longer asks the person about
+something the kit should have prepared or decided. Each case was reproduced by
+running 00 to 02 on old open-source trees (NUnit v2, phpBB 3.0.0, MediaWiki 1.15).
+
+- Source-only projects no longer need the installer's default
+  `verificationRoots` ("tests") to exist: `judge-prepare`, `phase complete 00b`
+  and the context hash treat a missing verification root as empty there.
+  Runtime projects still need it; the error now names the setting to fix and
+  has its own guidance.
+- An empty source file (phpBB's `config.php`) no longer fails the judge plan
+  ("Missing or empty source input"); only an empty scenario does.
+- `source-spec init` in a project already on source-as-spec writes its drafts
+  without `--apply`; only a profile switch still needs the person's consent.
+- Source-as-spec: `phase start 01` / `02` work before 00b is recorded (the
+  three are reviewed and recorded as one package), and `phase check` takes a
+  package list such as `00b,01,02`. `phase complete 01` alone still needs 00b.
+- Status no longer lists artifacts that the current or a later phase writes as
+  blockers ("阻害要因: manifest.tsv missing" during 00b); they are shown as not
+  written yet, and a context hash that cannot be computed before 03 is
+  `inputsPending`, not a blocker.
+- Legacy encodings no longer stop surveys or translation. Shift_JIS, EUC-JP,
+  Latin-1 and UTF-16 sources are decoded by the bundled mappers' rules (which
+  now also detect EUC-JP); every worker input names the `encoding`, and the
+  implementer and fixer get the decoded text in `extra.legacyEncodedSources`.
+  The original files are never rewritten. Binary files under a source root are
+  left out of surveys (`binaryFilesLeftOut`) instead of making them incomplete.
+- `source-spec check` prints the manifest command with the real extensions
+  (`--ext '.cs=.ts'`). `make_manifest.py` gains `--ext` (replaces only the file
+  extension) and refuses the `.SOURCE_EXT=.TARGET_EXT` placeholder instead of
+  silently writing targets with the source extension.
+- `survey merge --kind inventory` no longer fails on its own run lock (the
+  inventory merge takes the lock itself).
+- Preparation audits run on the phaseModels audit entry when it is set, and
+  otherwise on the person's reviewer-semantics model. No kit command could set
+  the audit entries, so every first `audit_inputs.mjs freeze` stopped.
+- The PHP mapper names the variables that leave most includes unresolved
+  (`$phpbb_root_path . 'common.' . $phpEx`: 364 of phpBB's 429 unresolved rows)
+  and suggests `--include-var`; with it, phpBB's computed includes fall to 78.
+- Independent re-review fixes: preparation audits hash legacy-encoded inputs
+  as decoded text, so `freeze` and the request check agree; `phase check`
+  takes a list only within 00 to 02; status still shows a missing source or
+  verification root as a blocker while other inputs are pending (after 00);
+  the implementer gets the unit's legacy-encoded source decoded before its
+  dependencies (within the input budget); a deleted or binary audit input
+  gives the "inputs changed" recovery instead of a raw error; a status
+  blocker is listed once; `sourceEncoding` in `migration/config.json` names
+  the encoding of non-UTF-8 sources (needed for kanji-only Shift_JIS or
+  EUC-JP; `cp932` accepted) and is validated.
+- Sonnet review fixes: the arbiter gets legacy-encoded sources decoded like the
+  implementer; tool-assisted review file lists and preparation audit inputs
+  name the `encoding`; status lists every missing artifact again (blockers
+  are de-duplicated by path and reason); a lone `phase check 01`/`02` in a
+  source-as-spec package names the phases still to record together;
+  the missing-root guidance offers source-as-spec only for a missing
+  verification root; C/C++ manifest commands name real extensions before the
+  map exists; README, TESTING and DEPENDENCY-MAPPERS no longer say non-UTF-8
+  input stops the run.
+
 # 0.11.0 — 2026-10-28
 
 - Decide run settings in one file instead of one question per setting.
