@@ -25,7 +25,7 @@ import { buildLoop } from '../lib/build-loop.mjs';
 import { readPreferences, setPreferences, preferencesReport } from '../lib/preferences.mjs';
 import { readGuardrails, cliFolderTrust, guardrailsProposal, installGuardrails } from '../lib/guardrails.mjs';
 import { listAvailableModels, modelsMarkdown, setRoleModels, readConfigIfPresent, currentAssignments } from '../lib/models.mjs';
-import { initRunSettings, checkRunSettings, applyRunSettings, syncRunSettings, runSettingsFile } from '../lib/run-settings.mjs';
+import { initRunSettings, checkRunSettings, applyRunSettings, syncRunSettings, runSettingsSnapshot, runSettingsFile } from '../lib/run-settings.mjs';
 import { ignoredLimits, processTimeout } from '../lib/execution-policy.mjs';
 
 export const usage = `Usage: node migration-kit/scripts/run_migration.mjs COMMAND [options]
@@ -220,8 +220,9 @@ export async function main(argv = process.argv.slice(2)) {
     fs.unlinkSync(file); console.log('Removed stale migration lock'); return;
   }
   if (cmd === 'preferences') {
+    const before = runSettingsSnapshot(root);
     const result = args.language || args['original-runtime'] ? setPreferences(root, { language: args.language, originalRuntime: args['original-runtime'] }) : preferencesReport(root);
-    if (args.language || args['original-runtime']) { const synced = syncRunSettings(root); if (synced) result.runSettings = `${synced} updated to match`; }
+    if (args.language || args['original-runtime']) { const synced = syncRunSettings(root, before); if (synced) result.runSettings = `${synced} updated to match`; }
     console.log(JSON.stringify(result, null, 2));
     return;
   }
@@ -236,8 +237,9 @@ export async function main(argv = process.argv.slice(2)) {
       if (!readConfigIfPresent(root)) throw new Error('migration/config.json is missing: initialize the project (install.mjs) before recording model choices');
       const release = lockRun(root, 'models-set');
       try {
+        const before = runSettingsSnapshot(root);
         const result = setRoleModels(root, models, { role: args.role, model: args.model, effort: args.effort, context: args.context, assign: args.assign });
-        const synced = syncRunSettings(root);
+        const synced = syncRunSettings(root, before);
         console.log(JSON.stringify(synced ? { ...result, runSettings: `${synced} updated to match` } : result, null, 2));
       } finally { release(); }
       return;

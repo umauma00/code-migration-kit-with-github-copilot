@@ -9,7 +9,7 @@ import { install, kitRoot } from '../scripts/install.mjs';
 import { contextHash, done, readJSON, writeJSON, safePath, loadConfig } from '../lib/core.mjs';
 import { translate, runStage, approve } from '../lib/pipeline.mjs';
 import { normalizeModels, setRoleModels } from '../lib/models.mjs';
-import { initRunSettings, checkRunSettings, applyRunSettings, runSettingsState, syncRunSettings, runSettingsFile } from '../lib/run-settings.mjs';
+import { initRunSettings, checkRunSettings, applyRunSettings, runSettingsState, syncRunSettings, runSettingsSnapshot, runSettingsFile } from '../lib/run-settings.mjs';
 import { migrationStatus, statusMarkdown } from '../lib/status.mjs';
 import { statusSnapshot } from '../lib/status-snapshot.mjs';
 import { humanGate, interactiveDecision } from '../lib/guardrails.mjs';
@@ -364,16 +364,32 @@ test('a model or language changed from chat updates the file, so apply never wri
   initRunSettings(root, models);
   writeSettings(root, filled(root));
   assert.equal(applyRunSettings(root, models).applied, true);
-  setRoleModels(root, models, { role: 'all', model: 'small-model' });
-  assert.equal(runSettingsState(root, loadConfig(root)).state, 'differs');
-  assert.equal(syncRunSettings(root), runSettingsFile);
+  // An unapplied edit in the file (arbiter) survives a chat change of other roles.
+  const edited = settingsOf(root);
+  edited.models.arbiter = { model: 'plain-model', effort: 'default', context: 'default' };
+  edited.originalRuntime = 'unavailable';
+  writeSettings(root, edited);
+  let before = runSettingsSnapshot(root);
+  setRoleModels(root, models, { assign: 'implementer=small-model,reviewers=small-model,fixer=small-model' });
+  assert.equal(syncRunSettings(root, before), runSettingsFile);
+  assert.equal(settingsOf(root).models.arbiter.model, 'plain-model');
+  assert.equal(settingsOf(root).originalRuntime, 'unavailable');
+  edited.models.arbiter = { model: 'small-model', effort: 'default', context: 'default' };
+  edited.originalRuntime = 'available';
+  writeSettings(root, { ...settingsOf(root), models: { ...settingsOf(root).models, arbiter: edited.models.arbiter }, originalRuntime: 'available' });
+  before = runSettingsSnapshot(root);
+  assert.equal(syncRunSettings(root, before), null, 'nothing changed, nothing written');
   const s = settingsOf(root);
   assert.equal(s.models.fixer.model, 'small-model');
   assert.equal(s.sourceLanguage, 'C#', 'other entries are kept');
   assert.equal(runSettingsState(root, loadConfig(root)).state, 'applied');
   assert.deepEqual(applyRunSettings(root, models).changed, []);
+  before = runSettingsSnapshot(root);
+  setRoleModels(root, models, { role: 'fixer', model: 'big-model' });
   fs.writeFileSync(safePath(root, runSettingsFile), '{ broken');
-  assert.equal(syncRunSettings(root), null, 'an unreadable file is left for the person');
+  assert.equal(syncRunSettings(root, before), null, 'an unreadable file is left for the person');
+  writeJSON(safePath(root, 'migration/preferences.json'), { schemaVersion: 1, userLanguage: 'ja', originalRuntime: 'maybe' });
+  assert.equal(runSettingsSnapshot(root), null, 'unreadable preferences skip the sync instead of failing the command');
 });
 
 test('without a model list, settings init offers no model choices and says to sign in', t => {
