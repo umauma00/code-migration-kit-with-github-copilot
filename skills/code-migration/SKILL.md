@@ -174,6 +174,7 @@ its options first, then copy it (with the shared `depmap_*.py` it imports) to
 fixture, never `migration-kit/`, and report the error, the change and the
 output difference in `depmap/report.md`. Read the [depmap-adapter skill](../depmap-adapter/SKILL.md) to
 choose the implementation language and build the adapter.
+
 Audit a bundled or fixture-tested mapper's graph with one fresh auditor over the
 `preparation_cli.mjs dependency-targets` files and `dependency-diff`, not 2 x 20
 sampled files over three rounds; list anything still unresolved in

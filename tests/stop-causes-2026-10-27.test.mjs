@@ -162,3 +162,33 @@ test('dependency-targets picks flagged files first, then the largest, and writes
   assert.equal(preparationCommand(f.root, f.config, 'dependency-targets', { size: '1' }).files[0], third);
   assert.throws(() => preparationCommand(f.root, f.config, 'dependency-targets', { size: '0' }), /size/);
 });
+
+test('dependency-targets defaults the parser root, reports unmatched rows, keeps within the input size and protects mapper outputs', t => {
+  const f = prepare(t, { count: 3 });
+  const files = Object.keys(readJSON(safePath(f.root, 'migration/review-dependencies.json')).dependencies).sort();
+  const [first, second] = files, rel = p => p.slice(p.indexOf('/') + 1);
+  assert.equal(f.config.sourceRoots.length, 1);
+  // A single source root is the parser root by default, as in make_review_dependencies.
+  atomicWrite(safePath(f.root, 'migration/depmap/unresolved.tsv'), `file\treference\treason\n${rel(second)}\tfoo\tunresolved import\nelsewhere/x.py\tbar\tunresolved import\n`);
+  const result = preparationCommand(f.root, f.config, 'dependency-targets', { size: '1' });
+  assert.equal(result.depmapRoot, f.config.sourceRoots[0]);
+  assert.deepEqual(result.files, [second]);
+  assert.deepEqual(result.unmatchedUnresolvedFiles, ['elsewhere/x.py']);
+  // With "." the paths are used as written, so the same rows no longer match.
+  const dot = preparationCommand(f.root, f.config, 'dependency-targets', { size: '1', 'depmap-root': '.' });
+  assert.equal(dot.flaggedFiles, 0);
+  assert.deepEqual(dot.unmatchedUnresolvedFiles, ['elsewhere/x.py', rel(second)].sort());
+  // Several source roots need an explicit parser root.
+  assert.throws(() => preparationCommand(f.root, { ...f.config, sourceRoots: [f.config.sourceRoots[0], 'other'] }, 'dependency-targets', {}), /--depmap-root/);
+  // A file that would not fit into one frozen audit input is skipped and counted.
+  fs.appendFileSync(safePath(f.root, first), '\n'.padEnd(4000, '#'));
+  const small = preparationCommand(f.root, { ...f.config, maxReviewInputBytes: 3000 }, 'dependency-targets', { size: '3' });
+  assert.equal(small.files.includes(first), false);
+  assert.ok(small.skippedForInputSize.includes(first));
+  assert.equal(small.skippedForInputSizeCount >= 1, true);
+  // Reports never overwrite the mapper's own files.
+  for (const out of ['migration/depmap/edges.tsv', 'migration/depmap/unresolved.tsv', 'migration/depmap/report.md']) {
+    assert.throws(() => preparationCommand(f.root, f.config, 'dependency-targets', { out }), /cannot replace mapper output/);
+  }
+  assert.match(fs.readFileSync(safePath(f.root, 'migration/depmap/unresolved.tsv'), 'utf8'), /elsewhere/);
+});

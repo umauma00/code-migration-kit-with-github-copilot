@@ -68,9 +68,9 @@ again together.
 
 ### Lighter preparation audits
 
-The standard [preparation audits](PREPARATION-AUDITS.md) (two auditors × 20
-files, up to three rounds, stopping after the first 20 inventory rows) are
-replaced by **one independent review of the whole specification package**:
+The standard [preparation audits](PREPARATION-AUDITS.md) (phase 01's
+dependency audit, the stop after the first 20 inventory rows and the paired
+audits in 02) are replaced by **one independent review of the whole specification package**:
 
 - One reviewer in a separate context reads the source, RULEBOOK, inventory and
   the dependency map together and lists statements that contradict the source,

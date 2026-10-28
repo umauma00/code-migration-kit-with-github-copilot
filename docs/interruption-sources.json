@@ -2044,7 +2044,7 @@
     },
     {
       "path": "lib/preparation.mjs",
-      "sha256": "52dab327e925e1e9495fd6870677826a37a156c0369a2e35a4efbe4d7c7d75b0",
+      "sha256": "19e733a0b27c9351aa54a1d235dda6e98006eb88476d8036f335670941fa14d0",
       "entries": [
         {
           "line": 20,
@@ -2142,17 +2142,32 @@
           "code": "if (!Number.isInteger(size) || size < 1 || size > 1000) throw new Error('Supply a target size 1..1000');"
         },
         {
+          "line": 158,
+          "kind": "error-or-exit-candidate",
+          "code": "if (depmapRoot === undefined) throw new Error('Specify --depmap-root (the mapper --root) for multiple source roots');"
+        },
+        {
+          "line": 168,
+          "kind": "error-or-exit-candidate",
+          "code": "const budget = Math.floor((config.maxReviewInputBytes ?? 65536) * 0.8);"
+        },
+        {
           "line": 175,
+          "kind": "loop-exit-candidate",
+          "code": "if (selected.length >= size) break;"
+        },
+        {
+          "line": 190,
           "kind": "error-or-exit-candidate",
           "code": "if (!Array.isArray(files) || !files.length || new Set(files).size !== files.length) throw new Error('Select the actual audited files');"
         },
         {
-          "line": 177,
+          "line": 192,
           "kind": "error-or-exit-candidate",
           "code": "if (files.some(p => !Object.hasOwn(graph, p))) throw new Error('Audited file missing from declared source graph');"
         },
         {
-          "line": 180,
+          "line": 195,
           "kind": "error-or-exit-candidate",
           "code": "if (!observed.has(from) || !Object.hasOwn(graph, to)) throw new Error('Audit edge outside selected files or declared source roots');"
         }
@@ -4096,12 +4111,12 @@
     },
     {
       "path": "scripts/preparation_cli.mjs",
-      "sha256": "3888204abbfd2c5b84ac3e2b8bc3c609b2db7df75dc3502acfc1195a3d0e28f8",
+      "sha256": "f36417a251d5b6b7136b076a43f666099ef2b6e2c500054a2100ccb5419f7c40",
       "entries": [
         {
           "line": 19,
           "kind": "error-or-exit-candidate",
-          "code": "else throw new Error('Use inventory-preview --shards LIST --sites PATH | inventory-merge --shards LIST --sites PATH [--expected-hash SHA256] | package-cycles --map PATH | dependency-samples --seed TEXT | dependency-targets [--size N] | dependency-diff --files LIST --audit PATH');"
+          "code": "else throw new Error('Use inventory-preview --shards LIST --sites PATH | inventory-merge --shards LIST --sites PATH [--expected-hash SHA256] | package-cycles --map PATH | dependency-samples --seed TEXT | dependency-targets [--size N] [--depmap-root DIR] [--unresolved PATH] [--out PATH] | dependency-diff --files LIST --audit PATH');"
         },
         {
           "line": 20,
@@ -4109,7 +4124,12 @@
           "code": "if (!out.startsWith('migration/depmap/')) throw new Error('Audit reports must be under migration/depmap/');"
         },
         {
-          "line": 29,
+          "line": 22,
+          "kind": "error-or-exit-candidate",
+          "code": "if (/^migration\\/depmap\\/(?:edges\\.tsv|order\\.txt|cycles\\.txt|unresolved\\.tsv|external\\.tsv|report\\.md)$/.test(out)) throw new Error(`Audit reports cannot replace mapper output: ${out}`);"
+        },
+        {
+          "line": 31,
           "kind": "error-or-exit-candidate",
           "code": "} catch (e) { console.error(`ERROR: ${e.message}`); process.exitCode = 1; }"
         }
@@ -4473,5 +4493,5 @@
       ]
     }
   ],
-  "candidateLines": 810
+  "candidateLines": 814
 }

@@ -42,12 +42,17 @@ over up to three rounds mostly repeats the parser's own output. Instead:
 
 1. Mechanical checks: the five-file trial, every `unresolved.tsv` row and every
    exclusion warning reviewed (see [dependency mappers](DEPENDENCY-MAPPERS.md)),
-   and a declaration for every source file (missing ones already fail).
+   and a declaration for every file reachable from the manifest (missing ones fail).
+   The selection also lists unresolved rows it could not map to a declared file.
 2. `preparation_cli.mjs dependency-targets` picks about ten files: those the
    parser flagged in `unresolved.tsv` (most rows first), then the largest files.
-3. One fresh auditor (`audit_inputs.mjs freeze --type dependencies` with those
-   files, then `run`) lists their direct edges with evidence; run
-   `dependency-diff --files` on the same files.
+3. Freeze those files as one request (`audit_inputs.mjs freeze --type
+   dependencies --files LIST`, then `run`). The auditor lists every direct edge
+   as a finding with source-line evidence. Write those edges to an observed-edge
+   TSV and run `dependency-diff --files LIST --audit migration/observed-edges.tsv`
+   on the same files. The selection stays within `maxReviewInputBytes`; files left
+   out for size are listed (`skippedForInputSize`): lower `--size` or raise the
+   limit only if you want them too.
 4. Confirm each difference against source. Fix the mapper copy or add the
    declaration, regenerate the whole map/order/manifest/review declaration, and
    run `dependency-diff` on the same files again. There are no further sampling
@@ -56,7 +61,12 @@ over up to three rounds mostly repeats the parser's own output. Instead:
 
 ```bash
 node migration-kit/scripts/preparation_cli.mjs dependency-targets --depmap-root src
+node migration-kit/scripts/preparation_cli.mjs dependency-diff \
+  --files src/a.py,src/b.py --audit migration/observed-edges.tsv
 ```
+
+`--depmap-root` is the mapper's `--root`; with a single source root it defaults
+to that root.
 
 ### With a hand-written graph or an unproven adapter
 
@@ -78,9 +88,9 @@ node migration-kit/scripts/preparation_cli.mjs dependency-diff \
 Observed-edge TSV has header `from<TAB>to<TAB>evidence`. The diff reports missed
 and invented edges separately; reported differences still need confirmation.
 Fix the scanner, regenerate the entire map/order/manifest/review declaration,
-then sample freshly with a new seed. Do not patch just edges.tsv. After three
-failed audit rounds, report the unresolved dependencies in `depmap/report.md`
-and continue; do not stop the phase for them. Retain seed,
+then sample freshly with a new seed. Do not patch just edges.tsv. Sampling ends
+after a clean round or after three rounds; then list what remains unresolved in
+`depmap/report.md` and finish phase 01 with it, without a further round. Retain seed,
 sample, extraction version, diffs, confirmed fixes and regeneration evidence.
 
 Use a source-to-target-package map when packages have been designed:

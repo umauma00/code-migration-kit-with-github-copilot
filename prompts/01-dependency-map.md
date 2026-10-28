@@ -6,10 +6,12 @@ End with its report; ask for the next decision only when needed.
 Prerequisite: feasibility and judge design reviewed. Work one phase and stop.
 
 Follow [preparation audits](../docs/PREPARATION-AUDITS.md): five-file extraction
-trial before full generation; two independent disjoint 20-file random/adversarial
-audits (record actual coverage for small repos); missed AND invented edge diffs;
-fix the scanner, regenerate everything and freshly resample. Stop after three
-failed rounds. Use the sample/diff CLI for mechanical evidence, not invented
+trial before full generation; then, for a bundled or fixture-tested mapper, the
+light audit described below (one auditor over `dependency-targets` files). Only
+a hand-written graph or unproven adapter gets two independent disjoint 20-file
+random/adversarial audits (record actual coverage for small repos), missed AND
+invented edge diffs, a fixed scanner, full regeneration and fresh resampling, at
+most three rounds, then a report of what remains. Use the sample/diff CLI for mechanical evidence, not invented
 source findings. Review scanner exclusions and unsupported syntax separately.
 When target packages are known, declare config.packageMap and generate the
 separate target-package cycle report before phase 01 completion.

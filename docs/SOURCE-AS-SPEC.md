@@ -59,7 +59,7 @@ node migration-kit/scripts/run_migration.mjs source-spec init --apply  # ユー�
 
 ### 準備監査を軽くする
 
-標準の[準備監査](PREPARATION-AUDITS.md)（独立監査2名×20ファイル、最大3ラウンド、01の最初の20行での停止など）は行いません。
+標準の[準備監査](PREPARATION-AUDITS.md)（01の依存監査、02の最初の20行での停止や2名の分割監査など）は行いません。
 代わりに、**仕様一式に対する独立レビューを1回**行います。
 
 - 作成者とは別の文脈のレビュー担当1名が、ソース・RULEBOOK・inventory・依存マップを一緒に読み、

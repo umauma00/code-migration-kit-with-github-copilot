@@ -16,8 +16,10 @@ export function preparationCommand(root, config, action, options = {}) {
     else if (action === 'dependency-samples') { result = dependencySamples(root, config, { seed: options.seed, size: options.size === undefined ? 20 : Number(options.size) }); out = options.out ?? 'migration/depmap/audit-samples.json'; }
     else if (action === 'dependency-targets') { result = dependencyTargets(root, config, { size: options.size === undefined ? 10 : Number(options.size), unresolved: options.unresolved, depmapRoot: options['depmap-root'] }); out = options.out ?? 'migration/depmap/audit-targets.json'; }
     else if (action === 'dependency-diff') { result = compareDependencyAudit(root, config, { files: options.files?.split(','), audit: options.audit }); out = options.out ?? 'migration/depmap/audit-diff.json'; }
-    else throw new Error('Use inventory-preview --shards LIST --sites PATH | inventory-merge --shards LIST --sites PATH [--expected-hash SHA256] | package-cycles --map PATH | dependency-samples --seed TEXT | dependency-targets [--size N] | dependency-diff --files LIST --audit PATH');
+    else throw new Error('Use inventory-preview --shards LIST --sites PATH | inventory-merge --shards LIST --sites PATH [--expected-hash SHA256] | package-cycles --map PATH | dependency-samples --seed TEXT | dependency-targets [--size N] [--depmap-root DIR] [--unresolved PATH] [--out PATH] | dependency-diff --files LIST --audit PATH');
     if (!out.startsWith('migration/depmap/')) throw new Error('Audit reports must be under migration/depmap/');
+    // Never let a report replace the mapper's own outputs.
+    if (/^migration\/depmap\/(?:edges\.tsv|order\.txt|cycles\.txt|unresolved\.tsv|external\.tsv|report\.md)$/.test(out)) throw new Error(`Audit reports cannot replace mapper output: ${out}`);
     writeJSON(assertReportPath(root, config, out), result); return result;
   } finally { release(); }
 }
