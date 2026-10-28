@@ -345,3 +345,16 @@ test('final review of 2edc8bf: emptied maps match models set, and runner checks 
   assert.match(text, /models\.fixer: Model no-such-model is not in your Copilot model list/);
   assert.match(text, /mode must be preserve or redesign/);
 });
+
+test('models come from one question first; the file then only needs the languages and whether the original runs', t => {
+  const root = fresh(t);
+  assert.match(initRunSettings(root, models).next, /models set --role all --model ID, then run settings init again/);
+  setRoleModels(root, models, { role: 'all', model: 'big-model' });
+  const result = initRunSettings(root, models);
+  assert.deepEqual(result.pending, ['originalRuntime', 'sourceLanguage', 'targetLanguage']);
+  assert.match(result.next, /filled in/);
+  const s = settingsOf(root);
+  for (const role of ['implementer', 'reviewer-semantics', 'reviewer-rules', 'arbiter', 'fixer']) assert.deepEqual(s.models[role], { model: 'big-model', effort: 'default', context: 'default' });
+  assert.equal(s.models.surveyor.model, 'same-as-implementer');
+  assert.match(s._help.models, /最初の質問で選んだモデル/);
+});

@@ -6,7 +6,9 @@
   migration languages, mode, roots, verification mode, execution mode,
   concurrency, stage commands, and every role's model, effort and context
   size), with the account's models, efforts and context tiers under `_choices` and `FILL_IN` where nothing was
-  chosen. The orchestrator asks one question: filled in, or a question?
+  chosen. Setup asks two questions after the report language: one model for
+  every role (`models set --role all`), which fills every role's model in the
+  file, then "filled in, or a question?" The file takes per-role changes.
 - `settings apply` checks every entry against the account's model list and the
   runner's configuration checks, reports every problem at once and writes
   nothing unless all pass; the host asks the person to confirm once, like

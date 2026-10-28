@@ -72,8 +72,9 @@ and next-instruction example in that language, and link the matching documents:
 initialization, ask only the report language and pass `--language ja|en` to the
 installer; everything else is decided in the [run settings file](#run-settings-file-instead-of-one-question-per-setting).
 
-**Models and reasoning effort are the person's choice.** They are normally
-chosen in the run settings file. When the person asks in chat to change models, run
+**Models and reasoning effort are the person's choice.** At setup, one question
+picks the model for every role and the run settings file takes per-role changes
+(below). When the person asks in chat to change models later, run
 `run_migration.mjs models list --format markdown`: it lists the models and
 reasoning efforts their own Copilot account offers (read live from the CLI) and
 the current assignment. Show it, then ask **one** question that covers every
@@ -104,13 +105,19 @@ first. A changed model, effort or context makes reviewed units be reviewed again
 
 ## Run settings file (instead of one question per setting)
 
-After initialization, run `run_migration.mjs settings init`. It writes
+After initialization, choose the models first with **one** question for every
+role: run `run_migration.mjs models list --format markdown`, show it, and offer
+each enabled model as a choice ("every role on MODEL"). Record the answer with
+`run_migration.mjs models set --role all --model ID` (the host asks the person
+to confirm once). Then run `run_migration.mjs settings init`. It writes
 `migration/run-settings.json` from the current configuration: report language,
 whether the original can still run, migration languages, preserve or redesign,
 source/output/test roots, verification mode, execution mode, concurrency, stage
 commands, and every role's model, effort and context size. The account's models,
 efforts and context tiers (read live from the CLI) are listed under `_choices`, explanations under
-`_help`, and `FILL_IN` marks what is still open. Link the file and ask **one**
+`_help`, and `FILL_IN` marks what is still open; every role already holds the
+model just chosen, and the person edits a role only to give it another model,
+effort or context. Link the file and ask **one**
 question with the question tool: has the person finished filling it in, or do
 they have a question? Offer two choices, "filled in" and "I have a question"
 (free text), in the report language.
@@ -126,7 +133,8 @@ they have a question? Offer two choices, "filled in" and "I have a question"
   the upstream model plan as information, never as a preselected answer.
 
 `settings check` validates without writing. Running `settings init` again keeps
-the person's values and refreshes the explanations and choices. The file stays
+the person's values, fills entries still `FILL_IN` from what was chosen since
+(such as the models), and refreshes the explanations and choices. The file stays
 as the record of the conditions a run used: `status` reports whether it still
 matches the configuration, and after an edit says it is not applied yet. To
 change settings later, the person edits the file and the same question follows.
