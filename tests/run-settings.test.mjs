@@ -161,7 +161,7 @@ test('changing only the report language through the file keeps reviewed work', a
   const s = settingsOf(f.root);
   assert.equal(s.models.implementer.model, 'test-double', 'chosen models are written as chosen');
   assert.equal(s.sourceLanguage, 'Python', 'a project with a manifest keeps its languages, even the template\'s');
-  Object.assign(s, { reportLanguage: 'en', originalRuntime: 'unavailable' });
+  Object.assign(s, { reportLanguage: 'en', originalRuntime: 'available' });
   writeSettings(f.root, s);
   const result = applyRunSettings(f.root, list);
   assert.equal(result.applied, true, JSON.stringify(result.errors));
@@ -408,4 +408,15 @@ test('the runner keeps the file in step after models set', t => {
   assert.equal(out.status, 0, out.stderr);
   assert.match(JSON.parse(out.stdout).runSettings, /updated to match/);
   assert.equal(settingsOf(root).models.implementer.model, 'big-model');
+});
+
+test('an original that cannot run rules out runtime verification', t => {
+  const root = fresh(t);
+  initRunSettings(root, models);
+  writeSettings(root, { ...filled(root), originalRuntime: 'unavailable' });
+  assert.match(applyRunSettings(root, models).errors.join('\n'), /verificationMode: runtime runs the original, but originalRuntime is unavailable/);
+  writeSettings(root, { ...filled(root), originalRuntime: 'unavailable', verificationMode: 'source-only' });
+  const result = applyRunSettings(root, models);
+  assert.equal(result.applied, true, JSON.stringify(result.errors));
+  assert.equal(loadConfig(root).verificationMode, 'source-only');
 });

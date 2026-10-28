@@ -23,6 +23,7 @@
   configuration, and lists the entries changed but not applied yet.
 - Only the report language is asked before initialization. `models set` stays
   for changing models alone from chat.
+
 # 0.10.0 — 2026-10-27
 
 Remove mid-run stops that a rerun would only repeat. Nothing here adds a stop
