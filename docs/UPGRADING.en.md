@@ -22,7 +22,10 @@ lapse once; rerun judge. Completed outputs and completed survey scopes are kept.
    plans keep working, including their `TODO(spec)` check. To move to the source
    index, delete `migration/judge-plan.json`, rerun `source-spec init --apply`
    and review 00b–02 together again.
-5. For a repository copy, replace all of `migration-kit/`, the
+5. Phase 01's dependency audit for a bundled mapper is one auditor over about
+   ten files from `preparation_cli.mjs dependency-targets` (no 2 x 20 files over
+   three rounds). A project in progress can switch at its next audit.
+6. For a repository copy, replace all of `migration-kit/`, the
    `.github/agents/migration-orchestrator.agent.md` file and the `.github/skills/`
    SKILL.md files with the freshly installed versions. The plugin only needs an
    update.

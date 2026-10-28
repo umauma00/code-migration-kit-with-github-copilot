@@ -35,6 +35,31 @@ the trial to the human before full generation. Name unsupported syntax, unresolv
 imports, generated/vendor exclusions and the scanner's supported language forms.
 Do not infer an unsupported edge as fact or silently omit its declaration.
 
+### With a bundled or fixture-tested deterministic mapper (default)
+
+The graph comes from a deterministic parser, so re-deriving 2 x 20 sampled files
+over up to three rounds mostly repeats the parser's own output. Instead:
+
+1. Mechanical checks: the five-file trial, every `unresolved.tsv` row and every
+   exclusion warning reviewed (see [dependency mappers](DEPENDENCY-MAPPERS.md)),
+   and a declaration for every source file (missing ones already fail).
+2. `preparation_cli.mjs dependency-targets` picks about ten files: those the
+   parser flagged in `unresolved.tsv` (most rows first), then the largest files.
+3. One fresh auditor (`audit_inputs.mjs freeze --type dependencies` with those
+   files, then `run`) lists their direct edges with evidence; run
+   `dependency-diff --files` on the same files.
+4. Confirm each difference against source. Fix the mapper copy or add the
+   declaration, regenerate the whole map/order/manifest/review declaration, and
+   run `dependency-diff` on the same files again. There are no further sampling
+   rounds and no stop after a number of rounds: a dependency still unresolved is
+   listed in `depmap/report.md` and stays visible to phase 02 and review.
+
+```bash
+node migration-kit/scripts/preparation_cli.mjs dependency-targets --depmap-root src
+```
+
+### With a hand-written graph or an unproven adapter
+
 Two independent workers each audit 20 distinct files using random plus adversarial
 sampling; batches must not overlap. For small repositories use all available
 files split between workers and record actual coverage. `dependency-samples
@@ -53,8 +78,9 @@ node migration-kit/scripts/preparation_cli.mjs dependency-diff \
 Observed-edge TSV has header `from<TAB>to<TAB>evidence`. The diff reports missed
 and invented edges separately; reported differences still need confirmation.
 Fix the scanner, regenerate the entire map/order/manifest/review declaration,
-then sample freshly with a new seed. Do not patch just edges.tsv. Stop after
-three failed audit rounds and report unresolved dependencies. Retain seed,
+then sample freshly with a new seed. Do not patch just edges.tsv. After three
+failed audit rounds, report the unresolved dependencies in `depmap/report.md`
+and continue; do not stop the phase for them. Retain seed,
 sample, extraction version, diffs, confirmed fixes and regeneration evidence.
 
 Use a source-to-target-package map when packages have been designed:

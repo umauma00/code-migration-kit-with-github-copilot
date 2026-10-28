@@ -21,6 +21,7 @@ CPU使用率、無出力、経過時間、呼び出し数、修正回数、入�
 | 子プロセスstdout+stderrが16MiB超 | 終了せず全出力をログファイルへ退避。メモリには末尾だけ保持。モデルJSONLと診断パーサーは全ログを順に読む | `process.mjs`, `copilot_adapter.mjs`, `diagnostics.mjs`, `diagnostic_queue.mjs` |
 | surveyのファイル集合・censusが入力上限超 | ファイル・箇所の集合を分割。scope IDと既存結果を維持 | `survey-parts.mjs` |
 | surveyの単一ファイル本文が入力上限超 | facts・contractsは行範囲に分割（1行自体が巨大でも文字位置で分割し、Unicodeのペアを切らない。入力は実際のJSON化後bytesで検査）。inventoryは、RULEBOOKと1箇所と一緒に1回の入力に収まらないファイルについて、モデルを呼ばずに全箇所をUNKNOWN / TODO(port)で記録し、`unsurveyedOversizedFiles` に残す（2万行・1,000箇所の1ファイルで148回の呼び出しが同じUNKNOWNに結合されていた） | `survey-parts.mjs`, `survey.mjs` |
+| 01の依存監査（2人×20ファイル、最大3ラウンドで停止） | 同梱・fixture検証済みの解析器では、`dependency-targets` が選ぶ約10ファイルを1人が1回監査する。見落としは直して同じファイルで比べ直す。残った未解決は report.md に書いて止めない（手書きのグラフも3ラウンド後は止めずに報告） | `preparation.mjs`, `PREPARATION-AUDITS.md`, 01の指示 |
 | 入力上限の既定64KB | 新規導入の既定を256KB（262144 bytes）に引き上げ、断片化そのものを減らす。既存設定の値は変えない（設定の指紋に含まれるため） | `templates/migration-config.json` |
 | 大きい本文に大量のcensus箇所 | 入力容量を本文と箇所に配分し、全箇所で全断片を維持しながら同一断片の重複送信を減らす | `survey-parts.mjs` |
 | 巨大ファイルの途中で手動中断・外部障害 | 検証済み断片を入力ハッシュ付きで保存。再開時に同じ断片を呼び直さない。全断片が揃うまでファイル・scopeは未完了 | `survey.mjs`の `.parts/` 記録 |

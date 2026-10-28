@@ -13,6 +13,7 @@ import { migrationStatus } from '../lib/status.mjs';
 import { acquireBuildLoop } from '../lib/core.mjs';
 import { commandProgress } from '../lib/command-progress.mjs';
 import { main } from '../scripts/run_migration.mjs';
+import { preparationCommand } from '../scripts/preparation_cli.mjs';
 
 const deadPid = () => {
   // A child that has exited and been reaped: its PID no longer exists.
@@ -141,4 +142,23 @@ test('unlock clears a build-loop lock or claim from another host, and status rep
   assert.notEqual(report.running, true);
   assert.equal(report.foreignLock.host, `${os.hostname()}-other`);
   assert.equal(report.staleLock, undefined);
+});
+
+test('dependency-targets picks flagged files first, then the largest, and writes its report', t => {
+  const f = prepare(t, { count: 3 });
+  const files = Object.keys(readJSON(safePath(f.root, 'migration/review-dependencies.json')).dependencies).sort();
+  assert.ok(files.length >= 3);
+  const [first, second, third] = files, rel = p => p.slice(p.indexOf('/') + 1), root = first.slice(0, first.indexOf('/'));
+  fs.appendFileSync(safePath(f.root, third), '\n'.padEnd(5000, '#'));
+  // unresolved.tsv paths are relative to the parser root, as the mappers write them.
+  atomicWrite(safePath(f.root, 'migration/depmap/unresolved.tsv'), `file\treference\treason\n${rel(second)}\tfoo\tunresolved import\n${rel(second)}\tbar\tunresolved import\n${rel(first)}\tbaz\tdynamic\n`);
+  const result = preparationCommand(f.root, f.config, 'dependency-targets', { size: '3', 'depmap-root': root });
+  assert.deepEqual(result.files, [second, first, third]);
+  assert.equal(result.flaggedFiles, 2);
+  assert.match(result.reasons[third], /largest/);
+  assert.deepEqual(readJSON(safePath(f.root, 'migration/depmap/audit-targets.json')).files, result.files);
+  // Without an unresolved file it still selects, by size.
+  fs.rmSync(safePath(f.root, 'migration/depmap/unresolved.tsv'));
+  assert.equal(preparationCommand(f.root, f.config, 'dependency-targets', { size: '1' }).files[0], third);
+  assert.throws(() => preparationCommand(f.root, f.config, 'dependency-targets', { size: '0' }), /size/);
 });

@@ -324,60 +324,60 @@
     },
     {
       "path": "lib/cli.mjs",
-      "sha256": "5ad418d551152b408b012ede9b9ec449ba7859005bd84c62407db8fbafece3e6",
+      "sha256": "0debdb44e8b3fd14e9cd49342130b79cf0d49b46cc360dc757b8df1fba709487",
       "entries": [
         {
-          "line": 95,
+          "line": 96,
           "kind": "error-or-exit-candidate",
           "code": "throw new Error(`Missing command. Commands: ${known.join(', ')}`);"
         },
         {
-          "line": 98,
+          "line": 99,
           "kind": "error-or-exit-candidate",
           "code": "if (!entry) throw new Error(`Unknown command ${cmd}. Commands: ${known.join(', ')}`);"
         },
         {
-          "line": 101,
+          "line": 102,
           "kind": "error-or-exit-candidate",
           "code": "if (!entry.sub[sub]) throw new Error(`${sub === undefined ? `Missing action for ${cmd}` : `Unknown ${cmd} action ${sub}`}. Use ${cmd} ${subs.join(' | ')}`);"
         },
         {
-          "line": 131,
+          "line": 132,
           "kind": "error-or-exit-candidate",
           "code": "if (key.includes('=')) throw new Error(`Write ${arg.slice(0, arg.indexOf('='))} VALUE as two words, not ${arg}`);"
         },
         {
-          "line": 136,
+          "line": 137,
           "kind": "error-or-exit-candidate",
           "code": "throw new Error(`Unknown option ${arg}.${accepted} Add --help for usage.`);"
         },
         {
-          "line": 139,
+          "line": 140,
           "kind": "error-or-exit-candidate",
           "code": "if (argv[i + 1] === undefined || argv[i + 1].startsWith('--')) throw new Error(`Missing value for ${arg} (expected ${arg} ${known[key]})`);"
         },
         {
-          "line": 146,
+          "line": 147,
           "kind": "error-or-exit-candidate",
           "code": "if (key !== '_' && !(key in target.options)) throw new Error(`Option --${key} does not apply to ${target.name}. Options for ${target.name}: ${describe(target.options)}. Add --help for usage.`);"
         },
         {
-          "line": 149,
+          "line": 150,
           "kind": "error-or-exit-candidate",
           "code": "if (extra.length < target.args.length) throw new Error(`${target.name} needs ${target.args.join(' ')}`);"
         },
         {
-          "line": 150,
+          "line": 151,
           "kind": "error-or-exit-candidate",
           "code": "if (extra.length > target.args.length) throw new Error(`Unexpected ${extra.slice(target.args.length).join(' ')} after ${target.name}${target.args.length ? ` ${target.args.join(' ')}` : ''}. Add --help for usage.`);"
         },
         {
-          "line": 155,
+          "line": 156,
           "kind": "error-or-exit-candidate",
           "code": "for (const v of allowed ? values(value) : []) if (!allowed.includes(v)) throw new Error(`--${key} must be one of ${allowed.join(', ')}, not ${v}`);"
         },
         {
-          "line": 160,
+          "line": 161,
           "kind": "error-or-exit-candidate",
           "code": "for (const v of values(extra[i], /[|,]/)) if (!allowed.includes(v)) throw new Error(`${target.name} ${target.args[i]} must be one of ${allowed.join(', ')}, not ${v}`);"
         }
@@ -2044,7 +2044,7 @@
     },
     {
       "path": "lib/preparation.mjs",
-      "sha256": "8ac66143340d487d777fb086718b2861ef966bbc1a178b9b0258c5bc185bf970",
+      "sha256": "52dab327e925e1e9495fd6870677826a37a156c0369a2e35a4efbe4d7c7d75b0",
       "entries": [
         {
           "line": 20,
@@ -2137,17 +2137,22 @@
           "code": "if (!seed || !Number.isInteger(size) || size < 1 || size > 1000) throw new Error('Supply a recorded seed and sample size 1..1000');"
         },
         {
-          "line": 147,
+          "line": 153,
+          "kind": "error-or-exit-candidate",
+          "code": "if (!Number.isInteger(size) || size < 1 || size > 1000) throw new Error('Supply a target size 1..1000');"
+        },
+        {
+          "line": 175,
           "kind": "error-or-exit-candidate",
           "code": "if (!Array.isArray(files) || !files.length || new Set(files).size !== files.length) throw new Error('Select the actual audited files');"
         },
         {
-          "line": 149,
+          "line": 177,
           "kind": "error-or-exit-candidate",
           "code": "if (files.some(p => !Object.hasOwn(graph, p))) throw new Error('Audited file missing from declared source graph');"
         },
         {
-          "line": 152,
+          "line": 180,
           "kind": "error-or-exit-candidate",
           "code": "if (!observed.has(from) || !Object.hasOwn(graph, to)) throw new Error('Audit edge outside selected files or declared source roots');"
         }
@@ -4091,20 +4096,20 @@
     },
     {
       "path": "scripts/preparation_cli.mjs",
-      "sha256": "3fe902c4592e0e4f5f4dbcfa58a09bfff90200e3be7332335402203487feaa25",
+      "sha256": "3888204abbfd2c5b84ac3e2b8bc3c609b2db7df75dc3502acfc1195a3d0e28f8",
       "entries": [
         {
-          "line": 18,
+          "line": 19,
           "kind": "error-or-exit-candidate",
-          "code": "else throw new Error('Use inventory-preview --shards LIST --sites PATH | inventory-merge --shards LIST --sites PATH [--expected-hash SHA256] | package-cycles --map PATH | dependency-samples --seed TEXT | dependency-diff --files LIST --audit PATH');"
+          "code": "else throw new Error('Use inventory-preview --shards LIST --sites PATH | inventory-merge --shards LIST --sites PATH [--expected-hash SHA256] | package-cycles --map PATH | dependency-samples --seed TEXT | dependency-targets [--size N] | dependency-diff --files LIST --audit PATH');"
         },
         {
-          "line": 19,
+          "line": 20,
           "kind": "error-or-exit-candidate",
           "code": "if (!out.startsWith('migration/depmap/')) throw new Error('Audit reports must be under migration/depmap/');"
         },
         {
-          "line": 28,
+          "line": 29,
           "kind": "error-or-exit-candidate",
           "code": "} catch (e) { console.error(`ERROR: ${e.message}`); process.exitCode = 1; }"
         }
@@ -4468,5 +4473,5 @@
       ]
     }
   ],
-  "candidateLines": 809
+  "candidateLines": 810
 }

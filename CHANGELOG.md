@@ -32,6 +32,12 @@ based on time, CPU, silence or output volume.
   scenario, and reviewers read cited source lines. Plans drafted earlier that
   name `contracts.md` keep their TODO(spec) gate; the `contracts` survey stays
   only for them.
+- Phase 01 with a bundled or fixture-tested mapper: replace the 2 x 20-file
+  sampling over up to three rounds with mechanical checks plus one auditor over
+  about ten files from the new `preparation_cli.mjs dependency-targets` (files
+  flagged in `unresolved.tsv` first, then the largest). Misses are fixed and the
+  same files compared again; what stays unresolved is reported, not a stop.
+  Hand-written graphs keep the sampling rounds, also without the stop.
 - Prompts, skills and orchestrators: report uncited and oversized counts
   instead of asking; ask only when a rerun fails again with no progress or a new
   decision is needed. Add the English interruption policy.

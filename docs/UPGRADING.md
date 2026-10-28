@@ -10,7 +10,8 @@
 2. 異常終了で残った `migration/run.lock` は、同じホストなら次のコマンドが自動で外します。別ホスト（共有フォルダ）のロックだけは、その実行が止まったことを確認してから `unlock --pid` で外します。旧版が残したロックはホストを記録していないため、このホストでのPIDで判断します。
 3. 新規導入の `maxReviewInputBytes` は 262144 です。既存の設定は変わりません。引き上げる場合は `migration/config.json` を書き換えます。設定の指紋に含まれるため、02以降の記録と承認は確認し直しになります。
 4. source-as-spec の新規計画では契約メモ（`contracts.md`）を作りません。既存の計画はそのまま使えます（`TODO(spec)` の確認も従来どおり）。ソース一覧の方式に移る場合は `migration/judge-plan.json` を削除して `source-spec init --apply` をやり直し、00b〜02 を一括で確認し直します。
-5. コピー導入では `migration-kit/` 全体と、`.github/agents/migration-orchestrator.agent.md`、`.github/skills/` の SKILL.md を一時導入先の内容に置き換えます。プラグインは更新だけで入ります。
+5. 01 の依存監査は、同梱の解析器なら `preparation_cli.mjs dependency-targets` で選んだ約10ファイルを1人が1回監査するだけになります（2人×20ファイル×最大3ラウンドは不要）。途中の案件も、次の監査からこの方法に切り替えられます。
+6. コピー導入では `migration-kit/` 全体と、`.github/agents/migration-orchestrator.agent.md`、`.github/skills/` の SKILL.md を一時導入先の内容に置き換えます。プラグインは更新だけで入ります。
 
 ## 0.8.0（コンテキストサイズの選択）
 

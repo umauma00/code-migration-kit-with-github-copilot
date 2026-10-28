@@ -33,6 +33,15 @@ guessed graph. When a bundled mapper fails or falls short, follow that
 document's "When a bundled mapper fails" steps: fix a copy there, never
 `migration-kit/`, and record it in `depmap/report.md`.
 
+Audit a bundled (or fixture-tested) mapper's graph lightly, as in
+[preparation audits](../docs/PREPARATION-AUDITS.md#dependency-map-01): review the
+mechanical checks, run `preparation_cli.mjs dependency-targets`, have ONE fresh
+auditor list those files' direct edges, and run `dependency-diff` on the same
+files. Fix confirmed misses in the mapper or declaration, regenerate, and diff
+the same files again. Do not run 2 x 20-file sampling rounds for a bundled
+mapper, and do not stop or ask because a dependency stays unresolved: list it
+in `depmap/report.md`.
+
 Draft `migration/RULEBOOK.md` with the user. Decide all ambiguous mappings once:
 architecture, null/exception/number semantics, library choices, names, imports,
 shared types, deferred markers and source-to-target paths. Survey facts with
