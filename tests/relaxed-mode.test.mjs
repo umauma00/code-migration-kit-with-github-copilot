@@ -110,6 +110,11 @@ test('relaxed mode: waive, proceed to translation and build, and every waiver st
   assert.match(statusChecklist(status, 'ja'), /03 事前試行【見送り】/);
   assert.match(statusTodo(status, 'en').todoList.find(i => i.title.startsWith('03')).title, /\[waived\]/);
   assert.match(statusMarkdown(status, 'ja'), /見送った工程（緩和モード。未完了のまま）:\n- 03: Want the overall shape/);
+  // With every remaining phase waived, nothing reads as complete.
+  for (const id of ['00', '00b', '01', '02', '04', '05b', '05c']) waive(f, id);
+  const rest = migrationStatus(f.root);
+  assert.equal(rest.workflow.next, '06');
+  assert.doesNotMatch(statusChecklist(rest, 'ja'), /^移行フロー：10\/10/m);
   const fast = statusSnapshot(f.root);
   assert.equal(fast.workflow.phases.find(p => p.id === '03').waived, true);
 });
