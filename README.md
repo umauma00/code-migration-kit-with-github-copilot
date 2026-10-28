@@ -79,7 +79,7 @@ node scripts/install.mjs --target /path/to/your-project --model MODEL_ID --langu
 node scripts/install.mjs --target /path/to/your-project --model MODEL_ID --language ja --apply
 ```
 
-**モデル・エフォート・コンテキストサイズは利用者が選びます。** `--model` を省略して導入し、対象リポジトリで次を実行すると、利用するアカウントで使えるモデルと、モデルごとに選べるエフォート（既定値）・コンテキストサイズ（入力上限）・料金をCLIから取得して表示します。AIはこの一覧をもとに、全担当のモデル・エフォート・コンテキストを**1回の質問**でまとめて聞き、回答を1回の `models set --assign` で記録します（ホストが利用者に1回だけ確認を求めます）。
+**モデル・エフォート・コンテキストサイズは利用者が選びます。** `--model` を省略して導入し、対象リポジトリで次を実行すると、利用するアカウントで使えるモデルと、モデルごとに選べるエフォート（既定値）・コンテキストサイズ（入力上限）・料金をCLIから取得して表示します。導入直後は、AIがこの一覧から全担当のモデルを**1回の質問**で聞き、`models set --role all` で記録します（ホストが利用者に1回だけ確認を求めます）。担当ごとのエフォート・コンテキストは下の実行設定ファイルで変えます。あとからチャットでモデルを変えるときは、全担当のモデル・エフォート・コンテキストを1回の質問で聞き、1回の `models set --assign` で記録します。`models set` と `preferences` で変えた値は、実行設定ファイルにも反映されます。
 
 ```bash
 node migration-kit/scripts/run_migration.mjs models list --format markdown

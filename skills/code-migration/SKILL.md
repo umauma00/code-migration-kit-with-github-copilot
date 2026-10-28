@@ -126,7 +126,8 @@ After initialization, choose the models first with **one** question for every
 role: run `run_migration.mjs models list --format markdown`, show it, and offer
 each enabled model as a choice ("every role on MODEL"). Record the answer with
 `run_migration.mjs models set --role all --model ID` (the host asks the person
-to confirm once). Then run `run_migration.mjs settings init`. It writes
+to confirm once; every role then runs the model's default effort and context).
+If the list cannot be read, offer no models: sign the CLI in first. Then run `run_migration.mjs settings init`. It writes
 `migration/run-settings.json` from the current configuration: report language,
 whether the original can still run, migration languages, preserve or redesign,
 source/output/test roots, verification mode, execution mode, concurrency, stage
@@ -155,6 +156,8 @@ the person's values, fills entries still `FILL_IN` from what was chosen since
 as the record of the conditions a run used: `status` reports whether it still
 matches the configuration, and after an edit says it is not applied yet. To
 change settings later, the person edits the file and the same question follows.
+`models set` and `preferences` update the file's models, report language and
+original-runtime entries too, so it never writes an older choice back.
 
 Follow [phase reports and user decisions](../../docs/PHASE-HANDOFF.md) at every
 phase boundary. Show the actual artifacts, review points and a copyable next

@@ -77,7 +77,7 @@ node scripts/install.mjs --target /path/to/your-project --model MODEL_ID --langu
 node scripts/install.mjs --target /path/to/your-project --model MODEL_ID --language en --apply
 ```
 
-**The person chooses models, reasoning effort and context size.** Install without `--model`, then in the target repository run the commands below: the first reads the models your account can use, each model's selectable efforts (and default), context sizes (prompt limits) and prices from the CLI. From that list the AI asks for every role's model, effort and context in **one question** and records the answer with one `models set --assign` (the host asks the person to confirm once).
+**The person chooses models, reasoning effort and context size.** Install without `--model`, then in the target repository run the commands below: the first reads the models your account can use, each model's selectable efforts (and default), context sizes (prompt limits) and prices from the CLI. Right after installation the AI asks for every role's model from that list in **one question** and records it with `models set --role all` (the host asks the person to confirm once); per-role effort and context are changed in the run settings file below. To change models later from chat, the AI asks for every role's model, effort and context in one question and records it with one `models set --assign`. Values changed with `models set` and `preferences` are written to the run settings file too.
 
 ```bash
 node migration-kit/scripts/run_migration.mjs models list --format markdown

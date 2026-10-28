@@ -9,7 +9,7 @@ import { install, kitRoot } from '../scripts/install.mjs';
 import { contextHash, done, readJSON, writeJSON, safePath, loadConfig } from '../lib/core.mjs';
 import { translate, runStage, approve } from '../lib/pipeline.mjs';
 import { normalizeModels, setRoleModels } from '../lib/models.mjs';
-import { initRunSettings, checkRunSettings, applyRunSettings, runSettingsState, runSettingsFile } from '../lib/run-settings.mjs';
+import { initRunSettings, checkRunSettings, applyRunSettings, runSettingsState, syncRunSettings, runSettingsFile } from '../lib/run-settings.mjs';
 import { migrationStatus, statusMarkdown } from '../lib/status.mjs';
 import { statusSnapshot } from '../lib/status-snapshot.mjs';
 import { humanGate, interactiveDecision } from '../lib/guardrails.mjs';
@@ -357,4 +357,39 @@ test('models come from one question first; the file then only needs the language
   for (const role of ['implementer', 'reviewer-semantics', 'reviewer-rules', 'arbiter', 'fixer']) assert.deepEqual(s.models[role], { model: 'big-model', effort: 'default', context: 'default' });
   assert.equal(s.models.surveyor.model, 'same-as-implementer');
   assert.match(s._help.models, /最初の質問で選んだモデル/);
+});
+
+test('a model or language changed from chat updates the file, so apply never writes the old choice back', t => {
+  const root = fresh(t);
+  initRunSettings(root, models);
+  writeSettings(root, filled(root));
+  assert.equal(applyRunSettings(root, models).applied, true);
+  setRoleModels(root, models, { role: 'all', model: 'small-model' });
+  assert.equal(runSettingsState(root, loadConfig(root)).state, 'differs');
+  assert.equal(syncRunSettings(root), runSettingsFile);
+  const s = settingsOf(root);
+  assert.equal(s.models.fixer.model, 'small-model');
+  assert.equal(s.sourceLanguage, 'C#', 'other entries are kept');
+  assert.equal(runSettingsState(root, loadConfig(root)).state, 'applied');
+  assert.deepEqual(applyRunSettings(root, models).changed, []);
+  fs.writeFileSync(safePath(root, runSettingsFile), '{ broken');
+  assert.equal(syncRunSettings(root), null, 'an unreadable file is left for the person');
+});
+
+test('without a model list, settings init offers no model choices and says to sign in', t => {
+  const root = fresh(t);
+  const result = initRunSettings(root, 'The Copilot CLI is not signed in');
+  assert.equal(result.modelsListed, false);
+  assert.match(result.next, /Offer no model choices: .*copilot login/);
+});
+
+test('the runner keeps the file in step after models set', t => {
+  const root = fresh(t);
+  const copilot = modelCatalogCli(root, catalog);
+  const run = (...args) => spawnSync(process.execPath, [path.join(kitRoot, 'scripts/run_migration.mjs'), ...args, '--copilot', copilot], { cwd: root, encoding: 'utf8' });
+  assert.equal(run('settings', 'init').status, 0);
+  const out = run('models', 'set', '--role', 'all', '--model', 'big-model');
+  assert.equal(out.status, 0, out.stderr);
+  assert.match(JSON.parse(out.stdout).runSettings, /updated to match/);
+  assert.equal(settingsOf(root).models.implementer.model, 'big-model');
 });

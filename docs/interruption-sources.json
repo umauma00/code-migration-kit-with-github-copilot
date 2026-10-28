@@ -2409,7 +2409,7 @@
     },
     {
       "path": "lib/run-settings.mjs",
-      "sha256": "eca3c4573a883aba351f91e81c4e7ee117fada17e0f10268c9c1426066318802",
+      "sha256": "81e85217800602b59214e9fa36d5f4e6cbf6697250e9f8b8623a981d2717ec01",
       "entries": [
         {
           "line": 20,
@@ -2462,17 +2462,17 @@
           "code": "if (!values || typeof values !== 'object' || Array.isArray(values)) throw new Error(`${runSettingsFile} must be a JSON object; correct it or delete it and run settings init again`);"
         },
         {
-          "line": 141,
+          "line": 143,
           "kind": "error-or-exit-candidate",
           "code": "if (!fs.existsSync(file)) throw new Error(`${runSettingsFile} is missing: run settings init first`);"
         },
         {
-          "line": 143,
+          "line": 145,
           "kind": "error-or-exit-candidate",
           "code": "try { value = readJSON(file); } catch (e) { throw new Error(`${runSettingsFile} is not valid JSON: ${e.message}`); }"
         },
         {
-          "line": 144,
+          "line": 146,
           "kind": "error-or-exit-candidate",
           "code": "if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${runSettingsFile} must be a JSON object`);"
         }
@@ -4255,7 +4255,7 @@
     },
     {
       "path": "scripts/run_migration.mjs",
-      "sha256": "6fe9e0e74216e86b0d4a3de0955a9521e5157d89260db3066379d92f7540787c",
+      "sha256": "de9d50b4818a1cfc193d5b9ea67a19fe830c792712d23c676b13217530f6fa88",
       "entries": [
         {
           "line": 77,
@@ -4373,112 +4373,112 @@
           "code": "if (alive) throw new Error('Lock owner is still running; refusing to unlock');"
         },
         {
-          "line": 230,
+          "line": 232,
           "kind": "error-or-exit-candidate",
           "code": "if (!['list', 'set'].includes(args._[1])) throw new Error('Use models list [--format json|markdown] | models set --assign ROLE=ID[:EFFORT][:long_context],... | models set --role ROLE --model ID [--effort LEVEL|default] [--context default|long_context]');"
         },
         {
-          "line": 231,
+          "line": 233,
           "kind": "error-or-exit-candidate",
           "code": "if (args.format !== undefined && !['json', 'markdown'].includes(args.format)) throw new Error('models list format must be json or markdown');"
         },
         {
-          "line": 234,
+          "line": 236,
           "kind": "error-or-exit-candidate",
           "code": "if (!readConfigIfPresent(root)) throw new Error('migration/config.json is missing: initialize the project (install.mjs) before recording model choices');"
         },
         {
-          "line": 248,
+          "line": 254,
           "kind": "error-or-exit-candidate",
           "code": "if (!readConfigIfPresent(root)) throw new Error('migration/config.json is missing: initialize the project (install.mjs) before run settings');"
         },
         {
-          "line": 256,
+          "line": 262,
           "kind": "error-or-exit-candidate",
           "code": "if (!fs.existsSync(file)) throw new Error(`${runSettingsFile} is missing: run settings init first`);"
         },
         {
-          "line": 258,
+          "line": 264,
           "kind": "error-or-exit-candidate",
           "code": "try { settings = JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\\uFEFF/, '')); } catch (e) { throw new Error(`${runSettingsFile} is not valid JSON: ${e.message}`); }"
         },
         {
-          "line": 260,
+          "line": 266,
           "kind": "error-or-exit-candidate",
           "code": "if (errors.length) process.exitCode = 1;"
         },
         {
-          "line": 264,
+          "line": 270,
           "kind": "error-or-exit-candidate",
           "code": "if (action !== 'apply') throw new Error('Use settings init | check | apply');"
         },
         {
-          "line": 268,
+          "line": 274,
           "kind": "error-or-exit-candidate",
           "code": "if (!result.applied) process.exitCode = 1;"
         },
         {
-          "line": 274,
+          "line": 280,
           "kind": "error-or-exit-candidate",
           "code": "if (args.format && !['json', 'markdown', 'todo', 'checklist'].includes(args.format)) throw new Error('status format must be json, markdown, todo or checklist');"
         },
         {
-          "line": 276,
+          "line": 282,
           "kind": "error-or-exit-candidate",
           "code": "if (!report.ok) process.exitCode = 1;"
         },
         {
-          "line": 287,
+          "line": 293,
           "kind": "error-or-exit-candidate",
           "code": "if (typeof args.message !== 'string' || !args.message.trim()) throw new Error('guidance requires --message TEXT (the error to explain)');"
         },
         {
-          "line": 293,
+          "line": 299,
           "kind": "cancellation",
           "code": "const abort = () => controller.abort();"
         },
         {
-          "line": 317,
+          "line": 323,
           "kind": "error-or-exit-candidate",
           "code": "else if (cmd === 'source-spec') throw new Error('Use source-spec init [--apply] | check');"
         },
         {
-          "line": 328,
+          "line": 334,
           "kind": "error-or-exit-candidate",
           "code": "} else throw new Error('Use survey plan|run|status|merge --kind facts|contracts|inventory [--max-files N] [--sites migration/PATH.tsv]');"
         },
         {
-          "line": 342,
+          "line": 348,
           "kind": "error-or-exit-candidate",
           "code": "else throw new Error('Use sessions status | prune [--run RUN_ID]');"
         },
         {
-          "line": 350,
+          "line": 356,
           "kind": "error-or-exit-candidate",
           "code": "} else throw new Error('Use guardrails show | install [--add CSV] [--remove CSV] [--deny CSV] [--waiver NOTE] [--replace]');"
         },
         {
-          "line": 355,
+          "line": 361,
           "kind": "error-or-exit-candidate",
           "code": "process.exitCode = 1;"
         },
         {
-          "line": 366,
+          "line": 372,
           "kind": "error-or-exit-candidate",
           "code": "if (args._[1] !== 'translation' || args['complete-phase'] !== '03') throw new Error('--complete-phase applies only as approve translation --complete-phase 03');"
         },
         {
-          "line": 373,
+          "line": 379,
           "kind": "error-or-exit-candidate",
           "code": "if (cmd === 'repair' && !args.target && !args.queue) throw new Error('repair requires --target or --queue');"
         },
         {
-          "line": 378,
+          "line": 384,
           "kind": "error-or-exit-candidate",
           "code": "} else throw new Error(`Unknown command ${cmd}\\n${usage}`);"
         },
         {
-          "line": 396,
+          "line": 402,
           "kind": "error-or-exit-candidate",
           "code": "process.exitCode = 1;"
         }
