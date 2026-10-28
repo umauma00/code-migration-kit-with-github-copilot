@@ -257,3 +257,23 @@ test('review of 7855afc: leaving auto retires its record, an escaped install opt
   assert.equal(status.autoMode.active, false);
   assert.equal(status.workflow.mode, 'relaxed');
 });
+
+test('review of 0c2a8c5: a failed retire leaves auto chosen, an invalid preferences file is never auto, and Windows paths install unasked', t => {
+  const f = fixture(t, { mode: 'auto', guardrails: false });
+  // The retire comes before the preference: if it fails, nothing says normal.
+  fs.writeFileSync(safePath(f.root, 'migration/phases/retired'), 'a file, not a folder');
+  assert.throws(() => setPreferences(f.root, { phaseMode: 'normal' }));
+  assert.equal(readPreferences(f.root).phaseMode, 'auto');
+  assert.ok(fs.existsSync(safePath(f.root, autoModeFile)));
+  fs.rmSync(safePath(f.root, 'migration/phases/retired'));
+  // Fast cycles keep every retired record.
+  for (let i = 0; i < 10; i++) { setPreferences(f.root, { phaseMode: 'normal' }); setPreferences(f.root, { phaseMode: 'auto' }); }
+  assert.equal(fs.readdirSync(safePath(f.root, 'migration/phases/retired')).filter(n => n.startsWith('auto-mode-')).length, 10);
+  // Windows-style runner paths are the same plain install.
+  assert.equal(decide(f, 'node migration-kit\\scripts\\run_migration.mjs guardrails install'), null);
+  assert.equal(decide(f, 'node migration-kit\\scripts\\run_migration.mjs guardrails install --waiver x')?.decision, 'ask');
+  // A preferences file the runner rejects is not auto mode anywhere.
+  writeJSON(safePath(f.root, 'migration/preferences.json'), { schemaVersion: 1, userLanguage: 'fr', phaseMode: 'auto' });
+  assert.equal(decide(f, gateCommands[0])?.decision, 'ask');
+  assert.equal(statusSnapshot(f.root).autoMode?.active ?? false, false);
+});

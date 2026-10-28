@@ -47,7 +47,7 @@
     },
     {
       "path": "lib/auto-mode.mjs",
-      "sha256": "5f169536ccdfc63a31b4c57e9c4759c7c615d2ff450a74cacd551462866b6f79",
+      "sha256": "ac8a1151539e6abbd6a71d0e6d9976a450e844f1aafe3093a7b59b95b4a0ce08",
       "entries": []
     },
     {
@@ -1005,7 +1005,7 @@
     },
     {
       "path": "lib/guardrails.mjs",
-      "sha256": "84d9b5edc8bd7aeba5beed7fa86fa26b4e61f91ff8b120f1fd4f38489977be87",
+      "sha256": "398a378f3aedbe8e6bcb985b52c8e584b0e04db2b842e8419d1b6863dcabdaa8",
       "entries": [
         {
           "line": 46,
@@ -1335,7 +1335,7 @@
     },
     {
       "path": "lib/phases.mjs",
-      "sha256": "e82a05fa2363bd781a9f994c5dd92948560e7dd1663ee064b9f6351ccf555a6b",
+      "sha256": "84522426457d971e12819ce744e3678ab1dfac6373ad99a0b1475c50150bf738",
       "entries": [
         {
           "line": 60,
@@ -2043,40 +2043,40 @@
     },
     {
       "path": "lib/preferences.mjs",
-      "sha256": "bf7d7eb76f4e2d58577a8b897014034757ddf865ff091e5731c6e1fb89bc1411",
+      "sha256": "08cb93f2bd3fe05a9388329774bb4c2fa2ce809d20f797095eced23451254087",
       "entries": [
         {
-          "line": 30,
+          "line": 32,
           "kind": "error-or-exit-candidate",
           "code": "if (value?.schemaVersion !== 1 || (value.userLanguage !== null && !userLanguages.includes(value.userLanguage))) throw new Error(`${preferencesFile} must have schemaVersion 1 and userLanguage ja or en`);"
         },
         {
-          "line": 31,
+          "line": 33,
           "kind": "error-or-exit-candidate",
           "code": "if (value.originalRuntime !== undefined && value.originalRuntime !== null && !originalRuntimes.includes(value.originalRuntime)) throw new Error(`${preferencesFile}: originalRuntime must be available or unavailable`);"
         },
         {
-          "line": 32,
+          "line": 34,
           "kind": "error-or-exit-candidate",
           "code": "if (value.phaseMode !== undefined && value.phaseMode !== null && !phaseModes.includes(value.phaseMode)) throw new Error(`${preferencesFile}: phaseMode must be normal, relaxed or auto`);"
         },
         {
-          "line": 37,
+          "line": 39,
           "kind": "error-or-exit-candidate",
           "code": "if (language === undefined && originalRuntime === undefined && phaseMode === undefined) throw new Error('Set --language ja|en, --original-runtime available|unavailable and/or --phase-mode normal|relaxed|auto');"
         },
         {
-          "line": 38,
+          "line": 40,
           "kind": "error-or-exit-candidate",
           "code": "if (language !== undefined && !userLanguages.includes(language)) throw new Error('language must be ja or en');"
         },
         {
-          "line": 39,
+          "line": 41,
           "kind": "error-or-exit-candidate",
           "code": "if (originalRuntime !== undefined && !originalRuntimes.includes(originalRuntime)) throw new Error('original-runtime must be available or unavailable');"
         },
         {
-          "line": 40,
+          "line": 42,
           "kind": "error-or-exit-candidate",
           "code": "if (phaseMode !== undefined && !phaseModes.includes(phaseMode)) throw new Error('phase-mode must be normal, relaxed or auto');"
         }
