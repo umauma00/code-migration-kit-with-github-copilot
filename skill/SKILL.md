@@ -233,10 +233,12 @@ work through and show the [one-page checklist](../docs/STRESS-TEST-CHECKLIST.md)
 03/04 need `migration/guardrails.json`, the human's decision: propose the list from
 `guardrails show` adapted to this target's build/test commands (or a waiver with its
 reason), and after their agreement in chat run `guardrails install` with exactly
-those options. Never write the file any other way (the hook denies it). The host
-asks the person to confirm every `approve` / `phase complete` / `guardrails install`
-command; if it cannot ask (autopilot denies the request), tell the person to leave
-autopilot and retry instead of working around it. Outside auto mode, run gate commands only in an
+those options. Never write the file any other way (the hook denies it). Outside
+auto mode the host asks the person to confirm every `approve` / `phase complete` /
+`guardrails install` command; if it cannot ask (autopilot denies the request),
+tell the person to leave autopilot and retry instead of working around it. In
+auto mode these run unasked (see the auto mode paragraph below), one command per
+call: a gate chained with anything else still asks. Outside auto mode, run gate commands only in an
 interactive session without autopilot, which denies them. The Copilot CLI may show
 its own permission prompt after the hook's question, so the person can be asked
 twice. An explicit

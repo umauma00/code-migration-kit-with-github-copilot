@@ -47,7 +47,7 @@
     },
     {
       "path": "lib/auto-mode.mjs",
-      "sha256": "ac8a1151539e6abbd6a71d0e6d9976a450e844f1aafe3093a7b59b95b4a0ce08",
+      "sha256": "b4832bb09ee9055bf068ee01386c6dfceb210015c52ae512861c89dba2e65f72",
       "entries": []
     },
     {
@@ -1005,7 +1005,7 @@
     },
     {
       "path": "lib/guardrails.mjs",
-      "sha256": "398a378f3aedbe8e6bcb985b52c8e584b0e04db2b842e8419d1b6863dcabdaa8",
+      "sha256": "962d48a4d1f2a1ff81ef4750585edc715fdd5ec2db6bff05e8b5e0027af4e88b",
       "entries": [
         {
           "line": 46,
@@ -1028,37 +1028,47 @@
           "code": "catch (e) { throw new Error(`Phase ${phase} guardrails are invalid: ${e.message}. ${install}`); }"
         },
         {
+          "line": 79,
+          "kind": "error-or-exit-candidate",
+          "code": "catch (e) { if (e.code !== 'EEXIST') throw e; }"
+        },
+        {
           "line": 80,
+          "kind": "error-or-exit-candidate",
+          "code": "try { policy = readGuardrails(root); } catch (e) { throw new Error(`Phase ${phase} guardrails are invalid: ${e.message}. ${install}`); }"
+        },
+        {
+          "line": 82,
           "kind": "error-or-exit-candidate",
           "code": "if (!policy) throw new Error(`Phase ${phase} requires human-installed command guardrails. ${install}`);"
         },
         {
-          "line": 81,
+          "line": 83,
           "kind": "error-or-exit-candidate",
           "code": "if (!policy.denyCommands.length && !policy.waiver) throw new Error(`Phase ${phase} guardrails deny nothing and record no waiver. ${install}`);"
         },
         {
-          "line": 103,
+          "line": 105,
           "kind": "error-or-exit-candidate",
           "code": "if (fs.existsSync(file) && !replace) throw new Error(`${guardrailsFile} already exists; pass --replace to change it (still the human's confirmed act)`);"
         },
         {
-          "line": 104,
+          "line": 106,
           "kind": "error-or-exit-candidate",
           "code": "if (waiver !== undefined && (deny !== undefined || add !== undefined || remove !== undefined)) throw new Error('Choose a deny list or a waiver, not both');"
         },
         {
-          "line": 111,
+          "line": 113,
           "kind": "error-or-exit-candidate",
           "code": "for (const r of removed) if (!base.includes(r)) throw new Error(`Cannot remove \"${r}\": it is not in the deny list`);"
         },
         {
-          "line": 115,
+          "line": 117,
           "kind": "error-or-exit-candidate",
           "code": "if (!value.waiver && !value.denyCommands.length) throw new Error('A guardrails file must deny something or record a waiver');"
         },
         {
-          "line": 137,
+          "line": 139,
           "kind": "loop-exit-candidate",
           "code": "if (!wrappers.has(name)) break;"
         }
@@ -1066,7 +1076,7 @@
     },
     {
       "path": "lib/guidance.mjs",
-      "sha256": "5d6c3ff8d3db95750f2b4f36284b301fd87a9daa0c994b5c8f11938e846de7d8",
+      "sha256": "3d693bac283d81a6c594d918205637d628f1d1f0f2e2374c1794f8ae102f07da",
       "entries": [
         {
           "line": 73,
@@ -1124,7 +1134,7 @@
           "code": "for (const r of rules) { m = message.match(r.match); if (m) { rule = r; break; } }"
         },
         {
-          "line": 728,
+          "line": 730,
           "kind": "deadline-or-observation",
           "code": "[/^hook responds before its timeout$/, c => `Hook check failed: ${c.command ?? 'no hook command'} took ${c.durationMs ?? '?'} ms (timeout ${c.timeoutSec ?? '?'} s)`],"
         }
@@ -2043,40 +2053,40 @@
     },
     {
       "path": "lib/preferences.mjs",
-      "sha256": "08cb93f2bd3fe05a9388329774bb4c2fa2ce809d20f797095eced23451254087",
+      "sha256": "9df140f39577e71bc70d1f0a6b125fd77e445cb9a210f762ffe7a5547d487d15",
       "entries": [
         {
-          "line": 32,
+          "line": 41,
           "kind": "error-or-exit-candidate",
           "code": "if (value?.schemaVersion !== 1 || (value.userLanguage !== null && !userLanguages.includes(value.userLanguage))) throw new Error(`${preferencesFile} must have schemaVersion 1 and userLanguage ja or en`);"
         },
         {
-          "line": 33,
+          "line": 42,
           "kind": "error-or-exit-candidate",
           "code": "if (value.originalRuntime !== undefined && value.originalRuntime !== null && !originalRuntimes.includes(value.originalRuntime)) throw new Error(`${preferencesFile}: originalRuntime must be available or unavailable`);"
         },
         {
-          "line": 34,
+          "line": 43,
           "kind": "error-or-exit-candidate",
           "code": "if (value.phaseMode !== undefined && value.phaseMode !== null && !phaseModes.includes(value.phaseMode)) throw new Error(`${preferencesFile}: phaseMode must be normal, relaxed or auto`);"
         },
         {
-          "line": 39,
+          "line": 49,
           "kind": "error-or-exit-candidate",
           "code": "if (language === undefined && originalRuntime === undefined && phaseMode === undefined) throw new Error('Set --language ja|en, --original-runtime available|unavailable and/or --phase-mode normal|relaxed|auto');"
         },
         {
-          "line": 40,
+          "line": 50,
           "kind": "error-or-exit-candidate",
           "code": "if (language !== undefined && !userLanguages.includes(language)) throw new Error('language must be ja or en');"
         },
         {
-          "line": 41,
+          "line": 51,
           "kind": "error-or-exit-candidate",
           "code": "if (originalRuntime !== undefined && !originalRuntimes.includes(originalRuntime)) throw new Error('original-runtime must be available or unavailable');"
         },
         {
-          "line": 42,
+          "line": 52,
           "kind": "error-or-exit-candidate",
           "code": "if (phaseMode !== undefined && !phaseModes.includes(phaseMode)) throw new Error('phase-mode must be normal, relaxed or auto');"
         }
@@ -4694,5 +4704,5 @@
       ]
     }
   ],
-  "candidateLines": 851
+  "candidateLines": 853
 }

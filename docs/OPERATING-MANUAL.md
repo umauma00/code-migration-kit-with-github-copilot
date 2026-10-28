@@ -103,6 +103,10 @@ the agent runs every command, installs the CLI or starts `copilot login` after t
 person agrees, and the person's own acts are chat answers and host confirmations
 of human-gate commands. The only entry point is the orchestrator agent in the
 agent picker, with Copilot and Local alike; it reads the code-migration skill.
+In auto phase mode, which only the person switches on, phase completions,
+approvals, waivers and build loops run without those confirmations so Copilot
+CLI autopilot can drive the run; every such record is marked auto (see
+[auto mode](ORDERED-WORKFLOW.en.md#auto-mode)).
 
 ## VS Code orchestration and verification modes
 

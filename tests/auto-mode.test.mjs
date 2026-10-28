@@ -277,3 +277,34 @@ test('review of 0c2a8c5: a failed retire leaves auto chosen, an invalid preferen
   assert.equal(decide(f, gateCommands[0])?.decision, 'ask');
   assert.equal(statusSnapshot(f.root).autoMode?.active ?? false, false);
 });
+
+test('review (Sonnet): a gate runs unasked only on its own; switching auto on outside the runner asks; a stale record never revives', t => {
+  const f = fixture(t, { mode: 'auto' });
+  // Anything chained after an auto gate keeps its ask.
+  for (const command of [`${kit} approve translation --note x && ${kit} models set --role all --model gpt-5`, `${kit} phase complete 02 --note x; ${kit} sessions prune`,
+    `${kit} phase complete 02 --note x; ${kit} preferences --phase-mode auto`, `${kit} build-loop --note x && ${kit} settings apply`,
+    `${kit} approve build --note x | ${kit} guardrails install --deny foo`, `${kit} approve build --note x\n${kit} pilot prepare --note y`,
+    `$(${kit} approve build --note x) ${kit} models set --role all --model m`, `bash -c "${kit} approve build --note x; ${kit} sessions prune"`])
+    assert.equal(decide(f, command)?.decision, 'ask', command);
+  // A note with separators inside quotes is still one gate.
+  assert.equal(decide(f, `${kit} phase complete 02 --note "a; b && c | d"`), null);
+  // The kit's preference modules reached in a form the hook cannot read ask.
+  assert.equal(decide(f, `node -e "import('./migration-kit/lib/preferences.mjs').then(m=>m.setPreferences(process.cwd(),{phaseMode:'auto'}))"`)?.decision, 'ask');
+  // Writing auto into preferences.json outside the runner asks.
+  assert.equal(decide(f, `echo '{"schemaVersion":1,"userLanguage":"ja","phaseMode":"auto"}' > migration/preferences.json`)?.decision, 'ask');
+  assert.equal(interactiveDecision({ toolName: 'edit', toolArgs: { path: 'migration/preferences.json', old_str: 'normal', new_str: 'auto' }, cwd: f.root }, f.root)?.decision, 'ask');
+  assert.equal(decide(f, 'cat migration/preferences.json'), null);
+  // The record named relative to a cd is still the record.
+  for (const command of ['cd migration && cp x phases/auto-mode.json', 'cd migration/phases && cp x ./auto-mode.json']) assert.equal(decide(f, command)?.decision, 'deny', command);
+  // A record left behind a hand-edited mode is retired on the next read.
+  writeJSON(safePath(f.root, 'migration/preferences.json'), { ...readPreferences(f.root), phaseMode: 'normal' });
+  assert.ok(fs.existsSync(safePath(f.root, autoModeFile)));
+  readPreferences(f.root);
+  assert.equal(fs.existsSync(safePath(f.root, autoModeFile)), false);
+  writeJSON(safePath(f.root, 'migration/preferences.json'), { ...readPreferences(f.root), phaseMode: 'auto' });
+  assert.equal(decide(f, gateCommands[0])?.decision, 'ask');
+  // Preferences without userLanguage are invalid for the runner, so not auto anywhere.
+  setPreferences(f.root, { phaseMode: 'auto' });
+  writeJSON(safePath(f.root, 'migration/preferences.json'), { schemaVersion: 1, phaseMode: 'auto' });
+  assert.equal(decide(f, gateCommands[0])?.decision, 'ask');
+});
