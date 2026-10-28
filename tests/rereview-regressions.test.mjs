@@ -80,7 +80,7 @@ test('RR2: validation fails if any explicitly mapped output under an excluded di
 
 // A legacy-encoded original stays as it is (it is the specification and may
 // still run); workers read it decoded, told which encoding it came from,
-// instead of the run stopping to ask for a conversion (0.10.1).
+// instead of the run stopping to ask for a conversion (0.11.1).
 test('RR3: a non-UTF-8 source is decoded for workers, names its encoding and does not stop translation', async t => {
   const f = prepare(t), unit = f.units[0], inputs = [];
   write(f.root, unit.source, Buffer.from("# coding: latin-1\nvalue = 'caf\xe9'\n", 'latin1'));
