@@ -686,6 +686,14 @@ test('review of ac3ad0c: the source-folder question clears once answered, persis
   initRunSettings(root, models, { sourceRoots: 'src' });
   assert.equal(initRunSettings(root, models, { source: 'Python', target: 'Go' }).sourceRootsUnchosen, undefined, 'repeating the recorded language does not ask again');
   assert.equal(initRunSettings(root, models, { source: 'COBOL', target: 'Go' }).sourceRootsUnchosen, true, 'another language asks again');
+  // A first answer asks even when the configuration already names a language (a manifest exists).
+  const manifested = fresh(t);
+  setRoleModels(manifested, models, { role: 'all', model: 'big-model' });
+  touch(manifested, ['src/A.java', 'migration/manifest.tsv']);
+  assert.equal(initRunSettings(manifested, models, { source: 'Python', target: 'Go' }).sourceRootsUnchosen, true);
+  // The recorded spelling is compared as the mappers name it.
+  writeSettings(manifested, { ...settingsOf(manifested), sourceLanguage: 'python' });
+  assert.equal(initRunSettings(manifested, models, { source: 'Python', target: 'Go' }).sourceRootsUnchosen, undefined);
   // English text, and a cache-only folder is not source (the kit skips __pycache__ too).
   writeSettings(root, { ...settingsOf(root), reportLanguage: 'en' });
   assert.match(initRunSettings(root, models, { source: 'Python', target: 'Go' }).sourceRootsQuestion, /^The source folder is still src, and no Python files were found there\. .*must be moved into a folder first/);
