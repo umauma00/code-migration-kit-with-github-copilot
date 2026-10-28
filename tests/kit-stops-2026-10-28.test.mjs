@@ -205,3 +205,25 @@ test('a second source extension keeps its name in the target, so a.php and a.inc
   assert.equal(r.status, 0, r.stderr);
   assert.equal(fs.readFileSync(safePath(root, 'migration/manifest.tsv'), 'utf8'), 'source\ttarget\napp/a.php\tported/a.ts\napp/b.php\tported/b.ts\napp/a.inc\tported/a.inc.ts\n');
 });
+
+test('re-review fixes: legacy audit inputs freeze, a wrong root stays a blocker, package checks stay in preparation, a declared encoding wins', async t => {
+  const root = project(t, { files: { 'app/A.php': Buffer.from('<?php // caf\xe9\n', 'latin1'), 'app/K.php': Buffer.from([0x3c, 0x3f, 0x0a, 0x2f, 0x2f, 0x93, 0xfa, 0x96, 0x7b, 0x8c, 0xea, 0x0a]) } });
+  const { freezeAudit } = await import('../scripts/audit_inputs.mjs');
+  const frozen = freezeAudit(root, loadConfig(root), { type: 'judge', files: ['app/A.php'] });
+  assert.match(frozen.request.input.files[0].content, /café/);
+  // Kanji without kana reads as Latin-1 by its bytes; a declared encoding decides.
+  const { readReviewSource } = await import('../lib/review.mjs');
+  assert.equal(readReviewSource(root, 'app/K.php').encoding, 'windows-1252');
+  const file = safePath(root, 'migration/config.json');
+  writeJSON(file, { ...readJSON(file), sourceEncoding: 'shift_jis' });
+  assert.deepEqual(readReviewSource(root, 'app/K.php'), { content: '<?\n//日本語\n', encoding: 'shift_jis' });
+  assert.equal(readReviewSource(root, 'app/A.php').encoding, 'windows-1252', 'a file the declared encoding cannot read still decodes');
+  writeJSON(file, { ...readJSON(file), sourceEncoding: 'no-such-encoding' });
+  assert.throws(() => loadConfig(root), /sourceEncoding must be an encoding label/);
+  writeJSON(file, { ...readJSON(file), sourceEncoding: 'shift_jis', verificationMode: 'runtime', preparationProfile: 'standard' });
+  reviewFeasibility(root);
+  const report = migrationStatus(root);
+  assert.ok(report.blockers.some(b => /Input root missing: tests \(verificationRoots/.test(b.reason)), 'a missing runtime root is still shown');
+  const listed = run(root, 'phase', 'check', '00b,01,02,03');
+  assert.notEqual(listed.status, 0); assert.match(listed.stderr, /Only preparation phases 00 through 02 can be checked together/);
+});

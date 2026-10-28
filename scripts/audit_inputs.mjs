@@ -39,7 +39,7 @@ export function freezeAudit(root, config, { type, files, out } = {}) {
     });
     const inputText = JSON.stringify({ schemaVersion: 1, type, files: input });
     if (Buffer.byteLength(inputText) > (config.maxReviewInputBytes ?? 65536)) throw new Error('Preparation audit input exceeds the configured bound; select an explicit batch, never truncate');
-    if (snapshot(root, config) !== before || input.some(f => fileHash(safePath(root, f.path)) !== f.hash)) throw new Error('Audit inputs changed while freezing');
+    if (snapshot(root, config) !== before || input.some(f => hash(readReviewText(root, f.path)) !== f.hash)) throw new Error('Audit inputs changed while freezing');
     const request = { schemaVersion: 1, kind: 'preparation-audit-request', task, type, requestedModel: model, observedModel: null,
       snapshot: before, inputHash: hash(inputText), input: JSON.parse(inputText),
       responseContract: { schemaVersion: 1, kind: 'preparation-audit', task, inputHash: hash(inputText), verdict: 'pass|changes', findings: [{ id: 'ID', message: 'specific problem', evidence: 'source/assertion/rule:line proof', proposedFix: 'proposal only' }] } };
@@ -57,7 +57,7 @@ function currentRequest(root, config, directory) {
   const request = readJSON(safePath(root, `${directory}/request.json`));
   if (request.schemaVersion !== 1 || request.kind !== 'preparation-audit-request' || !Object.hasOwn(models, request.type) || request.requestedModel !== auditModel(config, request.type) ||
         !request.input || !Array.isArray(request.input.files) || request.snapshot !== snapshot(root, config) || hash(JSON.stringify(request.input)) !== request.inputHash ||
-        request.input.files.some(f => typeof f.content !== 'string' || hash(f.content) !== f.hash || fileHash(safePath(root, f.path)) !== f.hash)) throw new Error(`Preparation audit inputs changed; use fresh contexts and requests: freeze a replacement, then retire --directory ${directory} --superseded-by NEW --reason TEXT`);
+        request.input.files.some(f => typeof f.content !== 'string' || hash(f.content) !== f.hash || hash(readReviewText(root, f.path)) !== f.hash)) throw new Error(`Preparation audit inputs changed; use fresh contexts and requests: freeze a replacement, then retire --directory ${directory} --superseded-by NEW --reason TEXT`);
   return request;
 }
 export async function runAudit(root, config, adapter, { directory, signal } = {}) {

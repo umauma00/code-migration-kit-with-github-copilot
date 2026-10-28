@@ -45,6 +45,7 @@ export function phaseCommand(root, config, action, phase, options = {}) {
     // complete would record it: each phase in order, predecessors assumed.
     const ids = typeof phase === 'string' && phase.includes(',') ? phase.split(',').map(p => p.trim()) : [phase];
     if (ids.length > 1 && ids.some((id, i) => i && orderedPhases.indexOf(id) !== orderedPhases.indexOf(ids[i - 1]) + 1)) throw new Error('List consecutive phases in order, for example 00b,01,02');
+    if (ids.length > 1 && ids.some(id => !['00','00b','01','02'].includes(id))) throw new Error('Only preparation phases 00 through 02 can be checked together');
     // In a source-as-spec package, 01 and 02 are checked for their own
     // evidence; their predecessors are recorded with them.
     const packaged = id => config.preparationProfile === 'source-as-spec' && ['01','02'].includes(id);

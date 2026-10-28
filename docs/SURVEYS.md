@@ -41,7 +41,7 @@ $R survey merge --kind inventory --sites migration/inventory-sites.tsv
 
 ファイル集合・census集合も分割し、全要求を実際のJSON化後bytesで検査します。検証済みの断片は `<scope-id>.parts/` に入力ハッシュ付きで保存し、同じ条件で再開すると再調査しません。scope IDは変えず、全断片・全ファイル・全箇所が揃うまでscopeはdoneにしません。contractsは断片ごとの観測と引用を機械的に結合し、断片をまたぐ未確定関係を明示します。inventoryの大きすぎるファイルの箇所は、既存のinventoryレビューで追跡します。必須メタデータ（rulebookやcensusの1項目）だけで容量を超える場合は、その原因を具体的に報告します。
 
-大きい本文と多数のcensus箇所が重なるときは、入力容量を本文と箇所に配分し、同じ断片を箇所ごとに繰り返し送る回数を減らします。UTF-8以外の古い文字コード（Shift_JIS・EUC-JP・Latin-1・UTF-16）は、同梱の依存解析器と同じ規則で読み替えて渡し、入力の各ファイルに `encoding` を書きます（元ファイルは変更しません。0.10.1 から、変換を求めて止まることはありません）。sourceRoots 配下の画像などのバイナリは調査対象から外し、件数を `binaryFilesLeftOut` に残します。censusの欠落ファイルや、census が指すバイナリは `skipped` に理由を記録し、読める範囲は先に保存します。その場合survey全体は未完了でmergeできません。censusを直して再開すると、既存の正常scopeは再利用します。
+大きい本文と多数のcensus箇所が重なるときは、入力容量を本文と箇所に配分し、同じ断片を箇所ごとに繰り返し送る回数を減らします。UTF-8以外の古い文字コード（Shift_JIS・EUC-JP・Latin-1・UTF-16）は、同梱の依存解析器と同じ規則で読み替えて渡し、入力の各ファイルに `encoding` を書きます（元ファイルは変更しません。0.10.1 から、変換を求めて止まることはありません）。かなを含まない漢字だけの Shift_JIS・EUC-JP は Latin-1 と区別しにくいため、`migration/config.json` の `sourceEncoding`（例 `"shift_jis"`）で指定できます。sourceRoots 配下の画像などのバイナリは調査対象から外し、件数を `binaryFilesLeftOut` に残します。censusの欠落ファイルや、census が指すバイナリは `skipped` に理由を記録し、読める範囲は先に保存します。その場合survey全体は未完了でmergeできません。censusを直して再開すると、既存の正常scopeは再利用します。
 
 CPU 100%・低CPU・無出力・600秒経過・ログ量を理由に実行中の仕事を中断しません。[全停止条件と継続方針](INTERRUPTION-POLICY.md)を参照してください。
 

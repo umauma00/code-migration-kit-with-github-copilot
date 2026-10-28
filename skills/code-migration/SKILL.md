@@ -168,7 +168,8 @@ Status lists files a current or later phase has not written yet under "not
 written yet": that is the work ahead, never a reason to stop or ask. Legacy
 encodings (Shift_JIS, EUC-JP, Latin-1, UTF-16) are read decoded and named in
 worker input, and binaries under a source root are left out of surveys: never
-ask the person to convert the original's encoding.
+ask the person to convert the original's encoding. If decoded Japanese
+looks wrong (kanji-only files), set `sourceEncoding` in migration/config.json.
 
 ## Dependency map (01)
 
