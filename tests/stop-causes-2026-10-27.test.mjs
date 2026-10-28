@@ -123,3 +123,22 @@ test('unlock reports a missing lock plainly and refuses a PID that owns nothing'
   writeJSON(safePath(f.root, 'migration/run.lock'), { pid: process.pid, task: 'survey' });
   await assert.rejects(main(['unlock', '--root', f.root, '--pid', '12345']), /exact lock owner PID/);
 });
+
+test('unlock clears a build-loop lock or claim from another host, and status reports a foreign run lock honestly', async t => {
+  const f = prepare(t), loop = safePath(f.root, 'migration/build-loop.lock');
+  writeJSON(loop, { pid: process.pid, host: `${os.hostname()}-other`, grantId: 'remote' });
+  assert.throws(() => acquireBuildLoop(f.root, 'mine'), /held by pid \d+ on host .*-other.*unlock --pid/);
+  writeJSON(`${loop}.recover`, { pid: 424242, host: `${os.hostname()}-other`, token: 'x' });
+  const log = console.log, out = []; console.log = m => out.push(m);
+  try {
+    await main(['unlock', '--root', f.root, '--pid', String(process.pid)]);
+    await main(['unlock', '--root', f.root, '--pid', '424242']);
+  } finally { console.log = log; }
+  assert.equal(fs.existsSync(loop), false); assert.equal(fs.existsSync(`${loop}.recover`), false);
+  assert.match(out.join('\n'), /build-loop\.lock\n.*build-loop\.lock\.recover/);
+  writeJSON(safePath(f.root, 'migration/run.lock'), { pid: process.pid, host: `${os.hostname()}-other`, task: 'survey' });
+  const report = migrationStatus(f.root);
+  assert.notEqual(report.running, true);
+  assert.equal(report.foreignLock.host, `${os.hostname()}-other`);
+  assert.equal(report.staleLock, undefined);
+});

@@ -219,7 +219,7 @@ test('a large census for one file is partitioned without dropping sites', async 
 });
 
 test('a mixed valid/foreign citation cannot be rescued by the valid anchor', async t => {
-  const f = fixture(t); f.config.maxAgentCalls = 1;
+  const f = fixture(t); f.config.maxAgentCalls = 2;
   await runSurvey(f.root, f.config, 'contracts', async args => {
     const r = answer(args); r.result.items[0].evidence += ' other/File.cs:5'; return r;
   });
@@ -325,4 +325,19 @@ console.log('done');`;
   assert.match(run.stdout, /done/);
   assert.match(run.stderr, /status: started/);
   assert.match(run.stderr, /status: still running \(\d+s\); waiting is not a failure/);
+});
+
+test('a bounded call limit reached before the correction keeps the part unfinished instead of writing uncited rows', async t => {
+  const f = fixture(t);
+  Object.assign(f.config, { executionMode: 'bounded', maxAgentCalls: 1 });
+  writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  const bad = async args => { const r = answer(args); r.result.items[0].evidence = `${r.result.items[0].file}:999`; return r; };
+  await assert.rejects(runSurvey(f.root, f.config, 'contracts', bad), /Agent call limit reached/);
+  const records = fs.existsSync(safePath(f.root, 'migration/surveys/contracts')) ? fs.readdirSync(safePath(f.root, 'migration/surveys/contracts')).filter(n => n.endsWith('.json')) : [];
+  assert.ok(records.every(n => !readJSON(safePath(f.root, `migration/surveys/contracts/${n}`)).items?.some(i => i.uncited)), 'no uncited rows without a correction');
+  // A larger limit then runs the correction (and only then may finish rows as uncited).
+  f.config.maxAgentCalls = 10; writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  let calls = 0;
+  const report = await runSurvey(f.root, f.config, 'contracts', async args => { calls++; return answer(args); });
+  assert.equal(report.done, report.total); assert.ok(calls >= 1);
 });

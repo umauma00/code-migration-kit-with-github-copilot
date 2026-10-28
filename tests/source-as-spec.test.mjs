@@ -294,6 +294,8 @@ test('a plan drafted before 0.10.0 keeps its contract memo and its TODO(spec) ga
   plan.scenarios = [{ path: contractsFile, contract: 'Per-file contracts', expectationBasis: 'source-inferred' }];
   writeJSONFile(root, 'migration/judge-plan.json', plan);
   atomicWrite(safePath(root, contractsFile), `${legacyContractsSkeleton(config, plan.sources)}\n`);
+  fs.rmSync(safePath(root, sourcesFile));
+  assert.deepEqual(initSourceSpec(root, config, { apply: true }).changes, [], 'no unused source index beside a legacy plan');
   const readiness = sourceSpecReadiness(root, config);
   assert.equal(readiness.items.find(i => i.path === contractsFile).status, 'placeholder');
   assert.equal(readiness.items.some(i => i.path === sourcesFile), false, 'readiness follows the saved plan');

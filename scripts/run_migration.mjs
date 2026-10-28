@@ -209,11 +209,12 @@ export async function main(argv = process.argv.slice(2)) {
   if (!cmd || cmd === 'help' || args.help) { console.log(usage); return; }
   const root = fs.realpathSync(path.resolve(args.root ?? '.'));
   if (cmd === 'unlock') {
-    const file = safePath(root, 'migration/run.lock'), claim = `${file}.recover`, pid = Number(args.pid);
-    // The recovery claim is cleared the same way when its owner (reused PID or another host) blocks recovery.
-    const target = [file, claim].find(f => readLock(f)?.pid === pid);
+    // Run and build-loop locks, and the recovery claim of either, are cleared
+    // the same way when their owner (reused PID or another host) blocks them.
+    const files = ['migration/run.lock', 'migration/build-loop.lock'].flatMap(p => { const f = safePath(root, p); return [f, `${f}.recover`]; });
+    const pid = Number(args.pid), target = files.find(f => readLock(f)?.pid === pid);
     if (!Number.isInteger(pid) || pid < 1 || !target) {
-      if (readLock(file) === undefined && readLock(claim) === undefined) { console.log('No migration lock to remove'); return; }
+      if (files.every(f => readLock(f) === undefined)) { console.log('No migration lock to remove'); return; }
       throw new Error('Specify the exact lock owner PID');
     }
     const lock = readLock(target);
@@ -224,7 +225,7 @@ export async function main(argv = process.argv.slice(2)) {
     if (alive) throw new Error('Lock owner is still running; refusing to unlock');
     // Remove it only if no other command took it in the meantime.
     if (JSON.stringify(readLock(target)) === JSON.stringify(lock)) fs.rmSync(target, { force: true });
-    console.log(target === claim ? 'Removed stale lock recovery claim' : 'Removed stale migration lock'); return;
+    console.log(`Removed stale ${target.endsWith('.recover') ? 'lock recovery claim' : 'lock'}: migration/${path.basename(target)}`); return;
   }
   if (cmd === 'preferences') {
     console.log(JSON.stringify(args.language || args['original-runtime'] ? setPreferences(root, { language: args.language, originalRuntime: args['original-runtime'] }) : preferencesReport(root), null, 2));

@@ -21,7 +21,7 @@ based on time, CPU, silence or output volume.
 - A `run.lock` or build-loop lock whose owner process is gone on this host is
   removed by the next command, under a short recovery claim so two recoverers
   never remove a fresh lock. Locks record their host; one from another host
-  still refuses and `unlock` can clear it (a pre-0.10.0 lock has no host and
+  still refuses and `unlock` can clear it, as well as a recovery claim (a pre-0.10.0 lock has no host and
   is judged by its PID here). Release removes only its own lock.
 - A "request/connection/... timed out" reported by the service or network is
   retried as transient; only the kit's own explicit deadline stays final.

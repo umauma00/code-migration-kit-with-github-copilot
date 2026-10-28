@@ -395,7 +395,7 @@
     },
     {
       "path": "lib/core.mjs",
-      "sha256": "d4388641d4e00abda065f7e047ee562bbf6e6a32e8c333924a5db52e3f36c5ab",
+      "sha256": "9f5fb6ecd506fcf8c6cdddd3fc8eab355f56735348809875e38ec749acd9da8a",
       "entries": [
         {
           "line": 26,
@@ -813,37 +813,37 @@
           "code": "catch (e) { if (e.code === 'ENOENT') return undefined; if (e instanceof SyntaxError) return null; throw e; }"
         },
         {
-          "line": 568,
+          "line": 570,
           "kind": "error-or-exit-candidate",
           "code": "if (e.code !== 'EEXIST') throw e;"
         },
         {
-          "line": 574,
+          "line": 576,
           "kind": "error-or-exit-candidate",
           "code": "try { fs.renameSync(claim, aside); } catch (error) { if (error.code === 'ENOENT') return; throw error; }"
         },
         {
-          "line": 592,
+          "line": 594,
           "kind": "error-or-exit-candidate",
           "code": "try { fs.linkSync(pending, lock); return; } catch (e) { if (e.code !== 'EEXIST') throw e; }"
         },
         {
-          "line": 595,
+          "line": 597,
           "kind": "error-or-exit-candidate",
           "code": "if (!ownerGone(owner)) throw liveError(owner);"
         },
         {
-          "line": 600,
+          "line": 602,
           "kind": "error-or-exit-candidate",
           "code": "if (blocker) throw new Error(`The ${name} lock's recovery claim ${path.basename(lock)}.recover is held by pid ${blocker.pid}${ownerHost(blocker)}; confirm no runner command is running there, then run unlock --pid ${blocker.pid}`);"
         },
         {
-          "line": 601,
+          "line": 603,
           "kind": "error-or-exit-candidate",
           "code": "throw new Error(`Could not take the ${name} lock while other commands kept taking it; rerun the command`);"
         },
         {
-          "line": 613,
+          "line": 617,
           "kind": "error-or-exit-candidate",
           "code": "if (loop) throw new Error(`A build-loop (grant ${loop.id}, pid ${loop.pid}) is running; wait for it to finish or interrupt that process before other runner commands`);"
         }
@@ -1051,7 +1051,7 @@
     },
     {
       "path": "lib/guidance.mjs",
-      "sha256": "640dddc33f879f019037d758ff4062bb3ea5b0088fc91e50526c681521272b95",
+      "sha256": "bbeaaee1d5dcfdd620739982013799e53b60a2b022298efbbda7b49a961ad866",
       "entries": [
         {
           "line": 73,
@@ -2557,7 +2557,7 @@
     },
     {
       "path": "lib/source-spec.mjs",
-      "sha256": "f5c9d802033beb23fddda24f1a65e8da70b1a27df40222ba322ee44bbd04d9fe",
+      "sha256": "c0dc72f85ab5820629adc5b34e780b2a86de84d98770a40f8c8f7768d9992e36",
       "entries": [
         {
           "line": 70,
@@ -2579,22 +2579,12 @@
     },
     {
       "path": "lib/status.mjs",
-      "sha256": "2d42c13091bb0179af136994a62558a8ef16da696b35b09c6ef1ca6ebe03da32",
+      "sha256": "daa37c8f4546480ac32a60195e5ac408ea628fd370263cb18aeb1f34a0945bad",
       "entries": [
         {
           "line": 73,
           "kind": "error-or-exit-candidate",
           "code": "if (!Number.isInteger(report.lock.pid) || report.lock.pid < 1) throw new Error('Invalid lock owner PID');"
-        },
-        {
-          "line": 74,
-          "kind": "pid-probe",
-          "code": "try { process.kill(report.lock.pid, 0); report.running = true; }"
-        },
-        {
-          "line": 75,
-          "kind": "error-or-exit-candidate",
-          "code": "catch (e) { if (e.code !== 'ESRCH') throw e; }"
         }
       ]
     },
@@ -2626,7 +2616,7 @@
     },
     {
       "path": "lib/survey.mjs",
-      "sha256": "156b60ed8ebc0798cdd8c0a1dc9f5b71b4529c486330a0576b5a1dd977a8ed75",
+      "sha256": "1ad39e6e820c56fccc4d375b1abd8567f97852151fedf4921e2c2e70276ba034",
       "entries": [
         {
           "line": 21,
@@ -2774,67 +2764,72 @@
           "code": "if (signal?.aborted) throw e;"
         },
         {
-          "line": 411,
+          "line": 393,
+          "kind": "error-or-exit-candidate",
+          "code": "if (!repaired) throw new Error(`Agent call limit reached (${limits.calls}) before the survey correction; validated rows are kept. Resume with a larger --max-calls`);"
+        },
+        {
+          "line": 414,
           "kind": "error-or-exit-candidate",
           "code": "if (e.code === 'SURVEY_VALIDATION') throw e;"
         },
         {
-          "line": 412,
+          "line": 415,
           "kind": "error-or-exit-candidate",
           "code": "if (isSystemicFailure(e)) { systemic ??= e; throw e; }"
         },
         {
-          "line": 413,
+          "line": 416,
           "kind": "error-or-exit-candidate",
           "code": "if (!isTransientFailure(e) || retry >= limits.retries || signal?.aborted) throw e;"
         },
         {
-          "line": 415,
+          "line": 418,
           "kind": "error-or-exit-candidate",
           "code": "await sleep(retryDelayMs(config, retry++), undefined, { signal }).catch(() => { throw new Error('Interrupted'); });"
         },
         {
-          "line": 422,
+          "line": 425,
           "kind": "loop-exit-candidate",
           "code": "failures.push(new Error(signal?.aborted ? 'Interrupted' : systemic.message)); break;"
         },
         {
-          "line": 431,
+          "line": 434,
           "kind": "error-or-exit-candidate",
           "code": "if (failures.length) throw failures[0];"
         },
         {
-          "line": 435,
+          "line": 438,
           "kind": "error-or-exit-candidate",
           "code": "if (surveyInput(root, config, kind, scope, { sitesFile }).hash !== input.hash) throw new Error('Survey scope inputs changed during the worker call');"
         },
         {
-          "line": 456,
+          "line": 459,
           "kind": "loop-exit-candidate",
           "code": "if (signal?.aborted || systemic) break;"
         },
         {
-          "line": 458,
+          "line": 461,
           "kind": "loop-exit-candidate",
           "code": "if (signal?.aborted || systemic) break;"
         },
         {
-          "line": 464,
+          "line": 467,
           "kind": "error-or-exit-candidate",
           "code": "const report = { runId, kind, executionMode: config.executionMode ?? 'continuous', ...(ignoredLimits(config).length ? { ignoredLimits: ignoredLimits(config) } : {}), startedAt, finishedAt: stamp(), agentCalls: calls, completed, done: status.done, total: status.total,"
         },
         {
-          "line": 477,
+          "line": 480,
           "kind": "error-or-exit-candidate",
           "code": "throw Object.assign(new Error(`Survey stopped: ${message || 'Interrupted'}`), { report });"
         },
         {
-          "line": 487,
+          "line": 490,
           "kind": "error-or-exit-candidate",
           "code": "if (plan.skipped.length) throw new Error(`Survey incomplete: ${plan.skipped.length} source files could not be read or found (${plan.skipped.slice(0, 5).map(s => s.file).join(', ')}); inspect skipped reasons, correct paths or prepare valid UTF-8 input and resume. Completed scopes are preserved.`);"
         },
         {
-          "line": 490,
+          "line": 493,
           "kind": "error-or-exit-candidate",
           "code": "if (missing.length) throw new Error(`Survey incomplete: ${missing.length} of ${plan.scopes.length} scopes have no current result (${missing.slice(0, 10).join(', ')}); resume survey run --kind ${kind}`);"
         }
@@ -4199,7 +4194,7 @@
     },
     {
       "path": "scripts/run_migration.mjs",
-      "sha256": "9434c8b9db8afd60b6335341a800a05343d89268a7dd78ae0385f89a6148b064",
+      "sha256": "7fe761abdf6c32eaaafbc2f3ac2c5b63bf4385e9ba4c8dfbe92a39c6a8ab808c",
       "entries": [
         {
           "line": 74,
@@ -4302,97 +4297,97 @@
           "code": "if (progressKey(report) !== start) break;"
         },
         {
-          "line": 217,
+          "line": 218,
           "kind": "error-or-exit-candidate",
           "code": "throw new Error('Specify the exact lock owner PID');"
         },
         {
-          "line": 223,
+          "line": 224,
           "kind": "pid-probe",
           "code": "if (alive) try { process.kill(pid, 0); } catch (e) { if (e.code === 'ESRCH') alive = false; else throw e; }"
         },
         {
-          "line": 224,
+          "line": 225,
           "kind": "error-or-exit-candidate",
           "code": "if (alive) throw new Error('Lock owner is still running; refusing to unlock');"
         },
         {
-          "line": 237,
+          "line": 238,
           "kind": "error-or-exit-candidate",
           "code": "if (!['list', 'set'].includes(args._[1])) throw new Error('Use models list [--format json|markdown] | models set --assign ROLE=ID[:EFFORT][:long_context],... | models set --role ROLE --model ID [--effort LEVEL|default] [--context default|long_context]');"
         },
         {
-          "line": 238,
+          "line": 239,
           "kind": "error-or-exit-candidate",
           "code": "if (args.format !== undefined && !['json', 'markdown'].includes(args.format)) throw new Error('models list format must be json or markdown');"
         },
         {
-          "line": 241,
+          "line": 242,
           "kind": "error-or-exit-candidate",
           "code": "if (!readConfigIfPresent(root)) throw new Error('migration/config.json is missing: initialize the project (install.mjs) before recording model choices');"
         },
         {
-          "line": 252,
+          "line": 253,
           "kind": "error-or-exit-candidate",
           "code": "if (args.format && !['json', 'markdown', 'todo', 'checklist'].includes(args.format)) throw new Error('status format must be json, markdown, todo or checklist');"
         },
         {
-          "line": 254,
+          "line": 255,
           "kind": "error-or-exit-candidate",
           "code": "if (!report.ok) process.exitCode = 1;"
         },
         {
-          "line": 265,
+          "line": 266,
           "kind": "error-or-exit-candidate",
           "code": "if (typeof args.message !== 'string' || !args.message.trim()) throw new Error('guidance requires --message TEXT (the error to explain)');"
         },
         {
-          "line": 271,
+          "line": 272,
           "kind": "cancellation",
           "code": "const abort = () => controller.abort();"
         },
         {
-          "line": 295,
+          "line": 296,
           "kind": "error-or-exit-candidate",
           "code": "else if (cmd === 'source-spec') throw new Error('Use source-spec init [--apply] | check');"
         },
         {
-          "line": 306,
+          "line": 307,
           "kind": "error-or-exit-candidate",
           "code": "} else throw new Error('Use survey plan|run|status|merge --kind facts|contracts|inventory [--max-files N] [--sites migration/PATH.tsv]');"
         },
         {
-          "line": 320,
+          "line": 321,
           "kind": "error-or-exit-candidate",
           "code": "else throw new Error('Use sessions status | prune [--run RUN_ID]');"
         },
         {
-          "line": 328,
+          "line": 329,
           "kind": "error-or-exit-candidate",
           "code": "} else throw new Error('Use guardrails show | install [--add CSV] [--remove CSV] [--deny CSV] [--waiver NOTE] [--replace]');"
         },
         {
-          "line": 333,
+          "line": 334,
           "kind": "error-or-exit-candidate",
           "code": "process.exitCode = 1;"
         },
         {
-          "line": 344,
+          "line": 345,
           "kind": "error-or-exit-candidate",
           "code": "if (args._[1] !== 'translation' || args['complete-phase'] !== '03') throw new Error('--complete-phase applies only as approve translation --complete-phase 03');"
         },
         {
-          "line": 351,
+          "line": 352,
           "kind": "error-or-exit-candidate",
           "code": "if (cmd === 'repair' && !args.target && !args.queue) throw new Error('repair requires --target or --queue');"
         },
         {
-          "line": 356,
+          "line": 357,
           "kind": "error-or-exit-candidate",
           "code": "} else throw new Error(`Unknown command ${cmd}\\n${usage}`);"
         },
         {
-          "line": 377,
+          "line": 378,
           "kind": "error-or-exit-candidate",
           "code": "process.exitCode = 1;"
         }
@@ -4473,5 +4468,5 @@
       ]
     }
   ],
-  "candidateLines": 810
+  "candidateLines": 809
 }
