@@ -37,13 +37,14 @@ const kit = 'node migration-kit/scripts/run_migration.mjs';
 const decide = (f, command) => interactiveDecision({ toolName: 'bash', toolArgs: { command }, cwd: f.root }, f.root);
 const gateCommands = [`${kit} approve translation --note "Reviewed"`, `${kit} approve translation --complete-phase 03 --note "Reviewed"`,
   `${kit} phase complete 02 --note "Reviewed"`, `${kit} phase waive 03 --note "shape first"`, `${kit} build-loop --note "go"`,
-  `${kit} guardrails install`, `${kit} approve build --note "Reviewed"`];
+  `${kit} approve build --note "Reviewed"`];
 const stillAsked = [`${kit} models set --role all --model gpt-5`, `${kit} settings apply`, `${kit} sessions prune`, `${kit} pilot prepare --note x`,
-  `${kit} source-spec init --apply`, 'node -e "import(\'./migration-kit/scripts/run_migration.mjs\')" approve'];
+  `${kit} source-spec init --apply`, 'node -e "import(\'./migration-kit/scripts/run_migration.mjs\')" approve', `${kit} guardrails install`];
 
 test('normal and relaxed mode keep every gate asking; auto mode is never recorded for them', t => {
   for (const mode of [undefined, 'normal', 'relaxed']) {
     const f = fixture(t, { mode });
+    fs.rmSync(safePath(f.root, 'migration/guardrails.json'));
     for (const command of [...gateCommands, ...stillAsked]) assert.equal(decide(f, command)?.decision, 'ask', `${mode}: ${command}`);
     assert.equal(fs.existsSync(safePath(f.root, autoModeFile)), false);
     complete(f, '00');
@@ -55,7 +56,6 @@ test('normal and relaxed mode keep every gate asking; auto mode is never recorde
     try { requirePhase(f.root, f.config, '02'); assert.fail('gate expected'); }
     catch (e) { assert.doesNotMatch(e.message, /\(auto\)|without asking/); }
     // Without auto mode a missing guardrails file still stops, as before.
-    fs.rmSync(safePath(f.root, 'migration/guardrails.json'));
     assert.throws(() => requireGuardrails(f.root, '03'), /requires human-installed command guardrails/);
     assert.equal(readGuardrails(f.root), null);
   }
@@ -65,6 +65,10 @@ test('auto mode lets the gate commands run unasked and keeps the rest asking', t
   const f = fixture(t, { mode: 'auto' });
   for (const command of gateCommands) assert.equal(decide(f, command), null, command);
   for (const command of stillAsked) assert.equal(decide(f, command)?.decision, 'ask', command);
+  // guardrails install runs unasked only as the plain template install while no file exists.
+  fs.rmSync(safePath(f.root, 'migration/guardrails.json'));
+  assert.equal(decide(f, `${kit} guardrails install`), null);
+  for (const option of ['--replace', '--waiver "shape first"', '--remove "git push"', '--add "rm -rf"', '--deny "git push"']) assert.equal(decide(f, `${kit} guardrails install ${option}`)?.decision, 'ask', option);
   // The guardrails file itself is still never written directly.
   assert.equal(decide(f, 'echo {} > migration/guardrails.json')?.decision, 'deny');
 });
@@ -113,26 +117,29 @@ test('auto mode records the deviation and marks receipts, gates and waivers auto
   assert.equal(status.workflow.mode, 'auto');
   assert.equal(status.autoMode.active, true);
   assert.equal(status.autoMode.enabledAt, deviation.enabledAt);
-  assert.deepEqual(status.autoMode.records, ['phase 00', 'approve translation']);
+  assert.deepEqual(status.autoMode.records, ['phase 00', 'approve translation', 'waive 03']);
   assert.equal(status.waivers[0].auto, true);
   assert.match(statusChecklist(status, 'ja'), /00 事前調査【自動・人の確認なし】/);
   const md = statusMarkdown(status, 'ja');
   assert.match(md, /自動モード：オン/);
-  assert.match(md, /自動モードが人の確認なしで記録したもの: phase 00, approve translation/);
+  assert.match(md, /自動モードが人の確認なしで記録したもの: phase 00, approve translation, waive 03/);
   assert.match(md, /- 03: Autopilot: shape first.*\[自動\]/);
   const fast = statusSnapshot(f.root);
   assert.equal(fast.workflow.mode, 'auto');
   assert.equal(fast.waivers[0].auto, true);
-  assert.deepEqual(fast.autoMode.records, ['phase 00', 'approve translation']);
+  assert.deepEqual(fast.autoMode.records, ['phase 00', 'approve translation', 'waive 03']);
   // Back to normal: the mode line goes, the auto records stay visible until redone.
   setPreferences(f.root, { phaseMode: 'normal' });
   const after = migrationStatus(f.root);
   assert.equal(after.autoMode.active, false);
-  assert.deepEqual(after.autoMode.records, ['phase 00', 'approve translation']);
+  assert.deepEqual(after.autoMode.records, ['phase 00', 'approve translation', 'waive 03'], 'auto waivers stay listed after leaving auto mode');
   assert.doesNotMatch(statusMarkdown(after, 'en'), /Auto mode: on/);
   complete(f, '00');
   assert.equal(readJSON(safePath(f.root, 'migration/phases/00.json')).auto, undefined, 'a completion by the person replaces the auto receipt');
-  assert.deepEqual(migrationStatus(f.root).autoMode.records, ['approve translation']);
+  assert.deepEqual(migrationStatus(f.root).autoMode.records, ['approve translation', 'waive 03']);
+  // The replaced receipt keeps the one cost row of the work.
+  const rows = fs.readFileSync(safePath(f.root, 'migration/cost-log.tsv'), 'utf8').split('\n').filter(l => l.startsWith('00\t'));
+  assert.equal(rows.length, 1);
 });
 
 test('auto mode installs the template guardrails when none exist; an existing file is never replaced', t => {
@@ -170,4 +177,55 @@ test('auto mode is offered as the third choice of the phase-mode question and ap
   assert.ok(fs.existsSync(safePath(f.root, autoModeFile)), 'applying auto from the file records the deviation too');
   // settings apply itself still asks, so autopilot cannot switch auto on through the file.
   assert.equal(humanGate(`${kit} settings apply`), 'settings apply');
+});
+
+test('review of 333c70f: auto mode needs its record, and agents cannot write that record or switch auto on by any spelling', t => {
+  const f = fixture(t, { mode: 'relaxed' });
+  // A hand-edited preferences file is not auto mode: the gates keep asking.
+  writeJSON(safePath(f.root, 'migration/preferences.json'), { ...readPreferences(f.root), phaseMode: 'auto' });
+  for (const command of gateCommands) assert.equal(decide(f, command)?.decision, 'ask', command);
+  try { requirePhase(f.root, f.config, '02'); assert.fail('gate expected'); }
+  catch (e) { assert.match(e.message, /Relaxed mode: ask the person/); }
+  const status = migrationStatus(f.root);
+  assert.equal(status.workflow.mode, 'relaxed');
+  assert.equal(status.autoMode.unrecorded, true);
+  assert.equal(status.autoMode.active, false);
+  assert.match(statusMarkdown(status, 'en'), /has no record .* not in effect/);
+  assert.equal(statusSnapshot(f.root).workflow.mode, 'relaxed');
+  // Writing the record is denied, by write tool and by shell.
+  for (const toolArgs of [{ path: 'migration/phases/auto-mode.json', content: '{}' }, { file_path: `${f.root}/migration/phases/auto-mode.json` }])
+    assert.equal(interactiveDecision({ toolName: 'create', toolArgs, cwd: f.root }, f.root)?.decision, 'deny');
+  for (const command of ['echo {} > migration/phases/auto-mode.json', 'cp x.json migration/phases/auto-mode.json', 'touch migration/phases/auto-mode.json', 'cd migration/phases && echo {} > auto-mode.json'])
+    assert.equal(decide(f, command)?.decision, 'deny', command);
+  assert.equal(decide(f, 'cat migration/phases/auto-mode.json'), null, 'reading it is fine');
+  // Any --phase-mode value that is not a literal normal or relaxed asks.
+  for (const value of ["$'auto'", '$(echo auto)', '${X:-auto}', 'a\\uto', '"$X"']) assert.equal(decide(f, `${kit} preferences --phase-mode ${value}`)?.decision, 'ask', value);
+  for (const value of ['normal', 'relaxed', '"relaxed"']) assert.equal(decide(f, `${kit} preferences --phase-mode ${value}`), null, value);
+  // Choosing auto writes the missing record, then the mode is in effect.
+  setPreferences(f.root, { phaseMode: 'auto' });
+  assert.ok(fs.existsSync(safePath(f.root, autoModeFile)));
+  assert.equal(decide(f, gateCommands[0]), null);
+});
+
+test('review of 333c70f: settings apply that switches auto on says so; the build-loop grant and a person\'s approval', async t => {
+  const f = fixture(t);
+  writeJSON(safePath(f.root, runSettingsFile), { schemaVersion: 1, phaseMode: 'auto' });
+  const ask = decide(f, `${kit} settings apply`);
+  assert.equal(ask?.decision, 'ask');
+  assert.match(ask.reason, /switches to auto mode.*rule 3/s);
+  writeJSON(safePath(f.root, runSettingsFile), { schemaVersion: 1, phaseMode: 'relaxed' });
+  assert.doesNotMatch(decide(f, `${kit} settings apply`).reason, /auto mode/);
+  // A person's current approval is kept when auto mode approves again.
+  for (const id of ['00', '00b', '01', '02']) complete(f, id);
+  const { runStage } = await import('../lib/pipeline.mjs');
+  await runStage(f.root, f.config, 'judge');
+  complete(f, '03');
+  const person = approve(f.root, f.config, 'translation', 'Reviewed by the person');
+  setPreferences(f.root, { phaseMode: 'auto' });
+  const again = approve(f.root, f.config, 'translation', 'Autopilot');
+  assert.equal(again.approvedAt, person.approvedAt);
+  assert.equal(readJSON(safePath(f.root, 'migration/gates/translation.json')).auto, undefined);
+  // The build-loop grant written in auto mode is marked and listed.
+  writeJSON(safePath(f.root, 'migration/gates/build-loop-x.json'), { schemaVersion: 1, kind: 'build-loop', id: 'x', auto: true });
+  assert.ok(migrationStatus(f.root).autoMode.records.includes('build-loop'));
 });

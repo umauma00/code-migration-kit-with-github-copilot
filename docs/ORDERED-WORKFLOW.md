@@ -87,10 +87,11 @@ node migration-kit/scripts/run_migration.mjs phase waive 03 --note "全体の形
 
 autopilot は確認（フックの ask）を自動で拒否するため、`normal` と `relaxed` では関門で止まります。`auto` はその関門だけを人に聞かずに通します。
 
-- 確認なしで実行できるもの：`approve`（`--complete-phase` 付きも）、`phase complete`、`phase waive`、`build-loop`、`guardrails install`。
-- 今までどおり確認するもの：`models set`、`settings apply`、`sessions prune`、`pilot prepare`、`source-spec init --apply`、読み取れない形のキット呼び出し。`guardrails.json` を直接書くことも拒否のままです。
-- `auto` に切り替える操作（`preferences --phase-mode auto` と、`phaseMode: "auto"` を含む `settings apply`）は、どのモードでも人の確認が必要です。autopilot 中にエージェントが自分で切り替えることはできません。`auto` から抜ける操作は確認なしです。
+- 確認なしで実行できるもの：`approve`（`--complete-phase` 付きも）、`phase complete`、`phase waive`、`build-loop`、guardrails が未設置のときのオプションなしの `guardrails install`（テンプレートのまま）。
+- 今までどおり確認するもの：`models set`、`settings apply`、`sessions prune`、`pilot prepare`、`source-spec init --apply`、`--add`・`--remove`・`--deny`・`--waiver`・`--replace` 付きか既に設置済みのときの `guardrails install`、読み取れない形のキット呼び出し。`guardrails.json` を直接書くことも拒否のままです。
+- `auto` に切り替える操作（`preferences --phase-mode auto` と、`phaseMode: "auto"` を含む `settings apply`。後者は確認の理由に自動モードへの切り替えと書かれます）は、どのモードでも人の確認が必要です。`--phase-mode` の値が文字どおりの `normal`・`relaxed` 以外（変数・`$(...)` など）のときも確認します。`auto` から抜ける操作は確認なしです。
+- `auto` が効くのは、runner が書く記録 `migration/phases/auto-mode.json` があるときだけです。エージェントがこのファイルを直接書くことはフックが拒否します。preferences.json を手で `auto` にしただけでは無効で、関門は緩和モードと同じく確認し、status がその旨を表示します。
 - guardrails が未設置なら、03・04・05 の関門でテンプレート（`templates/guardrails.json`）をそのまま設置し、`installedBy: "auto-mode"` を記録します。既にあるファイルは変えません。
 - 上流の規則3（承認ゲートで止まる）からの逸脱として、`auto` を選んだ時刻と内容を `migration/phases/auto-mode.json` に残します（RULEBOOK に書くと contextHash が変わり承認が失効するため、別ファイルです）。
-- `auto` で作った工程記録・承認・見送りには `auto: true` が付きます。status は「自動モード：オン」と「自動モードが人の確認なしで記録したもの」を出し、チェックリストでは【自動・人の確認なし】が付きます。`normal` や `relaxed` に戻しても一覧は残り、人が完了・承認し直すとその記録は置き換わります（工程を記録し直すと、その上に作った後続の工程も記録し直しになります）。
+- `auto` で作った工程記録・承認・見送りには `auto: true` が付きます。status は「自動モード：オン」と「自動モードが人の確認なしで記録したもの」を出し、チェックリストでは【自動・人の確認なし】が付きます。見送りと build-loop の許可も一覧に入ります。`normal` や `relaxed` に戻しても一覧は残り、人が完了・承認し直すとその記録は置き換わります（工程を記録し直すと、その上に作った後続の工程も記録し直しになります。費用の記録は増えません）。逆に、人が記録した有効な承認・見送りを `auto` が置き換えることはありません。
 - 止まるもの：安全系（保護パス・元ソースの上書き・guardrails の拒否）、サインイン・残高、未記入の実行設定。実行設定（run-settings.json）は autopilot を始める前に埋めて `settings apply` しておきます。
