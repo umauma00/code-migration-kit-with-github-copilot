@@ -43,7 +43,7 @@ export const usage = `Usage: node migration-kit/scripts/run_migration.mjs COMMAN
                               Record every role's model, effort and context from one answer (all=ID first, then overrides)
   models set --role ROLE[,ROLE]|reviewers|all --model ID [--effort LEVEL|default] [--context default|long_context]
                               Record one choice; both forms are checked against that list before writing
-  preferences [--language ja|en] [--original-runtime available|unavailable]
+  preferences [--language ja|en] [--original-runtime available|unavailable] [--phase-mode normal|relaxed]
                               Report language; whether the original can still run (guides recommendations)
   settings init [--source LANGUAGE] [--target LANGUAGE] | check | apply
                               migration/run-settings.json: write it with your account's models as choices and a guess
@@ -53,8 +53,9 @@ export const usage = `Usage: node migration-kit/scripts/run_migration.mjs COMMAN
                              Report / delete the local Copilot CLI transcripts of the kit's own workers
   guardrails show | install [--add CSV] [--remove CSV] [--deny CSV] [--waiver NOTE] [--replace]
                              Propose / install migration/guardrails.json (install is a host-confirmed human gate)
-  phase init | next | check ID | start ID | complete ID[,ID...] --note TEXT
-                              Ordered workflow; optional --tokens N --subagents N --model ID
+  phase init | next | check ID | start ID | complete ID[,ID...] --note TEXT | waive ID --note TEXT
+                              Ordered workflow; optional --tokens N --subagents N --model ID.
+                              waive (relaxed mode only) proceeds past an unfinished phase with the person's reason
   survey plan|run|status|merge --kind facts|contracts|inventory [--max-files N] [--sites migration/SITES.tsv]
                               Split preparation reading into scopes for fresh tool-free workers; results are files
   source-spec init [--apply] | check
@@ -233,8 +234,9 @@ export async function main(argv = process.argv.slice(2)) {
     console.log(`Removed stale ${target.endsWith('.recover') ? 'lock recovery claim' : 'lock'}: migration/${path.basename(target)}`); return;
   }
   if (cmd === 'preferences') {
-    const result = args.language || args['original-runtime'] ? setPreferences(root, { language: args.language, originalRuntime: args['original-runtime'] }) : preferencesReport(root);
-    if (args.language || args['original-runtime']) { const synced = syncRunSettings(root, { keys: [...(args.language ? ['reportLanguage'] : []), ...(args['original-runtime'] ? ['originalRuntime'] : [])] }); if (synced) result.runSettings = `${synced} updated to match`; }
+    const setting = args.language || args['original-runtime'] || args['phase-mode'];
+    const result = setting ? setPreferences(root, { language: args.language, originalRuntime: args['original-runtime'], phaseMode: args['phase-mode'] }) : preferencesReport(root);
+    if (setting) { const synced = syncRunSettings(root, { keys: [...(args.language ? ['reportLanguage'] : []), ...(args['original-runtime'] ? ['originalRuntime'] : []), ...(args['phase-mode'] ? ['phaseMode'] : [])] }); if (synced) result.runSettings = `${synced} updated to match`; }
     console.log(JSON.stringify(result, null, 2));
     return;
   }

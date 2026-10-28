@@ -92,6 +92,15 @@ folders holds the source language, the result has `sourceRootsUnchosen`: say
 so and ask the person to write the source folders in the file. If nothing was
 found, the question asks for both languages as free text.
 
+Third, while `phaseMode` is still open (`settings init` says so), ask **one**
+question about how phases advance: normal (recommended; each phase waits until
+its prerequisites are met) or relaxed (a missing prerequisite is a warning, and
+the person decides each time whether to fix it or proceed). Record the answer
+with `run_migration.mjs preferences --phase-mode normal|relaxed`; the file
+follows. The person may switch later by editing the file or asking in chat;
+switching never revokes approvals or completion records. See
+[relaxed mode](../docs/ORDERED-WORKFLOW.md#relaxed-mode).
+
 Then link the file and ask **one**
 question with the question tool: has the person finished filling it in, or do
 they have a question? Offer two choices, "filled in" and "I have a question"
@@ -228,11 +237,27 @@ autopilot and retry instead of working around it. Run gate commands only in an
 interactive session without autopilot, which denies them. The Copilot CLI may show
 its own permission prompt after the hook's question, so the person can be asked
 twice. An explicit
-request for a later phase does not waive missing earlier reviews. Do not route
+request for a later phase does not waive missing earlier reviews (only the person's
+answer to a relaxed-mode question does, below). Do not route
 from file existence. After user review, record early phases with `phase complete
 ID --note TEXT`; runner receipts determine implementation and validation phases.
 Keep all ten phases visible. Source-only 05c needs an explicit unverified-mode
-acknowledgment before handoff. Record known host usage with completion;
+acknowledgment before handoff.
+
+In relaxed mode (`preferences` shows `phaseMode: relaxed`) a gate failure ends
+with `Relaxed mode: ... phase waive ID`. Never proceed on your own: report what
+is missing and ask with the question tool, offering the failure guidance's
+choices (fixing first is recommended; proceeding without finishing ID is one
+choice). Only when the person picks proceed, run `phase waive ID --note
+"<their reason>"` (the host asks them to confirm), then retry the same command.
+Never waive for them, never waive phases ahead of the one that blocked, and
+never take an automatic reply as the answer. A waived phase stays unfinished:
+`status` lists it under `waivers` and marks it 【見送り】 / [waived]; finishing
+it later lifts the waiver, and records made on it are checked again. List every
+remaining waiver in each phase report and in the final handoff report. Safety
+checks (guardrails, protected paths, source overwrite, sign-in, the host's
+confirmation of each gate command) are never waived. In normal mode the failure
+guidance also offers switching to relaxed mode; it is never the recommendation. Record known host usage with completion;
 [main-format cost logs](../docs/COST-LOG.md) use unknown where unavailable.
 
 ## Worker execution

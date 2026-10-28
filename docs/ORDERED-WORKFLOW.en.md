@@ -41,3 +41,25 @@ node migration-kit/scripts/run_migration.mjs phase complete 05c --note "Comparis
 ```
 
 This control applies to the kit's entry points and the runner. It does not forbid arbitrary edits in VS Code itself. Keep the phase TODO list in line with the current records, and never check off a phase whose completion cannot be confirmed. For usage records, see [the main-format cost log](COST-LOG.en.md).
+
+<a id="relaxed-mode"></a>
+## Relaxed mode (fix or proceed when a prerequisite is missing)
+
+How phases advance is `phaseMode` in `migration/preferences.json`. Setup asks it in one question and records it with `preferences --phase-mode normal|relaxed` (or `phaseMode` in run-settings.json).
+
+| Mode | When a prerequisite is missing |
+|---|---|
+| `normal` (recommended, default) | Stops as before. The failure choices end with "switch to relaxed mode and proceed" (never the recommendation) |
+| `relaxed` | The error ends with `Relaxed mode: ... phase waive ID`. The parent asks with the question tool, "fix it (recommended) / proceed", and only on proceed runs `phase waive ID --note "reason"` and retries |
+
+```sh
+node migration-kit/scripts/run_migration.mjs phase waive 03 --note "See the overall shape before the stress test"
+```
+
+- A waiver is saved in `migration/phases/waivers/ID.json` with the reason and what was missing at the time. The hook asks the person to confirm `phase waive`.
+- A waived phase is never counted complete. It stays in status `waivers` and as [waived] in the checklist; list the waivers in every phase report and the final handoff report.
+- A waiver passes phase gates only: phase records (00–03), the formal judge, build and smoke records, reviewed translation units (04), and the feasibility.md, stress-test/report.md and judge success that translation approval asks for.
+- Never relaxed: guardrails, protected paths and source overwrites, the approval commands themselves (`approve` still needs the person's confirmation), sign-in and credits, and pilots.
+- Back to normal: finishing and recording a waived phase lifts its waiver. Later records made on the waiver (phase records, build and other runner records) are recorded again, since their prerequisite changed.
+- Switching to `normal` stops using waivers, so records made on them become unfinished; switching back restores them (nothing is deleted).
+- The mode is not part of the configuration fingerprint (contextHash), so switching revokes no approval or reviewed record.

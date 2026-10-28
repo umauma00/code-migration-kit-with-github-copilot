@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { lockRun, contextHash, readManifest, done } from '../lib/core.mjs';
 import { currentRecord, requireGate } from '../lib/pipeline.mjs';
-import { initializePhases, checkPreparation, startPhase, completePhase, requirePhase, orderedPhases, currentPhase } from '../lib/phases.mjs';
+import { initializePhases, checkPreparation, startPhase, completePhase, requirePhase, orderedPhases, currentPhase, phaseWaiver, gateError, waivePhase } from '../lib/phases.mjs';
 import { migrationStatus } from '../lib/status.mjs';
 import { requireGuardrails } from '../lib/guardrails.mjs';
 
@@ -9,8 +9,13 @@ function validate(root, config, phase, completing = false) {
   checkPreparation(root, config, phase, { completing });
   if (['00','00b','01','02'].includes(phase)) return;
   const context = contextHash(root, config);
+  // Relaxed mode: a waiver of the phase a record completes stands in for it.
+  const stagePhase = { judge: '03', build: '05', smoke: '05b', parity: '05c' };
   const record = stage => {
-    if (!currentRecord(root, config, stage, context, stage !== 'judge')) throw new Error(`Run ${stage} successfully for current inputs before phase ${phase}`);
+    if (!currentRecord(root, config, stage, context, stage !== 'judge')) {
+      if (phaseWaiver(root, stagePhase[stage])) return;
+      throw gateError(root, `Run ${stage} successfully for current inputs before phase ${phase}`, stagePhase[stage]);
+    }
     if (stage !== 'judge') requireGate(root, config, stage, context);
   };
   if (phase === '03' || phase === '04') record('judge');
@@ -18,7 +23,7 @@ function validate(root, config, phase, completing = false) {
   if ((phase === '03' || phase === '04') && !completing) requireGuardrails(root, phase);
   if (['05','05b','05c','06'].includes(phase)) {
     const units = readManifest(root, config);
-    if (!units.length || !units.every(u => done(root, u, context))) throw new Error('Current reviewed translation units are required');
+    if ((!units.length || !units.every(u => done(root, u, context))) && !phaseWaiver(root, '04')) throw gateError(root, 'Current reviewed translation units are required', '04');
     requireGate(root, config, 'translation', context);
   }
   if (phase === '05b') record('build');
@@ -68,10 +73,18 @@ export function phaseCommand(root, config, action, phase, options = {}) {
     }
     return ids.length > 1 ? ids.map(id => ({phase:id,ready:true})) : {phase,ready:true,...recordWith};
   }
-  if (!['init','start','complete'].includes(action)) throw new Error('Use phase init|next|check ID|start ID|complete ID --note TEXT');
+  if (!['init','start','complete','waive'].includes(action)) throw new Error('Use phase init|next|check ID|start ID|complete ID --note TEXT|waive ID --note TEXT');
   const release = lockRun(root,`phase-${action}-${phase ?? 'policy'}`);
   try {
     if (action === 'init') return initializePhases(root);
+    // The person chose to proceed past an unfinished phase (relaxed mode).
+    // What the phase still lacks is recorded with their reason.
+    if (action === 'waive') {
+      let unmet;
+      try { validate(root, config, phase, true); if (['00','00b','01','02','03'].includes(phase)) completePhase(root, config, phase, 'check', {}, { dryRun: true }); }
+      catch (e) { unmet = e.message.replace(/ Relaxed mode: .*$/s, ''); }
+      return waivePhase(root, config, phase, options.note, unmet);
+    }
     // One reviewed note may cover consecutive phases (source-as-spec reviews
     // 00b–02 as one package). Each phase is still validated and recorded in
     // order, so a missing artifact stops the list at that phase.

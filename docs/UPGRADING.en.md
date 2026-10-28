@@ -1,6 +1,14 @@
-# Upgrading (0.11.0 and earlier releases)
+# Upgrading (0.12.0 and earlier releases)
 
 [日本語](UPGRADING.md) | English
+
+## 0.12.0 (relaxed mode)
+
+The kit's files (lib, scripts) change, so existing approvals and completion records are invalidated once. Revalidate from judge. Completed outputs are kept.
+
+1. Nothing changes unless you choose it: the mode stays normal. For relaxed mode run `run_migration.mjs preferences --phase-mode relaxed`, or set `phaseMode` to `relaxed` in run-settings.json and run `settings apply`. See [relaxed mode](ORDERED-WORKFLOW.en.md#relaxed-mode).
+2. A run-settings.json written by 0.11.0 has no `phaseMode`; it still applies as is (the mode does not change). Running `settings init` again adds the `phaseMode` entry after `originalRuntime`.
+3. For copy installs, replace all of `migration-kit/`, `.github/agents/migration-orchestrator.agent.md` and the SKILL.md files under `.github/skills/` with the contents of a temporary install. Plugins pick it up with the update.
 
 ## 0.11.0 (run settings file)
 

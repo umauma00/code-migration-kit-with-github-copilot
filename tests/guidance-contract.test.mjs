@@ -227,7 +227,7 @@ test('phase-order guidance leads with the first incomplete phase that phase next
   assert.match(skipped.stderr, /^ERROR: Phase 03 is not reviewed/);
   assert.match(skipped.stderr, /1\. \*\*Go back to the first incomplete phase, 00, and continue in order\*\* \(recommended\)[\s\S]*phase next`/);
   const first = failureGuidance('Phase 03 is not reviewed for current inputs.', { root, language: 'en' });
-  assert.deepEqual(first.options.map(o => o.id), ['go-first', 'review-previous', 'pause']);
+  assert.deepEqual(first.options.map(o => o.id), ['go-first', 'review-previous', 'switch-relaxed', 'pause']);
   assert.match(first.options[1].command, /phase complete 00 --note "<確認した内容 \/ what you reviewed>"$/);
   assert.match(first.cause, /Phase 00, before 03, is not complete/);
   // After 00 the guidance moves on with phase next.
@@ -239,7 +239,7 @@ test('phase-order guidance leads with the first incomplete phase that phase next
   assert.match(second.options[1].command, /phase complete 00b --note/);
   // When the named phase is the first incomplete one, the guidance acts on it.
   const named = failureGuidance('Phase 00b is not reviewed for current inputs.', { root, language: 'en' });
-  assert.deepEqual(named.options.map(o => o.id), ['review-previous', 'redo-phase', 'pause']);
+  assert.deepEqual(named.options.map(o => o.id), ['review-previous', 'redo-phase', 'switch-relaxed', 'pause']);
   assert.match(named.options[0].command, /phase complete 00b --note/);
 });
 

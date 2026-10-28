@@ -40,9 +40,13 @@ The hook rejects a question before the language is recorded, and a Japanese
 report's question with no Japanese text.
 After initialization, decide the other settings through `migration/run-settings.json`
 (`settings init`, one question for the target language with the guessed source
-shown, `settings init --source --target`, one question "filled in, or a question?",
-then `settings apply`),
+shown, `settings init --source --target`, one question for the phase mode
+(normal recommended, or relaxed) recorded with `preferences --phase-mode`, one
+question "filled in, or a question?", then `settings apply`),
 not one question per setting; see the skill's run settings section.
+In relaxed mode a gate failure that names `phase waive ID` is a question for the
+person (fix first, recommended; or proceed): run `phase waive ID --note` only on
+their answer, and list remaining waivers in every report and the handoff.
 Follow [phase reports and user decisions](../../docs/PHASE-HANDOFF.md) after every phase.
 Use the host's available question tool for missing decisions; report concrete
 artifacts before asking and include a next-instruction example. Reuse explicit

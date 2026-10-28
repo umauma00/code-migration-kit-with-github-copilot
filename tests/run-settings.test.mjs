@@ -14,6 +14,7 @@ import { migrationStatus, statusMarkdown } from '../lib/status.mjs';
 import { statusSnapshot } from '../lib/status-snapshot.mjs';
 import { humanGate, interactiveDecision } from '../lib/guardrails.mjs';
 import { detectSourceLanguages, languageQuestion } from '../lib/source-detect.mjs';
+import { setPreferences } from '../lib/preferences.mjs';
 
 const catalog = [
   { id: 'big-model', name: 'Big Model', supportedReasoningEfforts: ['low', 'medium', 'high', 'xhigh'], defaultReasoningEffort: 'medium',
@@ -38,7 +39,7 @@ const initial = new Map();
 function filled(root) {
   if (!initial.has(root)) initial.set(root, settingsOf(root));
   const s = structuredClone(initial.get(root));
-  Object.assign(s, { reportLanguage: 'ja', originalRuntime: 'available', sourceLanguage: 'C#', targetLanguage: 'TypeScript' });
+  Object.assign(s, { reportLanguage: 'ja', originalRuntime: 'available', phaseMode: 'normal', sourceLanguage: 'C#', targetLanguage: 'TypeScript' });
   for (const role of ['implementer', 'reviewer-semantics', 'reviewer-rules', 'arbiter', 'fixer']) s.models[role] = { model: 'small-model', effort: 'default' };
   s.models['reviewer-semantics'] = s.models['reviewer-rules'] = { model: 'big-model', effort: 'high' };
   return s;
@@ -162,11 +163,11 @@ test('changing only the report language through the file keeps reviewed work', a
   const s = settingsOf(f.root);
   assert.equal(s.models.implementer.model, 'test-double', 'chosen models are written as chosen');
   assert.equal(s.sourceLanguage, 'Python', 'a project with a manifest keeps its languages, even the template\'s');
-  Object.assign(s, { reportLanguage: 'en', originalRuntime: 'available' });
+  Object.assign(s, { reportLanguage: 'en', originalRuntime: 'available', phaseMode: 'normal' });
   writeSettings(f.root, s);
   const result = applyRunSettings(f.root, list);
   assert.equal(result.applied, true, JSON.stringify(result.errors));
-  assert.deepEqual(result.changed, ['reportLanguage', 'originalRuntime']);
+  assert.deepEqual(result.changed, ['reportLanguage', 'originalRuntime', 'phaseMode']);
   assert.equal(result.note, undefined);
   assert.equal(done(f.root, f.units[0], contextHash(f.root, loadConfig(f.root))), true, 'preferences never revoke reviews');
   assert.equal(migrationStatus(f.root).runSettings.state, 'applied');
@@ -221,11 +222,11 @@ test('applying an unchanged file never adds keys, rewrites a model\'s spelling o
   initRunSettings(f.root, list);
   const s = settingsOf(f.root);
   assert.equal(s.verificationMode, 'runtime');
-  Object.assign(s, { reportLanguage: 'en', originalRuntime: 'available' });
+  Object.assign(s, { reportLanguage: 'en', originalRuntime: 'available', phaseMode: 'normal' });
   writeSettings(f.root, s);
   const result = applyRunSettings(f.root, list);
   assert.equal(result.applied, true, JSON.stringify(result.errors));
-  assert.deepEqual(result.changed, ['reportLanguage', 'originalRuntime']);
+  assert.deepEqual(result.changed, ['reportLanguage', 'originalRuntime', 'phaseMode']);
   const after = readJSON(safePath(f.root, 'migration/config.json'));
   assert.equal(Object.hasOwn(after, 'verificationMode'), false);
   assert.equal(after.models.arbiter, 'Big-Model');
@@ -352,7 +353,7 @@ test('models come from one question first; the file then only needs the language
   assert.match(initRunSettings(root, models).next, /models set --role all --model ID, then run settings init again/);
   setRoleModels(root, models, { role: 'all', model: 'big-model' });
   const result = initRunSettings(root, models);
-  assert.deepEqual(result.pending, ['originalRuntime', 'sourceLanguage', 'targetLanguage']);
+  assert.deepEqual(result.pending, ['originalRuntime', 'phaseMode', 'sourceLanguage', 'targetLanguage']);
   assert.match(result.next, /Ask languages\.question as one question/, 'the languages come from one question next');
   const s = settingsOf(root);
   for (const role of ['implementer', 'reviewer-semantics', 'reviewer-rules', 'arbiter', 'fixer']) assert.deepEqual(s.models[role], { model: 'big-model', effort: 'default', context: 'default' });
@@ -377,7 +378,7 @@ test('a model or language changed from chat updates the file, so apply never wri
   // A chat choice equal to the configuration still wins over a conflicting unapplied edit.
   setRoleModels(root, models, { role: 'arbiter', model: 'small-model' });
   syncRunSettings(root, { roles: ['arbiter'] });
-  writeJSON(safePath(root, 'migration/preferences.json'), { schemaVersion: 1, userLanguage: 'ja', originalRuntime: 'available' });
+  writeJSON(safePath(root, 'migration/preferences.json'), { schemaVersion: 1, userLanguage: 'ja', originalRuntime: 'available', phaseMode: 'normal' });
   syncRunSettings(root, { keys: ['originalRuntime'] });
   s = settingsOf(root);
   assert.equal(s.models.arbiter.model, 'small-model');
@@ -468,8 +469,15 @@ test('the language answer fills both languages and, over the template folders, t
   assert.match(asked.next, /settings init --source SOURCE --target TARGET/);
   const answered = initRunSettings(root, models, { source: 'c#', target: 'TypeScript' });
   assert.equal(answered.languages, undefined);
-  assert.deepEqual(answered.pending, ['originalRuntime']);
-  assert.match(answered.next, /filled in/);
+  // The phase mode is the third question; its answer reaches the file.
+  assert.deepEqual(answered.pending, ['originalRuntime', 'phaseMode']);
+  assert.match(answered.next, /phase mode is not chosen yet.*preferences --phase-mode normal\|relaxed/);
+  setPreferences(root, { phaseMode: 'relaxed' });
+  syncRunSettings(root, { keys: ['phaseMode'] });
+  assert.equal(settingsOf(root).phaseMode, 'relaxed');
+  const moded = initRunSettings(root, models);
+  assert.deepEqual(moded.pending, ['originalRuntime']);
+  assert.match(moded.next, /filled in/);
   const s = settingsOf(root);
   assert.equal(s.sourceLanguage, 'C#', 'the detected spelling is kept, which the bundled mapper recognizes');
   assert.equal(s.targetLanguage, 'TypeScript');

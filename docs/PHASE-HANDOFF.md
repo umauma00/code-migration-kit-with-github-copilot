@@ -100,7 +100,9 @@ choices. Setup settings are not asked one by one. After initialization, one ques
 picks the model for every role (`models set --role all --model ID`); then
 one question asks the target language with the source language the kit
 guessed from the files shown (`settings init` returns it; the answer is
-recorded with `settings init --source SOURCE --target TARGET`), and
+recorded with `settings init --source SOURCE --target TARGET`), one question
+asks how phases advance (normal, recommended, or relaxed; recorded with
+`preferences --phase-mode`, see [relaxed mode](ORDERED-WORKFLOW.en.md#relaxed-mode)), and
 `settings init` writes the rest (migration languages, roots, verification mode,
 commands, and per-role model, effort and context changes) to
 `migration/run-settings.json`, and one question asks whether the person has
@@ -135,7 +137,9 @@ Before a question tool call, publish a concise report in chat containing:
    blocked. Include the completed phase count and current or next phase with its
    waiting/running state. Completion refers to this phase, not the entire migration.
 2. **Artifacts:** link the actual files in the target repository. Distinguish
-   templates, drafts, disposable pilot outputs and production outputs. Cite
+   templates, drafts, disposable pilot outputs and production outputs. In
+   relaxed mode, list every phase still waived (`status` `waivers`) with its
+   reason; the final handoff report lists them too. Cite
    result receipts for commands; report reviewed done/total and blocked units
    for translation. Unknown time, usage or scenario counts remain unknown.
 3. **Review points:** two or three specific decisions or checks for the user,
