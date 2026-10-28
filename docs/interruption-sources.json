@@ -2597,7 +2597,7 @@
     },
     {
       "path": "lib/source-spec.mjs",
-      "sha256": "098c595afdfea8ddc61b9a78892d2e00da18a3b695d6c45196a6b18bc3d40660",
+      "sha256": "12c36ee9be502a8e50a909e3b18886f62e30c43729eef2fe76e684f18bb0d15a",
       "entries": [
         {
           "line": 99,
