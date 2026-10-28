@@ -15,10 +15,15 @@ import { commandProgress } from '../lib/command-progress.mjs';
 import { main } from '../scripts/run_migration.mjs';
 import { preparationCommand } from '../scripts/preparation_cli.mjs';
 
+const alive = pid => { try { process.kill(pid, 0); return true; } catch (e) { return e.code === 'EPERM'; } };
 const deadPid = () => {
-  // A child that has exited and been reaped: its PID no longer exists.
-  const child = spawnSync(process.execPath, ['-e', 'console.log(process.pid)'], { encoding: 'utf8' });
-  return Number(child.stdout.trim());
+  // A child that has exited and been reaped: its PID no longer exists. Windows
+  // reuses PIDs quickly, so confirm it is still free (CI saw one reused).
+  for (let i = 0; i < 20; i++) {
+    const pid = Number(spawnSync(process.execPath, ['-e', 'console.log(process.pid)'], { encoding: 'utf8' }).stdout.trim());
+    if (!alive(pid)) return pid;
+  }
+  throw new Error('No free PID found for the test');
 };
 
 test('a run.lock whose owner process is gone is taken over by the next command instead of stopping', t => {
