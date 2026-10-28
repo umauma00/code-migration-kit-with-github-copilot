@@ -1,6 +1,16 @@
-# 更新手順（0.13.0 と以前の版）
+# 更新手順（0.14.0 と以前の版）
 
 日本語 | [English](UPGRADING.en.md)
+
+## 0.14.0（最初の選択は質問で・設定ファイルは値だけ）
+
+キットのファイル（lib・scripts）が変わるため、既存の承認・完了記録は一度だけ失効します。judgeから再検証してください。完了済みの出力は保持されます。
+
+1. `originalRuntime` が未記入なら、`settings init` が「移行元のプログラムを動かせるか」を質問で聞きます。ファイルを手で書く必要はありません。動かせない場合はファイルの `verificationMode` が `source-only` になります。
+2. 移行元のフォルダーを判定できないときも質問で聞き、`settings init --source-roots` で記録します。
+3. `source-spec init --apply` で source-as-spec に切り替えると、run-settings.json の `verificationMode` も `source-only` になります。
+4. run-settings.json から `_help` と `_choices` がなくなり、説明と選択肢（使えるモデルなど）は `migration/run-settings.help.md` に移りました。既存のファイルは次の `settings init` で小さくなります（記入した値はそのまま）。
+5. コピー導入では `migration-kit/` 全体と、`.github/agents/migration-orchestrator.agent.md`、`.github/skills/` の SKILL.md を一時導入先の内容に置き換えます。プラグインは更新だけで入ります。
 
 ## 0.13.0（自動モード）
 

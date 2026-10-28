@@ -1,6 +1,16 @@
-# Upgrading (0.13.0 and earlier releases)
+# Upgrading (0.14.0 and earlier releases)
 
 [日本語](UPGRADING.md) | English
+
+## 0.14.0 (first choices are questions; the settings file holds values only)
+
+The kit's files (lib, scripts) change, so existing approvals and completion records are invalidated once. Revalidate from judge. Completed outputs are kept.
+
+1. While `originalRuntime` is open, `settings init` asks whether the original program runs here as a question; you never type it into the file. If it does not run, the file's `verificationMode` becomes `source-only`.
+2. Source folders the kit cannot find are asked as a question too, recorded with `settings init --source-roots`.
+3. Switching to source-as-spec with `source-spec init --apply` also sets `verificationMode` to `source-only` in run-settings.json.
+4. run-settings.json no longer carries `_help` and `_choices`: the explanations and choices (such as the available models) moved to `migration/run-settings.help.md`. An existing file shrinks on its next `settings init` (your values are kept).
+5. For copy installs, replace all of `migration-kit/`, `.github/agents/migration-orchestrator.agent.md` and the SKILL.md files under `.github/skills/` with the contents of a temporary install. Plugins pick it up with the update.
 
 ## 0.13.0 (auto mode)
 

@@ -114,11 +114,20 @@ If the list cannot be read, offer no models: sign the CLI in first. Then run `ru
 `migration/run-settings.json` from the current configuration: report language,
 whether the original can still run, migration languages, preserve or redesign,
 source/output/test roots, verification mode, execution mode, concurrency, stage
-commands, and every role's model, effort and context size. The account's models,
-efforts and context tiers (read live from the CLI) are listed under `_choices`, explanations under
-`_help`, and `FILL_IN` marks what is still open; every role already holds the
-model just chosen, and the person edits a role only to give it another model,
-effort or context.
+commands, and every role's model, effort and context size. The file holds only
+values: each field's explanation and choices, and the account's models, efforts
+and context tiers (read live from the CLI), are in `migration/run-settings.help.md`
+beside it (rewritten by every `settings init`, never read back). `FILL_IN` marks
+what is still open; every role already holds the model just chosen, and the
+person edits a role only to give it another model, effort or context.
+
+**First choices are questions, never file edits.** Every entry a question
+fills (models, languages, phase mode, whether the original runs) is asked with
+the question tool and recorded by a command; the file then shows the answer. The
+file is for changing settings later (several at once, such as every role's
+effort), and for resuming in another session. Never tell the person to type a
+first choice into the file, even when `settings apply` reports it still
+`FILL_IN`: its `next` sends you back to `settings init`, which asks it.
 
 While the languages are open, the result also carries `languages`: a guess of
 the source language from the project's files (counted by extension, leaving out
@@ -135,8 +144,13 @@ question says so and the person names the main one; smaller languages
 (`minor`) are not treated as the source language (the bundled dependency
 mapper reads only its files). A typed name such as `csharp` or `VB` is
 recorded as the name the mappers recognize. If no folder outside the test
-folders holds the source language, the result has `sourceRootsUnchosen`: say
-so and ask the person to write the source folders in the file. If nothing was
+folders holds the source language, the result has `sourceRootsUnchosen` and a
+ready `sourceRootsQuestion`: say so, ask it as **one** free-text question and
+record the answer with `run_migration.mjs settings init --source-roots DIR[,DIR]`
+(each must be a folder in the repository that holds files, not the root;
+otherwise the error says why and you ask again). An accepted answer is never
+asked again. Files only at the repository root must first be moved into a
+folder; the question says so. If nothing was
 found, the question asks for both languages as free text.
 
 Third, while `phaseMode` is still open (`settings init` says so), ask **one**
@@ -150,7 +164,19 @@ follows (the host asks the person to confirm auto). The person may switch later 
 switching never revokes approvals or completion records. See
 [relaxed mode](../../../docs/ORDERED-WORKFLOW.md#relaxed-mode).
 
-Then link the file and ask **one**
+Fourth, while `originalRuntime` is still open, `settings init` returns
+`originalRuntimeQuestion` (a ready question in the report language with two
+choices: it runs / it does not run). Ask it as **one** question and record the
+answer with `run_migration.mjs preferences --original-runtime available|unavailable`;
+the file follows. When the answer is unavailable and the file's verification
+mode is runtime, the file's `verificationMode` becomes `source-only` (runtime
+verification runs the original) and the result's `verificationMode` note says
+so; tell the person. When the answer is available but the file says
+`source-only`, the note asks you to ask whether to verify by running the
+original; set `runtime` in the file only on their yes. Then run `settings init`
+again.
+
+Then link the file and the help file and ask **one**
 question with the question tool: has the person finished filling it in, or do
 they have a question? Offer two choices, "filled in" and "I have a question"
 (free text), in the report language.
@@ -201,8 +227,8 @@ for review; they do not route directly to a later phase. Respect redesign mode.
 
 ## No runnable original or no specification
 
-At initialization, take whether the original can run and the verification mode
-from the run settings file instead of asking; if it says the original cannot run,
+At initialization, whether the original can run is the run settings' fourth
+question (above); take the verification mode from the file. If the original cannot run,
 ask only whether a specification or portable test suite exists. Whenever runtime
 00b blocks later, ask two yes/no questions with the question tool, one per call: can the original
 implementation still run here, and does a specification or portable test suite
@@ -210,8 +236,9 @@ exist? Record the first answer with `run_migration.mjs preferences --original-ru
 available|unavailable` (presentation only; failure guidance uses it to pick its
 recommendation). If both answers are no, recommend [source as the only specification](../../../docs/SOURCE-AS-SPEC.md)
 (`--preparation-profile source-as-spec` for a new project, `source-spec init`
-then `--apply` after consent for an existing one) and explain that equivalence
-stays unverified; if the original runs, recommend runtime. The user chooses.
+then `--apply` after consent for an existing one; `--apply` also sets
+`verificationMode` to `source-only` in the run settings file, so never ask the
+person to edit it) and explain that equivalence stays unverified; if the original runs, recommend runtime. The user chooses.
 In source-as-spec, draft 00b, 01 and 02 together from the source (no per-file
 contract memo: `source-spec init` writes a source index and reviewers read cited
 source lines), run one independent review of the package, show one report and record
