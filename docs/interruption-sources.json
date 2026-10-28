@@ -2597,7 +2597,7 @@
     },
     {
       "path": "lib/source-spec.mjs",
-      "sha256": "4b51ce91450ce8e185d996bdb173cdfd5db27febe45fdea1811bef07c5ce149d",
+      "sha256": "1f4520aabaf0f886f49a937bf6a0e0ed29eb33bdbb2bf5255f81765f8660b8ad",
       "entries": [
         {
           "line": 97,
@@ -4115,7 +4115,7 @@
     },
     {
       "path": "scripts/phase_cli.mjs",
-      "sha256": "f57b7acb773badd8e1f41a9bbd3803f8111af2fc86fafe6997fd3bc8b00c6d3e",
+      "sha256": "1950273ccf22555515840ffb399e2edc07abdc13475df2e08ff08ea0ca5d6949",
       "entries": [
         {
           "line": 13,
@@ -4148,17 +4148,17 @@
           "code": "if (ids.length > 1 && ids.some(id => !['00','00b','01','02'].includes(id))) throw new Error('Only preparation phases 00 through 02 can be checked together');"
         },
         {
-          "line": 64,
+          "line": 65,
           "kind": "error-or-exit-candidate",
           "code": "if (!['init','start','complete'].includes(action)) throw new Error('Use phase init|next|check ID|start ID|complete ID --note TEXT');"
         },
         {
-          "line": 72,
+          "line": 73,
           "kind": "error-or-exit-candidate",
           "code": "if (ids.length > 1 && ids.some((id, i) => i && orderedPhases.indexOf(id) !== orderedPhases.indexOf(ids[i - 1]) + 1)) throw new Error('List consecutive phases in order, for example 00b,01,02');"
         },
         {
-          "line": 73,
+          "line": 74,
           "kind": "error-or-exit-candidate",
           "code": "if (ids.length > 1 && ids.some(id => !['00','00b','01','02'].includes(id))) throw new Error('Only preparation phases 00 through 02 can be completed together');"
         }

@@ -89,7 +89,16 @@ test('a source-as-spec package starts 01 and 02 before 00b is recorded, checks t
   // Recording 01 alone still needs 00b first: completion keeps the order.
   const alone = run(root, 'phase', 'complete', '01', '--note', 'x');
   assert.notEqual(alone.status, 0); assert.match(alone.stderr, /Phase 00b is not reviewed/);
+  // With 00b already recorded, a lone check names only what is left.
+  atomicWrite(safePath(root, 'migration/phases/00b.json'), '{}');
+  const partial = ['02', '01'].map(id => run(root, 'phase', 'check', id));
+  partial.forEach((r, i) => ok(r, `phase check ${['02', '01'][i]} after 00b`));
+  assert.equal(partial[0].json.recordWith, 'phase complete 01,02');
+  assert.equal(partial[1].json.recordWith, undefined);
+  fs.rmSync(safePath(root, 'migration/phases/00b.json'));
   ok(run(root, 'phase', 'complete', '00b,01,02', '--note', 'package reviewed'), 'phase complete 00b,01,02');
+  const after = run(root, 'phase', 'check', '02');
+  if (!after.status) assert.equal(after.json.recordWith, undefined, 'nothing to name once recorded');
   ok(run(root, 'judge'), 'judge');
 });
 
@@ -283,4 +292,14 @@ test('Sonnet review: distinct blockers stay listed; missing source roots get no 
   const options = message => failureGuidance(new Error(message), { root }).options.map(o => o.id);
   assert.ok(!options('Input root missing: nosuch (sourceRoots in migration/config.json must name existing source directories)').includes('source-as-spec'));
   assert.ok(options('Input root missing: tests (verificationRoots in migration/config.json must name the existing directory)').includes('source-as-spec'));
+});
+
+test('C spellings get real manifest extensions before the map exists', t => {
+  const root = project(t, { files: { 'app/a.c': 'int a;\n' } });
+  const { sourceSpecReadiness } = loadReadiness;
+  for (const language of ['C', 'C ', 'ANSI C', 'C (C89)', 'Embedded C', 'C/C++', 'Visual C++']) {
+    const manifest = sourceSpecReadiness(root, { ...loadConfig(root), sourceLanguage: language }).commands.manifest;
+    assert.doesNotMatch(manifest, /SOURCE_EXT/, language);
+  }
+  assert.match(sourceSpecReadiness(root, { ...loadConfig(root), sourceLanguage: 'C#' }).commands.manifest, /--ext '\.cs=/);
 });
