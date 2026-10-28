@@ -49,6 +49,13 @@ time; reviewers read the cited source lines directly.
 Switching the profile changes config, so earlier approvals and receipts are
 invalidated (review again from 00b).
 
+A project installed with source-as-spec keeps its configuration, so plain
+`source-spec init` (no `--apply`) writes the drafts at once: the kit never asks
+for consent to its own scaffold. 00b to 02 are recorded as one package, so
+`phase start 01` and `phase start 02` work before 00b is recorded, and
+`phase check 00b,01,02` checks the package (record it with `phase complete
+00b,01,02`, which still goes in order).
+
 ## What the AI drafts (00b–02 together)
 
 `source-spec check` lists the remaining artifacts and the suggested commands
@@ -62,8 +69,7 @@ invalidated (review again from 00b).
 
 A judge plan drafted before 0.10.0 that names `contracts.md` keeps its rule:
 00b cannot be recorded while that memo still contains `TODO(spec)`. To move to
-the source index, delete `migration/judge-plan.json` and rerun `source-spec init
---apply`; config does not change, so 00 stays recorded and 00b–02 are reviewed
+the source index, delete `migration/judge-plan.json` and rerun `source-spec init`; config does not change, so 00 stays recorded and 00b–02 are reviewed
 again together.
 
 ### Lighter preparation audits

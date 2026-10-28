@@ -52,7 +52,7 @@ These are not time or load cutoffs: continuing could not save a correct result.
 | Cannot start, sign-in, credits | missing CLI or runtime, unknown agent or model, expired sign-in, 403, service quota or billing limits |
 | Broken streams | corrupt JSONL or terminal events from the CLI itself, session errors (classified as above) |
 | Preparation audit request over the input limit | `audit_inputs.mjs freeze` refuses instead of truncating; freeze again with fewer files per batch (or raise `maxReviewInputBytes`) |
-| Required data that truly cannot be processed | invalid UTF-8, NUL, unreadable files, or required metadata (rulebook, one census site) larger than the model capacity on its own |
+| Required data that truly cannot be processed | binary files (NUL bytes that are not UTF-16), unreadable files, or required metadata (rulebook, one census site) larger than the model capacity on its own |
 | Translation and test failures | non-zero typecheck, original, mutation, build, smoke or parity; fixable failures go to reviewed repair inside build-loop |
 | No owner for a fix | a compiler diagnostic that maps to no manifest target, a failing original test, a defect in the judge itself |
 | Real environment faults | ENOSPC, EACCES, EMFILE, EIO, spawn failure, OOM kill, external termination |

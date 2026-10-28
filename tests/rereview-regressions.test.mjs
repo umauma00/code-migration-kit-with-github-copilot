@@ -77,26 +77,45 @@ test('RR2: validation fails if any explicitly mapped output under an excluded di
   }
 });
 
-test('RR3: non-UTF-8 source blocks before model calls and names the offending file', async t => {
-  const f = prepare(t), unit = f.units[0], calls = [];
+// A legacy-encoded original stays as it is (it is the specification and may
+// still run); workers read it decoded, told which encoding it came from,
+// instead of the run stopping to ask for a conversion (0.10.1).
+test('RR3: a non-UTF-8 source is decoded for workers, names its encoding and does not stop translation', async t => {
+  const f = prepare(t), unit = f.units[0], inputs = [];
   write(f.root, unit.source, Buffer.from("# coding: latin-1\nvalue = 'caf\xe9'\n", 'latin1'));
   persist(f);
   await runStage(f.root, f.config, 'judge');
-  approve(f.root, f.config, 'translation', 'Encoding rejection fixture');
-  await assert.rejects(translate(f.root, f.config, args => { calls.push(args.role); return fake(args); }), /valid UTF-8: src\/math_ops\.py/);
-  assert.deepEqual(calls, []);
-  assert.equal(unitState(f.root, unit).status, 'blocked');
-  assert.equal(done(f.root, unit, contextHash(f.root, f.config)), false);
+  approve(f.root, f.config, 'translation', 'Encoding fixture');
+  await translate(f.root, f.config, args => { inputs.push(args); return fake(args); });
+  assert.ok(inputs.length);
+  const file = JSON.parse(inputs.find(a => a.reviewInput).reviewInput).files.find(x => x.path === unit.source);
+  assert.equal(file.encoding, 'windows-1252');
+  const implementer = inputs.find(a => a.role === 'implementer').extra.legacyEncodedSources;
+  assert.deepEqual(implementer.map(x => [x.path, x.encoding]), [[unit.source, 'windows-1252']]);
+  assert.match(implementer[0].content, /café/);
+  assert.match(file.content, /value = 'café'/);
+  assert.equal(done(f.root, unit, contextHash(f.root, f.config)), true);
+  assert.equal(fs.readFileSync(safePath(f.root, unit.source)).includes(0xe9), true, 'the original bytes are untouched');
 });
 
-test('RR3: non-UTF-8 repair diagnostics are rejected before model calls', async t => {
-  const f = prepare(t), calls = [];
+test('RR3: a Shift_JIS repair diagnostic (a Japanese Windows compiler log) is decoded, not refused', async t => {
+  const f = prepare(t), seen = [];
   await start(f);
   const evidence = 'migration/build-diagnostic.txt';
-  write(f.root, evidence, Buffer.from('Error: caf\xe9\n', 'latin1'));
-  await assert.rejects(translate(f.root, f.config, args => { calls.push(args.role); return fake(args); }, { onlyTarget: f.units[0].target, evidence }), /valid UTF-8: migration\/build-diagnostic\.txt/);
-  assert.deepEqual(calls, []);
+  write(f.root, evidence, Buffer.from([0x83, 0x47, 0x83, 0x89, 0x81, 0x5b, 0x3a, 0x20, 0x78, 0x0a])); // エラー: x
+  await translate(f.root, f.config, args => { seen.push(args); return fake(args); }, { onlyTarget: f.units[0].target, evidence });
+  assert.ok(seen.some(a => a.reviewInput.includes('エラー: x')));
   assert.equal(fs.existsSync(safePath(f.root, 'migration/run.lock')), false);
+});
+
+test('RR3: binary sources still stop before model calls and name the file', async t => {
+  const f = prepare(t), unit = f.units[0], calls = [];
+  write(f.root, unit.source, Buffer.from([0x89, 0x50, 0x4e, 0x47, 0, 0, 0, 1, 2, 3]));
+  persist(f);
+  await runStage(f.root, f.config, 'judge');
+  approve(f.root, f.config, 'translation', 'Binary fixture');
+  await assert.rejects(translate(f.root, f.config, args => { calls.push(args.role); return fake(args); }), /must be text: src\/math_ops\.py/);
+  assert.deepEqual(calls, []);
 });
 
 test('RR3: valid UTF-8 Unicode, BOM and an actual replacement character remain lossless', t => {

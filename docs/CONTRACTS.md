@@ -61,9 +61,11 @@ Include semantic evidence references as dependencies when auditing the map.
 Reviewer profiles
 have `tools: []`; they cannot read/search the repository. Their input hash is
 recorded with each review. No reviewer outcome is supplied to the other reviewer.
-Oversized input, NUL-containing files and invalid UTF-8 block the unit instead
-of silently omitting or replacing evidence. Files must be UTF-8 text; the runner
-does not guess encodings. Static input is checked at its serialized JSON size
+Oversized input and binary files block the unit instead of silently omitting
+evidence. A source in a legacy encoding (Shift_JIS, EUC-JP, Latin-1, UTF-16) is
+decoded by the bundled mappers' rules and its entry names the `encoding`; the
+implementer and fixer get such sources decoded in `extra.legacyEncodedSources`.
+The original bytes are never rewritten. Static input is checked at its serialized JSON size
 before implementer/fixer calls; the final candidate is checked after generation.
 
 ## Arbitration

@@ -6,7 +6,7 @@ import { migrationStatus } from '../lib/status.mjs';
 import { requireGuardrails } from '../lib/guardrails.mjs';
 
 function validate(root, config, phase, completing = false) {
-  checkPreparation(root, config, phase);
+  checkPreparation(root, config, phase, { completing });
   if (['00','00b','01','02'].includes(phase)) return;
   const context = contextHash(root, config);
   const record = stage => {
@@ -41,12 +41,21 @@ export function phaseCommand(root, config, action, phase, options = {}) {
     return report.workflow;
   }
   if (action === 'check') {
-    validate(root,config,phase);
-    // A manually recorded phase is checked as phase complete would check it
-    // (artifacts, drafted rules, dependency map), so "ready" is not followed
-    // by a refused completion after the person has reviewed it.
-    if (['00','00b','01','02','03'].includes(phase)) completePhase(root,config,phase,'check',{},{dryRun:true,confirmNoDependencies:Boolean(options['confirm-no-dependencies'])});
-    return {phase,ready:true};
+    // A list checks a package (source-as-spec: 00b,01,02) the way phase
+    // complete would record it: each phase in order, predecessors assumed.
+    const ids = typeof phase === 'string' && phase.includes(',') ? phase.split(',').map(p => p.trim()) : [phase];
+    if (ids.length > 1 && ids.some((id, i) => i && orderedPhases.indexOf(id) !== orderedPhases.indexOf(ids[i - 1]) + 1)) throw new Error('List consecutive phases in order, for example 00b,01,02');
+    // In a source-as-spec package, 01 and 02 are checked for their own
+    // evidence; their predecessors are recorded with them.
+    const packaged = id => config.preparationProfile === 'source-as-spec' && ['01','02'].includes(id);
+    ids.forEach((id, i) => {
+      if (!i) validate(root,config,id);
+      // A manually recorded phase is checked as phase complete would check it
+      // (artifacts, drafted rules, dependency map), so "ready" is not followed
+      // by a refused completion after the person has reviewed it.
+      if (['00','00b','01','02','03'].includes(id)) completePhase(root,config,id,'check',{},{dryRun:true,assumePredecessor:i > 0 || packaged(id),confirmNoDependencies:Boolean(options['confirm-no-dependencies'])});
+    });
+    return ids.length > 1 ? ids.map(id => ({phase:id,ready:true})) : {phase,ready:true};
   }
   if (!['init','start','complete'].includes(action)) throw new Error('Use phase init|next|check ID|start ID|complete ID --note TEXT');
   const release = lockRun(root,`phase-${action}-${phase ?? 'policy'}`);

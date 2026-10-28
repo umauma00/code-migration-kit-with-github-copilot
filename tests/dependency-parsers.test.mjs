@@ -213,13 +213,17 @@ for (const [language, ext, a, b] of sourceCases) test(`${language}: source-as-sp
   atomicWrite(safePath(f.root, `legacy code/unselected/B.${ext}`), b);
   if (language === 'Python') for (const root of f.config.sourceRoots) atomicWrite(safePath(f.root, `${root}/__init__.py`), '');
   const commands = sourceSpecReadiness(f.root, f.config).commands;
+  // The command names the extensions itself (target JavaScript: .js); only
+  // C/C++, whose .c/.h pairs need a project rule, keeps the placeholder.
+  const out = language === 'C/C++' ? 'mjs' : 'js';
+  assert.equal(commands.manifest.includes('SOURCE_EXT'), language === 'C/C++');
   for (const command of [commands.dependencyMap, commands.manifest.replace('.SOURCE_EXT=.TARGET_EXT', `.${ext}=.mjs`), commands.reviewDependencies]) {
     const r = await runProcess('bash', ['-c', command], { cwd: f.root });
     assert.equal(r.code, 0, `${command}\n${r.stderr}`);
   }
   const units = readManifest(f.root, f.config);
-  assert.ok(units.some(u => u.source === `legacy code/shared/B.${ext}` && u.target === 'ported/shared/B.mjs'));
-  assert.ok(units.some(u => u.source === `legacy code/app/A.${ext}` && u.target === 'ported/app/A.mjs'));
+  assert.ok(units.some(u => u.source === `legacy code/shared/B.${ext}` && u.target === `ported/shared/B.${out}`));
+  assert.ok(units.some(u => u.source === `legacy code/app/A.${ext}` && u.target === `ported/app/A.${out}`));
   assert.ok(units.every(u => !u.source.includes('/unselected/')));
   assert.doesNotMatch(fs.readFileSync(safePath(f.root, 'migration/depmap/order.txt'), 'utf8'), /unselected/);
   assert.deepEqual(readJSON(safePath(f.root, 'migration/review-dependencies.json')).dependencies[`legacy code/app/A.${ext}`], [`legacy code/shared/B.${ext}`]);

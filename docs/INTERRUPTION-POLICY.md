@@ -59,7 +59,7 @@ inventoryの巨大ファイルは断片をまたぐデータフローを確定�
 | 起動不能・認証・残高 | CLIや言語ランタイムがない、agentが見つからない、モデルが利用不可、認証切れ、403、サービス側のquota/credits/billing制限。新規起動を止め原因を報告 |
 | 実際に壊れた応答 | 不正JSON/JSONL、不完全なterminal event、誤target/schema、範囲外引用、取りこぼし・重複、裁定漏れ、レビューとverdictの矛盾。surveyでは正常終了したCLIストリーム内の不正なモデルJSON/schema/項目/引用を保存し、不正箇所だけ1回補正する。再び不正なら、その行を `uncited` 付きのUNKNOWNにして完了する（止めない）。CLIストリーム自体の破損やsession.errorは障害の分類に従って扱う |
 | 準備監査の入力が上限超 | `audit_inputs.mjs freeze` は切り詰めずに拒否する。1 batch のファイル数を減らして freeze し直す（または `maxReviewInputBytes` を上げる） |
-| 本当に処理できない必須データ | 不正UTF-8・NUL・読取権限、rulebookやcensusの1項目など必須メタデータだけでモデル容量を超える。ソース本文の大きさによる停止とは区別して報告 |
+| 本当に処理できない必須データ | バイナリ（NULを含み UTF-16 でもない）・読取権限、rulebookやcensusの1項目など必須メタデータだけでモデル容量を超える。ソース本文の大きさによる停止とは区別して報告 |
 | 変換結果・テストの失敗 | typecheck・original・mutation・build・smoke・parityの非ゼロ終了、比較差分、未確定のマーカー。build-loop内の修正可能な失敗はレビュー付き修正へ進む |
 | 修正の所有先を決められない | manifestに対応しないコンパイラ診断、16000文字を超える1修正用診断、元テストの失敗、比較器自身の欠陥。元ソースや比較器を勝手に直さない |
 | 保存・環境の実障害 | ENOSPC、EACCES、EMFILE、EIO、spawn失敗、stdinのEPIPE以外の障害、OSによるOOM kill、外部プロセス・端末・サービスの終了。保存できない結果を完了としない |

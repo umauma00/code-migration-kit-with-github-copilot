@@ -93,7 +93,7 @@ test('depmap commands follow the import base: src layout re-prefixes, a package 
     const r = await runProcess('bash', ['-c', command], { cwd: root });
     assert.equal(r.code, 0, `${command}\n${r.stderr}`);
   }
-  assert.match(fs.readFileSync(safePath(root, 'migration/manifest.tsv'), 'utf8'), /^source\ttarget\nsrc\/math_ops\.py\tported\/math_ops\.mjs/m);
+  assert.match(fs.readFileSync(safePath(root, 'migration/manifest.tsv'), 'utf8'), /^source\ttarget\nsrc\/math_ops\.py\tported\/math_ops\.js/m);
   assert.deepEqual(readJSON(safePath(root, 'migration/review-dependencies.json')).dependencies['src/main.py'], ['src/math_ops.py', 'src/text_ops.py']);
   fs.writeFileSync(safePath(root, 'src/__init__.py'), '');
   const pkg = sourceSpecReadiness(root, config).commands;
