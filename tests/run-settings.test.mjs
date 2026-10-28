@@ -683,6 +683,14 @@ test('review of ac3ad0c: the source-folder question clears once answered, persis
   assert.equal(testOnly.sourceRootsUnchosen, true);
   assert.doesNotMatch(testOnly.sourceRootsQuestion, /（.* にはあります）/);
   assert.equal(initRunSettings(root, models).sourceRootsUnchosen, undefined, 'asked once; src/ holds files, so later runs do not loop');
+  initRunSettings(root, models, { sourceRoots: 'src' });
+  assert.equal(initRunSettings(root, models, { source: 'Python', target: 'Go' }).sourceRootsUnchosen, undefined, 'repeating the recorded language does not ask again');
+  assert.equal(initRunSettings(root, models, { source: 'COBOL', target: 'Go' }).sourceRootsUnchosen, true, 'another language asks again');
+  // English text, and a cache-only folder is not source (the kit skips __pycache__ too).
+  writeSettings(root, { ...settingsOf(root), reportLanguage: 'en' });
+  assert.match(initRunSettings(root, models, { source: 'Python', target: 'Go' }).sourceRootsQuestion, /^The source folder is still src, and no Python files were found there\. .*must be moved into a folder first/);
+  touch(root, ['cache/__pycache__/x.pyc']);
+  assert.throws(() => initRunSettings(root, models, { sourceRoots: 'cache' }), /cache holds no files/);
   // Files elsewhere: the question says where they are instead of "not found".
   root = fresh(t);
   touch(root, ['lib/a.py']);

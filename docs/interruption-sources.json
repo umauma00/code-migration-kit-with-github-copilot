@@ -2504,7 +2504,7 @@
     },
     {
       "path": "lib/run-settings.mjs",
-      "sha256": "8e6a1a15e7a6f7ce07fb9b4da5354fa2820cfeaace04a802f3e732f0253e2c62",
+      "sha256": "415a4a96cc4ca9bde73153ae70f0233228e97d11e84c8f693abb7a2722e0f053",
       "entries": [
         {
           "line": 24,
@@ -2567,37 +2567,37 @@
           "code": "for (const [key, value] of [['source', source], ['target', target]]) if (value !== undefined && (typeof value !== 'string' || !value.trim())) throw new Error(`--${key} must name a language`);"
         },
         {
-          "line": 173,
+          "line": 175,
           "kind": "error-or-exit-candidate",
           "code": "if (!dirs.length) throw new Error('--source-roots must name one or more folders, separated by commas');"
         },
         {
-          "line": 174,
+          "line": 176,
           "kind": "error-or-exit-candidate",
           "code": "if (dirs.some(d => d === '.' || d === '/')) throw new Error('--source-roots: the repository root cannot be a source folder (the kit writes migration/ and the output there); the source files must be in a folder');"
         },
         {
-          "line": 176,
+          "line": 178,
           "kind": "error-or-exit-candidate",
           "code": "if (missing.length) throw new Error(`--source-roots: ${missing.join(', ')} ${missing.length > 1 ? 'are not folders' : 'is not a folder'} in the repository; ask for the source folders again`);"
         },
         {
-          "line": 178,
+          "line": 180,
           "kind": "error-or-exit-candidate",
           "code": "if (empty.length) throw new Error(`--source-roots: ${empty.join(', ')} ${empty.length > 1 ? 'hold' : 'holds'} no files; ask for the source folders again`);"
         },
         {
-          "line": 259,
+          "line": 261,
           "kind": "error-or-exit-candidate",
           "code": "if (!fs.existsSync(file)) throw new Error(`${runSettingsFile} is missing: run settings init first`);"
         },
         {
-          "line": 261,
+          "line": 263,
           "kind": "error-or-exit-candidate",
           "code": "try { value = readJSON(file); } catch (e) { throw new Error(`${runSettingsFile} is not valid JSON: ${e.message}`); }"
         },
         {
-          "line": 262,
+          "line": 264,
           "kind": "error-or-exit-candidate",
           "code": "if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${runSettingsFile} must be a JSON object`);"
         }
