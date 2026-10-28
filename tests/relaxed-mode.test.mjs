@@ -220,3 +220,43 @@ test('run settings carry the phase mode; files written before it existed still a
   assert.equal(readJSON(file).phaseMode, 'relaxed');
   assert.equal(keys.indexOf('phaseMode'), keys.indexOf('originalRuntime') + 1);
 });
+
+test('review of 304f781: a phase\'s own waiver never completes it, and real completion retires the waiver', async t => {
+  const f = fixture(t, { mode: 'relaxed' });
+  for (const id of ['00', '00b', '01', '02', '03']) waive(f, id);
+  writeJSON(safePath(f.root, 'migration/results/judge.json'), { forged: true });
+  // 03's own record (the judge) is required to complete 03, waiver or not.
+  assert.throws(() => phaseCommand(f.root, f.config, 'complete', '03', { note: 'Try completing on the waiver' }), /Run judge successfully/);
+  fs.rmSync(safePath(f.root, 'migration/results/judge.json'));
+  // Completing 01 for real retires its waiver into waivers/retired/.
+  complete(f, '00'); complete(f, '00b'); complete(f, '01');
+  assert.equal(fs.existsSync(waiverFile(f, '01')), false);
+  assert.equal(fs.readdirSync(safePath(f.root, 'migration/phases/waivers/retired')).filter(n => n.startsWith('01-')).length, 1);
+  // When 01 later goes stale, the gate asks again instead of passing silently.
+  atomicWrite(safePath(f.root, 'migration/depmap/report.md'), 'Changed after review.');
+  assert.throws(() => requirePhase(f.root, f.config, '01'), e => /Phase 01 is not reviewed.*phase waive 01/s.test(e.message));
+});
+
+test('review of 304f781: fast status lists waivers, a waived 04 records what was missing, and a late report makes the approval stale', async t => {
+  const f = fixture(t, { mode: 'relaxed' });
+  fs.rmSync(safePath(f.root, 'migration/stress-test/report.md'));
+  waive(f, '03', 'Shape first');
+  phaseCommand(f.root, f.config, 'start', '04');
+  approve(f.root, f.config, 'translation', 'Shape only; 03 waived');
+  const w = waive(f, '04', 'Build what exists');
+  assert.match(w.unmet, /Current reviewed translation units are required/);
+  const fast = statusSnapshot(f.root);
+  assert.deepEqual(fast.waivers.map(x => x.phase), ['03', '04']);
+  assert.equal(fast.workflow.phases.find(p => p.id === '04').waived, true);
+  // The stress report written after the approval makes it stale.
+  const context = contextHash(f.root, f.config);
+  const { requireGate } = await import('../lib/pipeline.mjs');
+  requireGate(f.root, f.config, 'translation', context);
+  atomicWrite(safePath(f.root, 'migration/stress-test/report.md'), 'Written later.');
+  assert.throws(() => requireGate(f.root, f.config, 'translation', context), /approval is stale/);
+  // Reviewing every unit for real retires the 04 waiver at the build approval.
+  approve(f.root, f.config, 'translation', 'Again with the report');
+  await translate(f.root, f.config, fake);
+  approve(f.root, f.config, 'build', 'All units reviewed');
+  assert.equal(fs.existsSync(waiverFile(f, '04')), false);
+});

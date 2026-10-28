@@ -17,7 +17,10 @@ mode (the default) keeps every gate as it was.
 - A waived phase is never counted complete: `status` lists it under
   `waivers`, the checklist marks it 【見送り】 / [waived], and `phase next`
   moves past it. Records made on a waiver bind to it, so finishing the phase
-  later (or switching back to normal) has them recorded again. Nothing is
+  later (or switching back to normal) has them recorded again. Finishing a
+  waived phase for real retires its waiver to `waivers/retired/`, and a
+  phase's own record (such as 03's judge) is never stood in for by its own
+  waiver. Pilots never use production waivers. Nothing is
   deleted; switching back to relaxed restores them.
 - Never relaxed: guardrails, protected paths and source overwrites, approval
   commands themselves, sign-in and credits, and pilots.

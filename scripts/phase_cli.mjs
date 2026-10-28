@@ -13,7 +13,8 @@ function validate(root, config, phase, completing = false) {
   const stagePhase = { judge: '03', build: '05', smoke: '05b', parity: '05c' };
   const record = stage => {
     if (!currentRecord(root, config, stage, context, stage !== 'judge')) {
-      if (phaseWaiver(root, stagePhase[stage])) return;
+      // A phase's own record is never stood in for by its own waiver.
+      if (stagePhase[stage] !== phase && phaseWaiver(root, stagePhase[stage])) return;
       throw gateError(root, `Run ${stage} successfully for current inputs before phase ${phase}`, stagePhase[stage]);
     }
     if (stage !== 'judge') requireGate(root, config, stage, context);
@@ -81,7 +82,11 @@ export function phaseCommand(root, config, action, phase, options = {}) {
     // What the phase still lacks is recorded with their reason.
     if (action === 'waive') {
       let unmet;
-      try { validate(root, config, phase, true); if (['00','00b','01','02','03'].includes(phase)) completePhase(root, config, phase, 'check', {}, { dryRun: true }); }
+      try {
+        validate(root, config, phase, true);
+        if (['00','00b','01','02','03'].includes(phase)) completePhase(root, config, phase, 'check', {}, { dryRun: true });
+        if (phase === '04') { const context = contextHash(root, config), units = readManifest(root, config); if (!units.length || !units.every(u => done(root, u, context))) throw new Error('Current reviewed translation units are required'); }
+      }
       catch (e) { unmet = e.message.replace(/ Relaxed mode: .*$/s, ''); }
       return waivePhase(root, config, phase, options.note, unmet);
     }
