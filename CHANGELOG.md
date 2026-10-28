@@ -38,6 +38,8 @@ based on time, CPU, silence or output volume.
   flagged in `unresolved.tsv` first, then the largest). Misses are fixed and the
   same files compared again; what stays unresolved is reported, not a stop.
   Hand-written graphs keep the sampling rounds, also without the stop.
+  The selection stays within the audit input limit and leaves out files that
+  are not UTF-8 text; source-as-spec skips this audit.
 - Prompts, skills and orchestrators: report uncited and oversized counts
   instead of asking; ask only when a rerun fails again with no progress or a new
   decision is needed. Add the English interruption policy.

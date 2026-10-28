@@ -178,7 +178,7 @@ choose the implementation language and build the adapter.
 Audit a bundled or fixture-tested mapper's graph with one fresh auditor over the
 `preparation_cli.mjs dependency-targets` files and `dependency-diff`, not 2 x 20
 sampled files over three rounds; list anything still unresolved in
-`depmap/report.md` instead of stopping.
+`depmap/report.md` instead of stopping. Source-as-spec skips this audit too.
 
 ## Keep the parent's context small
 

@@ -192,3 +192,24 @@ test('dependency-targets defaults the parser root, reports unmatched rows, keeps
   }
   assert.match(fs.readFileSync(safePath(f.root, 'migration/depmap/unresolved.tsv'), 'utf8'), /elsewhere/);
 });
+
+test('dependency-targets reads unresolved rows leniently, skips files freeze cannot read and refuses a missing named list', t => {
+  const f = prepare(t, { count: 3 });
+  const files = Object.keys(readJSON(safePath(f.root, 'migration/review-dependencies.json')).dependencies).sort();
+  const [first, second, third] = files, rel = p => p.slice(p.indexOf('/') + 1);
+  // An empty reference cell or an odd path is reported, not a reason to stop.
+  atomicWrite(safePath(f.root, 'migration/depmap/unresolved.tsv'), `file\treference\treason\n${rel(second)}\t\tunresolved import\nC:\\odd\\x.py\tbar\tunresolved\n# note\n`);
+  const result = preparationCommand(f.root, f.config, 'dependency-targets', { size: '5' });
+  assert.equal(result.files[0], second);
+  assert.equal(result.files.length, files.length);
+  assert.deepEqual(result.unmatchedUnresolvedFiles, ['C:\\odd\\x.py']);
+  assert.equal(result.unmatchedUnresolvedCount, 1);
+  // A file that is not UTF-8 text cannot be frozen, so it is left out and listed.
+  fs.writeFileSync(safePath(f.root, third), Buffer.from([0x82, 0xa0, 0xff, 0xfe, 0x00]));
+  const text = preparationCommand(f.root, f.config, 'dependency-targets', { size: '5' });
+  assert.equal(text.files.includes(third), false);
+  assert.deepEqual(text.skippedNotUtf8Text, [third]);
+  assert.ok(text.files.includes(first));
+  assert.throws(() => preparationCommand(f.root, f.config, 'dependency-targets', { unresolved: 'migration/depmap/unresolvd.tsv' }), /not found/);
+  assert.throws(() => preparationCommand(f.root, f.config, 'dependency-targets', { out: 'migration/depmap/Edges.TSV' }), /cannot replace mapper output/);
+});

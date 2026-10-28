@@ -11,8 +11,8 @@ light audit described below (one auditor over `dependency-targets` files). Only
 a hand-written graph or unproven adapter gets two independent disjoint 20-file
 random/adversarial audits (record actual coverage for small repos), missed AND
 invented edge diffs, a fixed scanner, full regeneration and fresh resampling, at
-most three rounds, then a report of what remains. Use the sample/diff CLI for mechanical evidence, not invented
-source findings. Review scanner exclusions and unsupported syntax separately.
+most three rounds, then a report of what remains. Use the sample/diff CLI for
+mechanical evidence, not invented source findings. Review scanner exclusions and unsupported syntax separately.
 When target packages are known, declare config.packageMap and generate the
 separate target-package cycle report before phase 01 completion.
 Run each audit request with `audit_inputs.mjs freeze` then `audit_inputs.mjs run
@@ -112,5 +112,5 @@ Save the concrete phase report to `migration/depmap/report.md`. After its actual
 
 With `preparationProfile: source-as-spec`, generate the map, manifest and review
 dependencies mechanically (`source-spec check` prints the commands), record parser
-limits in `depmap/report.md`, skip the agent edge-sampling rounds and do not stop
-for a 01-only gate: continue to 02. See [source-as-spec](../docs/SOURCE-AS-SPEC.md).
+limits in `depmap/report.md`, skip the agent edge-sampling rounds and the light
+audit (the package review in 02 replaces both) and do not stop for a 01-only gate: continue to 02. See [source-as-spec](../docs/SOURCE-AS-SPEC.md).

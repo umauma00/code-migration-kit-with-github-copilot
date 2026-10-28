@@ -52,12 +52,14 @@ over up to three rounds mostly repeats the parser's own output. Instead:
    TSV and run `dependency-diff --files LIST --audit migration/observed-edges.tsv`
    on the same files. The selection stays within `maxReviewInputBytes`; files left
    out for size are listed (`skippedForInputSize`): lower `--size` or raise the
-   limit only if you want them too.
+   limit only if you want them too. Files that are not UTF-8 text are left out
+   too (`skippedNotUtf8Text`); check those by hand. A named `--unresolved` file
+   must exist; rows it cannot place are listed under `unmatchedUnresolvedFiles`.
 4. Confirm each difference against source. Fix the mapper copy or add the
    declaration, regenerate the whole map/order/manifest/review declaration, and
    run `dependency-diff` on the same files again. There are no further sampling
    rounds and no stop after a number of rounds: a dependency still unresolved is
-   listed in `depmap/report.md` and stays visible to phase 02 and review.
+   listed in `depmap/report.md` for the user review.
 
 ```bash
 node migration-kit/scripts/preparation_cli.mjs dependency-targets --depmap-root src

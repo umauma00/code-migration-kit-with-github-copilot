@@ -2044,7 +2044,7 @@
     },
     {
       "path": "lib/preparation.mjs",
-      "sha256": "19e733a0b27c9351aa54a1d235dda6e98006eb88476d8036f335670941fa14d0",
+      "sha256": "a9bf52f1cddb59bd9a459704b1265e169ad89d7488b927a80731c56e4f095e82",
       "entries": [
         {
           "line": 20,
@@ -2147,27 +2147,32 @@
           "code": "if (depmapRoot === undefined) throw new Error('Specify --depmap-root (the mapper --root) for multiple source roots');"
         },
         {
-          "line": 168,
+          "line": 164,
+          "kind": "error-or-exit-candidate",
+          "code": "if (explicit && !present) throw new Error(`Unresolved list not found: ${unresolved}`);"
+        },
+        {
+          "line": 175,
           "kind": "error-or-exit-candidate",
           "code": "const budget = Math.floor((config.maxReviewInputBytes ?? 65536) * 0.8);"
         },
         {
-          "line": 175,
+          "line": 182,
           "kind": "loop-exit-candidate",
           "code": "if (selected.length >= size) break;"
         },
         {
-          "line": 190,
+          "line": 200,
           "kind": "error-or-exit-candidate",
           "code": "if (!Array.isArray(files) || !files.length || new Set(files).size !== files.length) throw new Error('Select the actual audited files');"
         },
         {
-          "line": 192,
+          "line": 202,
           "kind": "error-or-exit-candidate",
           "code": "if (files.some(p => !Object.hasOwn(graph, p))) throw new Error('Audited file missing from declared source graph');"
         },
         {
-          "line": 195,
+          "line": 205,
           "kind": "error-or-exit-candidate",
           "code": "if (!observed.has(from) || !Object.hasOwn(graph, to)) throw new Error('Audit edge outside selected files or declared source roots');"
         }
@@ -4111,7 +4116,7 @@
     },
     {
       "path": "scripts/preparation_cli.mjs",
-      "sha256": "f36417a251d5b6b7136b076a43f666099ef2b6e2c500054a2100ccb5419f7c40",
+      "sha256": "9525c65a5495cb33a8204d365f9271805a4419a8b13a57eb190124ffe552f3aa",
       "entries": [
         {
           "line": 19,
@@ -4126,7 +4131,7 @@
         {
           "line": 22,
           "kind": "error-or-exit-candidate",
-          "code": "if (/^migration\\/depmap\\/(?:edges\\.tsv|order\\.txt|cycles\\.txt|unresolved\\.tsv|external\\.tsv|report\\.md)$/.test(out)) throw new Error(`Audit reports cannot replace mapper output: ${out}`);"
+          "code": "if (/^migration\\/depmap\\/(?:edges\\.tsv|order\\.txt|cycles\\.txt|unresolved\\.tsv|external\\.tsv|report\\.md)$/i.test(out)) throw new Error(`Audit reports cannot replace mapper output: ${out}`);"
         },
         {
           "line": 31,
@@ -4493,5 +4498,5 @@
       ]
     }
   ],
-  "candidateLines": 814
+  "candidateLines": 815
 }
