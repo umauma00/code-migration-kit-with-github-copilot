@@ -324,518 +324,528 @@
     },
     {
       "path": "lib/cli.mjs",
-      "sha256": "d0341f745d57a5262568f4e4364d9a37fe4cbf256c87dfb6d36f0bad7feb1cea",
+      "sha256": "f5e628cff25e158fba120f61a535eb24ce8498393370750842f612cc2d43ac6b",
       "entries": [
         {
-          "line": 96,
+          "line": 97,
           "kind": "error-or-exit-candidate",
           "code": "throw new Error(`Missing command. Commands: ${known.join(', ')}`);"
         },
         {
-          "line": 99,
+          "line": 100,
           "kind": "error-or-exit-candidate",
           "code": "if (!entry) throw new Error(`Unknown command ${cmd}. Commands: ${known.join(', ')}`);"
         },
         {
-          "line": 102,
+          "line": 103,
           "kind": "error-or-exit-candidate",
           "code": "if (!entry.sub[sub]) throw new Error(`${sub === undefined ? `Missing action for ${cmd}` : `Unknown ${cmd} action ${sub}`}. Use ${cmd} ${subs.join(' | ')}`);"
         },
         {
-          "line": 132,
+          "line": 133,
           "kind": "error-or-exit-candidate",
           "code": "if (key.includes('=')) throw new Error(`Write ${arg.slice(0, arg.indexOf('='))} VALUE as two words, not ${arg}`);"
         },
         {
-          "line": 137,
+          "line": 138,
           "kind": "error-or-exit-candidate",
           "code": "throw new Error(`Unknown option ${arg}.${accepted} Add --help for usage.`);"
         },
         {
-          "line": 140,
+          "line": 141,
           "kind": "error-or-exit-candidate",
           "code": "if (argv[i + 1] === undefined || argv[i + 1].startsWith('--')) throw new Error(`Missing value for ${arg} (expected ${arg} ${known[key]})`);"
         },
         {
-          "line": 147,
+          "line": 148,
           "kind": "error-or-exit-candidate",
           "code": "if (key !== '_' && !(key in target.options)) throw new Error(`Option --${key} does not apply to ${target.name}. Options for ${target.name}: ${describe(target.options)}. Add --help for usage.`);"
         },
         {
-          "line": 150,
+          "line": 151,
           "kind": "error-or-exit-candidate",
           "code": "if (extra.length < target.args.length) throw new Error(`${target.name} needs ${target.args.join(' ')}`);"
         },
         {
-          "line": 151,
+          "line": 152,
           "kind": "error-or-exit-candidate",
           "code": "if (extra.length > target.args.length) throw new Error(`Unexpected ${extra.slice(target.args.length).join(' ')} after ${target.name}${target.args.length ? ` ${target.args.join(' ')}` : ''}. Add --help for usage.`);"
         },
         {
-          "line": 156,
+          "line": 157,
           "kind": "error-or-exit-candidate",
           "code": "for (const v of allowed ? values(value) : []) if (!allowed.includes(v)) throw new Error(`--${key} must be one of ${allowed.join(', ')}, not ${v}`);"
         },
         {
-          "line": 161,
+          "line": 162,
           "kind": "error-or-exit-candidate",
           "code": "for (const v of values(extra[i], /[|,]/)) if (!allowed.includes(v)) throw new Error(`${target.name} ${target.args[i]} must be one of ${allowed.join(', ')}, not ${v}`);"
         }
       ]
     },
     {
+      "path": "lib/command-progress-heartbeat.mjs",
+      "sha256": "bf1400c9a3734f70135c88400b9b6e652945aab3eb9b32c85627ed5fd77d0d68",
+      "entries": []
+    },
+    {
       "path": "lib/command-progress.mjs",
-      "sha256": "454f0df4d7735c098c292153b4e2c5cb18177fa6129b821eaf36eb18f6bcbcaf",
+      "sha256": "2c628af282c9aee831c9c876c10307e6c4b2f693097ba0cb7424982240a2504f",
       "entries": []
     },
     {
       "path": "lib/core.mjs",
-      "sha256": "f1e81462a827658cf8440857ea100ebf25db4e059dbf929c803acb7e734dd29a",
+      "sha256": "86d41c4c5155e06cd381f8104b7fd02ab0d21605778115632e503ae446b14374",
       "entries": [
         {
-          "line": 25,
+          "line": 26,
           "kind": "error-or-exit-candidate",
           "code": "if (!value || Array.isArray(value) || typeof value !== 'object') throw new Error('reasoningEfforts must map worker roles to effort levels');"
         },
         {
-          "line": 27,
+          "line": 28,
           "kind": "error-or-exit-candidate",
           "code": "if (!effortRoles.includes(role)) throw new Error(`reasoningEfforts.${role} is not a worker role (${effortRoles.join(', ')})`);"
         },
         {
-          "line": 28,
+          "line": 29,
           "kind": "error-or-exit-candidate",
           "code": "if (!effortLevels.includes(level)) throw new Error(`reasoningEfforts.${role} must be one of ${effortLevels.join(', ')}`);"
         },
         {
-          "line": 40,
+          "line": 41,
           "kind": "error-or-exit-candidate",
           "code": "if (!value || Array.isArray(value) || typeof value !== 'object') throw new Error('contextTiers must map worker roles to long_context');"
         },
         {
-          "line": 42,
+          "line": 43,
           "kind": "error-or-exit-candidate",
           "code": "if (!effortRoles.includes(role)) throw new Error(`contextTiers.${role} is not a worker role (${effortRoles.join(', ')})`);"
         },
         {
-          "line": 43,
+          "line": 44,
           "kind": "error-or-exit-candidate",
           "code": "if (tier !== 'long_context') throw new Error(`contextTiers.${role} must be long_context (leave the role out for the default tier)`);"
         },
         {
-          "line": 52,
+          "line": 53,
           "kind": "error-or-exit-candidate",
           "code": "throw new Error(`Expected a normalized repository-relative path: ${JSON.stringify(value)}`);"
         },
         {
-          "line": 63,
+          "line": 64,
           "kind": "error-or-exit-candidate",
           "code": "throw new Error(`Symlinks are not supported in migration paths: ${name}`);"
         },
         {
-          "line": 66,
+          "line": 67,
           "kind": "error-or-exit-candidate",
           "code": "throw new Error(`Parent is not a directory: ${name}`);"
         },
         {
-          "line": 71,
+          "line": 72,
           "kind": "error-or-exit-candidate",
           "code": "function isLink(p) { try { return fs.lstatSync(p).isSymbolicLink(); } catch (e) { if(e.code === 'ENOENT') return false; throw e; } }"
         },
         {
-          "line": 79,
+          "line": 80,
           "kind": "loop-exit-candidate",
           "code": "if (path.dirname(current) === current) break;"
         },
         {
-          "line": 97,
+          "line": 105,
           "kind": "error-or-exit-candidate",
           "code": "if (!config.outputRoots.some(dir => inside(target, dir))) throw new Error(`Target outside outputRoots: ${target}`);"
         },
         {
-          "line": 99,
+          "line": 107,
           "kind": "error-or-exit-candidate",
-          "code": "if (pathsOverlap(root, target, protectedPath)) throw new Error(`Output target overlaps protected path: ${target} (${protectedPath})`);"
+          "code": "if (pathsOverlap(root, target, protectedPath, locate)) throw new Error(`Output target overlaps protected path: ${target} (${protectedPath})`);"
         },
         {
-          "line": 106,
+          "line": 114,
           "kind": "error-or-exit-candidate",
           "code": "for (const input of inputs) if (pathsOverlap(root, output, input)) throw new Error(`Output overlaps protected input: ${output} (${input})`);"
         },
         {
-          "line": 110,
+          "line": 118,
           "kind": "error-or-exit-candidate",
           "code": "if (!target.startsWith('migration/')) throw new Error('Reports must be under migration/');"
         },
         {
-          "line": 116,
+          "line": 124,
           "kind": "error-or-exit-candidate",
           "code": "for (const input of protectedPaths) if (pathsOverlap(root, target, input)) throw new Error(`Report output overlaps protected input or receipt: ${target}`);"
         },
         {
-          "line": 136,
+          "line": 144,
           "kind": "error-or-exit-candidate",
           "code": "if (!stat.isDirectory()) throw new Error(`Unsupported path: ${name}`);"
         },
         {
-          "line": 163,
+          "line": 171,
           "kind": "loop-exit-candidate",
           "code": "if (arg === '--' || !arg.startsWith('-')) break;"
         },
         {
-          "line": 175,
+          "line": 183,
           "kind": "error-or-exit-candidate",
           "code": "if (!fs.existsSync(full) || !fs.statSync(full).isFile()) throw new Error(`verificationInputs file missing: ${name}`);"
         },
         {
-          "line": 195,
+          "line": 203,
           "kind": "error-or-exit-candidate",
           "code": "if ([...generatedMigrationState, ...generatedPreparationReceipts].some(r => inside(name, r))) throw new Error(`Configured command path overlaps generated migration state: ${name}; move command scripts and inputs outside runtime state directories`);"
         },
         {
-          "line": 201,
+          "line": 209,
           "kind": "error-or-exit-candidate",
           "code": "try { full = safePath(root, name); } catch (e) { if (e.code === 'ENAMETOOLONG') continue; throw e; }"
         },
         {
-          "line": 227,
+          "line": 235,
           "kind": "error-or-exit-candidate",
           "code": "if (config.verificationMode !== undefined && !['runtime', 'source-only'].includes(config.verificationMode)) throw new Error('verificationMode must be runtime or source-only');"
         },
         {
-          "line": 228,
+          "line": 236,
           "kind": "error-or-exit-candidate",
           "code": "if (config.phasePolicy !== undefined && !['strict', 'legacy'].includes(config.phasePolicy)) throw new Error('phasePolicy must be strict or legacy');"
         },
         {
-          "line": 229,
+          "line": 237,
           "kind": "error-or-exit-candidate",
           "code": "if (config.preparationProfile !== undefined && !['standard', 'source-as-spec'].includes(config.preparationProfile)) throw new Error('preparationProfile must be standard or source-as-spec');"
         },
         {
-          "line": 230,
+          "line": 238,
           "kind": "error-or-exit-candidate",
           "code": "if (config.preparationProfile === 'source-as-spec' && config.verificationMode !== 'source-only') throw new Error('preparationProfile source-as-spec requires verificationMode source-only');"
         },
         {
-          "line": 231,
+          "line": 239,
           "kind": "error-or-exit-candidate",
           "code": "if (config.markerPolicy !== undefined && config.markerPolicy !== 'todo-lines-v1') throw new Error('markerPolicy must be todo-lines-v1, or omitted for an existing project convention');"
         },
         {
-          "line": 232,
+          "line": 240,
           "kind": "error-or-exit-candidate",
           "code": "if (config.executionPurpose !== undefined && !['production', 'pilot'].includes(config.executionPurpose)) throw new Error('executionPurpose must be production or pilot');"
         },
         {
-          "line": 235,
+          "line": 243,
           "kind": "error-or-exit-candidate",
           "code": "if (!config.phaseModels || Array.isArray(config.phaseModels) || typeof config.phaseModels !== 'object' || Object.entries(config.phaseModels).some(([role, model]) => !names.includes(role) || typeof model !== 'string' || !model.trim() || /SELECT_MODEL|[<>]/.test(model))) throw new Error('phaseModels must explicitly map supported preparation roles to available host model selectors');"
         },
         {
-          "line": 237,
+          "line": 245,
           "kind": "error-or-exit-candidate",
           "code": "if (config.packageMap !== undefined && (typeof config.packageMap !== 'string' || !config.packageMap.startsWith('migration/') || config.packageMap.startsWith('migration/depmap/package-cycles.json'))) throw new Error('packageMap must name a source-to-target-package input under migration/');"
         },
         {
-          "line": 240,
+          "line": 248,
           "kind": "error-or-exit-candidate",
           "code": "'migration/diagnostics', 'migration/repair-queue.json', 'migration/inventory-merge.json'].some(r => pathsOverlap(root, config.packageMap, r))) throw new Error('packageMap must be a fixed input outside generated receipts and reports');"
         },
         {
-          "line": 241,
+          "line": 249,
           "kind": "error-or-exit-candidate",
           "code": "if (config.schemaVersion !== 1) throw new Error('Unsupported config schemaVersion');"
         },
         {
-          "line": 242,
+          "line": 250,
           "kind": "error-or-exit-candidate",
           "code": "if ((config.workerBackend !== undefined && config.workerBackend !== 'copilot-cli') || removedNativeKeys.some(k => Object.hasOwn(config, k))) throw new Error(`The VS Code subagent (native) worker backend was removed: workers always run as Copilot CLI processes, also from VS Code chat. In migration/config.json set \"workerBackend\": \"copilot-cli\" and delete ${removedNativeKeys.join(', ')}; the changed configuration needs a fresh judge and translation approval`);"
         },
         {
-          "line": 243,
+          "line": 251,
           "kind": "error-or-exit-candidate",
           "code": "if (config.dependencyOrder !== undefined && !['auto', 'reviewed', 'none'].includes(config.dependencyOrder)) throw new Error('dependencyOrder must be auto, reviewed or none');"
         },
         {
-          "line": 244,
+          "line": 252,
           "kind": "error-or-exit-candidate",
           "code": "if (config.dependencyOrder === 'none' && config.commands?.typecheck) throw new Error('dependencyOrder none cannot be combined with a per-unit typecheck, which needs translated dependencies; use auto or reviewed');"
         },
         {
-          "line": 245,
+          "line": 253,
           "kind": "error-or-exit-candidate",
           "code": "if (config.fixPolicy !== undefined && !['rereview', 'single-pass'].includes(config.fixPolicy)) throw new Error('fixPolicy must be rereview or single-pass');"
         },
         {
-          "line": 246,
+          "line": 254,
           "kind": "error-or-exit-candidate",
           "code": "if (config.reviewFocus !== undefined && !['shared', 'specialized'].includes(config.reviewFocus)) throw new Error('reviewFocus must be shared or specialized');"
         },
         {
-          "line": 248,
+          "line": 256,
           "kind": "error-or-exit-candidate",
           "code": "if (typeof config[field] !== 'string' || !config[field].trim()) throw new Error(`${field} is required`);"
         },
         {
-          "line": 250,
+          "line": 258,
           "kind": "error-or-exit-candidate",
           "code": "if (!['preserve', 'redesign'].includes(config.mode)) throw new Error('mode must be preserve or redesign');"
         },
         {
-          "line": 252,
+          "line": 260,
           "kind": "error-or-exit-candidate",
           "code": "if (!Array.isArray(config[key]) || !config[key].length) throw new Error(`${key} must be a nonempty array`);"
         },
         {
-          "line": 256,
+          "line": 264,
           "kind": "error-or-exit-candidate",
           "code": "if (metadataRoots.some(r => pathsOverlap(root, dir, r))) throw new Error(`Source root overlaps migration metadata: ${dir}`);"
         },
         {
-          "line": 258,
+          "line": 266,
           "kind": "error-or-exit-candidate",
           "code": "if (config.verificationInputs !== undefined && !Array.isArray(config.verificationInputs)) throw new Error('verificationInputs must be an array of file paths');"
         },
         {
-          "line": 259,
+          "line": 267,
           "kind": "error-or-exit-candidate",
           "code": "if (config.designInputs !== undefined && !Array.isArray(config.designInputs)) throw new Error('designInputs must be an array of complete design-document paths');"
         },
         {
-          "line": 262,
+          "line": 270,
           "kind": "error-or-exit-candidate",
           "code": "if (['.git', ...generatedMigrationState, ...generatedPreparationReceipts, ...config.outputRoots].some(r => pathsOverlap(root, name, r))) throw new Error(`verificationInputs/designInputs overlaps outputs or runtime state: ${name}`);"
         },
         {
-          "line": 264,
+          "line": 272,
           "kind": "error-or-exit-candidate",
           "code": "if (config.maxReviewInputBytes !== undefined && (!Number.isInteger(config.maxReviewInputBytes) || config.maxReviewInputBytes < 1024 || config.maxReviewInputBytes > 4 * 1024 * 1024)) throw new Error('maxReviewInputBytes must be between 1024 and 4194304');"
         },
         {
-          "line": 267,
+          "line": 275,
           "kind": "error-or-exit-candidate",
           "code": "if (!inside(dependencyPath, 'migration') || [...generatedMigrationState, ...generatedPreparationReceipts].some(r => pathsOverlap(root, dependencyPath, r))) throw new Error('reviewDependencyMap must be a file under migration outside generated runtime state');"
         },
         {
-          "line": 270,
+          "line": 278,
           "kind": "error-or-exit-candidate",
           "code": "if (pathsOverlap(root, out, reserved)) throw new Error(`Output root overlaps protected path: ${out}`);"
         },
         {
-          "line": 273,
+          "line": 281,
           "kind": "error-or-exit-candidate",
           "code": "if (config.buildArtifactRoots !== undefined && !Array.isArray(config.buildArtifactRoots)) throw new Error('buildArtifactRoots must be an array of directory paths');"
         },
         {
-          "line": 280,
+          "line": 288,
           "kind": "error-or-exit-candidate",
           "code": "protectedPaths.some(p => pathsOverlap(root, dir, p))) throw new Error(`buildArtifactRoots overlaps protected input/output or metadata: ${dir}`);"
         },
         {
-          "line": 282,
+          "line": 290,
           "kind": "error-or-exit-candidate",
           "code": "if (fs.existsSync(full) && !fs.statSync(full).isDirectory()) throw new Error(`buildArtifactRoots must name directories: ${dir}`);"
         },
         {
-          "line": 284,
+          "line": 292,
           "kind": "error-or-exit-candidate",
           "code": "if (config.executionMode !== undefined && !['continuous', 'bounded'].includes(config.executionMode)) throw new Error('executionMode must be continuous or bounded');"
         },
         {
-          "line": 285,
+          "line": 293,
           "kind": "deadline-or-observation",
           "code": "for (const [key, min, max] of [['concurrency', 1, 64], ['maxFixRounds', 0, 10], ['maxAgentCalls', 1, 10000], ['timeoutSeconds', 0, 86400], ['commandTimeoutSeconds', 0, 86400]]) {"
         },
         {
-          "line": 286,
+          "line": 294,
           "kind": "error-or-exit-candidate",
           "code": "if (!Number.isInteger(config[key]) || config[key] < min || config[key] > max) throw new Error(`Invalid ${key}`);"
         },
         {
-          "line": 290,
+          "line": 298,
           "kind": "error-or-exit-candidate",
           "code": "if (config[key] !== undefined && (!Number.isInteger(config[key]) || config[key] < min || config[key] > max)) throw new Error(`Invalid ${key}`);"
         },
         {
-          "line": 294,
+          "line": 302,
           "kind": "error-or-exit-candidate",
           "code": "if (config.maxRunInputBytes !== undefined && (!Number.isInteger(config.maxRunInputBytes) || config.maxRunInputBytes < 1024)) throw new Error('maxRunInputBytes must be an integer of at least 1024');"
         },
         {
-          "line": 297,
+          "line": 305,
           "kind": "error-or-exit-candidate",
           "code": "if (config.maxAiCreditsPerCall !== undefined && !(typeof config.maxAiCreditsPerCall === 'number' && Number.isFinite(config.maxAiCreditsPerCall) && config.maxAiCreditsPerCall >= 30)) throw new Error('maxAiCreditsPerCall must be a number of at least 30 (the Copilot CLI minimum for --max-ai-credits)');"
         },
         {
-          "line": 299,
+          "line": 307,
           "kind": "error-or-exit-candidate",
           "code": "if (unset.length && requireModels) throw new Error(`Set an available model ID for models.${unset[0]}`);"
         },
         {
-          "line": 304,
+          "line": 312,
           "kind": "error-or-exit-candidate",
           "code": "throw new Error(`commands.${key} must be null or an argv array`);"
         },
         {
-          "line": 314,
+          "line": 322,
           "kind": "error-or-exit-candidate",
           "code": "if (lines.shift() !== 'source\\ttarget') throw new Error('Manifest header must be source<TAB>target');"
         },
         {
-          "line": 318,
+          "line": 326,
           "kind": "error-or-exit-candidate",
           "code": "if (parts.length !== 2) throw new Error(`Malformed manifest row: ${line}`);"
         },
         {
-          "line": 321,
+          "line": 329,
           "kind": "error-or-exit-candidate",
           "code": "if (!config.sourceRoots.some(r => inside(source, r))) throw new Error(`Source outside sourceRoots: ${source}`);"
         },
         {
-          "line": 322,
+          "line": 330,
           "kind": "error-or-exit-candidate",
           "code": "if (!fs.existsSync(safePath(root, source)) || !fs.statSync(safePath(root, source)).isFile()) throw new Error(`Missing source: ${source}`);"
         },
         {
-          "line": 324,
+          "line": 332,
           "kind": "error-or-exit-candidate",
           "code": "if (sources.has(source.toLowerCase()) || targets.has(target.toLowerCase())) throw new Error(`Duplicate manifest mapping: ${line}`);"
         },
         {
-          "line": 332,
+          "line": 340,
           "kind": "error-or-exit-candidate",
           "code": "if (targets.has(parts.join('/'))) throw new Error('Manifest target is also a parent of another target');"
         },
         {
-          "line": 340,
+          "line": 348,
           "kind": "error-or-exit-candidate",
           "code": "if (!fs.existsSync(file) || !fs.statSync(file).isFile()) throw new Error(`Required review dependency map missing: ${name}; generate and audit it in phase 01`);"
         },
         {
-          "line": 343,
+          "line": 351,
           "kind": "error-or-exit-candidate",
           "code": "if (map?.schemaVersion !== 1 || !graph || Array.isArray(graph) || typeof graph !== 'object') throw new Error('Review dependency map requires schemaVersion: 1 and dependencies object');"
         },
         {
-          "line": 346,
+          "line": 354,
           "kind": "error-or-exit-candidate",
           "code": "if (!config.sourceRoots.some(r => inside(p, r))) throw new Error(`Review dependency outside sourceRoots: ${p}`);"
         },
         {
-          "line": 347,
+          "line": 355,
           "kind": "error-or-exit-candidate",
           "code": "if (!fs.existsSync(full) || !fs.statSync(full).isFile()) throw new Error(`Review dependency file missing: ${p}`);"
         },
         {
-          "line": 351,
+          "line": 359,
           "kind": "error-or-exit-candidate",
           "code": "if (!Array.isArray(deps) || new Set(deps).size !== deps.length) throw new Error(`Review dependencies must be a unique array: ${source}`);"
         },
         {
-          "line": 361,
+          "line": 369,
           "kind": "error-or-exit-candidate",
           "code": "if (!Object.hasOwn(graph, name)) throw new Error(`Review dependency declaration missing: ${name}; explicitly declare [] for audited independent files`);"
         },
         {
-          "line": 377,
+          "line": 385,
           "kind": "error-or-exit-candidate",
           "code": "throw new Error('Source-only judge plan requires schemaVersion 1, verificationMode source-only, method, nonempty sources, scenarios and unverified limitations');"
         },
         {
-          "line": 381,
+          "line": 389,
           "kind": "error-or-exit-candidate",
           "code": "if (!roots.some(r => inside(p, r)) || [...config.outputRoots, ...generatedMigrationState, ...(config.buildArtifactRoots ?? []), '.git'].some(r => inside(p, r))) throw new Error(`Invalid ${kind} input path: ${p}`);"
         },
         {
-          "line": 382,
+          "line": 390,
           "kind": "error-or-exit-candidate",
           "code": "if (!fs.existsSync(full) || !fs.statSync(full).isFile() || fs.statSync(full).size === 0) throw new Error(`Missing or empty ${kind} input: ${p}`);"
         },
         {
-          "line": 388,
+          "line": 396,
           "kind": "error-or-exit-candidate",
           "code": "if (!scenario || !text(scenario.contract) || scenario.expectationBasis !== 'source-inferred') throw new Error('Source-only scenarios require contract and expectationBasis: source-inferred; do not claim observed original behavior');"
         },
         {
-          "line": 396,
+          "line": 404,
           "kind": "deadline-or-observation",
           "code": "export const operationalConfigKeys = ['executionMode', 'concurrency', 'maxAgentCalls', 'maxFixRounds', 'timeoutSeconds', 'commandTimeoutSeconds',"
         },
         {
-          "line": 406,
+          "line": 414,
           "kind": "error-or-exit-candidate",
           "code": "if (!fileHash(safePath(root, p))) throw new Error(`Required artifact missing: ${p}`);"
         },
         {
-          "line": 409,
+          "line": 417,
           "kind": "error-or-exit-candidate",
           "code": "if (!fs.existsSync(safePath(root, dir))) throw new Error(`Input root missing: ${dir}`);"
         },
         {
-          "line": 434,
+          "line": 442,
           "kind": "error-or-exit-candidate",
           "code": "catch (e) { if (e instanceof SyntaxError) return null; throw e; }"
         },
         {
-          "line": 437,
+          "line": 445,
           "kind": "error-or-exit-candidate",
           "code": "if (!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(id)) throw new Error('Invalid repair intent ID');"
         },
         {
-          "line": 442,
+          "line": 450,
           "kind": "error-or-exit-candidate",
           "code": "if (!checksum || fileHash(file) !== checksum) throw new Error('Repair intent receipt missing or changed; restore its bound evidence before resuming');"
         },
         {
-          "line": 447,
+          "line": 455,
           "kind": "error-or-exit-candidate",
           "code": "j.diagnosticHash !== hash(j.diagnostic) || !/^[a-f0-9]{24}$/.test(j.unitId))) throw new Error('Invalid repair intent receipt');"
         },
         {
-          "line": 455,
+          "line": 463,
           "kind": "error-or-exit-candidate",
           "code": "if (ref.schemaVersion !== 1 || ref.kind !== 'repair-intent-reference') throw new Error('Invalid active repair reference');"
         },
         {
-          "line": 519,
+          "line": 527,
           "kind": "pid-probe",
           "code": "const pidAlive = pid => { try { process.kill(pid, 0); return true; } catch (e) { return e.code !== 'ESRCH'; } };"
         },
         {
-          "line": 550,
+          "line": 554,
           "kind": "error-or-exit-candidate",
-          "code": "} catch (e) { if (e.code !== 'EEXIST') throw e; }"
+          "code": "catch (e) { if (e.code === 'ENOENT') return undefined; if (e instanceof SyntaxError) return null; throw e; }"
         },
         {
-          "line": 552,
+          "line": 574,
           "kind": "error-or-exit-candidate",
-          "code": "if (owner && Number.isInteger(owner.pid) && pidAlive(owner.pid)) throw new Error(`A build-loop (grant ${owner.grantId}, pid ${owner.pid}) is already running; wait for it to finish or interrupt that process`);"
+          "code": "if (e.code !== 'EEXIST') throw e;"
         },
         {
-          "line": 555,
+          "line": 580,
           "kind": "error-or-exit-candidate",
-          "code": "try { fs.renameSync(lock, aside); } catch (e) { if (e.code === 'ENOENT') continue; throw e; }"
+          "code": "try { fs.renameSync(claim, aside); } catch (error) { if (error.code === 'ENOENT') return; throw error; }"
         },
         {
-          "line": 560,
+          "line": 598,
           "kind": "error-or-exit-candidate",
-          "code": "throw new Error('Another build-loop started while a stale build-loop lock was being recovered');"
+          "code": "try { fs.linkSync(pending, lock); return; } catch (e) { if (e.code !== 'EEXIST') throw e; }"
         },
         {
-          "line": 564,
+          "line": 601,
           "kind": "error-or-exit-candidate",
-          "code": "throw new Error('Could not take the build-loop lock');"
+          "code": "if (!ownerGone(owner)) throw liveError(owner);"
         },
         {
-          "line": 569,
+          "line": 606,
+          "kind": "error-or-exit-candidate",
+          "code": "if (blocker) throw new Error(`The ${name} lock's recovery claim ${path.basename(lock)}.recover is held by pid ${blocker.pid}${ownerHost(blocker)}; confirm no runner command is running there, then run unlock --pid ${blocker.pid}`);"
+        },
+        {
+          "line": 607,
+          "kind": "error-or-exit-candidate",
+          "code": "throw new Error(`Could not take the ${name} lock while other commands kept taking it; rerun the command`);"
+        },
+        {
+          "line": 621,
           "kind": "error-or-exit-candidate",
           "code": "if (loop) throw new Error(`A build-loop (grant ${loop.id}, pid ${loop.pid}) is running; wait for it to finish or interrupt that process before other runner commands`);"
-        },
-        {
-          "line": 578,
-          "kind": "error-or-exit-candidate",
-          "code": "catch (e) { if (e.code === 'EEXIST') throw new Error('Migration locked. Check the owner process, then use unlock --pid OWNER_PID if it has stopped.'); throw e; }"
         }
       ]
     },
@@ -964,10 +974,15 @@
     },
     {
       "path": "lib/failures.mjs",
-      "sha256": "c153396c2fd5d80061db1d4f7844d4d64ae54b4d7a1ec828e94c275d94311cfe",
+      "sha256": "45b94728f950089ce4b77185d850cf857c390eb9b5982889a1298f4f22f2c96c",
       "entries": [
         {
-          "line": 14,
+          "line": 12,
+          "kind": "deadline-or-observation",
+          "code": "// A timeout reported by the service or network is not: a retry finishes it."
+        },
+        {
+          "line": 16,
           "kind": "deadline-or-observation",
           "code": "return /session\\.error rate_limit|\\b429\\b|rate[ -]?limit|too many requests|overloaded|temporar(?:il)?y unavailable|service unavailable|\\b50[234]\\b|session\\.error (?:\\S+ )?500\\b|\\b500 Internal Server Error|internal server error|bad gateway|gateway timeout|ECONNRESET|ETIMEDOUT|EAI_AGAIN|ECONNREFUSED|socket hang up|network (?:error|timeout)|fetch failed/i.test(value);"
         }
@@ -1036,7 +1051,7 @@
     },
     {
       "path": "lib/guidance.mjs",
-      "sha256": "ed574f217aed753d29b62c2970f3713b5ae35543c5c0616e325c1200262419bc",
+      "sha256": "bbeaaee1d5dcfdd620739982013799e53b60a2b022298efbbda7b49a961ad866",
       "entries": [
         {
           "line": 73,
@@ -2029,7 +2044,7 @@
     },
     {
       "path": "lib/preparation.mjs",
-      "sha256": "8ac66143340d487d777fb086718b2861ef966bbc1a178b9b0258c5bc185bf970",
+      "sha256": "a9bf52f1cddb59bd9a459704b1265e169ad89d7488b927a80731c56e4f095e82",
       "entries": [
         {
           "line": 20,
@@ -2122,17 +2137,42 @@
           "code": "if (!seed || !Number.isInteger(size) || size < 1 || size > 1000) throw new Error('Supply a recorded seed and sample size 1..1000');"
         },
         {
-          "line": 147,
+          "line": 153,
+          "kind": "error-or-exit-candidate",
+          "code": "if (!Number.isInteger(size) || size < 1 || size > 1000) throw new Error('Supply a target size 1..1000');"
+        },
+        {
+          "line": 158,
+          "kind": "error-or-exit-candidate",
+          "code": "if (depmapRoot === undefined) throw new Error('Specify --depmap-root (the mapper --root) for multiple source roots');"
+        },
+        {
+          "line": 164,
+          "kind": "error-or-exit-candidate",
+          "code": "if (explicit && !present) throw new Error(`Unresolved list not found: ${unresolved}`);"
+        },
+        {
+          "line": 175,
+          "kind": "error-or-exit-candidate",
+          "code": "const budget = Math.floor((config.maxReviewInputBytes ?? 65536) * 0.8);"
+        },
+        {
+          "line": 182,
+          "kind": "loop-exit-candidate",
+          "code": "if (selected.length >= size) break;"
+        },
+        {
+          "line": 200,
           "kind": "error-or-exit-candidate",
           "code": "if (!Array.isArray(files) || !files.length || new Set(files).size !== files.length) throw new Error('Select the actual audited files');"
         },
         {
-          "line": 149,
+          "line": 202,
           "kind": "error-or-exit-candidate",
           "code": "if (files.some(p => !Object.hasOwn(graph, p))) throw new Error('Audited file missing from declared source graph');"
         },
         {
-          "line": 152,
+          "line": 205,
           "kind": "error-or-exit-candidate",
           "code": "if (!observed.has(from) || !Object.hasOwn(graph, to)) throw new Error('Audit edge outside selected files or declared source roots');"
         }
@@ -2613,10 +2653,10 @@
     },
     {
       "path": "lib/source-spec.mjs",
-      "sha256": "8346dfb3be77ccd36908dfaab19cf999573e68cdf54886520bdf860169cad41c",
+      "sha256": "c0dc72f85ab5820629adc5b34e780b2a86de84d98770a40f8c8f7768d9992e36",
       "entries": [
         {
-          "line": 58,
+          "line": 70,
           "kind": "error-or-exit-candidate",
           "code": "if (!sources.length) throw new Error(`No source files under ${config.sourceRoots.join(', ')}; check sourceRoots in migration/config.json`);"
         }
@@ -2635,28 +2675,18 @@
     },
     {
       "path": "lib/status.mjs",
-      "sha256": "a53726bbbc278708011c5f2ddb060fa93810e055ee990899f8c3174603d69217",
+      "sha256": "f036edc92fabc6de47e8b5f2ecb80341b3f351a3344a6b789d6136e11ad72336",
       "entries": [
         {
           "line": 75,
           "kind": "error-or-exit-candidate",
           "code": "if (!Number.isInteger(report.lock.pid) || report.lock.pid < 1) throw new Error('Invalid lock owner PID');"
-        },
-        {
-          "line": 76,
-          "kind": "pid-probe",
-          "code": "try { process.kill(report.lock.pid, 0); report.running = true; }"
-        },
-        {
-          "line": 77,
-          "kind": "error-or-exit-candidate",
-          "code": "catch (e) { if (e.code !== 'ESRCH') throw e; }"
         }
       ]
     },
     {
       "path": "lib/survey-parts.mjs",
-      "sha256": "316c11b9394f9555aaff0cf57aa108d8a7191fc2b90f5c18cbb564abe298eef8",
+      "sha256": "934e58177653065e54a15e68ecb4263751582a981f038ab95beedaa91b6d08a2",
       "entries": [
         {
           "line": 56,
@@ -2669,12 +2699,12 @@
           "code": "if (!count) throw new Error(`Survey metadata exceeds maxReviewInputBytes (${limit}) for ${file.path}; the rulebook and one site must fit`);"
         },
         {
-          "line": 99,
+          "line": 115,
           "kind": "error-or-exit-candidate",
           "code": "if (low <= start) throw new Error(`Survey metadata exceeds maxReviewInputBytes (${limit}) before source text for ${file.path}; increase the capacity for required metadata`);"
         },
         {
-          "line": 106,
+          "line": 122,
           "kind": "error-or-exit-candidate",
           "code": "if (!raw.length) throw new Error(`Survey metadata exceeds maxReviewInputBytes (${limit}) with an empty source file`);"
         }
@@ -2682,7 +2712,7 @@
     },
     {
       "path": "lib/survey.mjs",
-      "sha256": "e0545184a32050dd69adbd99b8dcdbb9f32b463afa6c2c3bd1e9bdaa41e8668f",
+      "sha256": "1ad39e6e820c56fccc4d375b1abd8567f97852151fedf4921e2c2e70276ba034",
       "entries": [
         {
           "line": 21,
@@ -2775,122 +2805,127 @@
           "code": "if (seen.size !== expected.size) throw new Error(`Inventory survey covered ${seen.size} of ${expected.size} scope sites`);"
         },
         {
-          "line": 256,
+          "line": 273,
           "kind": "error-or-exit-candidate",
           "code": "const limits = executionLimits(config);"
         },
         {
-          "line": 296,
+          "line": 313,
           "kind": "error-or-exit-candidate",
           "code": "const parts = surveyRequests(kind, request, config.maxReviewInputBytes ?? 65536), finished = [];"
         },
         {
-          "line": 324,
+          "line": 342,
           "kind": "error-or-exit-candidate",
           "code": "if (signal?.aborted) throw new Error('Interrupted');"
         },
         {
-          "line": 325,
+          "line": 343,
           "kind": "error-or-exit-candidate",
           "code": "if (systemic) throw systemic;"
         },
         {
-          "line": 326,
+          "line": 344,
           "kind": "error-or-exit-candidate",
           "code": "if (reservations >= limits.calls) throw new Error('Agent call limit reached; resume with a new run after reviewing usage');"
         },
         {
-          "line": 330,
+          "line": 348,
           "kind": "error-or-exit-candidate",
           "code": "if (Buffer.byteLength(pending.input.text) > (config.maxReviewInputBytes ?? 65536)) {"
         },
         {
-          "line": 334,
+          "line": 352,
           "kind": "error-or-exit-candidate",
           "code": "if (Buffer.byteLength(pending.input.text) > (config.maxReviewInputBytes ?? 65536)) throw new Error('Survey metadata exceeds maxReviewInputBytes during correction');"
         },
         {
-          "line": 347,
+          "line": 365,
           "kind": "error-or-exit-candidate",
           "code": "if (result?.schemaVersion !== 1 || result.kind !== 'survey' || result.survey !== kind || result.target !== unit.target) throw new Error('Invalid survey result: schemaVersion/kind/survey/target mismatch');"
         },
         {
-          "line": 354,
+          "line": 372,
           "kind": "error-or-exit-candidate",
           "code": "if (!response && e.code !== 'SURVEY_VALIDATION') throw e;"
         },
         {
-          "line": 368,
+          "line": 387,
           "kind": "error-or-exit-candidate",
           "code": "if (!repaired && reservations < limits.calls && !signal?.aborted) {"
         },
         {
-          "line": 372,
+          "line": 390,
           "kind": "error-or-exit-candidate",
-          "code": "throw e;"
+          "code": "if (signal?.aborted) throw e;"
         },
         {
-          "line": 381,
+          "line": 393,
+          "kind": "error-or-exit-candidate",
+          "code": "if (!repaired) throw new Error(`Agent call limit reached (${limits.calls}) before the survey correction; validated rows are kept. Resume with a larger --max-calls`);"
+        },
+        {
+          "line": 414,
           "kind": "error-or-exit-candidate",
           "code": "if (e.code === 'SURVEY_VALIDATION') throw e;"
         },
         {
-          "line": 382,
+          "line": 415,
           "kind": "error-or-exit-candidate",
           "code": "if (isSystemicFailure(e)) { systemic ??= e; throw e; }"
         },
         {
-          "line": 383,
+          "line": 416,
           "kind": "error-or-exit-candidate",
           "code": "if (!isTransientFailure(e) || retry >= limits.retries || signal?.aborted) throw e;"
         },
         {
-          "line": 385,
+          "line": 418,
           "kind": "error-or-exit-candidate",
           "code": "await sleep(retryDelayMs(config, retry++), undefined, { signal }).catch(() => { throw new Error('Interrupted'); });"
         },
         {
-          "line": 392,
+          "line": 425,
           "kind": "loop-exit-candidate",
           "code": "failures.push(new Error(signal?.aborted ? 'Interrupted' : systemic.message)); break;"
         },
         {
-          "line": 401,
+          "line": 434,
           "kind": "error-or-exit-candidate",
           "code": "if (failures.length) throw failures[0];"
         },
         {
-          "line": 405,
+          "line": 438,
           "kind": "error-or-exit-candidate",
           "code": "if (surveyInput(root, config, kind, scope, { sitesFile }).hash !== input.hash) throw new Error('Survey scope inputs changed during the worker call');"
         },
         {
-          "line": 417,
+          "line": 459,
           "kind": "loop-exit-candidate",
           "code": "if (signal?.aborted || systemic) break;"
         },
         {
-          "line": 419,
+          "line": 461,
           "kind": "loop-exit-candidate",
           "code": "if (signal?.aborted || systemic) break;"
         },
         {
-          "line": 425,
+          "line": 467,
           "kind": "error-or-exit-candidate",
           "code": "const report = { runId, kind, executionMode: config.executionMode ?? 'continuous', ...(ignoredLimits(config).length ? { ignoredLimits: ignoredLimits(config) } : {}), startedAt, finishedAt: stamp(), agentCalls: calls, completed, done: status.done, total: status.total,"
         },
         {
-          "line": 436,
+          "line": 480,
           "kind": "error-or-exit-candidate",
           "code": "throw Object.assign(new Error(`Survey stopped: ${message || 'Interrupted'}`), { report });"
         },
         {
-          "line": 446,
+          "line": 490,
           "kind": "error-or-exit-candidate",
           "code": "if (plan.skipped.length) throw new Error(`Survey incomplete: ${plan.skipped.length} source files could not be read or found (${plan.skipped.slice(0, 5).map(s => s.file).join(', ')}); inspect skipped reasons, correct paths or prepare valid UTF-8 input and resume. Completed scopes are preserved.`);"
         },
         {
-          "line": 449,
+          "line": 493,
           "kind": "error-or-exit-candidate",
           "code": "if (missing.length) throw new Error(`Survey incomplete: ${missing.length} of ${plan.scopes.length} scopes have no current result (${missing.slice(0, 10).join(', ')}); resume survey run --kind ${kind}`);"
         }
@@ -4152,20 +4187,25 @@
     },
     {
       "path": "scripts/preparation_cli.mjs",
-      "sha256": "3fe902c4592e0e4f5f4dbcfa58a09bfff90200e3be7332335402203487feaa25",
+      "sha256": "9525c65a5495cb33a8204d365f9271805a4419a8b13a57eb190124ffe552f3aa",
       "entries": [
         {
-          "line": 18,
+          "line": 19,
           "kind": "error-or-exit-candidate",
-          "code": "else throw new Error('Use inventory-preview --shards LIST --sites PATH | inventory-merge --shards LIST --sites PATH [--expected-hash SHA256] | package-cycles --map PATH | dependency-samples --seed TEXT | dependency-diff --files LIST --audit PATH');"
+          "code": "else throw new Error('Use inventory-preview --shards LIST --sites PATH | inventory-merge --shards LIST --sites PATH [--expected-hash SHA256] | package-cycles --map PATH | dependency-samples --seed TEXT | dependency-targets [--size N] [--depmap-root DIR] [--unresolved PATH] [--out PATH] | dependency-diff --files LIST --audit PATH');"
         },
         {
-          "line": 19,
+          "line": 20,
           "kind": "error-or-exit-candidate",
           "code": "if (!out.startsWith('migration/depmap/')) throw new Error('Audit reports must be under migration/depmap/');"
         },
         {
-          "line": 28,
+          "line": 22,
+          "kind": "error-or-exit-candidate",
+          "code": "if (/^migration\\/depmap\\/(?:edges\\.tsv|order\\.txt|cycles\\.txt|unresolved\\.tsv|external\\.tsv|report\\.md)$/i.test(out)) throw new Error(`Audit reports cannot replace mapper output: ${out}`);"
+        },
+        {
+          "line": 31,
           "kind": "error-or-exit-candidate",
           "code": "} catch (e) { console.error(`ERROR: ${e.message}`); process.exitCode = 1; }"
         }
@@ -4255,230 +4295,230 @@
     },
     {
       "path": "scripts/run_migration.mjs",
-      "sha256": "380977d7fa1035e425fb2464ca6f7bf0552ca80bdefcb6a693d1b830a47b4f8d",
+      "sha256": "fca93fb59c7cc31aabf0a190366c8f4c49914b0105282aaa9f7ce2ae0000eb21",
       "entries": [
         {
-          "line": 77,
+          "line": 78,
           "kind": "error-or-exit-candidate",
           "code": "limits apply only when explicitly chosen or executionMode is bounded"
         },
         {
-          "line": 83,
+          "line": 84,
           "kind": "error-or-exit-candidate",
           "code": "if (signal?.aborted) throw new Error('Interrupted');"
         },
         {
-          "line": 84,
+          "line": 85,
           "kind": "deadline-or-observation",
           "code": "const timeoutMs = processTimeout(config, 'commandTimeoutSeconds');"
         },
         {
-          "line": 87,
+          "line": 88,
           "kind": "error-or-exit-candidate",
           "code": "checks.push({ check: 'execution limits', ok: true, executionMode: config.executionMode ?? 'continuous', ...(ignored.length ? { ignored,"
         },
         {
-          "line": 88,
+          "line": 89,
           "kind": "error-or-exit-candidate",
           "code": "note: `Continuous mode does not enforce ${ignored.join(', ')}. Set \"executionMode\": \"bounded\" to enforce them, or delete them; per-command --max-calls / --max-rounds still apply.` } : {}) });"
         },
         {
-          "line": 116,
+          "line": 117,
           "kind": "deadline-or-observation",
           "code": "// Copilot hooks fail open on timeout: a slow start silently disables the"
         },
         {
-          "line": 125,
+          "line": 126,
           "kind": "deadline-or-observation",
           "code": "limit = entry?.timeoutSec ?? entry?.timeout ?? null;"
         },
         {
-          "line": 133,
+          "line": 134,
           "kind": "deadline-or-observation",
           "code": "signal, timeoutMs, env: { ...process.env, ...(role ? { MIGRATION_KIT_ROLE: role } : {}) } }).catch(e => {"
         },
         {
-          "line": 134,
+          "line": 135,
           "kind": "error-or-exit-candidate",
           "code": "if (signal?.aborted) throw new Error('Interrupted');"
         },
         {
-          "line": 143,
+          "line": 144,
           "kind": "deadline-or-observation",
           "code": "checks.push({ check: 'hook responds before its timeout', ok: Boolean(worker && parent) && worker.code === 0 && parent.code === 0 &&"
         },
         {
-          "line": 146,
+          "line": 147,
           "kind": "deadline-or-observation",
           "code": "command: line ?? null, durationMs: slowest, timeoutSec: limit,"
         },
         {
-          "line": 147,
+          "line": 148,
           "kind": "deadline-or-observation",
           "code": "note: 'Runs the configured hook command. Copilot CLI and VS Code let a tool call through when a hook times out; keep the measured time well under half the configured timeout.' });"
         },
         {
-          "line": 166,
+          "line": 167,
           "kind": "deadline-or-observation",
           "code": "const version = await runProcess(command, ['--version'], { cwd: root, env, signal, timeoutMs });"
         },
         {
-          "line": 167,
+          "line": 168,
           "kind": "deadline-or-observation",
           "code": "const help = await runProcess(command, ['--help'], { cwd: root, env, signal, timeoutMs });"
         },
         {
-          "line": 173,
+          "line": 174,
           "kind": "deadline-or-observation",
           "code": "const agents = await probeWorkerAgents(command, [], { cwd: root, layout, signal, timeoutMs });"
         },
         {
-          "line": 175,
+          "line": 176,
           "kind": "deadline-or-observation",
           "code": "if (agents.ok) checks.push({ check: 'tool-assisted reviewer hook loads in prompt mode', ...await probeReviewerHook(command, [], { cwd: root, layout, signal, timeoutMs }),"
         },
         {
-          "line": 177,
+          "line": 178,
           "kind": "deadline-or-observation",
           "code": "checks.push({ check: 'file descriptor limit', ...await fileLimits({ signal, timeoutMs }), minimum: fileLimitMinimum,"
         },
         {
-          "line": 180,
+          "line": 181,
           "kind": "error-or-exit-candidate",
           "code": "if (signal?.aborted) throw new Error('Interrupted');"
         },
         {
-          "line": 197,
+          "line": 198,
           "kind": "error-or-exit-candidate",
           "code": "if (!Number.isInteger(seconds) || seconds < 1 || seconds > 1800) throw new Error('--wait must be a number of seconds from 1 to 1800');"
         },
         {
-          "line": 205,
+          "line": 206,
           "kind": "loop-exit-candidate",
           "code": "if (progressKey(report) !== start) break;"
         },
         {
-          "line": 216,
+          "line": 222,
           "kind": "error-or-exit-candidate",
-          "code": "if (!Number.isInteger(pid) || pid < 1 || lock.pid !== pid) throw new Error('Specify the exact lock owner PID');"
+          "code": "throw new Error('Specify the exact lock owner PID');"
         },
         {
-          "line": 218,
+          "line": 228,
           "kind": "pid-probe",
-          "code": "try { process.kill(pid, 0); } catch (e) { if (e.code === 'ESRCH') alive = false; else throw e; }"
+          "code": "if (alive) try { process.kill(pid, 0); } catch (e) { if (e.code === 'ESRCH') alive = false; else throw e; }"
         },
         {
-          "line": 219,
+          "line": 229,
           "kind": "error-or-exit-candidate",
           "code": "if (alive) throw new Error('Lock owner is still running; refusing to unlock');"
         },
         {
-          "line": 232,
+          "line": 244,
           "kind": "error-or-exit-candidate",
           "code": "if (!['list', 'set'].includes(args._[1])) throw new Error('Use models list [--format json|markdown] | models set --assign ROLE=ID[:EFFORT][:long_context],... | models set --role ROLE --model ID [--effort LEVEL|default] [--context default|long_context]');"
         },
         {
-          "line": 233,
+          "line": 245,
           "kind": "error-or-exit-candidate",
           "code": "if (args.format !== undefined && !['json', 'markdown'].includes(args.format)) throw new Error('models list format must be json or markdown');"
         },
         {
-          "line": 236,
+          "line": 248,
           "kind": "error-or-exit-candidate",
           "code": "if (!readConfigIfPresent(root)) throw new Error('migration/config.json is missing: initialize the project (install.mjs) before recording model choices');"
         },
         {
-          "line": 254,
+          "line": 266,
           "kind": "error-or-exit-candidate",
           "code": "if (!readConfigIfPresent(root)) throw new Error('migration/config.json is missing: initialize the project (install.mjs) before run settings');"
         },
         {
-          "line": 262,
+          "line": 274,
           "kind": "error-or-exit-candidate",
           "code": "if (!fs.existsSync(file)) throw new Error(`${runSettingsFile} is missing: run settings init first`);"
         },
         {
-          "line": 264,
+          "line": 276,
           "kind": "error-or-exit-candidate",
           "code": "try { settings = JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\\uFEFF/, '')); } catch (e) { throw new Error(`${runSettingsFile} is not valid JSON: ${e.message}`); }"
         },
         {
-          "line": 266,
+          "line": 278,
           "kind": "error-or-exit-candidate",
           "code": "if (errors.length) process.exitCode = 1;"
         },
         {
-          "line": 270,
+          "line": 282,
           "kind": "error-or-exit-candidate",
           "code": "if (action !== 'apply') throw new Error('Use settings init | check | apply');"
         },
         {
-          "line": 274,
+          "line": 286,
           "kind": "error-or-exit-candidate",
           "code": "if (!result.applied) process.exitCode = 1;"
         },
         {
-          "line": 280,
+          "line": 292,
           "kind": "error-or-exit-candidate",
           "code": "if (args.format && !['json', 'markdown', 'todo', 'checklist'].includes(args.format)) throw new Error('status format must be json, markdown, todo or checklist');"
         },
         {
-          "line": 282,
+          "line": 294,
           "kind": "error-or-exit-candidate",
           "code": "if (!report.ok) process.exitCode = 1;"
         },
         {
-          "line": 293,
+          "line": 305,
           "kind": "error-or-exit-candidate",
           "code": "if (typeof args.message !== 'string' || !args.message.trim()) throw new Error('guidance requires --message TEXT (the error to explain)');"
         },
         {
-          "line": 299,
+          "line": 311,
           "kind": "cancellation",
           "code": "const abort = () => controller.abort();"
         },
         {
-          "line": 323,
+          "line": 335,
           "kind": "error-or-exit-candidate",
           "code": "else if (cmd === 'source-spec') throw new Error('Use source-spec init [--apply] | check');"
         },
         {
-          "line": 334,
+          "line": 346,
           "kind": "error-or-exit-candidate",
           "code": "} else throw new Error('Use survey plan|run|status|merge --kind facts|contracts|inventory [--max-files N] [--sites migration/PATH.tsv]');"
         },
         {
-          "line": 348,
+          "line": 360,
           "kind": "error-or-exit-candidate",
           "code": "else throw new Error('Use sessions status | prune [--run RUN_ID]');"
         },
         {
-          "line": 356,
+          "line": 368,
           "kind": "error-or-exit-candidate",
           "code": "} else throw new Error('Use guardrails show | install [--add CSV] [--remove CSV] [--deny CSV] [--waiver NOTE] [--replace]');"
         },
         {
-          "line": 361,
+          "line": 373,
           "kind": "error-or-exit-candidate",
           "code": "process.exitCode = 1;"
         },
         {
-          "line": 372,
+          "line": 384,
           "kind": "error-or-exit-candidate",
           "code": "if (args._[1] !== 'translation' || args['complete-phase'] !== '03') throw new Error('--complete-phase applies only as approve translation --complete-phase 03');"
         },
         {
-          "line": 379,
+          "line": 391,
           "kind": "error-or-exit-candidate",
           "code": "if (cmd === 'repair' && !args.target && !args.queue) throw new Error('repair requires --target or --queue');"
         },
         {
-          "line": 384,
+          "line": 396,
           "kind": "error-or-exit-candidate",
           "code": "} else throw new Error(`Unknown command ${cmd}\\n${usage}`);"
         },
         {
-          "line": 402,
+          "line": 417,
           "kind": "error-or-exit-candidate",
           "code": "process.exitCode = 1;"
         }
@@ -4544,7 +4584,7 @@
     },
     {
       "path": "templates/migration-config.json",
-      "sha256": "a0853eb9e7972d819148909211ea379f51166d62416f04b7f2144580a46fcbbe",
+      "sha256": "10d6e3e7593bea5d63dd72e6a794e8acf645fc7c6fff4683b119dc8285edccfd",
       "entries": [
         {
           "line": 28,
@@ -4559,5 +4599,5 @@
       ]
     }
   ],
-  "candidateLines": 827
+  "candidateLines": 834
 }

@@ -10,7 +10,7 @@ import { loadConfig, safePath, readJSON, atomicWrite } from '../lib/core.mjs';
 import { runStage } from '../lib/pipeline.mjs';
 import { phaseCommand } from '../scripts/phase_cli.mjs';
 import { migrationStatus, statusTodo, statusChecklist } from '../lib/status.mjs';
-import { initSourceSpec, sourceSpecReadiness, contractsFile } from '../lib/source-spec.mjs';
+import { initSourceSpec, sourceSpecReadiness, sourcesFile, contractsFile, legacyContractsSkeleton } from '../lib/source-spec.mjs';
 import { failureGuidance, guidanceMarkdown } from '../lib/guidance.mjs';
 import { setPreferences } from '../lib/preferences.mjs';
 import { runProcess } from '../lib/process.mjs';
@@ -28,8 +28,6 @@ function project(t, options = {}) {
 }
 // What the AI drafts from the source before the single user review.
 function draftPackage(root) {
-  const file = safePath(root, contractsFile);
-  atomicWrite(file, fs.readFileSync(file, 'utf8').replaceAll('TODO(spec)', 'inferred from the cited source line'));
   atomicWrite(safePath(root, 'migration/judge-report.md'), 'Source-derived contracts for three files; equivalence unverified.\n');
   atomicWrite(safePath(root, 'migration/depmap/edges.tsv'), 'from\tto\nsrc/main.py\tsrc/math_ops.py\nsrc/main.py\tsrc/text_ops.py\n');
   atomicWrite(safePath(root, 'migration/depmap/order.txt'), 'src/math_ops.py\tsrc/text_ops.py\nsrc/main.py\n');
@@ -58,7 +56,7 @@ test('source-spec init previews, then switches an existing runtime project and d
   const config = loadConfig(root), before = fs.readFileSync(safePath(root, 'migration/config.json'), 'utf8');
   const preview = initSourceSpec(root, config);
   assert.equal(preview.applied, false);
-  assert.deepEqual(preview.changes.map(c => c.path), ['migration/config.json', 'migration/judge-plan.json', contractsFile]);
+  assert.deepEqual(preview.changes.map(c => c.path), ['migration/config.json', 'migration/judge-plan.json', sourcesFile]);
   assert.equal(fs.readFileSync(safePath(root, 'migration/config.json'), 'utf8'), before, 'preview never writes');
   const applied = initSourceSpec(root, config, { apply: true });
   assert.match(applied.warning, /verification mode invalidates every phase record from 00/);
@@ -67,9 +65,13 @@ test('source-spec init previews, then switches an existing runtime project and d
   const plan = readJSON(safePath(root, 'migration/judge-plan.json'));
   assert.deepEqual(plan.sources, ['src/main.py', 'src/math_ops.py', 'src/text_ops.py']);
   assert.equal(plan.scenarios[0].expectationBasis, 'source-inferred');
-  atomicWrite(safePath(root, contractsFile), '# kept\n');
+  assert.equal(plan.scenarios[0].path, sourcesFile);
+  assert.equal(fs.existsSync(safePath(root, contractsFile)), false, 'no per-file contract memo to fill and review');
+  const index = fs.readFileSync(safePath(root, sourcesFile), 'utf8');
+  assert.match(index, /^- src\/main\.py$/m); assert.doesNotMatch(index, /TODO\(spec\)/);
+  atomicWrite(safePath(root, sourcesFile), '# kept\n');
   assert.deepEqual(initSourceSpec(root, saved, { apply: true }).changes, [], 'existing drafts are never overwritten');
-  assert.equal(fs.readFileSync(safePath(root, contractsFile), 'utf8'), '# kept\n');
+  assert.equal(fs.readFileSync(safePath(root, sourcesFile), 'utf8'), '# kept\n');
   const readiness = sourceSpecReadiness(root, saved);
   assert.equal(readiness.ready, false);
   assert.equal(readiness.items.find(i => i.path === 'migration/RULEBOOK.md').status, 'template');
@@ -103,7 +105,9 @@ test('one user OK records 00b-02 together; unfilled contracts and gaps stop with
   atomicWrite(safePath(root, 'migration/feasibility.md'), 'Three files; no original runtime or spec.\n');
   phaseCommand(root, config, 'complete', '00', { note: 'User reviewed feasibility' });
   draftPackage(root);
-  const file = safePath(root, contractsFile);
+  // The source index needs no drafting, but a TODO(spec) left in any plan scenario still blocks.
+  const file = safePath(root, sourcesFile);
+  assert.equal(sourceSpecReadiness(root, config).items.find(i => i.path === sourcesFile).status, 'ready');
   atomicWrite(file, `${fs.readFileSync(file, 'utf8')}\n- Extra: TODO(spec)\n`);
   let error;
   try { phaseCommand(root, config, 'complete', '00b,01,02', { note: 'User OK' }); } catch (e) { error = e; }
@@ -280,4 +284,24 @@ test('review fixes: doctor runs the configured hook command and fails when it po
   hook.hooks.preToolUse[0].bash = 'node migration-kit/scripts/missing_hook.mjs';
   fs.writeFileSync(file, JSON.stringify(hook));
   assert.equal((await doctor(root, loadConfig(root))).checks.find(c => c.check === 'hook responds before its timeout').ok, false);
+});
+
+test('a plan drafted before 0.10.0 keeps its contract memo and its TODO(spec) gate', t => {
+  const root = project(t, { preparationProfile: 'source-as-spec' });
+  let config = loadConfig(root);
+  initSourceSpec(root, config, { apply: true }); config = loadConfig(root);
+  const planFile = safePath(root, 'migration/judge-plan.json'), plan = readJSON(planFile);
+  plan.scenarios = [{ path: contractsFile, contract: 'Per-file contracts', expectationBasis: 'source-inferred' }];
+  writeJSONFile(root, 'migration/judge-plan.json', plan);
+  atomicWrite(safePath(root, contractsFile), `${legacyContractsSkeleton(config, plan.sources)}\n`);
+  fs.rmSync(safePath(root, sourcesFile));
+  assert.deepEqual(initSourceSpec(root, config, { apply: true }).changes, [], 'no unused source index beside a legacy plan');
+  const readiness = sourceSpecReadiness(root, config);
+  assert.equal(readiness.items.find(i => i.path === contractsFile).status, 'placeholder');
+  assert.equal(readiness.items.some(i => i.path === sourcesFile), false, 'readiness follows the saved plan');
+  phaseCommand(root, config, 'init');
+  atomicWrite(safePath(root, 'migration/feasibility.md'), 'Three files; no original runtime or spec.\n');
+  phaseCommand(root, config, 'complete', '00', { note: 'User reviewed feasibility' });
+  draftPackage(root);
+  assert.throws(() => phaseCommand(root, config, 'complete', '00b,01,02', { note: 'User OK' }), /TODO\(spec\)/);
 });

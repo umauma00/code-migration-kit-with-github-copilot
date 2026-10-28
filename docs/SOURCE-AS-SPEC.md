@@ -37,7 +37,10 @@ node migration-kit/scripts/run_migration.mjs source-spec init --apply  # ユー�
 `preparationProfile: "source-as-spec"` に切り替え、まだないファイルだけを作ります。
 
 - `migration/judge-plan.json`：sourceRoots配下の全ソースを列挙した準備記録
-- `migration/source-spec/contracts.md`：ファイルごとの契約メモの雛形（`TODO(spec)` 入り）
+- `migration/source-spec/sources.md`：仕様となるソースファイルの一覧（機械生成。記入は不要）
+
+0.10.0 から、ファイルごとの契約メモ（`contracts.md`）は作りません。ソースそのものが仕様なので、
+メモを作る調査とメモの正しさの確認の両方に時間がかかるだけだったためです。レビュー担当はソースの行を直接読みます。
 
 方式の切り替えは設定変更なので、以前の承認・記録は失効します（00bから確認し直し）。
 
@@ -47,21 +50,19 @@ node migration-kit/scripts/run_migration.mjs source-spec init --apply  # ユー�
 
 | 工程 | 成果物 | 作り方 |
 |---|---|---|
-| 00b | `source-spec/contracts.md` | 各ファイルの公開インターフェース・入出力・エラー・境界条件を、**ソースの行番号付き**で記入。ソースから判断できないものは「不明」と書く |
-| 00b | `judge-report.md` | 契約の要約、推定の根拠、未検証の範囲 |
+| 00b | `judge-report.md` | 対象範囲、方式、未検証の範囲（ファイルごとの契約メモは不要） |
 | 01 | `depmap/`、`manifest.tsv`、`review-dependencies.json`、`depmap/report.md` | 同梱の解析器で機械的に生成（推測しない）。ソースを読むだけで元のアプリは実行しない。同梱版のない言語は[アダプタを自作](DEPENDENCY-MAPPERS.md) |
 | 02 | `RULEBOOK.md`、`inventory.tsv`、`gap-report.md` | ソースの実際の使われ方から方針を決める。判断できない箇所はinventoryにUNKNOWNとして残し、最も保守的な訳とTODO(port)を指定 |
 
-大きなリポジトリでは、契約メモを親が全ファイル読んで書く代わりに `survey run --kind contracts` → `survey merge --kind contracts` で範囲ごとに作れます（[準備工程の調査](SURVEYS.md)）。
-
-`contracts.md` に `TODO(spec)` が残っている間は、00bを完了として記録できません（雛形のままの承認を防ぐため）。
+0.10.0 より前に作った judge-plan が `contracts.md` を指している場合は、従来どおり `TODO(spec)` が残っている間は00bを記録できません。
+新しい方式に移るには、`migration/judge-plan.json` を削除してから `source-spec init --apply` をやり直します（設定は変わらないので00の記録は残り、00b〜02は一括確認をやり直します）。
 
 ### 準備監査を軽くする
 
-標準の[準備監査](PREPARATION-AUDITS.md)（独立監査2名×20ファイル、最大3ラウンド、01の最初の20行での停止など）は行いません。
+標準の[準備監査](PREPARATION-AUDITS.md)（01の依存監査、02の最初の20行での停止や2名の分割監査など）は行いません。
 代わりに、**仕様一式に対する独立レビューを1回**行います。
 
-- 作成者とは別の文脈のレビュー担当1名が、契約メモ・RULEBOOK・inventory・依存マップを一緒に読み、
+- 作成者とは別の文脈のレビュー担当1名が、ソース・RULEBOOK・inventory・依存マップを一緒に読み、
   ソースと食い違う記述、根拠の行番号がない記述、ルールとinventoryの矛盾を挙げる
 - 指摘は修正してから、**修正済みの指摘と残った論点の両方**をユーザーへの報告に含める
 - 依存解析は機械的に作るため、エージェントによる辺のサンプリング監査は省略する。解析器の未対応構文・除外は `depmap/report.md` に書く
@@ -71,7 +72,7 @@ node migration-kit/scripts/run_migration.mjs source-spec init --apply  # ユー�
 仕様一式がそろったら、AIは1つの報告にまとめて表示します。
 
 1. 生成した成果物へのリンク（上表のすべて）
-2. 確認してほしい点：推定した契約のうち影響が大きいもの、UNKNOWNの一覧、独立レビューで残った論点
+2. 確認してほしい点：影響が大きい推定、UNKNOWNの一覧（引用を確かめられず UNKNOWN にした行の数を含む）、独立レビューで残った論点
 3. 選択肢（推奨付き、理由つき）：「この仕様一式で移行へ進む（推奨）」「指摘箇所を修正する」「中断する」
 
 ユーザーがOKと答えた場合だけ、AIは次のコマンドで3工程をまとめて記録します。

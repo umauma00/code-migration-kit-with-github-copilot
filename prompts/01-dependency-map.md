@@ -6,11 +6,13 @@ End with its report; ask for the next decision only when needed.
 Prerequisite: feasibility and judge design reviewed. Work one phase and stop.
 
 Follow [preparation audits](../docs/PREPARATION-AUDITS.md): five-file extraction
-trial before full generation; two independent disjoint 20-file random/adversarial
-audits (record actual coverage for small repos); missed AND invented edge diffs;
-fix the scanner, regenerate everything and freshly resample. Stop after three
-failed rounds. Use the sample/diff CLI for mechanical evidence, not invented
-source findings. Review scanner exclusions and unsupported syntax separately.
+trial before full generation; then, for a bundled or fixture-tested mapper, the
+light audit described below (one auditor over `dependency-targets` files). Only
+a hand-written graph or unproven adapter gets two independent disjoint 20-file
+random/adversarial audits (record actual coverage for small repos), missed AND
+invented edge diffs, a fixed scanner, full regeneration and fresh resampling, at
+most three rounds, then a report of what remains. Use the sample/diff CLI for
+mechanical evidence, not invented source findings. Review scanner exclusions and unsupported syntax separately.
 When target packages are known, declare config.packageMap and generate the
 separate target-package cycle report before phase 01 completion.
 Run each audit request with `audit_inputs.mjs freeze` then `audit_inputs.mjs run
@@ -32,6 +34,15 @@ language or unsupported syntax needs an adapter written under
 guessed graph. When a bundled mapper fails or falls short, follow that
 document's "When a bundled mapper fails" steps: fix a copy there, never
 `migration-kit/`, and record it in `depmap/report.md`.
+
+Audit a bundled (or fixture-tested) mapper's graph lightly, as in
+[preparation audits](../docs/PREPARATION-AUDITS.md#dependency-map-01): review the
+mechanical checks, run `preparation_cli.mjs dependency-targets`, have ONE fresh
+auditor list those files' direct edges, and run `dependency-diff` on the same
+files. Fix confirmed misses in the mapper or declaration, regenerate, and diff
+the same files again. Do not run 2 x 20-file sampling rounds for a bundled
+mapper, and do not stop or ask because a dependency stays unresolved: list it
+in `depmap/report.md`.
 
 Draft `migration/RULEBOOK.md` with the user. Decide all ambiguous mappings once:
 architecture, null/exception/number semantics, library choices, names, imports,
@@ -101,5 +112,5 @@ Save the concrete phase report to `migration/depmap/report.md`. After its actual
 
 With `preparationProfile: source-as-spec`, generate the map, manifest and review
 dependencies mechanically (`source-spec check` prints the commands), record parser
-limits in `depmap/report.md`, skip the agent edge-sampling rounds and do not stop
-for a 01-only gate: continue to 02. See [source-as-spec](../docs/SOURCE-AS-SPEC.md).
+limits in `depmap/report.md`, skip the agent edge-sampling rounds and the light
+audit (the package review in 02 replaces both) and do not stop for a 01-only gate: continue to 02. See [source-as-spec](../docs/SOURCE-AS-SPEC.md).

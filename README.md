@@ -130,7 +130,7 @@ node migration-kit/scripts/run_migration.mjs doctor --check-cli
 | `verificationRoots` | 比較器・テスト・テストデータ。例：`["tests"]` |
 | `verificationInputs` | 追加で変更を追跡するビルド設定・依存設定等のファイル。例：`["build/config.json", "packages/api/tsconfig.json"]` |
 | `buildArtifactRoots` | コマンドが生成するバイナリ・オブジェクト・レポートのディレクトリ。例：`["artifacts", "dist"]`。既定は空配列 |
-| `maxReviewInputBytes` | 固定レビュー入力のJSONサイズ上限。既定65536 bytes。超過した単位は、自動でツール付きレビュー（下記）に切り替わる |
+| `maxReviewInputBytes` | 固定レビュー入力のJSONサイズ上限。新規導入は262144 bytes（256 KiB、約6.5万〜9万トークン）。既存の設定は値を保ち、項目がなければ65536。超過した単位は、自動でツール付きレビュー（下記）に切り替わる |
 | `reviewDependencyMap` | 監査した依存宣言JSON。既定 `migration/review-dependencies.json`。phase 01で作成する必須成果物 |
 | `sourceLanguage`, `targetLanguage` | 対象言語。テンプレートのPython/JavaScriptを変更可能 |
 | `verificationMode` | `runtime`（省略時）：元環境と新旧比較を実行。`source-only`：ソース由来の準備と変換後build/smokeを検証し、動作同等性未検証として引き継ぐ。既存設定は自動変更しない |
@@ -301,7 +301,7 @@ smoke・parityの失敗も同じ経路で修正します（上流Step 6）。元
 
 同じ入力であっても、build等の再実行を開始すると下流の結果と承認は失効します。再実行が成功した場合も、smoke以降を改めて確認・承認・実行してください。judgeを再実行した場合はtranslationの承認からやり直します。
 
-長い実行中の進捗確認は `status --fast --wait 600 --format markdown` を使います。これは状態確認だけを最大600秒待つ指定で、workerの期限ではありません。返った後も既存の実行を待ちます。単位の完了や状態変化で返すので、親エージェントの確認回数（＝AI呼び出し）を減らせます。中断後は `translate` を再実行します。通常の `translate` は開始時に完了していた単位も終了時に再確認し、全単位の有効なレビュー記録が揃わなければ失敗します。`repair` の成功条件は指定した単位の完了です。異常終了でロックが残った場合のみ、所有プロセスの終了を確認して `unlock --pid OWNER_PID` を使います。稼働中のPIDでは解除できません。
+長い実行中の進捗確認は `status --fast --wait 600 --format markdown` を使います。これは状態確認だけを最大600秒待つ指定で、workerの期限ではありません。返った後も既存の実行を待ちます。単位の完了や状態変化で返すので、親エージェントの確認回数（＝AI呼び出し）を減らせます。中断後は `translate` を再実行します。通常の `translate` は開始時に完了していた単位も終了時に再確認し、全単位の有効なレビュー記録が揃わなければ失敗します。`repair` の成功条件は指定した単位の完了です。異常終了で残ったロックは、同じホストなら次のコマンドが自動で外します。別ホスト（共有フォルダ）のロックや、PIDが別のプロセスに再利用された場合だけ、その実行が止まったことを確認して `unlock --pid OWNER_PID` を使います。このホストで稼働中のPIDは解除できません。
 
 ## 任意：Dynamic Workflows
 

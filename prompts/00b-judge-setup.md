@@ -52,20 +52,26 @@ never delete or weaken a test to improve the numbers. Stop for review.
 
 When `preparationProfile` is `source-as-spec` (no runnable original, no
 specification), follow [source-as-spec](../docs/SOURCE-AS-SPEC.md) instead of the
-runtime harness above: run `source-spec init`, fill `migration/source-spec/contracts.md`
-from cited source lines (write "unknown" where the source cannot decide), write
-`judge-report.md`, and continue straight into 01 and 02 without stopping for a
+runtime harness above: run `source-spec init`, which writes the judge plan and
+a mechanical source index (`migration/source-spec/sources.md`). There is no
+per-file contract memo to draft: the source is the specification and reviewers
+read cited source lines directly. Write `judge-report.md` (scope, method and the
+unverified limits), and continue straight into 01 and 02 without stopping for a
 00b-only review. The user reviews 00b–02 once as a package.
 
-For source-as-spec, draft the contracts with `survey run --kind contracts` and
-`survey merge --kind contracts` instead of reading every file yourself; the merge
-fills `migration/source-spec/contracts.md` only while it is the untouched skeleton.
-See [surveys](../docs/SURVEYS.md).
+Do not run the `contracts` survey kind for source-as-spec. It is kept only for
+projects whose judge plan, drafted before 0.10.0, still names
+`migration/source-spec/contracts.md`. See [surveys](../docs/SURVEYS.md).
 
 Preserve completed scopes and validated rows. The runner supplies original line
-numbers and makes one bounded correction of bad citations/missing rows (counted
-against a call budget only when the person chose one); do not ask for another decision at each repair attempt.
+numbers and makes one correction of bad citations/missing rows (counted against
+a call budget only when the person chose one). Rows still uncited after that
+finish as UNKNOWN / TODO(port) marked `uncited`, and a file too large for one
+survey input finishes as UNKNOWN without model calls; the survey completes, and
+you report those counts in the review package instead of asking. Do not ask for
+a decision at any repair attempt.
 Do not resurvey the whole repository, discard sites or edit citations to make
 validation pass. Monitor the same terminal using `status --fast --format
-markdown`; silence alone does not justify cancellation. Ask only after bounded
-recovery is exhausted or a scope/model/budget change needs a new decision.
+markdown`; silence alone does not justify cancellation, and elapsed time or CPU
+use is never a reason to stop. Ask only when a scope, model or budget change
+needs a new decision, or the same command fails again on rerun with no progress.
