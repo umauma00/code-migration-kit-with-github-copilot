@@ -1,3 +1,39 @@
+# 0.11.0 — 2026-10-28
+
+- Decide run settings in one file instead of one question per setting.
+  `run_migration.mjs settings init` writes `migration/run-settings.json` from
+  the current configuration (report language, whether the original can run,
+  migration languages, mode, roots, verification mode, execution mode,
+  concurrency, stage commands, and every role's model, effort and context
+  size), with the account's models, efforts and context tiers under `_choices` and `FILL_IN` where nothing was
+  chosen. Setup asks two questions after the report language: one model for
+  every role (`models set --role all`), which fills every role's model in the
+  file, then "filled in, or a question?" The file takes per-role changes.
+- `settings apply` checks every entry against the account's model list and the
+  runner's configuration checks, reports every problem at once and writes
+  nothing unless all pass; the host asks the person to confirm once, like
+  `models set`. Values land in `migration/config.json` and
+  `migration/preferences.json` as before, so the report language still never
+  revokes approvals. An empty `phaseModels`/`reasoningEfforts`/`contextTiers`
+  map is left out as `models set` leaves it, and the reviewed configuration now
+  treats an empty map and an absent one alike, so neither command revokes
+  reviews by tidying one. Applying needs the Copilot CLI's model list (sign in first), since
+  every model entry is checked. `settings check` validates without writing.
+- `status` (full and `--fast`) reports whether the file still matches the
+  configuration, and lists the entries changed but not applied yet.
+- Setup guesses the source language from the project's files (counted by
+  extension, leaving out dependencies, build output, hidden folders and the
+  output and test roots) and asks one question for the target with the guess
+  shown; free text corrects the source. `settings init --source --target`
+  records the answer and, while the folders are the template's, fills
+  `sourceRoots` with the guessed language's folders. The runner migrates one
+  source language: another of comparable size is pointed out so the person
+  names the main one, and a language with only a few files is not treated as
+  the source language. Typed names such as `csharp` or `VB` are recorded as the
+  names the bundled mappers recognize.
+- Only the report language is asked before initialization. `models set` stays
+  for changing models alone from chat.
+
 # 0.10.0 — 2026-10-27
 
 Remove mid-run stops that a rerun would only repeat. Nothing here adds a stop
