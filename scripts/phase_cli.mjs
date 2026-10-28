@@ -82,18 +82,24 @@ export function phaseCommand(root, config, action, phase, options = {}) {
     // The person chose to proceed past an unfinished phase (relaxed mode).
     // What the phase still lacks is recorded with their reason.
     if (action === 'waive') {
+      // A runner phase already done for real needs no waiver, whatever its
+      // predecessors say now: its own done-condition is checked first.
+      const own = { '04': 'units', '05': 'build', '05b': 'smoke', '05c': config.verificationMode === 'source-only' ? null : 'parity' }[phase];
+      if (own) {
+        let finished = false;
+        try {
+          const context = contextHash(root, config), units = readManifest(root, config);
+          finished = own === 'units' ? units.length > 0 && units.every(u => done(root, u, context)) : Boolean(currentRecord(root, config, own, context, true));
+        } catch {}
+        if (finished) return { phase, waived: false, complete: true };
+      }
       let unmet;
       try {
         validate(root, config, phase, true);
         if (['00','00b','01','02','03'].includes(phase)) completePhase(root, config, phase, 'check', {}, { dryRun: true });
-        // A runner phase already done for real needs no waiver.
-        const context = contextHash(root, config);
-        if (phase === '04') { const units = readManifest(root, config); if (!units.length || !units.every(u => done(root, u, context))) throw new Error('Current reviewed translation units are required'); }
-        const own = { '05': 'build', '05b': 'smoke', '05c': config.verificationMode === 'source-only' ? null : 'parity' }[phase];
-        if (own && !currentRecord(root, config, own, context, true)) throw new Error(`Run ${own} successfully for current inputs`);
+        if (own) throw new Error(own === 'units' ? 'Current reviewed translation units are required' : `Run ${own} successfully for current inputs`);
       }
       catch (e) { unmet = e.message.replace(/ Relaxed mode: .*$/s, ''); }
-      if (!unmet && ['04', '05', '05b'].includes(phase) || (!unmet && phase === '05c' && config.verificationMode !== 'source-only')) return { phase, waived: false, complete: true };
       return waivePhase(root, config, phase, options.note, unmet);
     }
     // One reviewed note may cover consecutive phases (source-as-spec reviews

@@ -82,6 +82,9 @@ test('relaxed mode warns, names the phase to waive, and offers fix first, procee
   assert.match(proceed.command, /phase waive 03 --note "/);
   assert.equal(g.options.at(-1).id, 'pause');
   assert.throws(() => waive(f, '06'), /cannot be waived/);
+  // Waiving 00 records only what 00 lacks, not later phases' files.
+  fs.rmSync(safePath(f.root, 'migration/inventory.tsv'));
+  assert.doesNotMatch(waive(f, '00').unmet ?? '', /inventory/);
   assert.throws(() => phaseCommand(f.root, f.config, 'waive', '03', { note: ' ' }), /requires --note/);
 });
 

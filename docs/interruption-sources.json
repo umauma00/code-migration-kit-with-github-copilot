@@ -4221,7 +4221,7 @@
     },
     {
       "path": "scripts/phase_cli.mjs",
-      "sha256": "a07dd54a3ec0ed68c384e68f99d8b65933ef8c2405392a50e3714a3f40a9ab88",
+      "sha256": "3866603368dfcdc852dc339d555e6d7d93d42421128443295290abea5d3f2579",
       "entries": [
         {
           "line": 19,
@@ -4259,22 +4259,17 @@
           "code": "if (!['init','start','complete','waive'].includes(action)) throw new Error('Use phase init|next|check ID|start ID|complete ID --note TEXT|waive ID --note TEXT');"
         },
         {
-          "line": 91,
+          "line": 100,
           "kind": "error-or-exit-candidate",
-          "code": "if (phase === '04') { const units = readManifest(root, config); if (!units.length || !units.every(u => done(root, u, context))) throw new Error('Current reviewed translation units are required'); }"
+          "code": "if (own) throw new Error(own === 'units' ? 'Current reviewed translation units are required' : `Run ${own} successfully for current inputs`);"
         },
         {
-          "line": 93,
-          "kind": "error-or-exit-candidate",
-          "code": "if (own && !currentRecord(root, config, own, context, true)) throw new Error(`Run ${own} successfully for current inputs`);"
-        },
-        {
-          "line": 103,
+          "line": 109,
           "kind": "error-or-exit-candidate",
           "code": "if (ids.length > 1 && ids.some((id, i) => i && orderedPhases.indexOf(id) !== orderedPhases.indexOf(ids[i - 1]) + 1)) throw new Error('List consecutive phases in order, for example 00b,01,02');"
         },
         {
-          "line": 104,
+          "line": 110,
           "kind": "error-or-exit-candidate",
           "code": "if (ids.length > 1 && ids.some(id => !['00','00b','01','02'].includes(id))) throw new Error('Only preparation phases 00 through 02 can be completed together');"
         }
@@ -4694,5 +4689,5 @@
       ]
     }
   ],
-  "candidateLines": 852
+  "candidateLines": 851
 }
