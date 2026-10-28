@@ -146,8 +146,14 @@ Validation output fingerprints include both the output-root tree and every
 explicit manifest target, even under traversal exclusions. Changing any mapped
 output during build/smoke/parity makes the stage fail, even if its command exits 0.
 
-The global run lock prevents simultaneous runners/validation stages. A crash
-leaves the lock in place; unlock checks that the exact owner PID has stopped.
+The global run lock prevents simultaneous runners/validation stages. A lock
+whose owner PID no longer exists on this host is recovered by the next command
+under a short recovery claim. A lock from another host (shared folder) or a
+reused PID still refuses; unlock checks the exact owner PID. A lock written
+before 0.10.0 records no host and is judged by its PID on this host. Hosts
+are told apart by hostname, so containers with a new hostname per run need
+`unlock` for their own crashed lock. `unlock` covers run.lock, build-loop.lock
+and their `.recover` claims.
 Parallel workers operate on unique manifest outputs. The configured concurrency
 caps active agent calls; reviews cannot silently double the cap. Fatal input or
 scheduler failures stop new calls and cancel active adapters, but retain the lock
@@ -256,8 +262,10 @@ stdoutBytes/stderrBytes and stdoutHash/stderrHash identify the complete output; 
 The CLI JSONL and build diagnostic consumers iterate full logs, not the tails.
 A write failure is real evidence loss and remains an error.
 
-All survey kinds split oversized source bodies, including single long lines,
-into source-numbered ranges. A part receipt under <scope-id>.parts/<request-hash>.json
+Facts and contracts split oversized source bodies, including single long lines,
+into source-numbered ranges. An inventory file that does not fit in one input
+with the rulebook and one site is recorded as UNKNOWN for every site without
+model calls (`mechanical: oversized-source`). A part receipt under <scope-id>.parts/<request-hash>.json
 binds scopeInputHash and requestHash to validated items. The scope result records
 parts and partReceipts and is published only after all parts/files/sites are
 validated and the original inputs are unchanged. Rejected replies and validated

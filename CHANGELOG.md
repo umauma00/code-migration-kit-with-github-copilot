@@ -1,3 +1,49 @@
+# 0.10.0 — 2026-10-27
+
+Remove mid-run stops that a rerun would only repeat. Nothing here adds a stop
+based on time, CPU, silence or output volume.
+
+- Survey: rows whose citations or coverage are still invalid after the one
+  correction no longer stop the scope. They finish as UNKNOWN/TODO(port) marked
+  `uncited`, with evidence naming only the original file range and the
+  rejected-answer record (never the worker's citation); facts drop only the
+  invalid items. Scope records and the `survey merge` result count them
+  (`uncited`, `droppedFacts`, `droppedAnswers`).
+- Survey: an inventory file that does not fit in one input with the RULEBOOK
+  and one census site is recorded as UNKNOWN/TODO(port) for every site without model calls and listed under
+  `unsurveyedOversizedFiles`. Its fragment answers were always merged as
+  UNKNOWN; one 20k-line, 1,000-site file took 148 serial calls for that result.
+- Liveness notices now come from a separate thread, so synchronous checks
+  (`status`, `phase next`) no longer look silent to a host; `phase`, `approve`,
+  `diagnose` and `source-spec` get the notice too (without an opening line, so
+  a failure still starts with `ERROR:`). Manifest checks resolve each protected
+  path once per check: about 5.5 s to 2.2 s for 2,000 files.
+- A `run.lock` or build-loop lock whose owner process is gone on this host is
+  removed by the next command, under a short recovery claim so two recoverers
+  never remove a fresh lock. Locks record their host; one from another host
+  still refuses and `unlock` can clear it, as well as a recovery claim (a pre-0.10.0 lock has no host and
+  is judged by its PID here). Release removes only its own lock.
+- A "request/connection/... timed out" reported by the service or network is
+  retried as transient; only the kit's own explicit deadline stays final.
+- New installs default `maxReviewInputBytes` to 262144 (256 KiB). Existing
+  configs keep their value.
+- Source-as-spec drafts no per-file contract memo. `source-spec init` writes a
+  mechanical source index (`migration/source-spec/sources.md`) as the plan's
+  scenario, and reviewers read cited source lines. Plans drafted earlier that
+  name `contracts.md` keep their TODO(spec) gate; the `contracts` survey stays
+  only for them.
+- Phase 01 with a bundled or fixture-tested mapper: replace the 2 x 20-file
+  sampling over up to three rounds with mechanical checks plus one auditor over
+  about ten files from the new `preparation_cli.mjs dependency-targets` (files
+  flagged in `unresolved.tsv` first, then the largest). Misses are fixed and the
+  same files compared again; what stays unresolved is reported, not a stop.
+  Hand-written graphs keep the sampling rounds, also without the stop.
+  The selection stays within the audit input limit and leaves out files that
+  are not UTF-8 text; source-as-spec skips this audit.
+- Prompts, skills and orchestrators: report uncited and oversized counts
+  instead of asking; ask only when a rerun fails again with no progress or a new
+  decision is needed. Add the English interruption policy.
+
 # 0.8.0 — 2026-10-27
 
 - Let the person choose each worker's context size with its model and effort,

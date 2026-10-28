@@ -1,6 +1,17 @@
-# 更新手順（0.8.0 と以前の版）
+# 更新手順（0.10.0 と以前の版）
 
 日本語 | [English](UPGRADING.en.md)
+
+## 0.10.0（途中停止の撲滅・契約メモの廃止）
+
+キットのファイル（lib・scripts）が変わるため、既存の承認・完了記録は一度だけ失効します。judgeから再検証してください。完了済みの出力と、完了済みのsurvey scopeは保持されます。
+
+1. survey は、1回の補正後も引用を確かめられない行を `uncited` 付きの UNKNOWN にして完了します。止まっていた scope は同じ `survey run` を再実行すれば最後まで進みます。件数は scope 記録と `survey merge` の結果の `uncited`・`droppedFacts` と、inventory の巨大ファイルは `unsurveyedOversizedFiles` で確認できます。
+2. 異常終了で残った `migration/run.lock` は、同じホストなら次のコマンドが自動で外します。別ホスト（共有フォルダ）のロックだけは、その実行が止まったことを確認してから `unlock --pid` で外します。旧版が残したロックはホストを記録していないため、このホストでのPIDで判断します。
+3. 新規導入の `maxReviewInputBytes` は 262144 です。既存の設定は変わりません。引き上げる場合は `migration/config.json` を書き換えます。設定の指紋に含まれるため、02以降の記録と承認は確認し直しになります。
+4. source-as-spec の新規計画では契約メモ（`contracts.md`）を作りません。既存の計画はそのまま使えます（`TODO(spec)` の確認も従来どおり）。ソース一覧の方式に移る場合は `migration/judge-plan.json` を削除して `source-spec init --apply` をやり直し、00b〜02 を一括で確認し直します。
+5. 01 の依存監査は、同梱の解析器なら `preparation_cli.mjs dependency-targets` で選んだ約10ファイルを1人が1回監査するだけになります（2人×20ファイル×最大3ラウンドは不要）。途中の案件も、次の監査からこの方法に切り替えられます。
+6. コピー導入では `migration-kit/` 全体と、`.github/agents/migration-orchestrator.agent.md`、`.github/skills/` の SKILL.md を一時導入先の内容に置き換えます。プラグインは更新だけで入ります。
 
 ## 0.8.0（コンテキストサイズの選択）
 

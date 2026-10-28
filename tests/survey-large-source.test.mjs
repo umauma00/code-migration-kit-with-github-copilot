@@ -89,46 +89,50 @@ test('fragment citations cannot point to another, unread portion of the same ori
   assert.equal(repaired, true); assert.equal(surveyStatus(f.root, f.config, 'contracts').done, 1);
 });
 
-test('inventory visits every source fragment for every census site and preserves cross-fragment uncertainty', async t => {
+test('an inventory file larger than the survey capacity becomes UNKNOWN without model calls', async t => {
+  // Excerpt answers were always merged as UNKNOWN; asking a model per fragment
+  // and site batch only spent hours for the same result.
   const f = fixture(t, '// create change escape\n'.repeat(350)), sitesFile = 'migration/sites.tsv';
   atomicWrite(safePath(f.root, sitesFile), 'file\tsymbol\tsource_construct\n' + ['A', 'B', 'C'].map(s => `huge/Large.cs\t${s}\tnullable\n`).join(''));
-  const seen = new Map();
-  await runSurvey(f.root, f.config, 'inventory', async args => {
-    const data = JSON.parse(args.reviewInput);
-    for (const site of data.sites) {
-      const starts = seen.get(site.symbol) ?? []; starts.push(data.fragment.start); seen.set(site.symbol, starts);
-    }
-    return answer(args);
-  }, { sitesFile });
-  assert.deepEqual(seen.get('A'), seen.get('B')); assert.deepEqual(seen.get('B'), seen.get('C'));
-  assert.ok(seen.get('A').length > 1);
+  const report = await runSurvey(f.root, f.config, 'inventory', async () => assert.fail('no model call for an oversized inventory source'), { sitesFile });
+  assert.equal(report.agentCalls, 0); assert.equal(report.done, 1);
   const record = readJSON(safePath(f.root, 'migration/surveys/inventory/001-huge.json'));
   assert.equal(record.items.length, 3);
+  assert.deepEqual(record.unsurveyedOversizedFiles, ['huge/Large.cs']);
   assert.ok(record.items.every(i => i.classification === 'UNKNOWN' && i.status === 'unknown' && i.target_translation.includes('TODO(port)')));
+  assert.ok(record.items.every(i => i.evidence.startsWith('huge/Large.cs:1-350 ')));
   assert.equal(mergeSurvey(f.root, f.config, 'inventory', { sitesFile }).uniqueSites, 3);
+  assert.equal(surveyStatus(f.root, f.config, 'inventory', { sitesFile }).complete, true);
 });
 
-test('a large file and dense census share input capacity instead of duplicating a full fragment for each site', async t => {
+test('a dense census on a large file finishes without model calls while small files are still surveyed', async t => {
   const f = fixture(t, '// source create change escape\n'.repeat(9000)), sitesFile = 'migration/sites.tsv';
   f.config.maxReviewInputBytes = 65536;
-  atomicWrite(safePath(f.root, sitesFile), 'file\tsymbol\tsource_construct\n' + Array.from({ length: 628 }, (_, i) => `huge/Large.cs\tline-${i+1}\tnullable\n`).join(''));
-  const seen = new Map(), inputs = [];
+  atomicWrite(safePath(f.root, 'huge/Small.cs'), 'var x = Get();\n');
+  atomicWrite(safePath(f.root, sitesFile), 'file\tsymbol\tsource_construct\n' + Array.from({ length: 628 }, (_, i) => `huge/Large.cs\tline-${i+1}\tnullable\n`).join('') + 'huge/Small.cs\tx\tnullable\n');
+  const surveyed = [];
   const report = await runSurvey(f.root, f.config, 'inventory', async args => {
-    const input = JSON.parse(args.reviewInput); inputs.push(input);
-    assert.ok(Buffer.byteLength(args.reviewInput) <= 65536);
-    for (const site of input.sites) {
-      const ranges = seen.get(site.symbol) ?? [];
-      ranges.push([input.fragment.start, input.fragment.end]); seen.set(site.symbol, ranges);
-    }
+    const input = JSON.parse(args.reviewInput); surveyed.push(...input.files.map(file => file.path));
     return answer(args);
   }, { sitesFile });
-  assert.equal(seen.size, 628); assert.ok(report.agentCalls < 80, `dense survey generated ${report.agentCalls} calls`);
-  const expected = seen.get('line-1').sort((a,b)=>a[0]-b[0]);
-  let end = 0;
-  for (const range of expected) { assert.equal(range[0], end); end = range[1]; }
-  assert.equal(end, ('// source create change escape\n'.repeat(9000)).trimEnd().length);
-  for (const ranges of seen.values()) assert.deepEqual(ranges.sort((a,b)=>a[0]-b[0]), expected);
-  assert.equal(readJSON(safePath(f.root, 'migration/surveys/inventory/001-huge.json')).items.length, 628);
+  assert.deepEqual(surveyed, ['huge/Small.cs']); assert.equal(report.agentCalls, 1);
+  const items = surveyStatus(f.root, f.config, 'inventory', { sitesFile }).scopes
+    .flatMap(s => readJSON(safePath(f.root, `migration/surveys/inventory/${s.id}.json`)).items);
+  assert.equal(items.length, 629);
+  assert.equal(items.find(i => i.symbol === 'x').classification, 'VALUE');
+  assert.equal(items.filter(i => i.classification === 'UNKNOWN').length, 628);
+});
+
+test('a source that fits alone but not with a large rulebook is recorded as UNKNOWN, and the run reports it', async t => {
+  // Splitting it would only produce excerpt answers that merge as UNKNOWN.
+  const f = fixture(t, '// source create change escape\n'.repeat(40)), sitesFile = 'migration/sites.tsv';
+  atomicWrite(safePath(f.root, 'migration/RULEBOOK.md'), 'rule text\n'.repeat(175));
+  atomicWrite(safePath(f.root, sitesFile), 'file\tsymbol\tsource_construct\nhuge/Large.cs\tA\tnullable\n');
+  assert.ok(Buffer.byteLength(fs.readFileSync(safePath(f.root, 'huge/Large.cs'))) < 4096 / 2);
+  const report = await runSurvey(f.root, f.config, 'inventory', async () => assert.fail('no model call'), { sitesFile });
+  assert.equal(report.agentCalls, 0);
+  assert.deepEqual(report.unsurveyedOversizedFiles, ['huge/Large.cs']);
+  assert.equal(readJSON(safePath(f.root, 'migration/surveys/inventory/001-huge.json')).items[0].classification, 'UNKNOWN');
 });
 
 test('oversized required metadata reports its real capacity problem without dispatching oversized input', async t => {

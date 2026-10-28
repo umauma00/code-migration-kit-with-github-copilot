@@ -40,7 +40,11 @@ node migration-kit/scripts/run_migration.mjs source-spec init --apply  # after t
 and `preparationProfile: "source-as-spec"`, and creates only missing files:
 
 - `migration/judge-plan.json`: every file under sourceRoots
-- `migration/source-spec/contracts.md`: a per-file contract skeleton with `TODO(spec)` items
+- `migration/source-spec/sources.md`: the list of source files that form the specification (mechanical; nothing to fill)
+
+Since 0.10.0 no per-file contract memo (`contracts.md`) is drafted. The source is
+the specification, so surveying a memo and then checking the memo only added
+time; reviewers read the cited source lines directly.
 
 Switching the profile changes config, so earlier approvals and receipts are
 invalidated (review again from 00b).
@@ -52,25 +56,23 @@ invalidated (review again from 00b).
 
 | Phase | Artifact | How |
 |---|---|---|
-| 00b | `source-spec/contracts.md` | Per file: public interface, inputs/outputs, errors and edge cases, **with cited source lines**; write "unknown" where the source cannot decide |
-| 00b | `judge-report.md` | Contract summary, basis of inference, unverified scope |
+| 00b | `judge-report.md` | Scope, method and unverified limits (no per-file contract memo) |
 | 01 | `depmap/`, `manifest.tsv`, `review-dependencies.json`, `depmap/report.md` | Generated mechanically by the bundled parsers, never guessed. They read source only and never run the original. For a language without one, [write an adapter](DEPENDENCY-MAPPERS.en.md) |
 | 02 | `RULEBOOK.md`, `inventory.tsv`, `gap-report.md` | Decide policy from how the source actually behaves; undecidable sites stay UNKNOWN in the inventory with the most conservative translation and a TODO(port) |
 
-On large repositories, draft the contracts by scope with `survey run --kind
-contracts` and `survey merge --kind contracts` instead of the parent reading
-every file ([preparation surveys](SURVEYS.en.md)).
-
-Phase 00b cannot be recorded while `contracts.md` still contains `TODO(spec)`,
-so a skeleton is never approved as a specification.
+A judge plan drafted before 0.10.0 that names `contracts.md` keeps its rule:
+00b cannot be recorded while that memo still contains `TODO(spec)`. To move to
+the source index, delete `migration/judge-plan.json` and rerun `source-spec init
+--apply`; config does not change, so 00 stays recorded and 00b–02 are reviewed
+again together.
 
 ### Lighter preparation audits
 
-The standard [preparation audits](PREPARATION-AUDITS.md) (two auditors × 20
-files, up to three rounds, stopping after the first 20 inventory rows) are
-replaced by **one independent review of the whole specification package**:
+The standard [preparation audits](PREPARATION-AUDITS.md) (phase 01's
+dependency audit, the stop after the first 20 inventory rows and the paired
+audits in 02) are replaced by **one independent review of the whole specification package**:
 
-- One reviewer in a separate context reads contracts, RULEBOOK, inventory and
+- One reviewer in a separate context reads the source, RULEBOOK, inventory and
   the dependency map together and lists statements that contradict the source,
   statements without cited lines, and rule/inventory contradictions.
 - Fix the findings, then report **both the fixed findings and the open points**
@@ -83,7 +85,8 @@ replaced by **one independent review of the whole specification package**:
 When the package is complete, the AI shows one report:
 
 1. Links to every artifact above
-2. Review points: high-impact inferred contracts, the UNKNOWN list, open review points
+2. Review points: high-impact inferences, the UNKNOWN list (including how many
+   rows became UNKNOWN because their citations could not be verified), open review points
 3. Choices with a recommendation and reasons: "Proceed to migration with this
    package (recommended)", "Revise the flagged items", "Pause"
 

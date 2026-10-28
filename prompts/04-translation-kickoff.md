@@ -63,8 +63,10 @@ finding for the fixer (maxFixRounds applies only in bounded mode) (README Step 4
 
 On timeout, rejected permission, invalid JSON or interrupted execution, inspect
 `migration/state/units/` and the run summary. Reinvoke `translate` to resume.
-Do not manually fabricate done receipts. A stale process lock requires checking
-the owner process before `unlock --pid`. Respect the configured call/repair limits.
+Do not manually fabricate done receipts. A lock whose owner process has stopped
+on this host is removed by the rerun; use `unlock --pid` only for a lock from
+another host, or a PID now reused by an unrelated process, after confirming that
+run stopped. Respect the configured call/repair limits.
 
 Report reviewed done/total, blocked targets, measured time and actual usage when
 available. Unknown usage stays unknown. Stop before build approval.

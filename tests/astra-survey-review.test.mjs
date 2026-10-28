@@ -10,7 +10,7 @@ import { loadConfig, safePath, writeJSON, atomicWrite } from '../lib/core.mjs';
 import { approve, runStage, translate } from '../lib/pipeline.mjs';
 import { phaseCommand } from '../scripts/phase_cli.mjs';
 import { runSurvey, mergeSurvey } from '../lib/survey.mjs';
-import { initSourceSpec, contractsFile } from '../lib/source-spec.mjs';
+import { initSourceSpec, contractsFile, legacyContractsSkeleton, sourceSpecPlan } from '../lib/source-spec.mjs';
 import { humanGate, interactiveDecision } from '../lib/guardrails.mjs';
 
 const runner = 'node migration-kit/scripts/run_migration.mjs';
@@ -44,7 +44,8 @@ test('Astra S2: any edit to the contracts skeleton sends the merge to a draft', 
     const f = prepare(t, { count: 3 });
     initSourceSpec(f.root, f.config, { apply: true });
     const config = loadConfig(f.root), file = safePath(f.root, contractsFile);
-    const edited = edit(fs.readFileSync(file, 'utf8'));
+    // A project drafted before 0.10.0 still holds the per-file contract skeleton.
+    const edited = edit(`${legacyContractsSkeleton(config, sourceSpecPlan(f.root, config).sources)}\n`);
     atomicWrite(file, edited);
     await runSurvey(f.root, config, 'contracts', async args => contractsAnswer(args));
     const merged = mergeSurvey(f.root, config, 'contracts');
@@ -87,7 +88,6 @@ test('Astra S4: a package whose later phase fails its hash checks records nothin
   phaseCommand(root, config, 'init');
   write('migration/feasibility.md', 'Three files; no original runtime or spec.\n');
   phaseCommand(root, config, 'complete', '00', { note: 'User reviewed feasibility' });
-  write(contractsFile, fs.readFileSync(safePath(root, contractsFile), 'utf8').replaceAll('TODO(spec)', 'inferred from the cited source line'));
   write('migration/judge-report.md', 'Source-derived contracts.\n');
   write('migration/depmap/edges.tsv', 'from\tto\nsrc/main.py\tsrc/math_ops.py\n');
   write('migration/depmap/order.txt', 'src/math_ops.py\nsrc/main.py\n');
