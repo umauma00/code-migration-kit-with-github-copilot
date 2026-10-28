@@ -15,7 +15,8 @@ Normal and relaxed mode keep every gate as it was.
   existing file, and unreadable kit calls still ask, and a direct write of
   `migration/guardrails.json` stays denied.
 - Auto mode is in effect only with `migration/phases/auto-mode.json`, which the
-  runner writes and the hook keeps agents from writing; a hand-edited
+  runner writes, the hook keeps agents from writing, and leaving auto retires to
+  `migration/phases/retired/`; a hand-edited
   preferences file is reported by status and asks as relaxed mode. Any
   `--phase-mode` value but a literal `normal` or `relaxed` asks, and a
   `settings apply` that would switch auto on names it in the confirmation.

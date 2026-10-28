@@ -46,6 +46,11 @@
       ]
     },
     {
+      "path": "lib/auto-mode.mjs",
+      "sha256": "5f169536ccdfc63a31b4c57e9c4759c7c615d2ff450a74cacd551462866b6f79",
+      "entries": []
+    },
+    {
       "path": "lib/bench.mjs",
       "sha256": "c95981cf731770010dbcc500ba3e705965b2542aeee389dea89f57d200ee5202",
       "entries": [
@@ -1000,60 +1005,60 @@
     },
     {
       "path": "lib/guardrails.mjs",
-      "sha256": "9fa9dab5ce96d8ab7cb9942d6ea09df74ca0c53af2442b0e68a9a1652ece94be",
+      "sha256": "84d9b5edc8bd7aeba5beed7fa86fa26b4e61f91ff8b120f1fd4f38489977be87",
       "entries": [
         {
-          "line": 45,
+          "line": 46,
           "kind": "error-or-exit-candidate",
           "code": "if (!value || typeof value !== 'object' || Array.isArray(value) || value.schemaVersion !== 1) throw new Error(`${guardrailsFile} must be an object with schemaVersion 1`);"
         },
         {
-          "line": 47,
+          "line": 48,
           "kind": "error-or-exit-candidate",
           "code": "if (!Array.isArray(deny) || deny.some(rule => typeof rule !== 'string' || !rule.trim())) throw new Error(`${guardrailsFile}: denyCommands must be nonempty strings`);"
         },
         {
-          "line": 49,
+          "line": 50,
           "kind": "error-or-exit-candidate",
           "code": "if (waiver !== undefined && (typeof waiver !== 'object' || typeof waiver.note !== 'string' || !waiver.note.trim())) throw new Error(`${guardrailsFile}: waiver needs a nonempty note`);"
         },
         {
-          "line": 71,
+          "line": 72,
           "kind": "error-or-exit-candidate",
           "code": "catch (e) { throw new Error(`Phase ${phase} guardrails are invalid: ${e.message}. ${install}`); }"
         },
         {
-          "line": 79,
+          "line": 80,
           "kind": "error-or-exit-candidate",
           "code": "if (!policy) throw new Error(`Phase ${phase} requires human-installed command guardrails. ${install}`);"
         },
         {
-          "line": 80,
+          "line": 81,
           "kind": "error-or-exit-candidate",
           "code": "if (!policy.denyCommands.length && !policy.waiver) throw new Error(`Phase ${phase} guardrails deny nothing and record no waiver. ${install}`);"
         },
         {
-          "line": 102,
+          "line": 103,
           "kind": "error-or-exit-candidate",
           "code": "if (fs.existsSync(file) && !replace) throw new Error(`${guardrailsFile} already exists; pass --replace to change it (still the human's confirmed act)`);"
         },
         {
-          "line": 103,
+          "line": 104,
           "kind": "error-or-exit-candidate",
           "code": "if (waiver !== undefined && (deny !== undefined || add !== undefined || remove !== undefined)) throw new Error('Choose a deny list or a waiver, not both');"
         },
         {
-          "line": 110,
+          "line": 111,
           "kind": "error-or-exit-candidate",
           "code": "for (const r of removed) if (!base.includes(r)) throw new Error(`Cannot remove \"${r}\": it is not in the deny list`);"
         },
         {
-          "line": 114,
+          "line": 115,
           "kind": "error-or-exit-candidate",
           "code": "if (!value.waiver && !value.denyCommands.length) throw new Error('A guardrails file must deny something or record a waiver');"
         },
         {
-          "line": 136,
+          "line": 137,
           "kind": "loop-exit-candidate",
           "code": "if (!wrappers.has(name)) break;"
         }
@@ -1330,100 +1335,100 @@
     },
     {
       "path": "lib/phases.mjs",
-      "sha256": "6eb206097419730edeb6326e2d56d090daaf1a26ac1697258d83795ed4e37088",
+      "sha256": "e82a05fa2363bd781a9f994c5dd92948560e7dd1663ee064b9f6351ccf555a6b",
       "entries": [
         {
-          "line": 59,
+          "line": 60,
           "kind": "error-or-exit-candidate",
           "code": "if (value.schemaVersion !== 1 || value.policy !== 'strict') throw new Error('Invalid phase policy record');"
         },
         {
-          "line": 68,
+          "line": 69,
           "kind": "error-or-exit-candidate",
           "code": "if (old.schemaVersion !== 1 || old.policy !== 'strict') throw new Error('Invalid existing phase policy');"
         },
         {
-          "line": 76,
+          "line": 77,
           "kind": "error-or-exit-candidate",
           "code": "for (const p of config.sourceRoots) if (!fs.existsSync(safePath(root, p))) throw new Error(missingRootMessage(config, p, 'Input root missing'));"
         },
         {
-          "line": 113,
+          "line": 114,
           "kind": "error-or-exit-candidate",
           "code": "if (!currentPhase(root, config, phase) && !phaseWaiver(root, phase)) throw gateError(root, `Phase ${phase} is not reviewed for current inputs. Use phase next; review its artifacts and record phase complete ${phase} --note TEXT before proceeding.`, phase);"
         },
         {
-          "line": 134,
+          "line": 135,
           "kind": "error-or-exit-candidate",
           "code": "if (!relaxedPhases(root)) throw new Error('phase waive is available only in relaxed mode. Normal mode finishes each phase first; the person can switch with preferences --phase-mode relaxed (or phaseMode in migration/run-settings.json)');"
         },
         {
-          "line": 135,
+          "line": 136,
           "kind": "error-or-exit-candidate",
           "code": "if (!waivablePhases.includes(phase)) throw new Error(`Phase ${phase} cannot be waived; waivable phases: ${waivablePhases.join(', ')}`);"
         },
         {
-          "line": 136,
+          "line": 137,
           "kind": "error-or-exit-candidate",
           "code": "if (!note?.trim()) throw new Error('phase waive requires --note with the person\\'s reason for proceeding');"
         },
         {
-          "line": 153,
+          "line": 154,
           "kind": "error-or-exit-candidate",
           "code": "if (index < 0) throw new Error('Unknown phase; use 00, 00b, 01, 02, 03, 04, 05, 05b, 05c, 06');"
         },
         {
-          "line": 174,
+          "line": 175,
           "kind": "error-or-exit-candidate",
           "code": "if (rulebook === template('RULEBOOK.md') || /\\[source language\\]|\\[target language\\]/.test(rulebook)) throw new Error('migration/RULEBOOK.md is still the installed template (its [source language] / [target language] placeholders remain). Draft the project rules before phase 02 review');"
         },
         {
-          "line": 177,
+          "line": 178,
           "kind": "error-or-exit-candidate",
           "code": "if (examples.some(row => inventory.includes(row))) throw new Error('migration/inventory.tsv still contains the template example rows. Replace them with this project\\'s sites before phase 02 review');"
         },
         {
-          "line": 180,
+          "line": 181,
           "kind": "error-or-exit-candidate",
           "code": "if (!note?.trim()) throw new Error('Phase completion requires a concrete review --note');"
         },
         {
-          "line": 182,
+          "line": 183,
           "kind": "error-or-exit-candidate",
           "code": "if (!manual.has(phase) && phase !== '05c' && phase !== '06') throw new Error('This phase is completed by current runner receipts, not manual confirmation');"
         },
         {
-          "line": 183,
+          "line": 184,
           "kind": "error-or-exit-candidate",
           "code": "if (phase === '05c' && config.verificationMode !== 'source-only') throw new Error('Runtime parity requires actual runner validation');"
         },
         {
-          "line": 184,
+          "line": 185,
           "kind": "error-or-exit-candidate",
           "code": "if (phase === '06' && config.verificationMode === 'source-only') throw new Error('Source-only phase 06 requires the handoff runner receipt');"
         },
         {
-          "line": 191,
+          "line": 192,
           "kind": "error-or-exit-candidate",
           "code": "if (!fileHash(f) || fs.statSync(f).size === 0) throw new Error(`Nonempty phase artifact required: ${p}`);"
         },
         {
-          "line": 201,
+          "line": 202,
           "kind": "error-or-exit-candidate",
           "code": "if (unfilled.length) throw new Error(`Source-derived contracts still contain ${specPlaceholder}: ${unfilled.join(', ')}. Fill every item from cited source lines before phase 00b review`);"
         },
         {
-          "line": 204,
+          "line": 205,
           "kind": "error-or-exit-candidate",
           "code": "else if (!config.commands?.original || !config.commands?.mutation || !config.commands?.parity || !config.verificationRoots.some(p => fs.existsSync(safePath(root,p)))) throw new Error('Prepare runtime judge inputs and original/mutation/parity commands before phase 00b review');"
         },
         {
-          "line": 208,
+          "line": 209,
           "kind": "error-or-exit-candidate",
           "code": "if (!units.length) throw new Error('Manifest is empty');"
         },
         {
-          "line": 214,
+          "line": 215,
           "kind": "error-or-exit-candidate",
           "code": "throw new Error(`Review dependency map declares no dependencies between ${units.length} manifest files. This usually means the dependency parser ran from the wrong --root and could not resolve imports. Check migration/depmap/edges.tsv; if the files really are independent, record phase 01 with --confirm-no-dependencies`);"
         }
@@ -2038,40 +2043,40 @@
     },
     {
       "path": "lib/preferences.mjs",
-      "sha256": "c16ee4c4f97dff25a1b6cefd2576b215b2a51678419e440fbfab7d0df142b867",
+      "sha256": "bf7d7eb76f4e2d58577a8b897014034757ddf865ff091e5731c6e1fb89bc1411",
       "entries": [
         {
-          "line": 28,
+          "line": 30,
           "kind": "error-or-exit-candidate",
           "code": "if (value?.schemaVersion !== 1 || (value.userLanguage !== null && !userLanguages.includes(value.userLanguage))) throw new Error(`${preferencesFile} must have schemaVersion 1 and userLanguage ja or en`);"
         },
         {
-          "line": 29,
+          "line": 31,
           "kind": "error-or-exit-candidate",
           "code": "if (value.originalRuntime !== undefined && value.originalRuntime !== null && !originalRuntimes.includes(value.originalRuntime)) throw new Error(`${preferencesFile}: originalRuntime must be available or unavailable`);"
         },
         {
-          "line": 30,
+          "line": 32,
           "kind": "error-or-exit-candidate",
           "code": "if (value.phaseMode !== undefined && value.phaseMode !== null && !phaseModes.includes(value.phaseMode)) throw new Error(`${preferencesFile}: phaseMode must be normal, relaxed or auto`);"
         },
         {
-          "line": 35,
+          "line": 37,
           "kind": "error-or-exit-candidate",
           "code": "if (language === undefined && originalRuntime === undefined && phaseMode === undefined) throw new Error('Set --language ja|en, --original-runtime available|unavailable and/or --phase-mode normal|relaxed|auto');"
         },
         {
-          "line": 36,
+          "line": 38,
           "kind": "error-or-exit-candidate",
           "code": "if (language !== undefined && !userLanguages.includes(language)) throw new Error('language must be ja or en');"
         },
         {
-          "line": 37,
+          "line": 39,
           "kind": "error-or-exit-candidate",
           "code": "if (originalRuntime !== undefined && !originalRuntimes.includes(originalRuntime)) throw new Error('original-runtime must be available or unavailable');"
         },
         {
-          "line": 38,
+          "line": 40,
           "kind": "error-or-exit-candidate",
           "code": "if (phaseMode !== undefined && !phaseModes.includes(phaseMode)) throw new Error('phase-mode must be normal, relaxed or auto');"
         }

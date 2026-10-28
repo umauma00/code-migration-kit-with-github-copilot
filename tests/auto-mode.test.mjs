@@ -229,3 +229,31 @@ test('review of 333c70f: settings apply that switches auto on says so; the build
   writeJSON(safePath(f.root, 'migration/gates/build-loop-x.json'), { schemaVersion: 1, kind: 'build-loop', id: 'x', auto: true });
   assert.ok(migrationStatus(f.root).autoMode.records.includes('build-loop'));
 });
+
+test('review of 7855afc: leaving auto retires its record, an escaped install option asks, and an unreadable record is not auto', t => {
+  const f = fixture(t, { mode: 'auto', guardrails: false });
+  assert.equal(decide(f, gateCommands[0]), null);
+  setPreferences(f.root, { phaseMode: 'normal' });
+  assert.equal(fs.existsSync(safePath(f.root, autoModeFile)), false);
+  assert.equal(fs.readdirSync(safePath(f.root, 'migration/phases/retired')).filter(n => n.startsWith('auto-mode-')).length, 1);
+  // A hand edit back to auto after an earlier auto session is not in effect.
+  writeJSON(safePath(f.root, 'migration/preferences.json'), { ...readPreferences(f.root), phaseMode: 'auto' });
+  assert.equal(decide(f, `${kit} phase waive 04 --note x`)?.decision, 'ask');
+  assert.equal(migrationStatus(f.root).autoMode.unrecorded, true);
+  // Moving the retired record back is a write of the record: denied.
+  assert.equal(decide(f, 'mv migration/phases/retired/auto-mode-x.json migration/phases/auto-mode.json')?.decision, 'deny');
+  // Choosing auto again writes a fresh record.
+  setPreferences(f.root, { phaseMode: 'auto' });
+  assert.equal(decide(f, gateCommands[0]), null);
+  // Only the plain template install is unasked; quoted or escaped options ask.
+  assert.equal(decide(f, `${kit} guardrails install`), null);
+  for (const command of [`${kit} guardrails install --wa""iver "x"`, `${kit} guardrails install "--wa"iver x`, `${kit} guardrails install --wa\\iver x`,
+    `${kit} guardrails install $OPTS`, `${kit} guardrails install && ${kit} guardrails install --waiver x`, `${kit} guardrails install --help2`])
+    assert.equal(decide(f, command)?.decision, 'ask', command);
+  // An unreadable record is not auto mode, for the hook and for status alike.
+  fs.writeFileSync(safePath(f.root, autoModeFile), '{not json');
+  assert.equal(decide(f, gateCommands[0])?.decision, 'ask');
+  const status = migrationStatus(f.root);
+  assert.equal(status.autoMode.active, false);
+  assert.equal(status.workflow.mode, 'relaxed');
+});

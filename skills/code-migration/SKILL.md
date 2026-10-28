@@ -362,7 +362,8 @@ unfilled run settings, and the commands the hook still asks about (models set,
 settings apply, sessions prune, pilot prepare, source-spec init --apply); report
 them and stop. Never switch auto mode on yourself, neither with `preferences --phase-mode
 auto` nor by writing `phaseMode: "auto"` into run-settings.json or
-preferences.json: it is the person's act (the hook asks). Every report and the handoff list the
+preferences.json: it is the person's act (the hook asks for the command, and a
+hand edit is not in effect). Every report and the handoff list the
 records made without the person (`status` `autoMode.records`, marked
 【自動・人の確認なし】 / [auto, not reviewed by the person]) and the waivers. See
 [auto mode](../../docs/ORDERED-WORKFLOW.md#auto-mode).
