@@ -48,7 +48,7 @@ node /path/to/code-migration-kit/scripts/install.mjs --target . --layout plugin 
 
 Whether you start from VS Code or the Copilot CLI, the parent agent runs the runner in a terminal and the runner starts Copilot CLI workers. The AI runs these commands from chat too.
 
-It creates three files, `migration/config.json`, `migration/RULEBOOK.md` and `migration/inventory.tsv`, plus `migration/preferences.json` (the report language) when `--language` is given. Models and rules of an already configured project are never overwritten. Initialization approves no phase. Fill in the languages, source/output/test locations, validation commands and models in `migration/run-settings.json`, written by `run_migration.mjs settings init`, and record them with `settings apply`.
+It creates three files, `migration/config.json`, `migration/RULEBOOK.md` and `migration/inventory.tsv`, plus `migration/preferences.json` (the report language) when `--language` is given. Models and rules of an already configured project are never overwritten. Initialization approves no phase. The AI asks the models, languages, source location, phase mode and whether the original runs as questions and writes the answers into `migration/run-settings.json` (written by `run_migration.mjs settings init`). The remaining entries, such as output/test locations and validation commands, and later changes are made in that file and recorded with `settings apply`.
 
 Call the plugin's scripts by absolute path, with the target repository as the working directory.
 

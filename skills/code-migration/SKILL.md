@@ -164,7 +164,8 @@ recorded as the name the mappers recognize. If no folder outside the test
 folders holds the source language, the result has `sourceRootsUnchosen` and a
 ready `sourceRootsQuestion`: say so, ask it as **one** free-text question and
 record the answer with `run_migration.mjs settings init --source-roots DIR[,DIR]`
-(each must be a folder in the repository; otherwise ask again). If nothing was
+(each must be a folder in the repository, not the root, and one of them must hold
+the source; otherwise the error says why and you ask again). If nothing was
 found, the question asks for both languages as free text.
 
 Third, while `phaseMode` is still open (`settings init` says so), ask **one**
@@ -184,8 +185,11 @@ choices: it runs / it does not run). Ask it as **one** question and record the
 answer with `run_migration.mjs preferences --original-runtime available|unavailable`;
 the file follows. When the answer is unavailable and the file's verification
 mode is runtime, the file's `verificationMode` becomes `source-only` (runtime
-verification runs the original) and the result says so; tell the person. Then
-run `settings init` again.
+verification runs the original) and the result's `verificationMode` note says
+so; tell the person. When the answer is available but the file says
+`source-only`, the note asks you to ask whether to verify by running the
+original; set `runtime` in the file only on their yes. Then run `settings init`
+again.
 
 Then link the file and the help file and ask **one**
 question with the question tool: has the person finished filling it in, or do

@@ -48,7 +48,7 @@ node /path/to/code-migration-kit/scripts/install.mjs --target . --layout plugin 
 
 VS Code・Copilot CLIのどちらから開始する場合も、親エージェントがターミナルでrunnerを動かし、runnerがCopilot CLIのワーカーを起動します。これらのコマンドもAIがチャットから実行します。
 
-作成するのは `migration/config.json`、`migration/RULEBOOK.md`、`migration/inventory.tsv` の3ファイルと、`--language` を指定した場合の `migration/preferences.json`（報告の言語）です。設定済みの案件ではモデルやルールを上書きしません。初期化は工程を承認しません。言語、元ソース・出力・テストの場所、検証コマンド、モデルは、`run_migration.mjs settings init` が作る `migration/run-settings.json` に記入し、`settings apply` で反映します。
+作成するのは `migration/config.json`、`migration/RULEBOOK.md`、`migration/inventory.tsv` の3ファイルと、`--language` を指定した場合の `migration/preferences.json`（報告の言語）です。設定済みの案件ではモデルやルールを上書きしません。初期化は工程を承認しません。モデル、言語、元ソースの場所、工程の進め方、元のコードが動くかは AI が質問で聞き、`run_migration.mjs settings init` が作る `migration/run-settings.json` に書き込みます。出力・テストの場所や検証コマンドなど残りの欄と後からの変更はこのファイルで行い、`settings apply` で反映します。
 
 プラグイン内のスクリプトには絶対パスを指定し、実行ディレクトリは対象リポジトリにします。
 

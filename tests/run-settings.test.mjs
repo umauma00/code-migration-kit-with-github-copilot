@@ -592,6 +592,7 @@ test('typed language names are recorded as the mappers recognize them, and missi
 
 test('whether the original runs is asked, and an answer of no makes the file verify from the source instead of stopping apply', t => {
   const root = fresh(t);
+  touch(root, ['src/App.cs']);
   initRunSettings(root, models);
   writeSettings(root, { ...filled(root), originalRuntime: 'FILL_IN' });
   // apply sends a question-filled entry back to its question, not to the file.
@@ -641,4 +642,51 @@ test('switching to source-as-spec updates the run settings file, so apply does n
   const again = applyRunSettings(root, models);
   assert.deepEqual([again.applied, again.changed], [true, []]);
   assert.equal(readJSON(safePath(root, 'migration/config.json')).preparationProfile, 'source-as-spec');
+});
+
+test('review of ac3ad0c: the source-folder question clears once answered, persists until then, and comes before the runtime question', t => {
+  // Answering the template folder: an empty src/ is refused, a src/ with the files is accepted and not asked again.
+  let root = fresh(t);
+  touch(root, ['main.py']);
+  setRoleModels(root, models, { role: 'all', model: 'big-model' });
+  assert.equal(initRunSettings(root, models, { source: 'Python', target: 'Go' }).sourceRootsUnchosen, true);
+  assert.throws(() => initRunSettings(root, models, { sourceRoots: 'src' }), /--source-roots: src holds no Python files; ask for the source folders again/);
+  touch(root, ['src/app.py']);
+  initRunSettings(root, models, { sourceRoots: 'src' });
+  assert.equal(initRunSettings(root, models).sourceRootsUnchosen, undefined, 'an accepted answer is never asked again');
+  // The repository root is not a source folder (migration/ and the output live there).
+  assert.throws(() => initRunSettings(root, models, { sourceRoots: '.' }), /the repository root cannot be a source folder/);
+  // A language the kit cannot detect: an empty src/ is asked on every later init, not only the --source call.
+  root = fresh(t);
+  setRoleModels(root, models, { role: 'all', model: 'big-model' });
+  assert.equal(initRunSettings(root, models, { source: 'Fortran', target: 'Go' }).sourceRootsUnchosen, true);
+  const again = initRunSettings(root, models);
+  assert.equal(again.sourceRootsUnchosen, true);
+  assert.equal(again.originalRuntimeQuestion, undefined, 'one question at a time: the folders come first');
+  assert.throws(() => initRunSettings(root, models, { sourceRoots: 'src' }), /src is empty/);
+  touch(root, ['src/a.f90']);
+  assert.equal(initRunSettings(root, models).sourceRootsUnchosen, undefined, 'a src/ holding files of an undetected language stands');
+  // Files elsewhere: the question says where they are instead of "not found".
+  root = fresh(t);
+  touch(root, ['lib/a.py']);
+  setRoleModels(root, models, { role: 'all', model: 'big-model' });
+  initRunSettings(root, models);
+  writeSettings(root, { ...settingsOf(root), sourceLanguage: 'Python', targetLanguage: 'Go' });
+  const elsewhere = initRunSettings(root, models);
+  assert.match(elsewhere.sourceRootsQuestion, /Python のファイルは lib にあり、移行元のフォルダーは src のままです/);
+});
+
+test('review of ac3ad0c: the runner says when the original-runtime answer moves the verification mode, and asks when it no longer fits', t => {
+  const root = fresh(t);
+  touch(root, ['src/App.cs']);
+  initRunSettings(root, models);
+  writeSettings(root, { ...filled(root), originalRuntime: 'FILL_IN' });
+  const copilot = modelCatalogCli(root, catalog);
+  const run = (...args) => JSON.parse(spawnSync(process.execPath, [path.join(kitRoot, 'scripts/run_migration.mjs'), ...args, '--copilot', copilot], { cwd: root, encoding: 'utf8' }).stdout);
+  assert.match(run('preferences', '--original-runtime', 'unavailable').verificationMode, /now source-only.*Tell the person/);
+  assert.equal(settingsOf(root).verificationMode, 'source-only');
+  // Back to available: the mode is not switched silently; the person is asked.
+  assert.match(run('preferences', '--original-runtime', 'available').verificationMode, /Ask the person whether to verify by running the original/);
+  assert.equal(settingsOf(root).verificationMode, 'source-only');
+  assert.equal(run('preferences', '--phase-mode', 'normal').verificationMode, undefined);
 });

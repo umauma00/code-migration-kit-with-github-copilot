@@ -237,7 +237,13 @@ export async function main(argv = process.argv.slice(2)) {
   if (cmd === 'preferences') {
     const setting = args.language || args['original-runtime'] || args['phase-mode'];
     const result = setting ? setPreferences(root, { language: args.language, originalRuntime: args['original-runtime'], phaseMode: args['phase-mode'] }) : preferencesReport(root);
-    if (setting) { const synced = syncRunSettings(root, { keys: [...(args.language ? ['reportLanguage'] : []), ...(args['original-runtime'] ? ['originalRuntime'] : []), ...(args['phase-mode'] ? ['phaseMode'] : [])] }); if (synced) result.runSettings = `${synced} updated to match`; }
+    if (setting) {
+      const report = {};
+      const synced = syncRunSettings(root, { keys: [...(args.language ? ['reportLanguage'] : []), ...(args['original-runtime'] ? ['originalRuntime'] : []), ...(args['phase-mode'] ? ['phaseMode'] : [])], report });
+      if (synced) result.runSettings = `${synced} updated to match`;
+      if (report.verificationMode) result.verificationMode = 'The original does not run, so verificationMode in the run settings file is now source-only (runtime verification runs the original). Tell the person.';
+      if (report.verificationModeKept) result.verificationMode = 'The original runs, but verificationMode in the run settings file is source-only. Ask the person whether to verify by running the original (runtime); on yes, set verificationMode to runtime in the file and run settings apply.';
+    }
     console.log(JSON.stringify(result, null, 2));
     return;
   }
