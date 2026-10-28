@@ -339,3 +339,12 @@ test('review of 6e26d89: guardrails.json matching is unchanged in every mode; th
   readPreferences(f.root);
   assert.equal(fs.existsSync(safePath(f.root, autoModeFile)), false);
 });
+
+test('review of 5d5d992: quotes are tracked as the shell does, and an in-place edit to auto asks', t => {
+  const f = fixture(t, { mode: 'auto' });
+  assert.equal(decide(f, `${kit} approve build --note "a'" --note "$(touch /tmp/evil)'"`)?.decision, 'ask');
+  assert.equal(decide(f, `${kit} approve build --note 'it'"'"'s $5'`), null);
+  assert.equal(decide(f, `${kit} approve build --note "a \\$5"`), null, 'an escaped $ in double quotes is literal');
+  for (const command of ["sed -i 's/normal/auto/' migration/preferences.json", "perl -pi -e 's/relaxed/auto/' migration/preferences.json"])
+    assert.equal(decide(f, command)?.decision, 'ask', command);
+});
