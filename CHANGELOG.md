@@ -17,6 +17,10 @@ at a clear point.
   orchestrator shows it and ends the turn before phase 00 for the person to
   switch to autopilot. A setup question answered by autopilot itself is not an
   answer.
+  The handoff is shown once per choice of auto (marked in the auto-mode
+  record); choosing auto after setup is applied but before phase 00 returns it
+  from `preferences --phase-mode auto`. Once phase 00 has started (or the
+  handoff was shown) there is no fifth question, notice or handoff.
 - Auto mode: if phase 00 finds a setup answer wrong, the orchestrator says
   which and stops for the person to decide in chat.
 - Normal and relaxed mode: only the setup-time source-as-spec switch changes.

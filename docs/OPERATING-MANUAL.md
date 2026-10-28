@@ -19,8 +19,9 @@ at every phase boundary. Show artifacts, review points and a next-action example
 use the available question tool when an answer is needed. This reporting format
 does not apply to automated workers, which keep their JSON-only contracts.
 
-1. Without a runnable original or a specification, the user may choose
-   [source as the only specification](SOURCE-AS-SPEC.md): 00b–02 are drafted
+1. Without a runnable original or a specification (setup's fifth question),
+   setup switches to [source as the only specification](SOURCE-AS-SPEC.md)
+   before phase 00, with one host confirmation: 00b–02 are drafted
    from the source and reviewed once. Otherwise, in runtime mode (the default), keep the original implementation runnable as
    the executable specification and require original/mutation/parity validation.
    Explicit source-only mode instead validates source-derived preparation, then

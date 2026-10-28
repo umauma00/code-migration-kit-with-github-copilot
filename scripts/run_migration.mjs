@@ -26,7 +26,7 @@ import { buildLoop } from '../lib/build-loop.mjs';
 import { readPreferences, setPreferences, preferencesReport } from '../lib/preferences.mjs';
 import { readGuardrails, cliFolderTrust, guardrailsProposal, installGuardrails } from '../lib/guardrails.mjs';
 import { listAvailableModels, modelsMarkdown, setRoleModels, readConfigIfPresent, currentAssignments } from '../lib/models.mjs';
-import { initRunSettings, checkRunSettings, applyRunSettings, syncRunSettings, runSettingsFile, setupEnd } from '../lib/run-settings.mjs';
+import { initRunSettings, checkRunSettings, applyRunSettings, syncRunSettings, runSettingsFile, runSettingsState, setupEnd, phase00Started } from '../lib/run-settings.mjs';
 import { ignoredLimits, processTimeout } from '../lib/execution-policy.mjs';
 
 export const usage = `Usage: node migration-kit/scripts/run_migration.mjs COMMAND [options]
@@ -236,6 +236,7 @@ export async function main(argv = process.argv.slice(2)) {
   }
   if (cmd === 'preferences') {
     const setting = args.language || args['original-runtime'] || args['phase-mode'] || args.specification;
+    const wasAuto = setting ? readPreferences(root).phaseMode === 'auto' : false;
     const result = setting ? setPreferences(root, { language: args.language, originalRuntime: args['original-runtime'], phaseMode: args['phase-mode'], specification: args.specification }) : preferencesReport(root);
     if (setting) {
       const report = {};
@@ -243,6 +244,13 @@ export async function main(argv = process.argv.slice(2)) {
       if (synced) result.runSettings = `${synced} updated to match`;
       if (report.verificationMode) result.verificationMode = 'The original does not run, so verificationMode in the run settings file is now source-only (runtime verification runs the original). Tell the person.';
       if (report.verificationModeKept) result.verificationMode = 'The original runs, but verificationMode in the run settings file is source-only. Ask the person whether to verify by running the original (runtime); on yes, set verificationMode to runtime in the file and run settings apply.';
+      // Auto chosen after setup was applied but before phase 00: the handoff
+      // to autopilot comes now, since no later apply would show it.
+      if (args['phase-mode'] === 'auto' && !wasAuto && !phase00Started(root)) {
+        let config = null;
+        try { config = loadConfig(root, { requireModels: false }); } catch {}
+        if (config && runSettingsState(root, config)?.state === 'applied') Object.assign(result, setupEnd(root, config));
+      }
     }
     console.log(JSON.stringify(result, null, 2));
     return;
@@ -347,7 +355,7 @@ export async function main(argv = process.argv.slice(2)) {
           const synced = syncRunSettings(root, { keys: ['verificationMode'] });
           if (synced) result.runSettings = `${synced} updated to match`;
           // Switched during setup: phase 00 comes first, and auto mode stops here for autopilot.
-          if (!fs.existsSync(path.join(root, 'migration/phases/00.json'))) {
+          if (!phase00Started(root)) {
             result.next = 'The source-as-spec profile is set as part of setup. Phase 00 comes first; the drafts listed in readiness are phase 00b-02 work.';
             Object.assign(result, setupEnd(root, config));
           }

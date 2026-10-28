@@ -12,7 +12,9 @@ import { install, kitRoot } from '../scripts/install.mjs';
 import { readJSON, writeJSON, safePath } from '../lib/core.mjs';
 import { normalizeModels, setRoleModels } from '../lib/models.mjs';
 import { initRunSettings, applyRunSettings, syncRunSettings, runSettingsFile } from '../lib/run-settings.mjs';
-import { setPreferences, readPreferences } from '../lib/preferences.mjs';
+import { setPreferences, readPreferences, autoModeFile } from '../lib/preferences.mjs';
+import { autoModeOn } from '../lib/auto-mode.mjs';
+import { interactiveDecision } from '../lib/guardrails.mjs';
 
 const catalog = [{ id: 'm', name: 'M', supportedReasoningEfforts: ['low', 'high'] }];
 const models = normalizeModels(catalog);
@@ -111,4 +113,85 @@ test('auto mode: every setup step says it is still manual, and setup ends with t
     const r = fresh(t); upToMode(r, mode);
     assert.equal(initRunSettings(r, models).setupNotice, undefined, mode);
   }
+});
+
+test('a mid-run project is past setup: no fifth question, no notice, no handoff', t => {
+  for (const record of ['migration/phases/00.json', 'migration/phases/starts/00.json']) {
+    const root = fresh(t);
+    upToMode(root, 'auto'); runtime(root, 'unavailable');
+    writeJSON(safePath(root, record), { schemaVersion: 1 });
+    const init = initRunSettings(root, models);
+    assert.equal(init.specificationQuestion, undefined, record);
+    assert.equal(init.setupNotice, undefined, record);
+    assert.doesNotMatch(init.next, /specificationQuestion/, record);
+    const applied = applyRunSettings(root, models);
+    assert.equal(applied.applied, true, JSON.stringify(applied.errors));
+    assert.equal(applied.next, undefined, record);
+    assert.equal(applied.autoHandoff, undefined, record);
+    // A source-spec switch after phase 00 has started keeps its own next.
+    const switched = JSON.parse(cli(root, 'source-spec', 'init', '--apply').stdout);
+    assert.doesNotMatch(switched.next ?? '', /Phase 00 comes first/, record);
+    assert.equal(switched.autoHandoff, undefined, record);
+  }
+});
+
+test('auto mode hands over once per choice of auto, and counts what is left exactly', t => {
+  const root = fresh(t);
+  upToMode(root, 'auto'); runtime(root, 'unavailable');
+  // Apply before the specification answer: that question and the switch are left.
+  assert.match(applyRunSettings(root, models).setupNotice, /残り2回/);
+  setPreferences(root, { specification: 'unavailable' });
+  assert.match(applyRunSettings(root, models).setupNotice, /残り1回/);
+  assert.ok(JSON.parse(cli(root, 'source-spec', 'init', '--apply').stdout).autoHandoff);
+  assert.equal(typeof readJSON(safePath(root, autoModeFile)).handedOffAt, 'string');
+  assert.equal(autoModeOn(root), true, 'the handoff mark keeps auto mode in effect');
+  // A later apply neither repeats the handoff nor says setup is manual.
+  const again = applyRunSettings(root, models);
+  assert.equal(again.autoHandoff, undefined);
+  assert.equal(again.setupNotice, undefined);
+  assert.equal(initRunSettings(root, models).setupNotice, undefined);
+  // Leaving auto and choosing it again hands over again.
+  setPreferences(root, { phaseMode: 'relaxed' }); syncRunSettings(root, { keys: ['phaseMode'] });
+  const back = JSON.parse(cli(root, 'preferences', '--phase-mode', 'auto').stdout);
+  assert.match(back.autoHandoff, /初期設定が完了しました/);
+  assert.match(back.next, /end the turn now/);
+  // Choosing auto when it already is does not.
+  assert.equal(JSON.parse(cli(root, 'preferences', '--phase-mode', 'auto').stdout).autoHandoff, undefined);
+});
+
+test('choosing auto after setup is applied hands over at once; during setup or after phase 00 it does not', t => {
+  const root = fresh(t, 'en');
+  upToMode(root, 'normal'); runtime(root, 'available');
+  assert.equal(applyRunSettings(root, models).applied, true);
+  const out = cli(root, 'preferences', '--phase-mode', 'auto');
+  assert.equal(out.status, 0, out.stderr);
+  assert.match(JSON.parse(out.stdout).autoHandoff, /Setup is done/);
+  // During setup (the file is not applied yet) the handoff waits for apply.
+  const early = fresh(t);
+  initRunSettings(early, models, { source: 'C#', target: 'TypeScript' });
+  assert.equal(JSON.parse(cli(early, 'preferences', '--phase-mode', 'auto').stdout).autoHandoff, undefined);
+  // After phase 00 has started it never comes.
+  const late = fresh(t);
+  upToMode(late, 'normal'); runtime(late, 'available'); applyRunSettings(late, models);
+  writeJSON(safePath(late, 'migration/phases/starts/00.json'), { schemaVersion: 1 });
+  assert.equal(JSON.parse(cli(late, 'preferences', '--phase-mode', 'auto').stdout).autoHandoff, undefined);
+});
+
+test('the specification answer: validated everywhere, recorded unasked, and the switch still asks in auto mode', t => {
+  const root = fresh(t);
+  upToMode(root, 'auto');
+  assert.equal(autoModeOn(root), true);
+  const kit = 'node migration-kit/scripts/run_migration.mjs';
+  const decide = command => interactiveDecision({ toolName: 'bash', toolArgs: { command }, cwd: root }, root);
+  assert.equal(decide(`${kit} preferences --specification unavailable`), null);
+  assert.equal(decide(`${kit} source-spec init --apply`)?.decision, 'ask');
+  assert.equal(decide(`${kit} preferences --phase-mode auto`)?.decision, 'ask');
+  const bad = cli(root, 'preferences', '--specification', 'maybe');
+  assert.notEqual(bad.status, 0);
+  assert.match(bad.stderr, /--specification must be one of available, unavailable, not maybe/);
+  // A hand-edited invalid answer is rejected by the runner and is never auto mode.
+  const file = safePath(root, 'migration/preferences.json');
+  writeJSON(file, { ...readJSON(file), specification: 'maybe' });
+  assert.throws(() => readPreferences(root), /specification must be available or unavailable/);
+  assert.equal(autoModeOn(root), false);
 });

@@ -17,9 +17,11 @@ so behavioral equivalence is handed off as unverified.
 | The original can run | Default runtime mode; parity verifies equivalence for real |
 | The original cannot run, but a spec or portable tests exist | source-only, with spec-derived scenarios in `judge-plan.json` |
 
-At initialization the skill asks whether the original can run and whether a
-spec exists; if both answers are no, it offers this profile as the recommended
-choice. The user decides.
+Setup (`settings init`) asks whether the original can run and, only when it
+cannot, whether a specification or a test suite the target can use exists. If
+that is no as well, after `settings apply` and before phase 00, `source-spec
+init` shows the changes and `source-spec init --apply` (the host asks once)
+switches to this profile.
 
 ## Getting started
 
