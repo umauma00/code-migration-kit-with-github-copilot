@@ -39,7 +39,7 @@ export function freezeAudit(root, config, { type, files, out } = {}) {
     });
     const inputText = JSON.stringify({ schemaVersion: 1, type, files: input });
     if (Buffer.byteLength(inputText) > (config.maxReviewInputBytes ?? 65536)) throw new Error('Preparation audit input exceeds the configured bound; select an explicit batch, never truncate');
-    if (snapshot(root, config) !== before || input.some(f => hash(readReviewText(root, f.path)) !== f.hash)) throw new Error('Audit inputs changed while freezing');
+    if (snapshot(root, config) !== before || input.some(f => currentHash(root, f.path) !== f.hash)) throw new Error('Audit inputs changed while freezing');
     const request = { schemaVersion: 1, kind: 'preparation-audit-request', task, type, requestedModel: model, observedModel: null,
       snapshot: before, inputHash: hash(inputText), input: JSON.parse(inputText),
       responseContract: { schemaVersion: 1, kind: 'preparation-audit', task, inputHash: hash(inputText), verdict: 'pass|changes', findings: [{ id: 'ID', message: 'specific problem', evidence: 'source/assertion/rule:line proof', proposedFix: 'proposal only' }] } };
@@ -50,6 +50,8 @@ export function freezeAudit(root, config, { type, files, out } = {}) {
 }
 const auditDirectory = /^migration\/audits\/[A-Za-z0-9_-]+$/;
 const retirement = (root, directory) => fs.existsSync(safePath(root, `${directory}/retired.json`)) ? readJSON(safePath(root, `${directory}/retired.json`)) : null;
+// A deleted input or one that became binary is a changed input, not a crash.
+const currentHash = (root, name) => { try { return hash(readReviewText(root, name)); } catch { return null; } };
 function currentRequest(root, config, directory) {
   if (!auditDirectory.test(directory ?? '')) throw new Error('Invalid audit directory');
   const retired = retirement(root, directory);

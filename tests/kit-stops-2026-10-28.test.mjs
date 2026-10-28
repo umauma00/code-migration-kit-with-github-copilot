@@ -226,4 +226,29 @@ test('re-review fixes: legacy audit inputs freeze, a wrong root stays a blocker,
   assert.ok(report.blockers.some(b => /Input root missing: tests \(verificationRoots/.test(b.reason)), 'a missing runtime root is still shown');
   const listed = run(root, 'phase', 'check', '00b,01,02,03');
   assert.notEqual(listed.status, 0); assert.match(listed.stderr, /Only preparation phases 00 through 02 can be checked together/);
+  // Once the root exists, the review dependency map that 01 writes is pending, not a blocker.
+  fs.mkdirSync(safePath(root, 'tests'));
+  const later = migrationStatus(root);
+  assert.deepEqual(later.blockers.filter(b => b.path === 'migration inputs'), []);
+  // Worker input names Shift_JIS "cp932"; the same name is accepted as the setting.
+  writeJSON(file, { ...readJSON(file), sourceEncoding: 'cp932' });
+  assert.equal(readReviewSource(root, 'app/K.php').content, '<?\n//日本語\n');
+  writeJSON(file, { ...readJSON(file), sourceEncoding: ['shift_jis'] });
+  assert.throws(() => loadConfig(root), /sourceEncoding must be an encoding label/);
+  writeJSON(file, { ...readJSON(file), sourceEncoding: 'shift_jis' });
+  // A deleted audit input is a changed input with its recovery, not a raw ENOENT.
+  fs.rmSync(safePath(root, 'app/A.php'));
+  const { runAudit } = await import('../scripts/audit_inputs.mjs');
+  await assert.rejects(runAudit(root, loadConfig(root), async () => { throw new Error('not called'); }, { directory: frozen.directory }), /Preparation audit inputs changed/);
+});
+
+test('a legacy-encoded unit source over the input budget is named, not inlined', async t => {
+  const root = project(t, { files: { 'app/K.php': Buffer.from([0x3c, 0x3f, 0x0a, ...Array(300).fill([0x93, 0xfa]).flat(), 0x82, 0xa0, 0x0a]) } });
+  const { legacySources } = await import('../lib/review.mjs');
+  const deps = safePath(root, 'migration/review-dependencies.json');
+  writeJSON(deps, { schemaVersion: 1, dependencies: { 'app/K.php': [] } });
+  const config = { ...loadConfig(root), maxReviewInputBytes: 256 };
+  const [entry] = legacySources(root, config, { source: 'app/K.php' });
+  assert.equal(entry.encoding, 'cp932'); assert.equal(entry.content, undefined);
+  assert.equal(legacySources(root, { ...config, maxReviewInputBytes: 65536 }, { source: 'app/K.php' })[0].content.length, 305);
 });

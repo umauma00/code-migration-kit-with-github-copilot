@@ -65,10 +65,13 @@ Oversized input and binary files block the unit instead of silently omitting
 evidence. A source in a legacy encoding (Shift_JIS, EUC-JP, Latin-1, UTF-16) is
 decoded by the bundled mappers' rules and its entry names the `encoding`; the
 implementer and fixer get such sources decoded in `extra.legacyEncodedSources`
-(the unit's own source always; dependencies within `maxReviewInputBytes`).
+(the unit's source first, then dependencies, within `maxReviewInputBytes`; a
+file over the budget is named with its encoding only).
 Kanji-only Shift_JIS or EUC-JP cannot be told from Latin-1 reliably; set
 `sourceEncoding` (for example `"shift_jis"`) in `migration/config.json` to
-name the encoding of non-UTF-8 sources.
+name the encoding of non-UTF-8 sources (`cp932` is accepted). It is tried
+first for every non-UTF-8 file, so declare it only when the legacy sources
+share one encoding.
 The original bytes are never rewritten. Static input is checked at its serialized JSON size
 before implementer/fixer calls; the final candidate is checked after generation.
 

@@ -395,7 +395,7 @@
     },
     {
       "path": "lib/core.mjs",
-      "sha256": "5af028ec9f6102c12d3a18594087309d284de6ed657626a4755e0c2a372453bb",
+      "sha256": "c580695e041a6ffe7e3a8130846a538cd8ae351fabb3f3635f8ffc9a6ac4b1f0",
       "entries": [
         {
           "line": 26,
@@ -600,7 +600,7 @@
         {
           "line": 267,
           "kind": "error-or-exit-candidate",
-          "code": "try { new TextDecoder(config.sourceEncoding); } catch { throw new Error('sourceEncoding must be an encoding label such as shift_jis, euc-jp or windows-1252'); }"
+          "code": "try { if (typeof config.sourceEncoding !== 'string') throw new Error(); new TextDecoder(encodingLabel(config.sourceEncoding)); } catch { throw new Error('sourceEncoding must be an encoding label such as shift_jis, euc-jp or windows-1252'); }"
         },
         {
           "line": 269,
@@ -2383,7 +2383,7 @@
     },
     {
       "path": "lib/review.mjs",
-      "sha256": "280e4063527a67dd026f9c1a43db3b91557ee77f35173c2601b9af9718db34ac",
+      "sha256": "b20edbdab3900a199bc89e82e0bb2cd4a2d5a044bfe7f6232bcdad3028bfb303",
       "entries": [
         {
           "line": 22,
@@ -2406,57 +2406,57 @@
           "code": "const limit = config.maxReviewInputBytes ?? 65536, out = [];"
         },
         {
-          "line": 62,
+          "line": 63,
           "kind": "error-or-exit-candidate",
           "code": "if (!Array.isArray(front?.tools) || front.tools.length || Object.hasOwn(front, 'model')) throw new Error('Preparation auditor requires tools: [] and explicit host model selection without a profile override');"
         },
         {
-          "line": 75,
+          "line": 76,
           "kind": "error-or-exit-candidate",
           "code": "if (cells[0] !== 'file' || cells.length < 2 || cells.some(c => !c) || new Set(cells).size !== cells.length) throw new Error('Inventory header must begin with file<TAB> and have unique column names');"
         },
         {
-          "line": 78,
+          "line": 79,
           "kind": "error-or-exit-candidate",
           "code": "if (cells.length !== columns.length) throw new Error(`Malformed inventory row at line ${i + 1}`);"
         },
         {
-          "line": 82,
+          "line": 83,
           "kind": "error-or-exit-candidate",
           "code": "if (!columns) throw new Error('Inventory header missing');"
         },
         {
-          "line": 99,
+          "line": 100,
           "kind": "error-or-exit-candidate",
           "code": "const limit = config.maxReviewInputBytes ?? 65536;"
         },
         {
-          "line": 108,
+          "line": 109,
           "kind": "error-or-exit-candidate",
           "code": "if (fs.statSync(file).size > limit - bytes) throw tooLarge(`Review input exceeds maxReviewInputBytes (${limit}) at ${name}; reduce the audited unit or raise the limit after checking model capacity`);"
         },
         {
-          "line": 115,
+          "line": 116,
           "kind": "error-or-exit-candidate",
           "code": "if (bytes > limit) throw tooLarge(`Review input exceeds maxReviewInputBytes (${limit}) at ${name}; no content was truncated`);"
         },
         {
-          "line": 119,
+          "line": 120,
           "kind": "error-or-exit-candidate",
           "code": "if (Buffer.byteLength(text) > limit) throw tooLarge(`Review input exceeds maxReviewInputBytes (${limit}); no content was truncated`);"
         },
         {
-          "line": 129,
+          "line": 130,
           "kind": "error-or-exit-candidate",
           "code": "if (e.code !== 'REVIEW_INPUT_TOO_LARGE') throw e;"
         },
         {
-          "line": 130,
+          "line": 131,
           "kind": "error-or-exit-candidate",
           "code": "const sources = reviewSources(root, config, unit.source), limit = config.maxReviewInputBytes ?? 65536;"
         },
         {
-          "line": 141,
+          "line": 142,
           "kind": "error-or-exit-candidate",
           "code": "if (Buffer.byteLength(text) > limit) throw tooLarge(`Even the tool-assisted file list exceeds maxReviewInputBytes (${limit}) for ${unit.target}; raise the limit or split the unit`);"
         }
@@ -2619,7 +2619,7 @@
     },
     {
       "path": "lib/status.mjs",
-      "sha256": "5ef12bef0a0221b8cf8f4980654779d7a20ca97f5ed9e7247df467550ce6b490",
+      "sha256": "b75a1044e0d065ff77f0ab16183d003958ec8228f1608ba4dd707e36a3426c27",
       "entries": [
         {
           "line": 73,
@@ -2877,35 +2877,35 @@
     },
     {
       "path": "lib/text.mjs",
-      "sha256": "eb2f9271643aa899af25e283a9ef8d447330beca683268bc48a6b02a8e5655e4",
+      "sha256": "d8d185782ba29b84bf06fc997c82a4961b0097f0a6016b1351ee26ecf4f73411",
       "entries": [
         {
-          "line": 36,
+          "line": 38,
           "kind": "loop-exit-candidate",
           "code": "try { return { content: new TextDecoder(label, { fatal: true }).decode(data), encoding: label }; } catch { break; }"
         },
         {
-          "line": 55,
+          "line": 57,
           "kind": "error-or-exit-candidate",
           "code": "if (decoded.binary) throw new Error(`Review input must be text: ${name}`);"
         },
         {
-          "line": 56,
+          "line": 58,
           "kind": "error-or-exit-candidate",
           "code": "if (decoded.content.includes('\\0')) throw new Error(`Review input must be text: ${name}`);"
         },
         {
-          "line": 61,
+          "line": 63,
           "kind": "error-or-exit-candidate",
           "code": "if (!isUtf8(data)) throw new Error(`Review input must be valid UTF-8: ${name}; convert the file to UTF-8 before retrying`);"
         },
         {
-          "line": 63,
+          "line": 65,
           "kind": "error-or-exit-candidate",
           "code": "if (content.includes('\\0')) throw new Error(`Review input must be text: ${name}`);"
         },
         {
-          "line": 74,
+          "line": 76,
           "kind": "error-or-exit-candidate",
           "code": "if (platform !== 'win32' || !['EPERM', 'EACCES', 'EBUSY'].includes(e.code) || wait > 1280) throw e;"
         }
@@ -2929,7 +2929,7 @@
     },
     {
       "path": "scripts/audit_inputs.mjs",
-      "sha256": "815f8fa10b3ab0fb4805be4beace7a09806150ac8c1753aedba05ff92381c4a1",
+      "sha256": "0f03278d648c8f409d8672d22a8ae11490f82f98e7b148e8d63f0a3761a971ac",
       "entries": [
         {
           "line": 29,
@@ -2954,7 +2954,7 @@
         {
           "line": 42,
           "kind": "error-or-exit-candidate",
-          "code": "if (snapshot(root, config) !== before || input.some(f => hash(readReviewText(root, f.path)) !== f.hash)) throw new Error('Audit inputs changed while freezing');"
+          "code": "if (snapshot(root, config) !== before || input.some(f => currentHash(root, f.path) !== f.hash)) throw new Error('Audit inputs changed while freezing');"
         },
         {
           "line": 46,
@@ -2962,82 +2962,82 @@
           "code": "if (Buffer.byteLength(JSON.stringify(request)) > (config.maxReviewInputBytes ?? 65536)) throw new Error('Complete preparation request exceeds the configured input bound');"
         },
         {
-          "line": 54,
+          "line": 56,
           "kind": "error-or-exit-candidate",
           "code": "if (!auditDirectory.test(directory ?? '')) throw new Error('Invalid audit directory');"
         },
         {
-          "line": 56,
+          "line": 58,
           "kind": "error-or-exit-candidate",
           "code": "if (retired) throw new Error(`Audit request ${directory} is retired${retired.supersededBy ? `, superseded by ${retired.supersededBy}` : ''}; run its replacement instead`);"
         },
         {
-          "line": 60,
+          "line": 62,
           "kind": "error-or-exit-candidate",
           "code": "request.input.files.some(f => typeof f.content !== 'string' || hash(f.content) !== f.hash || hash(readReviewText(root, f.path)) !== f.hash)) throw new Error(`Preparation audit inputs changed; use fresh contexts and requests: freeze a replacement, then retire --directory ${directory} --superseded-by NEW --reason TEXT`);"
         },
         {
-          "line": 65,
+          "line": 67,
           "kind": "error-or-exit-candidate",
           "code": "if (fileHash(safePath(root, `${directory}/result.json`))) throw new Error('Audit result already submitted; freeze a new request for another independent audit');"
         },
         {
-          "line": 81,
+          "line": 83,
           "kind": "error-or-exit-candidate",
           "code": "if (!auditDirectory.test(directory ?? '') || !fs.existsSync(safePath(root, `${directory}/request.json`))) throw new Error('Name an existing audit request directory');"
         },
         {
-          "line": 82,
+          "line": 84,
           "kind": "error-or-exit-candidate",
           "code": "if (typeof reason !== 'string' || !reason.trim()) throw new Error('Give the reason for retiring the request');"
         },
         {
-          "line": 85,
+          "line": 87,
           "kind": "error-or-exit-candidate",
           "code": "if (fileHash(safePath(root, `${directory}/result.json`))) throw new Error('Audit result already submitted; a submitted audit stays as evidence');"
         },
         {
-          "line": 86,
+          "line": 88,
           "kind": "error-or-exit-candidate",
           "code": "if (retirement(root, directory)) throw new Error('Audit request already retired');"
         },
         {
-          "line": 89,
+          "line": 91,
           "kind": "error-or-exit-candidate",
           "code": "if (supersededBy === directory || !auditDirectory.test(supersededBy) || !fs.existsSync(safePath(root, `${supersededBy}/request.json`)) || retirement(root, supersededBy)) throw new Error('The replacement must be another, unretired audit request directory');"
         },
         {
-          "line": 107,
+          "line": 109,
           "kind": "loop-exit-candidate",
           "code": "if (signal?.aborted) break;"
         },
         {
-          "line": 123,
+          "line": 125,
           "kind": "error-or-exit-candidate",
           "code": "if (fileHash(safePath(root, `${directory}/result.json`))) throw new Error('Audit result already submitted; do not overwrite evidence');"
         },
         {
-          "line": 127,
+          "line": 129,
           "kind": "error-or-exit-candidate",
           "code": "new Set(result.findings.map(f => f.id)).size !== result.findings.length || result.findings.some(f => ['id', 'message', 'evidence', 'proposedFix'].some(k => typeof f[k] !== 'string' || !f[k].trim()))) throw new Error('Invalid preparation audit response or task/input binding');"
         },
         {
-          "line": 138,
+          "line": 140,
           "kind": "error-or-exit-candidate",
           "code": "if (args.help) { console.log(usageText(specs.audit_inputs)); process.exit(0); }"
         },
         {
-          "line": 144,
+          "line": 146,
           "kind": "error-or-exit-candidate",
           "code": ": args._[0] === 'submit' ? submitAudit(root, config, { directory: args.directory, response: args.response }) : (() => { throw new Error('Use freeze --type TYPE --files LIST | run --directory PATH [--copilot PATH] | run-pending [--copilot PATH] | retire --directory PATH [--superseded-by PATH] --reason TEXT | submit --directory PATH --response PATH'); })();"
         },
         {
-          "line": 146,
+          "line": 148,
           "kind": "error-or-exit-candidate",
           "code": "if (result.failed) process.exitCode = 1;"
         },
         {
-          "line": 147,
+          "line": 149,
           "kind": "error-or-exit-candidate",
           "code": "} catch (e) { console.error(`ERROR: ${e.message}`); process.exitCode = 1; }"
         }
@@ -3091,7 +3091,7 @@
     },
     {
       "path": "scripts/copilot_adapter.mjs",
-      "sha256": "521f6963d249d9bbb62a8f10131b17e50aefe0e95df13991fa883e83671abd2d",
+      "sha256": "785b85ce00451228800792efd9dd80e7ab14c5124e6eda0adfd12e399c6ac29b",
       "entries": [
         {
           "line": 9,

@@ -42,9 +42,12 @@ running 00 to 02 on old open-source trees (NUnit v2, phpBB 3.0.0, MediaWiki 1.15
   as decoded text, so `freeze` and the request check agree; `phase check`
   takes a list only within 00 to 02; status still shows a missing source or
   verification root as a blocker while other inputs are pending (after 00);
-  the implementer always gets the unit's own legacy-encoded source decoded;
-  `sourceEncoding` in `migration/config.json` names the encoding of non-UTF-8
-  sources (needed for kanji-only Shift_JIS or EUC-JP) and is validated.
+  the implementer gets the unit's legacy-encoded source decoded before its
+  dependencies (within the input budget); a deleted or binary audit input
+  gives the "inputs changed" recovery instead of a raw error; a status
+  blocker is listed once; `sourceEncoding` in `migration/config.json` names
+  the encoding of non-UTF-8 sources (needed for kanji-only Shift_JIS or
+  EUC-JP; `cp932` accepted) and is validated.
 
 # 0.10.0 — 2026-10-27
 
