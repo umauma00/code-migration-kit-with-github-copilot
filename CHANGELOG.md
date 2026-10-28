@@ -1,3 +1,29 @@
+# 0.13.0 — 2026-10-28
+
+Auto phase mode, for Copilot CLI autopilot: relaxed mode without the person.
+Normal and relaxed mode keep every gate as it was.
+
+- `phaseMode` gains `auto`, offered as the third choice of the phase-mode
+  question. Choosing it (`preferences --phase-mode auto`, or `settings apply`
+  with `phaseMode: "auto"`) is always confirmed by the person through the hook,
+  so an autopilot agent cannot switch it on; leaving it is unasked.
+- In auto mode the hook no longer asks for `approve` (with `--complete-phase`
+  too), `phase complete`, `phase waive`, `build-loop` and `guardrails install`.
+  `models set`, `settings apply`, `sessions prune`, `pilot prepare`,
+  `source-spec init --apply` and unreadable kit calls still ask, and a direct
+  write of `migration/guardrails.json` stays denied.
+- Gate failures end with `Relaxed mode (auto): ...`: the orchestrator does the
+  phase's work, waives only what the work cannot supply, and asks no
+  phase-boundary question.
+- With no guardrails file, the 03, 04 and 05 gates install the template deny
+  list and record `installedBy: "auto-mode"`. An existing file is never changed.
+- The deviation from upstream rule 3 is recorded in
+  `migration/phases/auto-mode.json`. Phase receipts, approval gates and waivers
+  made in auto mode carry `auto: true`; `status` (and `status --fast`) shows
+  `autoMode` with those records, and the checklist marks them
+  【自動・人の確認なし】 / [auto, not reviewed by the person]. The list stays after
+  leaving auto mode; completing a phase outside auto mode records it again.
+
 # 0.12.0 — 2026-10-28
 
 Relaxed phase mode: when a phase's prerequisite is missing, the person decides

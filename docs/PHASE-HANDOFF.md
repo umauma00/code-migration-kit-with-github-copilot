@@ -101,8 +101,9 @@ picks the model for every role (`models set --role all --model ID`); then
 one question asks the target language with the source language the kit
 guessed from the files shown (`settings init` returns it; the answer is
 recorded with `settings init --source SOURCE --target TARGET`), one question
-asks how phases advance (normal, recommended, or relaxed; recorded with
-`preferences --phase-mode`, see [relaxed mode](ORDERED-WORKFLOW.en.md#relaxed-mode)), and
+asks how phases advance (normal, recommended; relaxed; or auto, for autopilot;
+recorded with `preferences --phase-mode`, see [relaxed mode](ORDERED-WORKFLOW.en.md#relaxed-mode)
+and [auto mode](ORDERED-WORKFLOW.en.md#auto-mode)), and
 `settings init` writes the rest (migration languages, roots, verification mode,
 commands, and per-role model, effort and context changes) to
 `migration/run-settings.json`, and one question asks whether the person has
@@ -148,6 +149,13 @@ Before a question tool call, publish a concise report in chat containing:
    run or change. If prerequisites failed, recommend resolving the blocker.
 5. **Next action:** provide a copyable natural-language instruction that names
    the intended phase. This remains useful even when a question UI is available.
+
+In auto mode (`phaseMode: auto`) the person chose beforehand not to be asked at
+phase boundaries: publish the report, then record the phase and continue with
+the next one without a question. The report lists the records made without the
+person (`status` `autoMode.records`) as well as the waivers. Questions that are
+not phase gates (unfilled settings, sign-in, a command the hook still asks
+about) still stop the run.
 
 At an ordinary successful boundary, ask one question with these choices adapted
 to the actual next phase:

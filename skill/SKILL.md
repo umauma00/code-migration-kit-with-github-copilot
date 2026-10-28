@@ -94,10 +94,12 @@ found, the question asks for both languages as free text.
 
 Third, while `phaseMode` is still open (`settings init` says so), ask **one**
 question about how phases advance: normal (recommended; each phase waits until
-its prerequisites are met) or relaxed (a missing prerequisite is a warning, and
-the person decides each time whether to fix it or proceed). Record the answer
-with `run_migration.mjs preferences --phase-mode normal|relaxed`; the file
-follows. The person may switch later by editing the file or asking in chat;
+its prerequisites are met), relaxed (a missing prerequisite is a warning, and
+the person decides each time whether to fix it or proceed) or auto (relaxed
+without asking, for Copilot CLI autopilot; completions, approvals and waivers
+are recorded unasked and marked auto). Record the answer
+with `run_migration.mjs preferences --phase-mode normal|relaxed|auto`; the file
+follows (the host asks the person to confirm auto). The person may switch later by editing the file or asking in chat;
 switching never revokes approvals or completion records. See
 [relaxed mode](../docs/ORDERED-WORKFLOW.md#relaxed-mode).
 
@@ -131,7 +133,8 @@ phase boundary. Show the actual artifacts, review points and a copyable next
 instruction before asking. Use the available question tool for missing decisions;
 otherwise present the choices in chat and wait. Reuse answers already given (never a past gate approval for a new gate).
 An automatic reply that the user is not available (Copilot CLI autopilot) is not
-an answer: choose nothing and ask the person to continue interactively.
+an answer: choose nothing and ask the person to continue interactively (in
+auto mode, phase boundaries ask nothing; see the auto mode paragraph).
 After a phase, resolve the next step from the user's instruction and current
 evidence, not just a report/template's existence.
 
@@ -233,7 +236,7 @@ reason), and after their agreement in chat run `guardrails install` with exactly
 those options. Never write the file any other way (the hook denies it). The host
 asks the person to confirm every `approve` / `phase complete` / `guardrails install`
 command; if it cannot ask (autopilot denies the request), tell the person to leave
-autopilot and retry instead of working around it. Run gate commands only in an
+autopilot and retry instead of working around it. Outside auto mode, run gate commands only in an
 interactive session without autopilot, which denies them. The Copilot CLI may show
 its own permission prompt after the hook's question, so the person can be asked
 twice. An explicit
@@ -257,7 +260,24 @@ it later lifts the waiver, and records made on it are checked again. List every
 remaining waiver in each phase report and in the final handoff report. Safety
 checks (guardrails, protected paths, source overwrite, sign-in, the host's
 confirmation of each gate command) are never waived. In normal mode the failure
-guidance also offers switching to relaxed mode; it is never the recommendation. Record known host usage with completion;
+guidance also offers switching to relaxed mode; it is never the recommendation.
+In auto mode (`phaseMode: auto`, for Copilot CLI autopilot) the person chose
+beforehand to let the gates run unasked. At each phase boundary, publish the
+phase report as usual but ask no question: do the phase's work, record it
+(`phase complete`, `approve`, `build-loop`; the hook does not ask) and continue
+with the next phase. A gate failure ending `Relaxed mode (auto): ...` means: if
+the phase's own work can supply what is missing, do that work; only otherwise
+run `phase waive ID --note "<why>"` and retry. Never waive phases ahead of the
+one that blocked. Missing guardrails are installed from the template
+automatically. Everything else still stops: safety checks, sign-in and credits,
+unfilled run settings, and the commands the hook still asks about (models set,
+settings apply, sessions prune, pilot prepare, source-spec init --apply); report
+them and stop. Never switch auto mode on yourself: `preferences --phase-mode
+auto` is the person's act (the hook asks). Every report and the handoff list the
+records made without the person (`status` `autoMode.records`, marked
+【自動・人の確認なし】 / [auto, not reviewed by the person]) and the waivers. See
+[auto mode](../../../docs/ORDERED-WORKFLOW.md#auto-mode).
+ Record known host usage with completion;
 [main-format cost logs](../docs/COST-LOG.md) use unknown where unavailable.
 
 ## Worker execution

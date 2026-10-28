@@ -99,7 +99,7 @@ export function phaseCommand(root, config, action, phase, options = {}) {
         if (['00','00b','01','02','03'].includes(phase)) completePhase(root, config, phase, 'check', {}, { dryRun: true });
         if (own) throw new Error(own === 'units' ? 'Current reviewed translation units are required' : `Run ${own} successfully for current inputs`);
       }
-      catch (e) { unmet = e.message.replace(/ Relaxed mode: .*$/s, ''); }
+      catch (e) { unmet = e.message.replace(/ Relaxed mode(?: \(auto\))?: .*$/s, ''); }
       return waivePhase(root, config, phase, options.note, unmet);
     }
     // One reviewed note may cover consecutive phases (source-as-spec reviews

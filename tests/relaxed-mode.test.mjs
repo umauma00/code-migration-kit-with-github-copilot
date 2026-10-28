@@ -200,9 +200,9 @@ test('run settings carry the phase mode; files written before it existed still a
   const file = safePath(f.root, runSettingsFile);
   const fill = value => { const s = readJSON(file); Object.assign(s, { reportLanguage: 'en', originalRuntime: 'available' }, value); writeJSON(file, s); };
   assert.equal(readJSON(file).phaseMode, 'FILL_IN');
-  assert.deepEqual(readJSON(file)._choices.phaseMode, ['normal', 'relaxed']);
+  assert.deepEqual(readJSON(file)._choices.phaseMode, ['normal', 'relaxed', 'auto']);
   fill({ phaseMode: 'loose' });
-  assert.match(applyRunSettings(f.root, catalog).errors.join('\n'), /phaseMode: must be one of normal, relaxed, not "loose"/);
+  assert.match(applyRunSettings(f.root, catalog).errors.join('\n'), /phaseMode: must be one of normal, relaxed, auto, not "loose"/);
   fill({ phaseMode: 'relaxed' });
   const applied = applyRunSettings(f.root, catalog);
   assert.equal(applied.applied, true, applied.errors?.join('\n'));
