@@ -116,7 +116,7 @@ test('auto mode: every setup step says it is still manual, and setup ends with t
 });
 
 test('a mid-run project is past setup: no fifth question, no notice, no handoff', t => {
-  for (const record of ['migration/phases/00.json', 'migration/phases/starts/00.json']) {
+  for (const record of ['migration/phases/00.json', 'migration/phases/starts/00.json', 'migration/phases/waivers/00.json', 'migration/phases/starts/00b.json']) {
     const root = fresh(t);
     upToMode(root, 'auto'); runtime(root, 'unavailable');
     writeJSON(safePath(root, record), { schemaVersion: 1 });
@@ -157,6 +157,14 @@ test('auto mode hands over once per choice of auto, and counts what is left exac
   assert.match(back.next, /end the turn now/);
   // Choosing auto when it already is does not.
   assert.equal(JSON.parse(cli(root, 'preferences', '--phase-mode', 'auto').stdout).autoHandoff, undefined);
+  // A hand-edited auto has no record and is not in effect; choosing it
+  // properly, as status advises, is a new choice and hands over.
+  setPreferences(root, { phaseMode: 'relaxed' }); syncRunSettings(root, { keys: ['phaseMode'] });
+  const file = safePath(root, 'migration/preferences.json');
+  writeJSON(file, { ...readJSON(file), phaseMode: 'auto' });
+  syncRunSettings(root, { keys: ['phaseMode'] });
+  assert.equal(autoModeOn(root), false);
+  assert.match(JSON.parse(cli(root, 'preferences', '--phase-mode', 'auto').stdout).autoHandoff ?? '', /初期設定が完了しました/);
 });
 
 test('choosing auto after setup is applied hands over at once; during setup or after phase 00 it does not', t => {

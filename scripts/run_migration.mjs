@@ -24,6 +24,7 @@ import { diagnoseBuild } from './diagnostic_queue.mjs';
 import { sessionsStatus, pruneSessions } from '../lib/sessions.mjs';
 import { buildLoop } from '../lib/build-loop.mjs';
 import { readPreferences, setPreferences, preferencesReport } from '../lib/preferences.mjs';
+import { autoModeOn } from '../lib/auto-mode.mjs';
 import { readGuardrails, cliFolderTrust, guardrailsProposal, installGuardrails } from '../lib/guardrails.mjs';
 import { listAvailableModels, modelsMarkdown, setRoleModels, readConfigIfPresent, currentAssignments } from '../lib/models.mjs';
 import { initRunSettings, checkRunSettings, applyRunSettings, syncRunSettings, runSettingsFile, runSettingsState, setupEnd, phase00Started } from '../lib/run-settings.mjs';
@@ -236,7 +237,9 @@ export async function main(argv = process.argv.slice(2)) {
   }
   if (cmd === 'preferences') {
     const setting = args.language || args['original-runtime'] || args['phase-mode'] || args.specification;
-    const wasAuto = setting ? readPreferences(root).phaseMode === 'auto' : false;
+    // In effect, not just chosen: a hand-edited auto (no record) chosen properly
+    // now is a new choice and hands over.
+    const wasAuto = setting ? autoModeOn(root) : false;
     const result = setting ? setPreferences(root, { language: args.language, originalRuntime: args['original-runtime'], phaseMode: args['phase-mode'], specification: args.specification }) : preferencesReport(root);
     if (setting) {
       const report = {};
