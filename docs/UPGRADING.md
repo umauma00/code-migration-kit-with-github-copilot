@@ -1,6 +1,10 @@
-# 更新手順（0.10.0 と以前の版）
+# 更新手順（0.11.0 と以前の版）
 
 日本語 | [English](UPGRADING.en.md)
+
+## 0.11.0（実行設定ファイル）
+
+キットのファイル（lib・scripts）が変わるため、既存の承認・完了記録は一度だけ失効します。judgeから再検証してください。完了済みの出力は保持されます。既存の `migration/config.json` は `settings apply` を実行するまで変わりません。既存の案件をファイル方式にするには `run_migration.mjs settings init` を実行します。現在の設定から `migration/run-settings.json` を作り、`status` が設定と一致しているかを表示します。`models set` と `preferences` は引き続き使えます。
 
 ## 0.10.0（途中停止の撲滅・契約メモの廃止）
 

@@ -1,6 +1,10 @@
-# Upgrading (0.10.0 and earlier releases)
+# Upgrading (0.11.0 and earlier releases)
 
 [日本語](UPGRADING.md) | English
+
+## 0.11.0 (run settings file)
+
+Kit files (lib, scripts) change, so existing approvals and completion records lapse once; revalidate from judge. Completed outputs are kept. Nothing in an existing `migration/config.json` changes until you run `settings apply`. To move an existing project to the file, run `run_migration.mjs settings init`: it writes `migration/run-settings.json` from the current configuration, and `status` shows whether the file matches it. `models set` and `preferences` keep working.
 
 ## 0.10.0 (no mid-run stops; no contract memo)
 
