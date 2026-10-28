@@ -560,18 +560,14 @@ test('typed language names are recorded as the mappers recognize them, and missi
   setRoleModels(root, models, { role: 'all', model: 'big-model' });
   const result = initRunSettings(root, models, { source: 'Python', target: 'TypeScript' });
   assert.equal(result.sourceRootsUnchosen, true);
-  // Files only at the root: no folder answers it, so the question says to move them.
-  assert.match(result.next, /only at the repository root.*once the person has moved them into a folder, run settings init again/);
-  assert.match(result.sourceRootsQuestion, /Python のファイルがリポジトリ直下にしかありません/);
+  assert.match(result.next, /ask sourceRootsQuestion as one free-text question.*settings init --source-roots DIR\[,DIR\].*files only at the repository root must be moved into a folder first.*Never ask the person to edit the file/);
+  assert.match(result.sourceRootsQuestion, /移行元のフォルダーが src のままで、そこに Python のファイルが見つかりませんでした。.*リポジトリ直下だけにある場合は、先にフォルダーへ移してください/);
   assert.deepEqual(settingsOf(root).sourceRoots, ['src']);
   // The question stays until answered, in later runs too, before the phase mode.
   const later = initRunSettings(root, models);
   assert.equal(later.sourceRootsUnchosen, true);
   assert.match(later.next, /sourceRootsQuestion/);
   assert.doesNotMatch(later.next, /phase mode/);
-  fs.rmSync(path.join(root, 'main.py'));
-  touch(root, ['other/x.py']);
-  assert.match(initRunSettings(root, models).next, /ask sourceRootsQuestion as one free-text question.*settings init --source-roots DIR\[,DIR\].*Never ask the person to edit the file/);
   // The answer: folders that exist are recorded; anything else is asked again.
   assert.throws(() => initRunSettings(root, models, { sourceRoots: 'app, nowhere' }), /--source-roots: app, nowhere are not folders in the repository; ask for the source folders again/);
   assert.throws(() => initRunSettings(root, models, { sourceRoots: ' , ' }), /must name one or more folders/);
@@ -654,10 +650,10 @@ test('review of ac3ad0c: the source-folder question clears once answered, persis
   touch(root, ['main.py']);
   setRoleModels(root, models, { role: 'all', model: 'big-model' });
   assert.equal(initRunSettings(root, models, { source: 'Python', target: 'Go' }).sourceRootsUnchosen, true);
-  assert.throws(() => initRunSettings(root, models, { sourceRoots: 'src' }), /--source-roots: src holds no Python files; ask for the source folders again/);
-  touch(root, ['src/app.py']);
+  assert.throws(() => initRunSettings(root, models, { sourceRoots: 'src' }), /--source-roots: src holds no files; ask for the source folders again/);
   fs.mkdirSync(path.join(root, 'src/empty'));
-  assert.throws(() => initRunSettings(root, models, { sourceRoots: 'src/empty' }), /holds no Python files/, 'an empty folder under a detected one is not source');
+  touch(root, ['src/app.py', 'src/empty/.gitkeep']);
+  assert.throws(() => initRunSettings(root, models, { sourceRoots: 'src/empty' }), /src\/empty holds no files/, 'placeholders are not files');
   initRunSettings(root, models, { sourceRoots: 'src' });
   assert.equal(initRunSettings(root, models).sourceRootsUnchosen, undefined, 'an accepted answer is never asked again');
   // The repository root is not a source folder (migration/ and the output live there).
@@ -669,12 +665,24 @@ test('review of ac3ad0c: the source-folder question clears once answered, persis
   const again = initRunSettings(root, models);
   assert.equal(again.sourceRootsUnchosen, true);
   assert.equal(again.originalRuntimeQuestion, undefined, 'one question at a time: the folders come first');
-  assert.throws(() => initRunSettings(root, models, { sourceRoots: 'src' }), /src is empty/);
+  assert.throws(() => initRunSettings(root, models, { sourceRoots: 'src' }), /src holds no files/);
   touch(root, ['src/.gitkeep']);
-  assert.throws(() => initRunSettings(root, models, { sourceRoots: 'src' }), /src is empty/, 'hidden files are not source');
-  assert.match(initRunSettings(root, models).sourceRootsQuestion, /No Fortran files were found in the source folder src|移行元のフォルダー src に Fortran のファイルが見つかりませんでした/);
+  assert.equal(initRunSettings(root, models).sourceRootsUnchosen, true, 'a placeholder is not a file');
   touch(root, ['src/a.f90']);
   assert.equal(initRunSettings(root, models).sourceRootsUnchosen, undefined, 'a src/ holding files of an undetected language stands');
+  // Dot-named sources count (the detector counts them too).
+  root = fresh(t);
+  setRoleModels(root, models, { role: 'all', model: 'big-model' });
+  touch(root, ['src/.legacy.py']);
+  assert.equal(initRunSettings(root, models, { source: 'Python', target: 'Go' }).sourceRootsUnchosen, undefined);
+  // Sources only in test folders: asked once, with the true reason, and any non-empty answer is final.
+  root = fresh(t);
+  setRoleModels(root, models, { role: 'all', model: 'big-model' });
+  touch(root, ['tests/test_a.py', 'src/Makefile']);
+  const testOnly = initRunSettings(root, models, { source: 'Python', target: 'Go' });
+  assert.equal(testOnly.sourceRootsUnchosen, true);
+  assert.doesNotMatch(testOnly.sourceRootsQuestion, /（.* にはあります）/);
+  assert.equal(initRunSettings(root, models).sourceRootsUnchosen, undefined, 'asked once; src/ holds files, so later runs do not loop');
   // Files elsewhere: the question says where they are instead of "not found".
   root = fresh(t);
   touch(root, ['lib/a.py']);
@@ -682,7 +690,7 @@ test('review of ac3ad0c: the source-folder question clears once answered, persis
   initRunSettings(root, models);
   writeSettings(root, { ...settingsOf(root), sourceLanguage: 'Python', targetLanguage: 'Go' });
   const elsewhere = initRunSettings(root, models);
-  assert.match(elsewhere.sourceRootsQuestion, /Python のファイルは lib にあり、移行元のフォルダーは src のままです/);
+  assert.match(elsewhere.sourceRootsQuestion, /そこに Python のファイルが見つかりませんでした（lib にはあります）/);
 });
 
 test('review of ac3ad0c: the runner says when the original-runtime answer moves the verification mode, and asks when it no longer fits', t => {

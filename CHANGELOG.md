@@ -17,10 +17,10 @@ First choices are questions; the run settings file holds values only.
   writes `runtime` back.
 - Source folders the kit cannot find are asked too: `settings init` returns
   `sourceRootsQuestion` (free text) while `sourceRoots` is still the
-  template's and holds no source-language files, until the answer is recorded
-  with the new `settings init --source-roots DIR[,DIR]`. The answer must name
-  existing folders (not the repository root), one of them holding the source,
-  so an accepted answer is never asked again.
+  template's and holds no files, and once on the language answer when the
+  language was not detected there. The answer is recorded with the new
+  `settings init --source-roots DIR[,DIR]`; each folder must exist, hold files
+  and not be the repository root, and an accepted answer is never asked again.
 - `settings apply` with a question-filled entry still `FILL_IN` (models,
   languages, phase mode, originalRuntime) says to run `settings init` and ask
   it, never to edit the file.

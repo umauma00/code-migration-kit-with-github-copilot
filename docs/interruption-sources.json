@@ -2504,7 +2504,7 @@
     },
     {
       "path": "lib/run-settings.mjs",
-      "sha256": "696fce2c8d76c07b9cfa7eb6189edf59dd615539415876cc50b9e4b37fdd2413",
+      "sha256": "8e6a1a15e7a6f7ce07fb9b4da5354fa2820cfeaace04a802f3e732f0253e2c62",
       "entries": [
         {
           "line": 24,
@@ -2582,22 +2582,22 @@
           "code": "if (missing.length) throw new Error(`--source-roots: ${missing.join(', ')} ${missing.length > 1 ? 'are not folders' : 'is not a folder'} in the repository; ask for the source folders again`);"
         },
         {
-          "line": 177,
+          "line": 178,
           "kind": "error-or-exit-candidate",
-          "code": "if (!dirs.some(holdsSource)) throw new Error(`--source-roots: ${dirs.join(', ')} ${sourceFound ? `hold${dirs.length > 1 ? '' : 's'} no ${values.sourceLanguage} files` : `${dirs.length > 1 ? 'are' : 'is'} empty`}; ask for the source folders again`);"
+          "code": "if (empty.length) throw new Error(`--source-roots: ${empty.join(', ')} ${empty.length > 1 ? 'hold' : 'holds'} no files; ask for the source folders again`);"
         },
         {
-          "line": 261,
+          "line": 259,
           "kind": "error-or-exit-candidate",
           "code": "if (!fs.existsSync(file)) throw new Error(`${runSettingsFile} is missing: run settings init first`);"
         },
         {
-          "line": 263,
+          "line": 261,
           "kind": "error-or-exit-candidate",
           "code": "try { value = readJSON(file); } catch (e) { throw new Error(`${runSettingsFile} is not valid JSON: ${e.message}`); }"
         },
         {
-          "line": 264,
+          "line": 262,
           "kind": "error-or-exit-candidate",
           "code": "if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${runSettingsFile} must be a JSON object`);"
         }

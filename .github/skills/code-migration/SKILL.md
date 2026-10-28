@@ -147,11 +147,10 @@ recorded as the name the mappers recognize. If no folder outside the test
 folders holds the source language, the result has `sourceRootsUnchosen` and a
 ready `sourceRootsQuestion`: say so, ask it as **one** free-text question and
 record the answer with `run_migration.mjs settings init --source-roots DIR[,DIR]`
-(each must be a folder in the repository, not the root, and one of them must hold
-the source; otherwise the error says why and you ask again). When the source
-files are only at the repository root, no folder can answer it: show the
-question (it asks the person to move them into a folder) and run `settings init`
-again once they have. If nothing was
+(each must be a folder in the repository that holds files, not the root;
+otherwise the error says why and you ask again). An accepted answer is never
+asked again. Files only at the repository root must first be moved into a
+folder; the question says so. If nothing was
 found, the question asks for both languages as free text.
 
 Third, while `phaseMode` is still open (`settings init` says so), ask **one**
