@@ -16,7 +16,7 @@ import { statusSnapshot } from '../lib/status-snapshot.mjs';
 import { setPreferences, readPreferences } from '../lib/preferences.mjs';
 import { failureGuidance } from '../lib/guidance.mjs';
 import { humanGate, interactiveDecision } from '../lib/guardrails.mjs';
-import { initRunSettings, applyRunSettings, runSettingsState, runSettingsFile } from '../lib/run-settings.mjs';
+import { initRunSettings, applyRunSettings, runSettingsState, runSettingsFile, runSettingsHelpFile } from '../lib/run-settings.mjs';
 import { setRoleModels } from '../lib/models.mjs';
 import { kitRoot } from '../scripts/install.mjs';
 
@@ -200,7 +200,7 @@ test('run settings carry the phase mode; files written before it existed still a
   const file = safePath(f.root, runSettingsFile);
   const fill = value => { const s = readJSON(file); Object.assign(s, { reportLanguage: 'en', originalRuntime: 'available' }, value); writeJSON(file, s); };
   assert.equal(readJSON(file).phaseMode, 'FILL_IN');
-  assert.deepEqual(readJSON(file)._choices.phaseMode, ['normal', 'relaxed', 'auto']);
+  assert.match(fs.readFileSync(safePath(f.root, runSettingsHelpFile), 'utf8'), /`phaseMode`: .*\(choices: `normal`, `relaxed`, `auto`\)/);
   fill({ phaseMode: 'loose' });
   assert.match(applyRunSettings(f.root, catalog).errors.join('\n'), /phaseMode: must be one of normal, relaxed, auto, not "loose"/);
   fill({ phaseMode: 'relaxed' });

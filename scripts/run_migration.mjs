@@ -45,9 +45,10 @@ export const usage = `Usage: node migration-kit/scripts/run_migration.mjs COMMAN
                               Record one choice; both forms are checked against that list before writing
   preferences [--language ja|en] [--original-runtime available|unavailable] [--phase-mode normal|relaxed|auto]
                               Report language; whether the original can still run (guides recommendations)
-  settings init [--source LANGUAGE] [--target LANGUAGE] | check | apply
-                              migration/run-settings.json: write it with your account's models as choices and a guess
-                              of the source language (init; --source/--target record the answer to the language question),
+  settings init [--source LANGUAGE] [--target LANGUAGE] [--source-roots CSV] | check | apply
+                              migration/run-settings.json: write it (values only; explanations and your account's models
+                              as choices go to migration/run-settings.help.md) with a guess
+                              of the source language (init; --source/--target and --source-roots record the answers to its questions),
                               check every entry (check), or check and record it in config.json and preferences.json (apply)
   sessions status | prune [--run RUN_ID]
                              Report / delete the local Copilot CLI transcripts of the kit's own workers
@@ -271,7 +272,7 @@ export async function main(argv = process.argv.slice(2)) {
     // other fields); the model entries then report why.
     let models;
     try { models = await listAvailableModels({ command: args.copilot ?? 'copilot', cwd: root }); } catch (e) { models = e.message; }
-    if (action === 'init') { console.log(JSON.stringify(initRunSettings(root, models, { source: args.source, target: args.target }), null, 2)); return; }
+    if (action === 'init') { console.log(JSON.stringify(initRunSettings(root, models, { source: args.source, target: args.target, sourceRoots: args['source-roots'] }), null, 2)); return; }
     if (action === 'check') {
       const file = safePath(root, runSettingsFile);
       if (!fs.existsSync(file)) throw new Error(`${runSettingsFile} is missing: run settings init first`);
@@ -332,7 +333,15 @@ export async function main(argv = process.argv.slice(2)) {
     }
     else if (cmd === 'source-spec' && args._[1] === 'init') {
       const release = lockRun(root, 'source-spec-init');
-      try { result = initSourceSpec(root, config, { apply: args.apply }); } finally { release(); }
+      try {
+        result = initSourceSpec(root, config, { apply: args.apply });
+        // The switch writes verificationMode to config.json; the run settings
+        // file follows, so a later settings apply does not write runtime back.
+        if (result.applied && result.changes.some(c => c.path === 'migration/config.json')) {
+          const synced = syncRunSettings(root, { keys: ['verificationMode'] });
+          if (synced) result.runSettings = `${synced} updated to match`;
+        }
+      } finally { release(); }
     }
     else if (cmd === 'source-spec' && args._[1] === 'check') result = sourceSpecReadiness(root, config);
     else if (cmd === 'source-spec') throw new Error('Use source-spec init [--apply] | check');

@@ -42,8 +42,11 @@ After initialization, decide the other settings through `migration/run-settings.
 (`settings init`, one question for the target language with the guessed source
 shown, `settings init --source --target`, one question for the phase mode
 (normal recommended, relaxed, or auto for autopilot) recorded with `preferences --phase-mode`, one
+question whether the original runs (`originalRuntimeQuestion`) recorded with `preferences --original-runtime`, one
 question "filled in, or a question?", then `settings apply`),
-not one question per setting; see the skill's run settings section.
+not one question per setting; see the skill's run settings section. First choices
+are always questions: never tell the person to type one into the file (the file is
+for later changes and resuming).
 In relaxed mode a gate failure that names `phase waive ID` is a question for the
 person (fix first, recommended; or proceed): run `phase waive ID --note` only on
 their answer, and list remaining waivers in every report and the handoff.

@@ -1,3 +1,31 @@
+# 0.14.0 — 2026-10-28
+
+First choices are questions; the run settings file holds values only.
+
+- Whether the original runs here (`originalRuntime`) is the fourth question of
+  `settings init`, after models, languages and the phase mode. The result
+  carries `originalRuntimeQuestion` (a ready question in the report language,
+  two choices) and the answer is recorded with
+  `preferences --original-runtime`; the file follows. The person is no longer
+  told to type it into the file.
+- An answer of unavailable sets the file's `verificationMode` to `source-only`
+  when it was `runtime`, instead of `settings apply` refusing the pair.
+- `source-spec init --apply` writes `verificationMode: source-only` into the
+  run settings file too, so a later `settings apply` neither refuses nor
+  writes `runtime` back.
+- Source folders the kit cannot find are asked too: `settings init` returns
+  `sourceRootsQuestion` (free text) while `sourceRoots` is still the
+  template's and holds no source-language files, until the answer is recorded
+  with the new `settings init --source-roots DIR[,DIR]` (folders must exist).
+- `settings apply` with a question-filled entry still `FILL_IN` (models,
+  languages, phase mode, originalRuntime) says to run `settings init` and ask
+  it, never to edit the file.
+- `migration/run-settings.json` drops `_help` and `_choices`: the explanations,
+  allowed values and the account's models are written to
+  `migration/run-settings.help.md` beside it by every `settings init`. An
+  existing file loses them on its next `settings init`; `_about` stays and
+  points to the help file.
+
 # 0.13.0 — 2026-10-28
 
 Auto phase mode, for Copilot CLI autopilot: relaxed mode without the person.

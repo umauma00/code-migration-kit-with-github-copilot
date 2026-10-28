@@ -9,7 +9,7 @@ import { install, kitRoot } from '../scripts/install.mjs';
 import { contextHash, done, readJSON, writeJSON, safePath, loadConfig } from '../lib/core.mjs';
 import { translate, runStage, approve } from '../lib/pipeline.mjs';
 import { normalizeModels, setRoleModels } from '../lib/models.mjs';
-import { initRunSettings, checkRunSettings, applyRunSettings, runSettingsState, syncRunSettings, runSettingsFile } from '../lib/run-settings.mjs';
+import { initRunSettings, checkRunSettings, applyRunSettings, runSettingsState, syncRunSettings, runSettingsFile, runSettingsHelpFile } from '../lib/run-settings.mjs';
 import { migrationStatus, statusMarkdown } from '../lib/status.mjs';
 import { statusSnapshot } from '../lib/status-snapshot.mjs';
 import { humanGate, interactiveDecision } from '../lib/guardrails.mjs';
@@ -33,6 +33,7 @@ function fresh(t, language = 'ja') {
   return root;
 }
 const settingsOf = root => readJSON(safePath(root, runSettingsFile));
+const helpOf = root => fs.readFileSync(safePath(root, runSettingsHelpFile), 'utf8');
 const writeSettings = (root, value) => writeJSON(safePath(root, runSettingsFile), value);
 // Filled from the file settings init wrote (kept aside, since tests overwrite it).
 const initial = new Map();
@@ -45,7 +46,7 @@ function filled(root) {
   return s;
 }
 
-test('settings init writes one file with the account\'s models as choices and placeholders where nothing was chosen', t => {
+test('settings init writes the values in one file, and the explanations and the account\'s models as choices beside it', t => {
   const root = fresh(t);
   const result = initRunSettings(root, models);
   assert.equal(result.created, true);
@@ -54,11 +55,18 @@ test('settings init writes one file with the account\'s models as choices and pl
   assert.equal(s.sourceLanguage, 'FILL_IN', 'template example languages are not presented as a choice');
   assert.equal(s.models.implementer.model, 'FILL_IN');
   assert.deepEqual(s.models.surveyor, { model: 'same-as-implementer', effort: 'default', context: 'default' });
-  assert.deepEqual(s._choices.models.map(m => m.contexts), [['default', 'long_context'], ['default'], ['default']]);
-  assert.deepEqual(s._choices.models.map(m => m.id), ['big-model', 'small-model', 'plain-model'], 'only enabled models are offered');
-  assert.deepEqual(s._choices.models[0].efforts, ['low', 'medium', 'high', 'xhigh']);
+  // The settings file holds only values: no explanations or choices in it.
+  assert.deepEqual(Object.keys(s).filter(k => k.startsWith('_')), ['_about']);
   assert.match(s._about, /記入した/);
-  assert.match(s._help.models, /same-as-implementer/);
+  assert.match(s._about, /run-settings\.help\.md/);
+  assert.equal(result.help, runSettingsHelpFile);
+  const help = helpOf(root);
+  assert.match(help, /\| `big-model` \| Big Model \| low, medium（既定）, high, xhigh \| default, long_context \|/);
+  assert.match(help, /\| `small-model` \| Small Model \| low, medium, high \| default \|/);
+  assert.doesNotMatch(help, /blocked-model/, 'only enabled models are offered');
+  assert.match(help, /same-as-implementer/);
+  assert.match(help, /`originalRuntime`: .*（選択肢: `available`、`unavailable`）/);
+  assert.match(help, /`phaseMode`: .*（選択肢: `normal`、`relaxed`、`auto`）/);
   assert.ok(result.pending.includes('sourceLanguage') && result.pending.includes('originalRuntime') && result.pending.includes('models.fixer.model'));
   assert.deepEqual(runSettingsState(root, readJSON(safePath(root, 'migration/config.json'))).state, 'unfilled');
 });
@@ -68,13 +76,15 @@ test('settings init keeps the person\'s values and refreshes only explanations a
   initRunSettings(root, models);
   const s = settingsOf(root);
   assert.match(s._about, /filled in/);
-  s.sourceLanguage = 'Java'; s._choices.models = [];
+  // A file written by 0.13.0 and earlier carried _help and _choices; a refresh drops them.
+  s.sourceLanguage = 'Java'; s._choices = { models: [] }; s._help = { models: 'old' };
   writeSettings(root, s);
   const again = initRunSettings(root, 'not signed in');
   assert.equal(again.refreshed, true);
   assert.equal(again.modelsListed, false);
   assert.equal(settingsOf(root).sourceLanguage, 'Java');
-  assert.equal(settingsOf(root)._choices.models, 'not signed in', 'the reason the list is missing is written where the choices go');
+  assert.deepEqual(Object.keys(settingsOf(root)).filter(k => k.startsWith('_')), ['_about'], 'older explanations and choices leave the file');
+  assert.match(helpOf(root), /The model list could not be read \(not signed in\)/, 'the reason the list is missing is written where the choices go');
   fs.writeFileSync(safePath(root, runSettingsFile), '{ broken');
   assert.throws(() => initRunSettings(root, models), /not valid JSON/);
 });
@@ -358,7 +368,7 @@ test('models come from one question first; the file then only needs the language
   const s = settingsOf(root);
   for (const role of ['implementer', 'reviewer-semantics', 'reviewer-rules', 'arbiter', 'fixer']) assert.deepEqual(s.models[role], { model: 'big-model', effort: 'default', context: 'default' });
   assert.equal(s.models.surveyor.model, 'same-as-implementer');
-  assert.match(s._help.models, /最初の質問で選んだモデル/);
+  assert.match(helpOf(root), /最初の質問で選んだモデル/);
 });
 
 test('a model or language changed from chat updates the file, so apply never writes the old choice back', t => {
@@ -475,9 +485,18 @@ test('the language answer fills both languages and, over the template folders, t
   setPreferences(root, { phaseMode: 'relaxed' });
   syncRunSettings(root, { keys: ['phaseMode'] });
   assert.equal(settingsOf(root).phaseMode, 'relaxed');
+  // Whether the original runs is the fourth question, never a file edit.
   const moded = initRunSettings(root, models);
   assert.deepEqual(moded.pending, ['originalRuntime']);
-  assert.match(moded.next, /filled in/);
+  assert.match(moded.next, /Ask originalRuntimeQuestion as one question.*preferences --original-runtime available\|unavailable.*Never ask the person to edit the file/);
+  assert.match(moded.originalRuntimeQuestion.question, /移行元の C# のプログラムを、この環境でビルドして実行できますか？/);
+  assert.deepEqual(moded.originalRuntimeQuestion.choices.map(c => c.value), ['available', 'unavailable']);
+  setPreferences(root, { originalRuntime: 'available' });
+  syncRunSettings(root, { keys: ['originalRuntime'] });
+  const runtimed = initRunSettings(root, models);
+  assert.deepEqual(runtimed.pending, []);
+  assert.equal(runtimed.originalRuntimeQuestion, undefined);
+  assert.match(runtimed.next, /filled in/);
   const s = settingsOf(root);
   assert.equal(s.sourceLanguage, 'C#', 'the detected spelling is kept, which the bundled mapper recognizes');
   assert.equal(s.targetLanguage, 'TypeScript');
@@ -501,6 +520,10 @@ test('the runner takes the language answer on settings init', t => {
   out = run('settings', 'init', '--source', 'Java', '--target', 'Kotlin');
   assert.equal(out.status, 0, out.stderr);
   assert.deepEqual([settingsOf(root).sourceLanguage, settingsOf(root).targetLanguage, settingsOf(root).sourceRoots], ['Java', 'Kotlin', ['Legacy']]);
+  touch(root, ['Shared/a.java']);
+  out = run('settings', 'init', '--source-roots', 'Legacy,Shared');
+  assert.equal(out.status, 0, out.stderr);
+  assert.deepEqual(settingsOf(root).sourceRoots, ['Legacy', 'Shared']);
 });
 
 test('review of 46230fb: monorepos, virtual environments, case, helper-only sources and typed names', t => {
@@ -537,8 +560,23 @@ test('typed language names are recorded as the mappers recognize them, and missi
   setRoleModels(root, models, { role: 'all', model: 'big-model' });
   const result = initRunSettings(root, models, { source: 'Python', target: 'TypeScript' });
   assert.equal(result.sourceRootsUnchosen, true);
-  assert.match(result.next, /ask the person to write the source folders/);
+  assert.match(result.next, /ask sourceRootsQuestion as one free-text question.*settings init --source-roots DIR\[,DIR\].*Never ask the person to edit the file/);
+  assert.match(result.sourceRootsQuestion, /Python のファイルがテスト以外のフォルダーに見つかりませんでした/);
   assert.deepEqual(settingsOf(root).sourceRoots, ['src']);
+  // The question stays until answered, in later runs too, before the phase mode.
+  const later = initRunSettings(root, models);
+  assert.equal(later.sourceRootsUnchosen, true);
+  assert.match(later.next, /sourceRootsQuestion/);
+  assert.doesNotMatch(later.next, /phase mode/);
+  // The answer: folders that exist are recorded; anything else is asked again.
+  assert.throws(() => initRunSettings(root, models, { sourceRoots: 'app, nowhere' }), /--source-roots: app, nowhere are not folders in the repository; ask for the source folders again/);
+  assert.throws(() => initRunSettings(root, models, { sourceRoots: ' , ' }), /must name one or more folders/);
+  touch(root, ['app/a.py', 'lib/b.py']);
+  const answered = initRunSettings(root, models, { sourceRoots: './app/, lib' });
+  assert.deepEqual(settingsOf(root).sourceRoots, ['app', 'lib']);
+  assert.equal(answered.sourceRootsUnchosen, undefined);
+  assert.match(answered.next, /phase mode is not chosen yet/);
+  assert.equal(initRunSettings(root, models).sourceRootsUnchosen, undefined, 'answered folders are not asked again');
   // Re-review of 4ed07f5: a src/ holding another language is pointed out too,
   // and a source folder named env is source.
   root = fresh(t);
@@ -546,8 +584,61 @@ test('typed language names are recorded as the mappers recognize them, and missi
   setRoleModels(root, models, { role: 'all', model: 'big-model' });
   const other = initRunSettings(root, models, { source: 'Python', target: 'Go' });
   assert.equal(other.sourceRootsUnchosen, true);
-  assert.match(other.next, /write the source folders/);
+  assert.match(other.next, /sourceRootsQuestion/);
   touch(root, [...many('env', '.ts', 3), 'venvs/a/pyvenv.cfg', ...many('venvs/a/lib', '.py', 9), 'conda/env/conda-meta/history', ...many('conda/env/lib/python3.12', '.py', 9)]);
   assert.equal(detectSourceLanguages(root).languages.find(l => l.language === 'Python').files, 1, 'pyvenv.cfg and conda-meta mark environments, whatever the folder\'s name');
   assert.deepEqual(detectSourceLanguages(root).languages.find(l => l.language === 'TypeScript').roots, ['env', 'src']);
+});
+
+test('whether the original runs is asked, and an answer of no makes the file verify from the source instead of stopping apply', t => {
+  const root = fresh(t);
+  initRunSettings(root, models);
+  writeSettings(root, { ...filled(root), originalRuntime: 'FILL_IN' });
+  // apply sends a question-filled entry back to its question, not to the file.
+  const refused = applyRunSettings(root, models);
+  assert.equal(refused.applied, false);
+  assert.match(refused.errors.join('\n'), /originalRuntime: still FILL_IN/);
+  assert.match(refused.next, /originalRuntime is still FILL_IN and answered by a question: run settings init.*Never ask the person to type these into the file/);
+  const asked = initRunSettings(root, models);
+  assert.deepEqual(asked.pending, ['originalRuntime']);
+  assert.ok(asked.originalRuntimeQuestion, 'the question is ready once the earlier questions are answered');
+  // The answer goes through preferences (as the question's record does) and the file follows.
+  const copilot = modelCatalogCli(root, catalog);
+  const run = (...args) => spawnSync(process.execPath, [path.join(kitRoot, 'scripts/run_migration.mjs'), ...args, '--copilot', copilot], { cwd: root, encoding: 'utf8' });
+  const out = run('preferences', '--original-runtime', 'unavailable');
+  assert.equal(out.status, 0, out.stderr);
+  assert.match(JSON.parse(out.stdout).runSettings, /updated to match/);
+  const s = settingsOf(root);
+  assert.equal(s.originalRuntime, 'unavailable');
+  assert.equal(s.verificationMode, 'source-only', 'runtime verification cannot run an original that does not run');
+  const applied = applyRunSettings(root, models);
+  assert.equal(applied.applied, true, JSON.stringify(applied.errors));
+  assert.equal(readJSON(safePath(root, 'migration/config.json')).verificationMode, 'source-only');
+  // A later change is still the person's: editing the file back is applied as written.
+  writeSettings(root, { ...settingsOf(root), originalRuntime: 'available', verificationMode: 'runtime' });
+  assert.equal(applyRunSettings(root, models).applied, true);
+  assert.equal(readJSON(safePath(root, 'migration/config.json')).verificationMode, 'runtime');
+  assert.equal(initRunSettings(root, models).verificationModeFollowed, undefined, 'available leaves the verification mode alone');
+});
+
+test('switching to source-as-spec updates the run settings file, so apply does not write runtime back', t => {
+  const root = fresh(t);
+  touch(root, ['src/app.py']);
+  initRunSettings(root, models);
+  writeSettings(root, { ...filled(root), sourceLanguage: 'Python', targetLanguage: 'JavaScript' });
+  assert.equal(applyRunSettings(root, models).applied, true);
+  const copilot = modelCatalogCli(root, catalog);
+  const run = (...args) => spawnSync(process.execPath, [path.join(kitRoot, 'scripts/run_migration.mjs'), ...args, '--copilot', copilot], { cwd: root, encoding: 'utf8' });
+  // A preview writes nothing, the file included.
+  let out = run('source-spec', 'init');
+  assert.equal(out.status, 0, out.stderr);
+  assert.equal(settingsOf(root).verificationMode, 'runtime');
+  out = run('source-spec', 'init', '--apply');
+  assert.equal(out.status, 0, out.stderr);
+  assert.match(JSON.parse(out.stdout).runSettings, /updated to match/);
+  assert.equal(settingsOf(root).verificationMode, 'source-only');
+  assert.equal(runSettingsState(root, loadConfig(root)).state, 'applied', 'the file matches the switched configuration');
+  const again = applyRunSettings(root, models);
+  assert.deepEqual([again.applied, again.changed], [true, []]);
+  assert.equal(readJSON(safePath(root, 'migration/config.json')).preparationProfile, 'source-as-spec');
 });

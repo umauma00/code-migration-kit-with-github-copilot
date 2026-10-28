@@ -16,7 +16,7 @@ import { statusSnapshot } from '../lib/status-snapshot.mjs';
 import { setPreferences, readPreferences, autoModeFile } from '../lib/preferences.mjs';
 import { failureGuidance } from '../lib/guidance.mjs';
 import { humanGate, interactiveDecision, requireGuardrails, readGuardrails } from '../lib/guardrails.mjs';
-import { initRunSettings, applyRunSettings, runSettingsFile } from '../lib/run-settings.mjs';
+import { initRunSettings, applyRunSettings, runSettingsFile, runSettingsHelpFile } from '../lib/run-settings.mjs';
 import { setRoleModels } from '../lib/models.mjs';
 import { kitRoot } from '../scripts/install.mjs';
 
@@ -168,7 +168,7 @@ test('auto mode is offered as the third choice of the phase-mode question and ap
   assert.match(init.next, /three choices: normal .*relaxed .*auto .*preferences --phase-mode normal\|relaxed\|auto/s);
   const file = safePath(f.root, runSettingsFile);
   const s = readJSON(file);
-  assert.match(s._help.phaseMode, /auto is relaxed without asking/);
+  assert.match(fs.readFileSync(safePath(f.root, runSettingsHelpFile), 'utf8'), /`phaseMode`: .*auto is relaxed without asking/);
   Object.assign(s, { reportLanguage: 'en', originalRuntime: 'available', phaseMode: 'auto' });
   writeJSON(file, s);
   const applied = applyRunSettings(f.root, catalog);
