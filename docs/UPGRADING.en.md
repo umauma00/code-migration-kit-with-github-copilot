@@ -1,6 +1,14 @@
-# Upgrading (0.12.0 and earlier releases)
+# Upgrading (0.13.0 and earlier releases)
 
 [日本語](UPGRADING.md) | English
+
+## 0.13.0 (auto mode)
+
+The kit's files (lib, scripts) change, so existing approvals and completion records are invalidated once. Revalidate from judge. Completed outputs are kept.
+
+1. Nothing changes unless you choose it. To run through with Copilot CLI autopilot, before starting autopilot run `run_migration.mjs preferences --phase-mode auto` in an interactive session, or set `phaseMode` to `auto` in run-settings.json and run `settings apply` (the host asks you to confirm either). See [auto mode](ORDERED-WORKFLOW.en.md#auto-mode).
+2. `phaseMode` gains the choice `auto`. Running `settings init` again refreshes the explanations and choices.
+3. For copy installs, replace all of `migration-kit/`, `.github/agents/migration-orchestrator.agent.md` and the SKILL.md files under `.github/skills/` with the contents of a temporary install. Plugins pick it up with the update.
 
 ## 0.12.0 (relaxed mode)
 

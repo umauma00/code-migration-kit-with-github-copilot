@@ -62,12 +62,13 @@ node migration-kit/scripts/run_migration.mjs phase complete 05c --note "source-o
 ## 緩和モード（前提が足りないときに「直す／進む」を選ぶ）
 
 工程の進め方は `migration/preferences.json` の `phaseMode` で決めます。最初の設定で1問だけ聞き、
-`preferences --phase-mode normal|relaxed`（または run-settings.json の `phaseMode`）で記録します。
+`preferences --phase-mode normal|relaxed|auto`（または run-settings.json の `phaseMode`）で記録します。
 
 | モード | 前提が足りないとき |
 |---|---|
 | `normal`（推奨・既定） | 今までどおり止まります。失敗時の選択肢の最後に「緩和モードに切り替えて進む」が出ます（推奨にはなりません） |
 | `relaxed` | 止まった理由の末尾に `Relaxed mode: ... phase waive ID` が付きます。親は質問ツールで「直す（推奨）／このまま進む」を聞き、「進む」を選んだときだけ `phase waive ID --note "理由"` を実行してからやり直します |
+| `auto`（autopilot 向け） | `relaxed` を人に聞かずに進めます。末尾は `Relaxed mode (auto): ...` になり、親は質問せずに工程の作業を続け、作業で埋められない前提だけ `phase waive` で見送ります。下の「自動モード」を参照 |
 
 ```sh
 node migration-kit/scripts/run_migration.mjs phase waive 03 --note "全体の形を先に見たいので事前試行を見送る"
@@ -76,7 +77,23 @@ node migration-kit/scripts/run_migration.mjs phase waive 03 --note "全体の形
 - 見送りは `migration/phases/waivers/ID.json` に、理由と「その時足りなかったもの」と一緒に残ります。`phase waive` はフックが人間の確認を求めます。
 - 見送った工程は完了扱いになりません。status の `waivers` と、チェックリストの【見送り】で残り続けます。各工程の報告と最終の引き継ぎ報告に一覧を書きます。
 - 見送りで通るのは工程の関門だけです。工程記録（00〜03）、正式 judge・ビルド・smoke の実行記録、変換単位のレビュー（04）、翻訳承認が求める feasibility.md・stress-test/report.md・judge の成功が対象です。
-- 緩めないもの：guardrails、保護パス・元ソースの上書き、承認コマンドそのもの（`approve` は今までどおり人間の確認つき）、サインイン・残高、pilot。
+- 緩めないもの：guardrails、保護パス・元ソースの上書き、承認コマンドそのもの（`relaxed` では `approve` は今までどおり人間の確認つき）、サインイン・残高、pilot。
 - 後で正規に戻す：見送った工程を普通に終えて記録すると（00〜03・05c は phase complete、04 は全単位のレビューが揃ったとき、05・05b・05c は実行の成功）、見送りは `migration/phases/waivers/retired/` へ移り、二度と使われません。その工程が後で失効したときは、もう一度「直す／進む」を聞きます。工程自身の記録（03 の judge など）を見送りで代わりにすることはできません。見送りの上で作った後続の記録（工程記録・ビルド等の実行記録）は、前提が変わったので記録し直しになります。
 - `normal` に戻すと見送りは使われなくなり、見送りの上で作った記録は未完了に戻ります。`relaxed` に戻せば復活します（何も削除しません）。
 - モードは設定の指紋（contextHash）に含めません。切り替えても承認やレビュー済みの記録は失効しません。
+
+<a id="auto-mode"></a>
+### 自動モード（`auto`、Copilot CLI の autopilot 向け）
+
+autopilot は確認（フックの ask）を自動で拒否するため、`normal` と `relaxed` では関門で止まります。`auto` はその関門だけを人に聞かずに通します。
+
+- 確認なしで実行できるもの：`approve`（`--complete-phase` 付きも）、`phase complete`、`phase waive`、`build-loop`、guardrails が未設置のときのオプションなしの `guardrails install`（テンプレートのまま）。
+- 確認なしになるのは、関門コマンドを単独で実行したときだけです（`cd`・`&&`・`;`・パイプ・`$(...)` で他のコマンドとつなぐと確認します）。`--note` に `$` やバッククォートを含めるときは単一引用符で囲みます。
+- 今までどおり確認するもの：`models set`、`settings apply`、`sessions prune`、`pilot prepare`、`source-spec init --apply`、`--add`・`--remove`・`--deny`・`--waiver`・`--replace` 付きか既に設置済みのときの `guardrails install`、読み取れない形のキット呼び出し。`guardrails.json` を直接書くことも拒否のままです。
+- `auto` に切り替える操作（`preferences --phase-mode auto` と、`phaseMode: "auto"` を含む `settings apply`。後者は確認の理由に自動モードへの切り替えと書かれます）は、どのモードでも人の確認が必要です。`--phase-mode` の値が文字どおりの `normal`・`relaxed` 以外（変数・`$(...)` など）のときも確認します。`auto` から抜ける操作は確認なしです。
+- `auto` が効くのは、runner が書く記録 `migration/phases/auto-mode.json` があるときだけです。エージェントがこのファイルを直接書くことはフックが拒否します。`auto` から抜けるとこの記録は `migration/phases/retired/` へ移ります。preferences.json を手で `auto` にしただけでは無効で、関門は緩和モードと同じく確認し、status がその旨を表示します。
+- guardrails が未設置なら、03・04・05 の関門でテンプレート（`templates/guardrails.json`）をそのまま設置し、`installedBy: "auto-mode"` を記録します。既にあるファイルは変えません。
+- 上流の規則3（承認ゲートで止まる）からの逸脱として、`auto` を選んだ時刻と内容を `migration/phases/auto-mode.json` に残します（RULEBOOK に書くと contextHash が変わり承認が失効するため、別ファイルです）。
+- `auto` で作った工程記録・承認・見送りには `auto: true` が付きます。status は「自動モード：オン」と「自動モードが人の確認なしで記録したもの」を出し、チェックリストでは【自動・人の確認なし】が付きます。見送りと build-loop の許可も一覧に入ります。`normal` や `relaxed` に戻しても一覧は残り、人が完了・承認し直すとその記録は置き換わります（工程を記録し直すと、その上に作った後続の工程も記録し直しになります。費用の記録は増えません）。逆に、人が記録した有効な承認・見送りを `auto` が置き換えることはありません（範囲を指定した翻訳承認と build-loop の承認は、その範囲・回の記録として書き直します）。
+- 限界：フックはコマンドの文字列を読みます。ファイルを直接書く手段をすべて見分けられるわけではないため（変数で組み立てたパスなど）、`auto` の記録や承認ファイルの偽造は、普通モードの承認ファイルと同じく完全には防げません。
+- 止まるもの：安全系（保護パス・元ソースの上書き・guardrails の拒否）、サインイン・残高、未記入の実行設定。実行設定（run-settings.json）は autopilot を始める前に埋めて `settings apply` しておきます。

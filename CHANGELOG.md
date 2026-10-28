@@ -1,3 +1,44 @@
+# 0.13.0 — 2026-10-28
+
+Auto phase mode, for Copilot CLI autopilot: relaxed mode without the person.
+Normal and relaxed mode keep every gate as it was.
+
+- `phaseMode` gains `auto`, offered as the third choice of the phase-mode
+  question. Choosing it (`preferences --phase-mode auto`, or `settings apply`
+  with `phaseMode: "auto"`) is always confirmed by the person through the hook,
+  so an autopilot agent cannot switch it on; leaving it is unasked.
+- In auto mode the hook no longer asks for `approve` (with `--complete-phase`
+  too), `phase complete`, `phase waive`, `build-loop`, and a plain
+  `guardrails install` while no guardrails file exists. `models set`,
+  `settings apply`, `sessions prune`, `pilot prepare`,
+  `source-spec init --apply`, `guardrails install` with options or over an
+  existing file, and unreadable kit calls still ask, and a direct write of
+  `migration/guardrails.json` stays denied. A gate runs unasked only as a
+  command of its own; chained with anything else it asks.
+- Auto mode is in effect only with `migration/phases/auto-mode.json`, which the
+  runner writes, the hook keeps agents from writing, and leaving auto retires to
+  `migration/phases/retired/`; a hand-edited
+  preferences file is reported by status and asks as relaxed mode. Any
+  `--phase-mode` value but a literal `normal` or `relaxed` asks, and a
+  `settings apply` that would switch auto on names it in the confirmation.
+  Writing auto into `migration/preferences.json` outside the runner asks, and a
+  record left behind a non-auto mode is retired on the next read. The hook
+  reads command text, so a forged record is no more fully prevented than a
+  forged approval file in normal mode.
+- Gate failures end with `Relaxed mode (auto): ...`: the orchestrator does the
+  phase's work, waives only what the work cannot supply, and asks no
+  phase-boundary question.
+- With no guardrails file, the 03, 04 and 05 gates install the template deny
+  list and record `installedBy: "auto-mode"`. An existing file is never changed.
+- The deviation from upstream rule 3 is recorded in
+  `migration/phases/auto-mode.json`. Phase receipts, approval gates, waivers
+  and build-loop grants made in auto mode carry `auto: true`; `status` (and `status --fast`) shows
+  `autoMode` with those records, and the checklist marks them
+  【自動・人の確認なし】 / [auto, not reviewed by the person]. The list stays after
+  leaving auto mode; completing a phase outside auto mode records it again
+  (keeping its one cost row). Auto mode never replaces a current approval or a
+  waiver the person recorded.
+
 # 0.12.0 — 2026-10-28
 
 Relaxed phase mode: when a phase's prerequisite is missing, the person decides

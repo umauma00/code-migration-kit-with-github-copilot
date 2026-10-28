@@ -1,6 +1,14 @@
-# 更新手順（0.12.0 と以前の版）
+# 更新手順（0.13.0 と以前の版）
 
 日本語 | [English](UPGRADING.en.md)
+
+## 0.13.0（自動モード）
+
+キットのファイル（lib・scripts）が変わるため、既存の承認・完了記録は一度だけ失効します。judgeから再検証してください。完了済みの出力は保持されます。
+
+1. 何もしなければモードは変わりません。Copilot CLI の autopilot で通して動かすには、autopilot を始める前に対話セッションで `run_migration.mjs preferences --phase-mode auto` を実行するか、run-settings.json の `phaseMode` を `auto` にして `settings apply` します（どちらもホストが確認を求めます）。詳しくは[自動モード](ORDERED-WORKFLOW.md#auto-mode)。
+2. `phaseMode` の選択肢に `auto` が加わりました。`settings init` をやり直すと説明と選択肢が更新されます。
+3. コピー導入では `migration-kit/` 全体と、`.github/agents/migration-orchestrator.agent.md`、`.github/skills/` の SKILL.md を一時導入先の内容に置き換えます。プラグインは更新だけで入ります。
 
 ## 0.12.0（緩和モード）
 

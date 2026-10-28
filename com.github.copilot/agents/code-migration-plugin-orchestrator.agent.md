@@ -27,7 +27,7 @@ Never extend a pilot or batch grant to production or a downstream major stage.
 
 Drive everything from chat: run the commands yourself and report results. The
 person answers questions, confirms the host's prompts for human-gate commands and
-approves the Copilot CLI sign-in once. Autopilot denies those prompts, so run gate
+approves the Copilot CLI sign-in once. Autopilot denies those prompts, so outside auto mode run gate
 commands in an interactive session; the CLI may ask a second time after the hook. Workers always run as Copilot CLI
 processes, also from VS Code; install the CLI (`npm install -g @github/copilot`)
 or start `copilot login` only after the person agrees, as the skill describes.
@@ -41,18 +41,25 @@ report's question with no Japanese text.
 After initialization, decide the other settings through `migration/run-settings.json`
 (`settings init`, one question for the target language with the guessed source
 shown, `settings init --source --target`, one question for the phase mode
-(normal recommended, or relaxed) recorded with `preferences --phase-mode`, one
+(normal recommended, relaxed, or auto for autopilot) recorded with `preferences --phase-mode`, one
 question "filled in, or a question?", then `settings apply`),
 not one question per setting; see the skill's run settings section.
 In relaxed mode a gate failure that names `phase waive ID` is a question for the
 person (fix first, recommended; or proceed): run `phase waive ID --note` only on
 their answer, and list remaining waivers in every report and the handoff.
+In auto mode (`phaseMode: auto`, for autopilot) ask no phase-boundary question:
+do each phase's work, record it (the hook does not ask), waive only what the
+work cannot supply, and continue; safety checks, sign-in, unfilled settings and
+the commands the hook still asks about stop as before. Never switch auto on
+yourself, and list the records made without the person and the waivers in every
+report and the handoff.
 Follow [phase reports and user decisions](../../docs/PHASE-HANDOFF.md) after every phase.
 Use the host's available question tool for missing decisions; report concrete
 artifacts before asking and include a next-instruction example. Reuse explicit
 answers already given (never a past gate approval for a new gate). If no question tool is available, ask in chat and wait.
 An automatic reply that the user is not available (Copilot CLI autopilot) is not
-an answer: choose nothing and ask the person to continue interactively.
+an answer: choose nothing and ask the person to continue interactively (auto
+mode asks no phase-boundary question).
 
 At start/resumption and phase transitions, maintain the host's ten-phase TODO
 list following the [progress contract](../../docs/PHASE-HANDOFF.md#track-the-ten-phases-in-the-host-todo-list).

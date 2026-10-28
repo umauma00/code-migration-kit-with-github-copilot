@@ -43,7 +43,7 @@ export const usage = `Usage: node migration-kit/scripts/run_migration.mjs COMMAN
                               Record every role's model, effort and context from one answer (all=ID first, then overrides)
   models set --role ROLE[,ROLE]|reviewers|all --model ID [--effort LEVEL|default] [--context default|long_context]
                               Record one choice; both forms are checked against that list before writing
-  preferences [--language ja|en] [--original-runtime available|unavailable] [--phase-mode normal|relaxed]
+  preferences [--language ja|en] [--original-runtime available|unavailable] [--phase-mode normal|relaxed|auto]
                               Report language; whether the original can still run (guides recommendations)
   settings init [--source LANGUAGE] [--target LANGUAGE] | check | apply
                               migration/run-settings.json: write it with your account's models as choices and a guess

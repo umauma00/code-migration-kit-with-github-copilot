@@ -45,12 +45,13 @@ This control applies to the kit's entry points and the runner. It does not forbi
 <a id="relaxed-mode"></a>
 ## Relaxed mode (fix or proceed when a prerequisite is missing)
 
-How phases advance is `phaseMode` in `migration/preferences.json`. Setup asks it in one question and records it with `preferences --phase-mode normal|relaxed` (or `phaseMode` in run-settings.json).
+How phases advance is `phaseMode` in `migration/preferences.json`. Setup asks it in one question and records it with `preferences --phase-mode normal|relaxed|auto` (or `phaseMode` in run-settings.json).
 
 | Mode | When a prerequisite is missing |
 |---|---|
 | `normal` (recommended, default) | Stops as before. The failure choices end with "switch to relaxed mode and proceed" (never the recommendation) |
 | `relaxed` | The error ends with `Relaxed mode: ... phase waive ID`. The parent asks with the question tool, "fix it (recommended) / proceed", and only on proceed runs `phase waive ID --note "reason"` and retries |
+| `auto` (for autopilot) | `relaxed` without asking. The error ends with `Relaxed mode (auto): ...`; the parent keeps doing the phase's work without a question and waives only a prerequisite that work cannot supply. See Auto mode below |
 
 ```sh
 node migration-kit/scripts/run_migration.mjs phase waive 03 --note "See the overall shape before the stress test"
@@ -59,7 +60,23 @@ node migration-kit/scripts/run_migration.mjs phase waive 03 --note "See the over
 - A waiver is saved in `migration/phases/waivers/ID.json` with the reason and what was missing at the time. The hook asks the person to confirm `phase waive`.
 - A waived phase is never counted complete. It stays in status `waivers` and as [waived] in the checklist; list the waivers in every phase report and the final handoff report.
 - A waiver passes phase gates only: phase records (00–03), the formal judge, build and smoke records, reviewed translation units (04), and the feasibility.md, stress-test/report.md and judge success that translation approval asks for.
-- Never relaxed: guardrails, protected paths and source overwrites, the approval commands themselves (`approve` still needs the person's confirmation), sign-in and credits, and pilots.
+- Never relaxed: guardrails, protected paths and source overwrites, the approval commands themselves (in `relaxed`, `approve` still needs the person's confirmation), sign-in and credits, and pilots.
 - Back to normal: finishing a waived phase for real (phase complete for 00–03 and 05c, every unit reviewed for 04, a successful run for 05, 05b and 05c) moves its waiver to `migration/phases/waivers/retired/`, where it is never used again; if the phase later goes stale, the person is asked again. A phase's own record (such as 03's judge) is never stood in for by its own waiver. Later records made on the waiver (phase records, build and other runner records) are recorded again, since their prerequisite changed.
 - Switching to `normal` stops using waivers, so records made on them become unfinished; switching back restores them (nothing is deleted).
 - The mode is not part of the configuration fingerprint (contextHash), so switching revokes no approval or reviewed record.
+
+<a id="auto-mode"></a>
+### Auto mode (`auto`, for Copilot CLI autopilot)
+
+Autopilot refuses every confirmation (a hook ask), so `normal` and `relaxed` stop at the gates. `auto` lets those gates through without asking the person.
+
+- Run unasked: `approve` (with `--complete-phase` too), `phase complete`, `phase waive`, `build-loop`, and a plain `guardrails install` (the template as is) while no guardrails file exists.
+- A gate runs unasked only as a command of its own: chained with anything else (`cd`, `&&`, `;`, a pipe, `$(...)`) it asks. Put a `--note` containing `$` or backticks in single quotes.
+- Still asked: `models set`, `settings apply`, `sessions prune`, `pilot prepare`, `source-spec init --apply`, `guardrails install` with `--add`, `--remove`, `--deny`, `--waiver` or `--replace` or when a file exists, and kit calls the hook cannot read. Writing `guardrails.json` directly stays denied.
+- Switching to `auto` (`preferences --phase-mode auto`, or a `settings apply` carrying `phaseMode: "auto"`, whose confirmation then names the switch) needs the person's confirmation in every mode, also when the `--phase-mode` value is anything but a literal `normal` or `relaxed` (a variable, `$(...)`). Leaving `auto` is unasked.
+- `auto` is in effect only with the record the runner writes, `migration/phases/auto-mode.json`; the hook denies agents writing it, and leaving `auto` moves it to `migration/phases/retired/`. A preferences.json edited to `auto` by hand is not in effect: gates ask as in relaxed mode, and status says so.
+- With no guardrails installed, the 03, 04 and 05 gates install the template (`templates/guardrails.json`) as is and record `installedBy: "auto-mode"`. An existing file is never changed.
+- The deviation from upstream rule 3 (stop at sign-off gates) is recorded in `migration/phases/auto-mode.json` with the time auto was chosen (not in RULEBOOK, whose change would alter contextHash and revoke approvals).
+- Phase records, approvals and waivers made in `auto` carry `auto: true`. Status shows "Auto mode: on" and "Recorded by auto mode without the person's review", and the checklist marks [auto, not reviewed by the person]. Waivers and build-loop grants are listed too. The list stays after switching back to `normal` or `relaxed`; a completion or approval by the person replaces that record (re-recording a phase also makes the later phases built on it be recorded again; no cost row is added). `auto` never replaces a current approval or a waiver the person recorded (a scoped translation approval or a build-loop approval is recorded for its scope or round).
+- Limit: the hook reads command text. It cannot recognize every way of writing a file (a path built in a variable, for example), so forging the auto record or an approval file is no more fully prevented than forging an approval file in normal mode.
+- Still stops: safety (protected paths, source overwrites, guardrails denies), sign-in and credits, and unfilled run settings. Fill in run-settings.json and `settings apply` before starting autopilot.
