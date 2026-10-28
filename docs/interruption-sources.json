@@ -2504,7 +2504,7 @@
     },
     {
       "path": "lib/run-settings.mjs",
-      "sha256": "179562f93a68d8ef19c68eef44cbecc3ef5a40378a61f103f9c287ee59c23ddd",
+      "sha256": "696fce2c8d76c07b9cfa7eb6189edf59dd615539415876cc50b9e4b37fdd2413",
       "entries": [
         {
           "line": 24,
@@ -2587,17 +2587,17 @@
           "code": "if (!dirs.some(holdsSource)) throw new Error(`--source-roots: ${dirs.join(', ')} ${sourceFound ? `hold${dirs.length > 1 ? '' : 's'} no ${values.sourceLanguage} files` : `${dirs.length > 1 ? 'are' : 'is'} empty`}; ask for the source folders again`);"
         },
         {
-          "line": 257,
+          "line": 261,
           "kind": "error-or-exit-candidate",
           "code": "if (!fs.existsSync(file)) throw new Error(`${runSettingsFile} is missing: run settings init first`);"
         },
         {
-          "line": 259,
+          "line": 263,
           "kind": "error-or-exit-candidate",
           "code": "try { value = readJSON(file); } catch (e) { throw new Error(`${runSettingsFile} is not valid JSON: ${e.message}`); }"
         },
         {
-          "line": 260,
+          "line": 264,
           "kind": "error-or-exit-candidate",
           "code": "if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${runSettingsFile} must be a JSON object`);"
         }
