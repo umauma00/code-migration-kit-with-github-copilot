@@ -58,8 +58,14 @@ export function phaseCommand(root, config, action, phase, options = {}) {
     });
     // A single packaged 01/02 is ready for its own evidence only; while an
     // earlier package phase is not current, say which phases record together.
-    const unrecorded = ['00b','01','02'].filter(id => !currentPhase(root, config, id));
-    const recordWith = ids.length === 1 && packaged(phase) && unrecorded.includes(phase) && unrecorded[0] !== phase ? { recordWith: `phase complete ${unrecorded.join(',')}` } : {};
+    // The hint never fails the check: an unreadable receipt just omits it.
+    let recordWith = {};
+    if (ids.length === 1 && packaged(phase)) {
+      try {
+        const read = {}, unrecorded = ['00b','01','02'].filter(id => !currentPhase(root, config, id, read));
+        if (unrecorded.includes(phase) && unrecorded[0] !== phase) recordWith = { recordWith: `phase complete ${unrecorded.join(',')}` };
+      } catch {}
+    }
     return ids.length > 1 ? ids.map(id => ({phase:id,ready:true})) : {phase,ready:true,...recordWith};
   }
   if (!['init','start','complete'].includes(action)) throw new Error('Use phase init|next|check ID|start ID|complete ID --note TEXT');

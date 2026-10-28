@@ -95,6 +95,15 @@ test('a source-as-spec package starts 01 and 02 before 00b is recorded, checks t
   partial.forEach((r, i) => ok(r, `phase check ${['02', '01'][i]} after 00b`));
   assert.equal(partial[0].json.recordWith, 'phase complete 01,02');
   assert.equal(partial[1].json.recordWith, undefined);
+  // A 00b receipt that is no longer current is named again; an unreadable one
+  // only drops the hint and never fails an unrelated check.
+  const receipt = safePath(root, 'migration/phases/00b.json'), saved = fs.readFileSync(receipt);
+  writeJSON(receipt, { ...JSON.parse(saved), note: ' ' });
+  assert.equal(run(root, 'phase', 'check', '02').json?.recordWith, 'phase complete 00b,01,02');
+  atomicWrite(receipt, '{bad');
+  const unreadable = run(root, 'phase', 'check', '01');
+  assert.equal(unreadable.json?.recordWith, undefined);
+  atomicWrite(receipt, saved);
   ok(run(root, 'phase', 'complete', '01,02', '--note', 'package reviewed'), 'phase complete 01,02');
   const after = run(root, 'phase', 'check', '02');
   ok(after, 'phase check 02 once recorded');
@@ -299,7 +308,9 @@ test('C spellings get real manifest extensions before the map exists', t => {
   const { sourceSpecReadiness } = loadReadiness;
   for (const language of ['C', 'C ', 'ANSI C', 'C (C89)', 'Embedded C', 'C99', 'C/C++', 'Visual C++']) {
     const manifest = sourceSpecReadiness(root, { ...loadConfig(root), sourceLanguage: language }).commands.manifest;
+    const commands = sourceSpecReadiness(root, { ...loadConfig(root), sourceLanguage: language }).commands;
     assert.doesNotMatch(manifest, /SOURCE_EXT/, language);
+    assert.match(commands.dependencyMap, /depmap_c\.py/, language);
   }
   assert.match(sourceSpecReadiness(root, { ...loadConfig(root), sourceLanguage: 'C#' }).commands.manifest, /--ext '\.cs=/);
 });

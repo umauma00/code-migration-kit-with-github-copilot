@@ -2597,10 +2597,10 @@
     },
     {
       "path": "lib/source-spec.mjs",
-      "sha256": "83bc4d49606dc7b8c6c8cb9cdcb2534f45b4f9954bf6fef5b2a367612fab59c8",
+      "sha256": "098c595afdfea8ddc61b9a78892d2e00da18a3b695d6c45196a6b18bc3d40660",
       "entries": [
         {
-          "line": 97,
+          "line": 99,
           "kind": "error-or-exit-candidate",
           "code": "if (!sources.length) throw new Error(`No source files under ${config.sourceRoots.join(', ')}; check sourceRoots in migration/config.json`);"
         }
@@ -4115,7 +4115,7 @@
     },
     {
       "path": "scripts/phase_cli.mjs",
-      "sha256": "2e4cd61393cda390e370a1f31825809bb7d0171de367a04e4a2002c45107799b",
+      "sha256": "ad8adb7e261aad3757c12531415c68bca62bd880a9ade2bbfed887325713f1ca",
       "entries": [
         {
           "line": 13,
@@ -4148,17 +4148,17 @@
           "code": "if (ids.length > 1 && ids.some(id => !['00','00b','01','02'].includes(id))) throw new Error('Only preparation phases 00 through 02 can be checked together');"
         },
         {
-          "line": 65,
+          "line": 71,
           "kind": "error-or-exit-candidate",
           "code": "if (!['init','start','complete'].includes(action)) throw new Error('Use phase init|next|check ID|start ID|complete ID --note TEXT');"
         },
         {
-          "line": 73,
+          "line": 79,
           "kind": "error-or-exit-candidate",
           "code": "if (ids.length > 1 && ids.some((id, i) => i && orderedPhases.indexOf(id) !== orderedPhases.indexOf(ids[i - 1]) + 1)) throw new Error('List consecutive phases in order, for example 00b,01,02');"
         },
         {
-          "line": 74,
+          "line": 80,
           "kind": "error-or-exit-candidate",
           "code": "if (ids.length > 1 && ids.some(id => !['00','00b','01','02'].includes(id))) throw new Error('Only preparation phases 00 through 02 can be completed together');"
         }
