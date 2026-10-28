@@ -1542,7 +1542,7 @@
     },
     {
       "path": "lib/pipeline.mjs",
-      "sha256": "af8343061983032a7caf7f9b19854423314e559be48985a9f74a606209f45133",
+      "sha256": "87d1a9ba7f836206113203a52b9f008fe4b7a94db35933ef27c4f5f55f1ff516",
       "entries": [
         {
           "line": 19,
@@ -2025,12 +2025,12 @@
           "code": "executionMode: config.executionMode ?? 'continuous', ...(ignoredLimits(config).length ? { ignoredLimits: ignoredLimits(config) } : {}), ...(Number.isFinite(maxInputBytes) ? { maxRunInputBytes: maxInputBytes } : {}) };"
         },
         {
-          "line": 628,
+          "line": 630,
           "kind": "error-or-exit-candidate",
           "code": "if (errors.length || signal?.aborted || required.some(u => !completed.has(u))) throw Object.assign(new Error(`Translation stopped: ${errors.map(e => `${e.target}: ${e.error}`).join('; ') || (signal?.aborted ? 'Interrupted' : 'Reviewed receipts incomplete')}`), { report, budgetStop: budgetExhausted });"
         },
         {
-          "line": 637,
+          "line": 639,
           "kind": "error-or-exit-candidate",
           "code": "if (!grant) throw new Error('pilot run requires an authorized isolated pilot project');"
         }
@@ -4221,55 +4221,60 @@
     },
     {
       "path": "scripts/phase_cli.mjs",
-      "sha256": "3eccc982c6c7144e9bde9f37886f15e17795253ac42b96eebc7e79cf1ba6062e",
+      "sha256": "a07dd54a3ec0ed68c384e68f99d8b65933ef8c2405392a50e3714a3f40a9ab88",
       "entries": [
         {
-          "line": 18,
+          "line": 19,
           "kind": "error-or-exit-candidate",
-          "code": "throw gateError(root, `Run ${stage} successfully for current inputs before phase ${phase}`, stagePhase[stage]);"
+          "code": "throw gateError(root, `Run ${stage} successfully for current inputs before phase ${phase}`, stagePhase[stage] === phase ? null : stagePhase[stage]);"
         },
         {
-          "line": 27,
+          "line": 28,
           "kind": "error-or-exit-candidate",
           "code": "if ((!units.length || !units.every(u => done(root, u, context))) && !phaseWaiver(root, '04')) throw gateError(root, 'Current reviewed translation units are required', '04');"
         },
         {
-          "line": 40,
+          "line": 41,
           "kind": "error-or-exit-candidate",
           "code": "if (!Number.isSafeInteger(n) || n < 0) throw new Error('tokens/subagents must be a nonnegative integer or unknown');"
         },
         {
-          "line": 46,
+          "line": 47,
           "kind": "error-or-exit-candidate",
           "code": "if (!report.ok) throw new Error(report.blockers[0].reason);"
         },
         {
-          "line": 53,
+          "line": 54,
           "kind": "error-or-exit-candidate",
           "code": "if (ids.length > 1 && ids.some((id, i) => i && orderedPhases.indexOf(id) !== orderedPhases.indexOf(ids[i - 1]) + 1)) throw new Error('List consecutive phases in order, for example 00b,01,02');"
         },
         {
-          "line": 54,
+          "line": 55,
           "kind": "error-or-exit-candidate",
           "code": "if (ids.length > 1 && ids.some(id => !['00','00b','01','02'].includes(id))) throw new Error('Only preparation phases 00 through 02 can be checked together');"
         },
         {
-          "line": 77,
+          "line": 78,
           "kind": "error-or-exit-candidate",
           "code": "if (!['init','start','complete','waive'].includes(action)) throw new Error('Use phase init|next|check ID|start ID|complete ID --note TEXT|waive ID --note TEXT');"
         },
         {
-          "line": 88,
+          "line": 91,
           "kind": "error-or-exit-candidate",
-          "code": "if (phase === '04') { const context = contextHash(root, config), units = readManifest(root, config); if (!units.length || !units.every(u => done(root, u, context))) throw new Error('Current reviewed translation units are required'); }"
+          "code": "if (phase === '04') { const units = readManifest(root, config); if (!units.length || !units.every(u => done(root, u, context))) throw new Error('Current reviewed translation units are required'); }"
         },
         {
-          "line": 97,
+          "line": 93,
+          "kind": "error-or-exit-candidate",
+          "code": "if (own && !currentRecord(root, config, own, context, true)) throw new Error(`Run ${own} successfully for current inputs`);"
+        },
+        {
+          "line": 103,
           "kind": "error-or-exit-candidate",
           "code": "if (ids.length > 1 && ids.some((id, i) => i && orderedPhases.indexOf(id) !== orderedPhases.indexOf(ids[i - 1]) + 1)) throw new Error('List consecutive phases in order, for example 00b,01,02');"
         },
         {
-          "line": 98,
+          "line": 104,
           "kind": "error-or-exit-candidate",
           "code": "if (ids.length > 1 && ids.some(id => !['00','00b','01','02'].includes(id))) throw new Error('Only preparation phases 00 through 02 can be completed together');"
         }
@@ -4689,5 +4694,5 @@
       ]
     }
   ],
-  "candidateLines": 851
+  "candidateLines": 852
 }

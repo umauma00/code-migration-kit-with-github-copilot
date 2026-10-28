@@ -226,7 +226,8 @@ test('review of 304f781: a phase\'s own waiver never completes it, and real comp
   for (const id of ['00', '00b', '01', '02', '03']) waive(f, id);
   writeJSON(safePath(f.root, 'migration/results/judge.json'), { forged: true });
   // 03's own record (the judge) is required to complete 03, waiver or not.
-  assert.throws(() => phaseCommand(f.root, f.config, 'complete', '03', { note: 'Try completing on the waiver' }), /Run judge successfully/);
+  // ...and the message never suggests waiving 03 again.
+  assert.throws(() => phaseCommand(f.root, f.config, 'complete', '03', { note: 'Try completing on the waiver' }), e => /Run judge successfully/.test(e.message) && !/phase waive 03/.test(e.message));
   fs.rmSync(safePath(f.root, 'migration/results/judge.json'));
   // Completing 01 for real retires its waiver into waivers/retired/.
   complete(f, '00'); complete(f, '00b'); complete(f, '01');
@@ -254,9 +255,12 @@ test('review of 304f781: fast status lists waivers, a waived 04 records what was
   requireGate(f.root, f.config, 'translation', context);
   atomicWrite(safePath(f.root, 'migration/stress-test/report.md'), 'Written later.');
   assert.throws(() => requireGate(f.root, f.config, 'translation', context), /approval is stale/);
-  // Reviewing every unit for real retires the 04 waiver at the build approval.
+  // Reviewing every unit for real retires the 04 waiver.
   approve(f.root, f.config, 'translation', 'Again with the report');
   await translate(f.root, f.config, fake);
-  approve(f.root, f.config, 'build', 'All units reviewed');
   assert.equal(fs.existsSync(waiverFile(f, '04')), false);
+  // A runner phase already done needs no waiver: none is written.
+  assert.deepEqual(waive(f, '04'), { phase: '04', waived: false, complete: true });
+  assert.equal(fs.existsSync(waiverFile(f, '04')), false);
+
 });

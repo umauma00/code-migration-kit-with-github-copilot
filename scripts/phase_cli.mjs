@@ -15,7 +15,8 @@ function validate(root, config, phase, completing = false) {
     if (!currentRecord(root, config, stage, context, stage !== 'judge')) {
       // A phase's own record is never stood in for by its own waiver.
       if (stagePhase[stage] !== phase && phaseWaiver(root, stagePhase[stage])) return;
-      throw gateError(root, `Run ${stage} successfully for current inputs before phase ${phase}`, stagePhase[stage]);
+      // Only the record itself completes its own phase; waiving it again would not help.
+      throw gateError(root, `Run ${stage} successfully for current inputs before phase ${phase}`, stagePhase[stage] === phase ? null : stagePhase[stage]);
     }
     if (stage !== 'judge') requireGate(root, config, stage, context);
   };
@@ -85,9 +86,14 @@ export function phaseCommand(root, config, action, phase, options = {}) {
       try {
         validate(root, config, phase, true);
         if (['00','00b','01','02','03'].includes(phase)) completePhase(root, config, phase, 'check', {}, { dryRun: true });
-        if (phase === '04') { const context = contextHash(root, config), units = readManifest(root, config); if (!units.length || !units.every(u => done(root, u, context))) throw new Error('Current reviewed translation units are required'); }
+        // A runner phase already done for real needs no waiver.
+        const context = contextHash(root, config);
+        if (phase === '04') { const units = readManifest(root, config); if (!units.length || !units.every(u => done(root, u, context))) throw new Error('Current reviewed translation units are required'); }
+        const own = { '05': 'build', '05b': 'smoke', '05c': config.verificationMode === 'source-only' ? null : 'parity' }[phase];
+        if (own && !currentRecord(root, config, own, context, true)) throw new Error(`Run ${own} successfully for current inputs`);
       }
       catch (e) { unmet = e.message.replace(/ Relaxed mode: .*$/s, ''); }
+      if (!unmet && ['04', '05', '05b'].includes(phase) || (!unmet && phase === '05c' && config.verificationMode !== 'source-only')) return { phase, waived: false, complete: true };
       return waivePhase(root, config, phase, options.note, unmet);
     }
     // One reviewed note may cover consecutive phases (source-as-spec reviews
