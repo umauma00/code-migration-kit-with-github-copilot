@@ -40,6 +40,7 @@ test('a piped or file-redirected long runner command is detected, the plain form
     ['R=$HOME/kit/scripts/run_migration.mjs; node "$R" translate | tee log']: 'translate',
     [`$script:r='C:\\k\\run_migration.mjs'; node $script:r translate | Out-String`]: 'translate',
     [`$log = (${kit} translate 2>&1 | Out-String)`]: 'translate',
+    ['node /x/run_migration.mjs translate --root "$ROOT"\\\n  2>&1 | tee log']: 'translate',
     [`& node "$r" pilot run --root p | Out-String`]: null, // no runner path anywhere in the command
   };
   for (const [command, name] of Object.entries(hidden)) assert.equal(hiddenLongRun(command), name, command);
@@ -51,7 +52,9 @@ test('a piped or file-redirected long runner command is detected, the plain form
     `$r='C:\\kit\\scripts\\run_migration.mjs'; & $r pilot run --root X 2>&1`,
     `${kit} translate --root $(git -C (pwd) rev-parse --show-toplevel | head -1)`,
     `$r='C:\\kit\\scripts\\run_migration.mjs'; & $r pilot run --note a\`|b --root X`,
-    `$x translate > out.txt; ${kit} status`, `node C:\\kit\\scripts\\run_migration.mjs translate --root C:\\p\\\nGet-Date | Out-Null`, `${kit} translate --help | head`, `${kit} translate || echo failed`,
+    `$x translate > out.txt; ${kit} status`,
+    `$r='C:\\k\\scripts\\run_migration.mjs'; node $r translate --root (Get-Item $root | Select-Object -ExpandProperty FullName) 2>&1`,
+    `$r='C:\\k\\scripts\\run_migration.mjs'; node $r translate --root (Split-Path $r | Split-Path) 2>&1`, `node C:\\kit\\scripts\\run_migration.mjs translate --root C:\\p\\\nGet-Date | Out-Null`, `${kit} translate --help | head`, `${kit} translate || echo failed`,
   ]) assert.equal(hiddenLongRun(command), null, command);
 });
 
