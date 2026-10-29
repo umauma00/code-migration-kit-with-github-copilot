@@ -12,7 +12,7 @@
   "verificationRoots": ["tests"],
   "verificationInputs": [],
   "buildArtifactRoots": [],
-  "maxReviewInputBytes": 262144,
+  "maxReviewInputBytes": 1048576,
   "reviewDependencyMap": "migration/review-dependencies.json",
   "models": {
     "implementer": "SELECT_MODEL_ID",
