@@ -1,3 +1,26 @@
+# 0.22.0 — 2026-10-29
+
+The kit's whole AI usage can be read in one place. Before, only translation and
+repair runs summed the CLI's usage records: survey runs dropped them,
+preparation audits kept them only in each receipt, and nothing added them up.
+
+- Every Copilot CLI worker call, successful or not, adds one line to
+  `migration/runs/usage/calls.jsonl`: run, role, target, session, model, CLI
+  version and the CLI's own usage (input, output and cache tokens, nano AIU).
+  A call the CLI wrote no usage for is kept as unmeasured.
+  A call the CLI reported one different (fallback) model for counts under that
+  model (with several reported models, under the requested one); a call that never started a CLI process is not logged.
+- New read-only command `usage [--format json|markdown] [--run RUN_ID]`:
+  totals by role and model, AI units, and what is not included (the parent
+  chat with the orchestrator, earlier calls, other roots such as pilots). The
+  CLI does not report the AI Credits amount, so the report says to check
+  GitHub billing for the charge and `/usage` for the parent chat.
+  Totals with an unmeasured call, or a call without AI units, are marked as
+  lower bounds; an empty report is never complete.
+- Survey run reports get `measuredUsage`, and their cost-log rows get `tokens`
+  when every surveyor call was measured (before: always unknown).
+- The skill reports `usage` when asked about AI usage and in the handoff.
+
 # 0.21.0 — 2026-10-29
 
 New installs give the frozen review input more room.

@@ -299,7 +299,7 @@ test('actual calls exclude a reserved review stopped by reviewer failure', async
   await assert.rejects(translate(f.root, f.config, async call => {
     calls++; if (call.role === 'reviewer-semantics') throw new Error('review failed: Bad credentials'); return fake(call);
   }), /review failed/);
-  const runs = fs.readdirSync(safePath(f.root, 'migration/runs'));
+  const runs = fs.readdirSync(safePath(f.root, 'migration/runs')).filter(run => /^\d+-[0-9a-f]{8}$/.test(run));
   const summary = readJSON(safePath(f.root, `migration/runs/${runs[0]}/summary.json`));
   assert.equal(calls, 2); assert.equal(summary.agentCalls, 2);
 });
@@ -333,7 +333,7 @@ for (const corruption of ['missing rulebook', 'malformed dependencies']) test(`f
   held.resolve(); const error = await outcome;
   assert.match(error.message, corruption === 'missing rulebook' ? /RULEBOOK/ : /JSON|property/i);
   assert.equal(thirdCalls, 0); assert.equal(fs.existsSync(safePath(f.root, 'migration/run.lock')), false);
-  const directories = fs.readdirSync(safePath(f.root, 'migration/runs'));
+  const directories = fs.readdirSync(safePath(f.root, 'migration/runs')).filter(run => /^\d+-[0-9a-f]{8}$/.test(run));
   const summary = readJSON(safePath(f.root, `migration/runs/${directories[0]}/summary.json`));
   assert.equal(summary.agentCalls, 4); assert.equal(summary.done, 1);
   // A finished before corruption; the held B response is never accepted.

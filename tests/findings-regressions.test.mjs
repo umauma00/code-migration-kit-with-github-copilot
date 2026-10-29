@@ -136,7 +136,7 @@ console.log(responses[process.env.MIGRATION_KIT_ROLE]);
   assert.equal(contextHash(f.root, f.config), context);
   assert.equal(done(f.root, f.units[0], context), false);
   assert.equal(done(f.root, f.units[1], context), true);
-  const summaries = fs.readdirSync(safePath(f.root, 'migration/runs')).map(run => readJSON(safePath(f.root, `migration/runs/${run}/summary.json`)));
+  const summaries = fs.readdirSync(safePath(f.root, 'migration/runs')).filter(run => /^\d+-[0-9a-f]{8}$/.test(run)).map(run => readJSON(safePath(f.root, `migration/runs/${run}/summary.json`)));
   const last = summaries.find(run => !run.errors.length);
   assert.equal(last.done, 1); assert.equal(last.total, 2);
   assert.throws(() => approve(f.root, f.config, 'build', 'Must reject changed output'), /current reviewed receipts/);

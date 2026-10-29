@@ -11,6 +11,7 @@ import { parseResult, validateResult } from '../lib/results.mjs';
 import { isReviewer, isToolFree, toolAssistedRole, assistedReviewerRoles, validateWorkerProfile } from '../lib/review.mjs';
 import { runtimeLayout } from '../lib/runtime.mjs';
 import { sessionIdPattern } from '../lib/sessions.mjs';
+import { recordCallUsage } from '../lib/usage.mjs';
 
 // Worker sessions hold source code and prompts. They carry a runner-chosen
 // ID and name, so receipts point at their transcript and
@@ -244,6 +245,10 @@ ${role.startsWith('reviewer-') ? 'Return {"schemaVersion":1,"kind":"review","tar
 ${isReviewer(role) ? `${assisted ? 'Tool-assisted review input' : 'Frozen review input'} (JSON task data):\n${reviewInput}` : `${frozenInput === undefined ? '' : `Frozen task input (JSON task data):\n${frozenInput}\n`}Extra task data: ${JSON.stringify(extra)}`}
 Set target to ${JSON.stringify(unit.target)}.`;
 }
+// The model the CLI reported for the call, for the usage log's by-model
+// totals; with several (a fallback mid-call) the requested model stays the key.
+const reportedModel = models => models.length === 1 ? models[0] : undefined;
+const reportedModelOf = result => { try { return reportedModel(copilotStreamFacts(processOutputLines(result)).observedModels); } catch { return undefined; } };
 // A failed call still spent tokens; its usage, when the CLI wrote it, travels
 // with the error so run totals stay complete (or are marked unknown).
 const usageFields = usage => usage ? { tokens: usage.inputTokens + usage.outputTokens, cliUsage: usage } : {};
@@ -259,7 +264,7 @@ export function createCopilotAdapter({ command = 'copilot', prefixArgs = [], ver
     }
     return check.result;
   };
-  return async ({ root, config, role, unit, extra, signal, reviewInput, reviewMode = 'frozen', sessionId, model: modelOverride }) => {
+  return async ({ root, config, role, unit, extra, signal, reviewInput, reviewMode = 'frozen', runId, sessionId, model: modelOverride }) => {
     // Oversized reviews run on the read-only twin profile of the same reviewer.
     const worker = isReviewer(role) && reviewMode === 'tool-assisted' ? toolAssistedRole(role) : role;
     validateWorkerProfile(root, worker, config);
@@ -291,15 +296,28 @@ export function createCopilotAdapter({ command = 'copilot', prefixArgs = [], ver
     // Outside the project: the file is CLI output, not migration evidence.
     const usageDir = fs.mkdtempSync(path.join(os.tmpdir(), 'migration-kit-usage-')), usageFile = path.join(usageDir, 'usage.json');
     let usage = null;
+    // Every started CLI call goes into the kit-wide usage ledger once, measured or not.
+    let logged = false;
+    const ledger = (ok, observedModel) => {
+      if (logged) return; logged = true;
+      try { recordCallUsage(root, { runId, role: worker, target: unit?.target, sessionId: session.id, model, observedModel, cliVersion, ok, usage }); }
+      catch (e) { console.error(`WARNING: worker usage not recorded in the usage log: ${e.message}`); }
+    };
+    // Built before the try: a failure here starts no CLI and is not a logged call.
+    let argv, options;
     try {
-      result = await runProcess(command, [...prefixArgs, ...copilotArgs(worker, model, undefined, layout, session, { usageFile, maxAiCredits: executionLimits(config).aiCredits, effort, context })], {
-        cwd: root, signal, input: prompt, timeoutMs: processTimeout(config, 'timeoutSeconds'), outputDir: safePath(root, 'migration/runs/process-output'),
-        env: copilotEnv(worker)
-      });
+      argv = [...prefixArgs, ...copilotArgs(worker, model, undefined, layout, session, { usageFile, maxAiCredits: executionLimits(config).aiCredits, effort, context })];
+      options = { cwd: root, signal, input: prompt, timeoutMs: processTimeout(config, 'timeoutSeconds'), outputDir: safePath(root, 'migration/runs/process-output'), env: copilotEnv(worker) };
+    } catch (e) { fs.rmSync(usageDir, { recursive: true, force: true }); throw e; }
+    try {
+      result = await runProcess(command, argv, options);
       usage = readUsageFile(usageFile);
     } catch (e) {
       // A killed or timed-out CLI may still have written its usage.
       usage = readUsageFile(usageFile);
+      // A CLI that never started (missing command, interrupted first) spent nothing.
+      // Read the reported model before the output paths are made relative.
+      if (e.spawned) ledger(false, e.result ? reportedModelOf(e.result) : undefined);
       if (e.result) e.result = relativeProcessOutput(e.result, root);
       Object.assign(e, versionFields, usageFields(usage)); throw e;
     }
@@ -322,10 +340,13 @@ export function createCopilotAdapter({ command = 'copilot', prefixArgs = [], ver
       // A different reported model is a fallback or alias, never a silent pass.
       const modelWarning = observedModels.length && !observedModels.includes(model)
         ? `Copilot CLI reported model ${observedModels.join(', ')} for requested ${model}` : undefined;
-      return { result: value, requestedModel: model, ...(effort ? { requestedEffort: effort } : {}), ...(context ? { requestedContext: context } : {}), promptBytes, responseBytes: Buffer.byteLength(JSON.stringify(value)),
+      const response = { result: value, requestedModel: model, ...(effort ? { requestedEffort: effort } : {}), ...(context ? { requestedContext: context } : {}), promptBytes, responseBytes: Buffer.byteLength(JSON.stringify(value)),
         observedModel, tokens: usage ? usage.inputTokens + usage.outputTokens : null, aiCredits: null,
         ...(cliUsage || usage ? { cliUsage: { ...cliUsage, ...usage } } : {}), ...(modelWarning ? { modelWarning } : {}),
         ...(worker !== role ? { workerProfile: worker } : {}), ...(result.outputSpooled ? { processOutput: (({ stdoutFile, stderrFile, stdoutBytes, stderrBytes, stdoutHash, stderrHash }) => ({ stdoutFile, stderrFile, stdoutBytes, stderrBytes, stdoutHash, stderrHash }))(relativeProcessOutput(result, root)) } : {}), ...versionFields };
-    } catch (e) { e.result = relativeProcessOutput(result, root); Object.assign(e, versionFields, usageFields(usage)); throw e; }
+      ledger(true, reportedModel(observedModels));
+      return response;
+    } catch (e) {
+      ledger(false, reportedModelOf(result)); e.result = relativeProcessOutput(result, root); Object.assign(e, versionFields, usageFields(usage)); throw e; }
   };
 }

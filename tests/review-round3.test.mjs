@@ -30,7 +30,7 @@ const fixture = (t, options) => {
 };
 const approved = async f => { await runStage(f.root, f.config, 'judge'); approve(f.root, f.config, 'translation', 'Round-3 fixture'); };
 const lastSummary = f => {
-  const runs = fs.readdirSync(safePath(f.root, 'migration/runs')).sort();
+  const runs = fs.readdirSync(safePath(f.root, 'migration/runs')).filter(run => /^\d+-[0-9a-f]{8}$/.test(run)).sort();
   return readJSON(safePath(f.root, `migration/runs/${runs.at(-1)}/summary.json`));
 };
 

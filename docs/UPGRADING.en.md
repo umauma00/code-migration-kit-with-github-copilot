@@ -1,6 +1,14 @@
-# Upgrading (0.21.0 and earlier releases)
+# Upgrading (0.22.0 and earlier releases)
 
 [日本語](UPGRADING.md) | English
+
+## 0.22.0 (kit-wide AI usage)
+
+Kit files (plugin.json, scripts) change, so existing approvals and completion records expire once. Revalidate from judge. Completed outputs are kept.
+
+1. Each worker call's usage is recorded in `migration/runs/usage/calls.jsonl`, and `usage --format markdown` shows the kit-wide total. Recording starts with this release, so earlier calls are not included.
+2. Survey run reports carry `measuredUsage`, and survey rows in cost-log.tsv get `tokens`.
+3. For a copied install, replace all of `migration-kit/` and the SKILL.md files in `.github/skills/` with the temporary install's. A plugin only needs updating.
 
 ## 0.21.0 (1 MiB default for the frozen review input)
 

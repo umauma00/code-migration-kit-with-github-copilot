@@ -58,7 +58,7 @@ test('C1: a failed terminal event retains process evidence and writes no candida
   assert.equal(record.process.code, 0); assert.match(record.process.stdout, /"exitCode":9/);
 });
 function statePathFromRuns(root) {
-  const run = fs.readdirSync(safePath(root, 'migration/runs'))[0];
+  const run = fs.readdirSync(safePath(root, 'migration/runs')).find(run => /^\d+-[0-9a-f]{8}$/.test(run));
   return `migration/runs/${run}/summary.json`;
 }
 

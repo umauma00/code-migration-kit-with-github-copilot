@@ -456,6 +456,11 @@ records made without the person (`status` `autoMode.records`, marked
 [auto mode](../../docs/ORDERED-WORKFLOW.md#auto-mode).
  Record known host usage with completion;
 [main-format cost logs](../../docs/COST-LOG.md) use unknown where unavailable.
+When the person asks how much AI the kit used, and in the handoff, report
+`usage --format markdown`: the tokens and AI units of every worker call since
+0.22.0, by role and model. Relay its "not included" list: the person's own chat
+with you (`/usage` in that Copilot CLI session shows it) and other roots such as
+pilots. The charge itself is on GitHub billing.
 
 ## Worker execution
 

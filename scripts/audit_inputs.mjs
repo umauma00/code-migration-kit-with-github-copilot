@@ -69,7 +69,7 @@ export async function runAudit(root, config, adapter, { directory, signal } = {}
   const sessionId = recordSession(root, `audit-${request.task}`, { role: 'preparation-auditor', target: directory });
   const unit = { source: null, target: `${directory}/request.json` };
   const frozen = JSON.stringify({ task: request.task, type: request.type, inputHash: request.inputHash, input: request.input, responseContract: request.responseContract });
-  const response = await adapter({ root, config, role: 'preparation-auditor', unit, extra: {}, signal, reviewInput: frozen, sessionId, model: request.requestedModel });
+  const response = await adapter({ root, config, role: 'preparation-auditor', unit, extra: {}, signal, reviewInput: frozen, runId: `audit-${request.task}`, sessionId, model: request.requestedModel });
   const { target, ...result } = response.result;
   writeJSON(safePath(root, `${directory}/response.json`), result);
   return submitAudit(root, config, { directory, response: `${directory}/response.json`, execution: {
