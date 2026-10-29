@@ -33,7 +33,11 @@ does not apply to automated workers, which keep their JSON-only contracts.
    phase invocation authorizes that phase. Never self-issue `approve` without the
    user asking you to approve the concrete artifacts. Approval is bound to hashes.
    The hook asks the person to confirm approval, phase-completion,
-   `guardrails install`, `build-loop` and `sessions prune` commands and denies any other agent write of
+   `pilot prepare`, `source-spec init --apply`, `guardrails install`,
+   `build-loop` and `sessions prune` commands and switching auto mode on (auto
+   mode lets the gates through, except `sessions prune`, the switch and
+   guardrails changes; `models set` and `settings apply` record the person's
+   choice and do not ask) and denies any other agent write of
    `migration/guardrails.json`.
 4. 00 reads and samples the source directly, as upstream does. 00b (source-as-spec)
    and 02 must cover every file: delegate that reading by scope with `survey` (fresh
