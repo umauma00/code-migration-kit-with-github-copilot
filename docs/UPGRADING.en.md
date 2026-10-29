@@ -10,6 +10,14 @@ Kit files (plugin.json, scripts) change, so existing approvals and completion re
 2. Survey run reports carry `measuredUsage`, and survey rows in cost-log.tsv get `tokens`.
 3. For a copied install, replace all of `migration-kit/` and the SKILL.md files in `.github/skills/` with the temporary install's. A plugin only needs updating.
 
+## 0.21.0 (1 MiB default for the frozen review input)
+
+The plugin version changes, so existing approvals and completion records expire once. Revalidate from judge. Completed outputs are kept.
+
+1. New installs set `maxReviewInputBytes` to 1048576 (1 MiB, roughly 260k–360k tokens). Existing `migration/config.json` files are not changed.
+2. To raise it in an existing project, edit `migration/config.json`. It is part of the config fingerprint, so phase 02 onward and approvals are reviewed again. When the reviewer model's "Context (prompt limit)" in `models list` is smaller (for example 272K), lower it to fit that limit (655360 or less for 272K); a frozen input over the model's prompt limit cannot be sent and that call fails.
+3. In a copy install, replace all of `migration-kit/` with the temporary install's. The plugin needs only an update.
+
 ## 0.20.0 (recording settings no longer asks)
 
 The kit files (plugin.json, scripts) change, so existing approvals and completion records expire once. Revalidate from judge. Completed outputs are kept.

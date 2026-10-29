@@ -4744,7 +4744,7 @@
     },
     {
       "path": "templates/migration-config.json",
-      "sha256": "10d6e3e7593bea5d63dd72e6a794e8acf645fc7c6fff4683b119dc8285edccfd",
+      "sha256": "ebec4d3c287731fbe7b83b1397eef3a6c090cd04255db666c19294546dec432c",
       "entries": [
         {
           "line": 28,
