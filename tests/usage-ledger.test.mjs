@@ -25,7 +25,7 @@ const argv = process.argv, at = argv.indexOf('--usage-output-file');
 const mode = fs.existsSync(${JSON.stringify(safePath(f.root, 'mode.txt'))}) ? fs.readFileSync(${JSON.stringify(safePath(f.root, 'mode.txt'))}, 'utf8') : 'ok';
 if (!argv.includes('--version') && at > 0 && mode !== 'none') fs.writeFileSync(argv[at + 1], ${JSON.stringify(usageJSON)});
 if (!argv.includes('--version') && mode.startsWith('fallback')) console.log(JSON.stringify({ type: 'model.call_final_result', data: { result: 'success', model: 'fallback-model' } }));
-if (!argv.includes('--version') && mode === 'fallback-hang') setInterval(() => {}, 1000);
+if (!argv.includes('--version') && mode === 'fallback-hang') { fs.writeFileSync(${JSON.stringify(safePath(f.root, 'hanging.txt'))}, 'reported'); setInterval(() => {}, 1000); }
 else if (!argv.includes('--version') && (mode === 'fail' || mode === 'fallback-fail')) { process.stderr.write('boom'); process.exit(1); }
 await import(${JSON.stringify(importable(transport.prefixArgs[0]))});
 `);
@@ -174,7 +174,7 @@ test('a survey with one unmeasured surveyor call keeps its tokens unknown', asyn
   assert.equal(fs.readFileSync(safePath(f.root, 'migration/cost-log.tsv'), 'utf8').trimEnd().split('\n').at(-1).split('\t')[3], 'unknown');
 });
 
-test('the usage log counts a call under the model the CLI reported, on success and on failure', async t => {
+test('the usage log counts a call under the model the CLI reported, on success, failure and interruption', async t => {
   const f = await ready(t), transport = cliDouble(f);
   wrapper(f, transport);
   const adapter = createCopilotAdapter({ command: process.execPath, prefixArgs: [safePath(f.root, 'usage-cli.mjs')] });
@@ -188,7 +188,10 @@ test('the usage log counts a call under the model the CLI reported, on success a
   atomicWrite(safePath(f.root, 'mode.txt'), 'fallback-hang');
   const controller = new AbortController();
   const hanging = adapter({ ...f, config: f.config, role: 'implementer', unit: f.units[0], extra: {}, runId: '5-eeeeeeee', signal: controller.signal });
-  setTimeout(() => controller.abort(), 1500);
+  // Abort only once the CLI has reported its model and is hanging.
+  for (const until = Date.now() + 20000; !fs.existsSync(safePath(f.root, 'hanging.txt')) && Date.now() < until;) await new Promise(r => setTimeout(r, 20));
+  await new Promise(r => setTimeout(r, 200));
+  controller.abort();
   await assert.rejects(hanging, /Interrupted/);
   assert.deepEqual(lines(f.root).map(e => [e.ok, e.observedModel]), [[true, 'fallback-model'], [false, 'fallback-model'], [false, 'fallback-model']]);
   assert.deepEqual(Object.keys(usageReport(f.root).byModel), ['fallback-model']);
