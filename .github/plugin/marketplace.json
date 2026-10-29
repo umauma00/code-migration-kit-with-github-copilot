@@ -1,12 +1,21 @@
 {
   "name": "code-migration-kit-marketplace",
   "owner": { "name": "umauma00" },
+  "metadata": {
+    "description": "The code migration kit for GitHub Copilot CLI, VS Code and the GitHub Copilot app.",
+    "version": "0.16.0"
+  },
   "plugins": [
     {
       "name": "code-migration-kit",
       "source": "./",
       "description": "Staged language migration with explicit approvals and independent reviews.",
-      "version": "0.15.0"
+      "version": "0.16.0",
+      "author": { "name": "umauma00", "url": "https://github.com/umauma00" },
+      "homepage": "https://github.com/umauma00/code-migration-kit-with-github-copilot",
+      "repository": "https://github.com/umauma00/code-migration-kit-with-github-copilot",
+      "license": "Apache-2.0",
+      "keywords": ["migration", "language-migration", "code-translation", "copilot-cli", "agent-plugins"]
     }
   ]
 }

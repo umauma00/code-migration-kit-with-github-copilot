@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import fs from 'node:fs';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { safePath, readJSON, filesUnder, atomicWrite } from '../lib/core.mjs';
 import { parseCommandLine, specs } from '../lib/cli.mjs';
@@ -14,6 +15,28 @@ function rewriteLinks(text, relativeFile) {
     return `](${path.posix.relative(path.posix.dirname(relativeFile), `migration-kit/${resolved}`)}${fragment})`;
   });
 }
+// The GitHub Copilot app can start each session in a new git worktree. Migration
+// state is not committed, so initializing there would start a second migration
+// beside the one in another checkout. List the other worktrees that already hold one.
+export function otherWorktreeMigrations(root) {
+  const git = args => execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true });
+  // native realpath expands Windows short names, so git's paths and the target compare.
+  let top, list;
+  try { top = fs.realpathSync.native(git(['rev-parse', '--show-toplevel']).trim()); list = git(['worktree', 'list', '--porcelain']); } catch { return []; }
+  const rel = path.relative(top, fs.realpathSync.native(root));
+  if (rel.startsWith('..') || path.isAbsolute(rel)) return [];
+  const found = [];
+  for (const line of list.split(/\r?\n/)) {
+    if (!line.startsWith('worktree ')) continue;
+    let other;
+    try { other = fs.realpathSync.native(line.slice('worktree '.length)); } catch { continue; }
+    if (other === top) continue;
+    const candidate = path.join(other, rel);
+    if (fs.existsSync(path.join(candidate, 'migration/config.json'))) found.push(candidate);
+  }
+  return found;
+}
+const existingMigrationsNote = 'A migration already exists in another worktree of this repository (existingMigrations). Its state is not committed, so initializing here would start a second one. Ask the person whether to resume it in that checkout (in the GitHub Copilot app, start the session with Workspace: Current checkout) or to start a new migration here, before --apply.';
 const workerRoles = ['implementer', 'reviewer-semantics', 'reviewer-rules', 'arbiter', 'fixer'];
 function parseRoleModels(value) {
   if (value === undefined) return {};
@@ -62,6 +85,8 @@ export function install(target, { apply = false, model, harness = 'copilot', wit
   if (root === kitRoot || kitRoot.startsWith(`${root}${path.sep}`)) throw new Error('Install into a separate migration target repository');
   const existingConfig = safePath(root, 'migration/config.json');
   if (layout === 'repository' && fs.existsSync(existingConfig) && readJSON(existingConfig).runtime === 'plugin') throw new Error('Existing configuration uses plugin layout; reconcile it explicitly before switching to repository layout');
+  const existingMigrations = fs.existsSync(existingConfig) ? [] : otherWorktreeMigrations(root);
+  const withExisting = result => existingMigrations.length ? { ...result, existingMigrations, existingMigrationsNote } : result;
   if (layout === 'plugin') {
     const files = new Map(), configPath = safePath(root, 'migration/config.json');
     if (fs.existsSync(configPath)) {
@@ -81,8 +106,8 @@ export function install(target, { apply = false, model, harness = 'copilot', wit
     }
     if (preferences) files.set('migration/preferences.json', preferences);
     if (apply) for (const [name, content] of files) atomicWrite(safePath(root, name), content);
-    return { applied: apply, target: root, layout, changes: [...files.keys()],
-      next: 'Edit migration/config.json (languages, paths, models and commands), then select the code-migration-plugin-orchestrator agent from the installed plugin. Existing configuration is retained.' };
+    return withExisting({ applied: apply, target: root, layout, changes: [...files.keys()],
+      next: 'Edit migration/config.json (languages, paths, models and commands), then select the code-migration-plugin-orchestrator agent from the installed plugin. Existing configuration is retained.' });
   }
   const files = new Map();
   for (const dir of ['lib', 'scripts', 'prompts', 'templates', 'docs']) for (const rel of filesUnder(kitRoot, dir)) {
@@ -124,8 +149,8 @@ export function install(target, { apply = false, model, harness = 'copilot', wit
     changes.push(rel);
   }
   if (apply) for (const rel of changes) atomicWrite(safePath(root, rel), files.get(rel));
-  return { applied: apply, target: root, harness, changes,
-    next: 'Edit migration/config.json, then select the migration-orchestrator agent in a new chat to draft the rulebook and inventory. Existing configuration is retained.' };
+  return withExisting({ applied: apply, target: root, harness, changes,
+    next: 'Edit migration/config.json, then select the migration-orchestrator agent in a new chat to draft the rulebook and inventory. Existing configuration is retained.' });
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
   try {

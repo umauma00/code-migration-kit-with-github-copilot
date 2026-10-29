@@ -2,21 +2,37 @@
 
 日本語 | [English](PLUGIN.en.md)
 
-Node.js 22以上、Agent Plugins 1.0対応のVS Code / GitHub Copilotを使います。ワーカーは常にCopilot CLIで動くため、VS Codeから進める場合もCopilot CLIが必要です（未導入ならAIが同意を得てインストールし、サインインを始めます）。確認したCLIは1.0.93・1.0.95・1.0.98です。移行対象の言語環境とテストも必要です。
+Node.js 22以上、Agent Plugins 1.0に対応したGitHub Copilot CLI・VS Code・GitHub Copilot appのどれかを使います。ワーカーは常にCopilot CLIで動くため、VS Codeやappから進める場合もCopilot CLIが必要です（未導入ならAIが同意を得てインストールし、サインインを始めます）。確認したCLIは1.0.93・1.0.95・1.0.98です。移行対象の言語環境とテストも必要です。
 
 ## インストール
 
-このブランチの0.2.0を含むcheckoutを、移行対象リポジトリとは別の場所に用意します。キット本体を移行対象に配置する必要はありません。
+GitHub Copilot CLI・VS Code・GitHub Copilot app の3つとも、同じマーケットプレイスから同じプラグインを入れます。識別子は `code-migration-kit@code-migration-kit-marketplace` です。キットは Agent Plugins 1.0 形式（ルートの `plugin.json`、`skills/`、`com.github.copilot/` の担当・hooks）で、3つともこの配置を読みます（2026-10-29 時点の GitHub・VS Code 公式文書で確認）。キット本体を移行対象リポジトリに置く必要はありません。
+
+マーケットプレイスの登録元は次のとおりです。リポジトリの既定ブランチ（main）にプラグインが入るまでは、`#` の後ろでブランチを指定します。main に入った後は `#feat/github-copilot-migration-kit` を外してください。
+
+```text
+umauma00/code-migration-kit-with-github-copilot#feat/github-copilot-migration-kit
+```
+
+同じプラグインは一つの導入元で管理してください。複数の方法（マーケットプレイス・ローカルcheckout・`chat.pluginLocations`）で同時に登録すると、オーケストレーターが2つ並び、先に見つかった方が使われます。旧コピー導入の `.github/skills/code-migration/` も同名スキルとして優先されます。移行する場合は既存データを保存し、旧スキルを明示的に外して `migration/config.json` に `"runtime": "plugin"` を設定してください。既存の承認・完了記録は再確認が必要です。
+
+### GitHub Copilot CLI
 
 ```bash
-copilot plugin marketplace add /path/to/code-migration-kit
+copilot plugin marketplace add umauma00/code-migration-kit-with-github-copilot#feat/github-copilot-migration-kit
 copilot plugin install code-migration-kit@code-migration-kit-marketplace
 copilot plugin list
 ```
 
-VS CodeはCLIの `~/.copilot/installed-plugins/` を検出します。`chat.plugins.enabled` を有効にし、Agent Pluginsの一覧を確認してください。ローカルのマーケットプレイスから導入したプラグインはcheckoutを直接読みます。変更後はチャットを再起動してください。
+更新は `copilot plugin marketplace update code-migration-kit-marketplace` の後に `copilot plugin update code-migration-kit` です。手元のcheckoutを使う場合は `copilot plugin marketplace add /path/to/code-migration-kit` で登録します。ローカルのマーケットプレイスから入れたプラグインはcheckoutを直接読み、変更は新しいセッション（または `/restart`）で反映されます。
 
-開発中のcheckoutは、VS Codeのユーザー設定からも登録できます。
+### VS Code
+
+設定 `chat.plugins.enabled` を有効にし、次のどれか一つで入れます。
+
+1. コマンドパレットの **Chat: Open Customizations** → **Browse** → 入手元メニューの **Configure Marketplaces** → **Add Marketplace** で上の登録元を入力し、**Browse** で `code-migration-kit` を **Install** します。設定 `chat.plugins.marketplaces` に同じ値を書いても登録できます。
+2. Copilot CLI で入れたプラグイン（`~/.copilot/installed-plugins/`）は VS Code が自動で検出し、Customizations の **Plugins** に表示します。
+3. 開発中のcheckoutは、ユーザー設定の `chat.pluginLocations` で登録します（実験的な設定）。
 
 ```json
 {
@@ -27,9 +43,48 @@ VS CodeはCLIの `~/.copilot/installed-plugins/` を検出します。`chat.plug
 }
 ```
 
-同じプラグインは一つの導入元で管理してください。複数版を同時登録すると、先に見つかったエージェント・スキルが使われます。旧コピー導入の `.github/skills/code-migration/` も同名スキルとして優先されます。移行する場合は既存データを保存し、旧スキルを明示的に外して `migration/config.json` に `"runtime": "plugin"` を設定してください。既存の承認・完了記録は再確認が必要です。
+Copilot 実行方式のチャットで使える `/plugin` コマンドは、Customizations 画面と別の一覧を持ちます。入れた画面で管理してください。
 
-Git配布が整った後はマーケットプレイスのGit URLを登録できます。リポジトリの既定ブランチにもこの形式が入ってから、`Chat: Install Plugin From Source` にGit URLを指定する方法が使えます。
+### GitHub Copilot app
+
+1. サイドバーの **Customize** を開き、マーケットプレイスの選択欄の横にあるマーケットプレイス設定から、上の登録元を GitHub リポジトリとして追加します。リンク `ghapp://plugins/marketplace/add?source=umauma00%2Fcode-migration-kit-with-github-copilot%23feat%2Fgithub-copilot-migration-kit` を開くと入力済みのフォームが出ます（確認後に追加）。
+2. **Customize** で `code-migration-kit` を検索して **Install** します。リンク `ghapp://plugins/install?source=code-migration-kit%40code-migration-kit-marketplace` でも開けます。**Installed** で有効になっていることを確認してください。
+3. app の文書は追加元を「GitHub リポジトリまたは Git URL」と書いており、`#ブランチ` の指定には触れていません（未確認）。受け付けられない場合は、main に入るまで Copilot CLI で上の手順のとおり入れてから app の **Installed** に出るか確認してください。app は Copilot CLI を土台にしていますが、CLI で入れたプラグインが app に出るかも文書には書かれていません。
+
+app でセッションを始めるときは次のようにします。
+
+- **Environment** は **This computer** にします。キットは手元の Copilot CLI でワーカーを動かし、移行の記録を手元のファイルに書くためです（Cloud は未確認）。
+- **Workspace** は **Current checkout** にします。**New worktree** はセッションごとに別の作業コピーを作り、未コミットの `migration/` が引き継がれません。別のワークツリーに移行がある状態で初期化しようとすると、キットはその場所（`existingMigrations`）を示して、そちらで再開するか質問します。
+- エージェントの選択欄（または `/agent`）で `code-migration-plugin-orchestrator` を選びます。セッションモードの **Autopilot** はキットの自動モード（`phaseMode: auto`）に対応します。
+- ツールの権限は **Ask every time** か **Assisted** にします。ゲートのコマンドは確認を前提にしています。**Approve all** で確認が出るかは未確認です。
+- ローカルのサンドボックスが有効なセッションでワーカーがネットワークやサインインに届かない場合は、そのセッションで `/sandbox off` にします。
+
+### 社内の Git サーバーから入れる
+
+GitLab などに置いたcheckoutも、Git URL（`https://git.example.com/group/code-migration-kit.git` や `git@git.example.com:group/code-migration-kit.git`）を登録元にすれば3つとも追加できます（文書上。実機は未確認）。`#ブランチ` の指定が文書にあるのは `owner/repo` 形式だけなので、キットはそのサーバーの既定ブランチに置いてください。認証は手元の git の設定に従うと見られます。先にターミナルで `git clone` が通ることを確かめてください。組織の管理設定でマーケットプレイスが制限されている場合は追加できません。
+
+### 案件で既定にする（任意）
+
+プラグインが main に入った後は、移行対象リポジトリの `.github/copilot/settings.json` に次を書くと、そのリポジトリで作業する人の Copilot CLI・VS Code（Copilot 実行方式）・app で既定で有効になります。各自のオフ設定や組織の管理設定が優先されます。
+
+```json
+{
+  "extraKnownMarketplaces": {
+    "code-migration-kit-marketplace": {
+      "source": { "source": "github", "repo": "umauma00/code-migration-kit-with-github-copilot" }
+    }
+  },
+  "enabledPlugins": {
+    "code-migration-kit@code-migration-kit-marketplace": true
+  }
+}
+```
+
+### 調べた一次情報（2026-10-29）
+
+- GitHub Docs: [Customizing the GitHub Copilot app](https://docs.github.com/en/copilot/how-tos/github-copilot-app/customize-github-copilot-app)、[Opening the app with deep links](https://docs.github.com/en/copilot/how-tos/github-copilot-app/open-with-deep-links)、[Agent sessions](https://docs.github.com/en/copilot/how-tos/github-copilot-app/agent-sessions)
+- GitHub Docs: [Finding and installing plugins for Copilot CLI](https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/plugins-finding-installing)、[CLI plugin reference](https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-plugin-reference)、[Plugins](https://docs.github.com/en/copilot/concepts/customizations/plugins)
+- VS Code: [Agent plugins](https://code.visualstudio.com/docs/agent-customization/agent-plugins)、[Agent plugin reference](https://code.visualstudio.com/docs/agents/reference/agent-plugin-reference)
 
 ## 新しい案件を開始する
 
@@ -46,7 +101,7 @@ node /path/to/code-migration-kit/scripts/install.mjs --target . --layout plugin 
 node /path/to/code-migration-kit/scripts/install.mjs --target . --layout plugin --model MODEL_ID --language ja --apply
 ```
 
-VS Code・Copilot CLIのどちらから開始する場合も、親エージェントがターミナルでrunnerを動かし、runnerがCopilot CLIのワーカーを起動します。これらのコマンドもAIがチャットから実行します。
+VS Code・Copilot CLI・GitHub Copilot appのどれから開始する場合も、親エージェントがターミナルでrunnerを動かし、runnerがCopilot CLIのワーカーを起動します。これらのコマンドもAIがチャットから実行します。
 
 作成するのは `migration/config.json`、`migration/RULEBOOK.md`、`migration/inventory.tsv` の3ファイルと、`--language` を指定した場合の `migration/preferences.json`（報告の言語）です。設定済みの案件ではモデルやルールを上書きしません。初期化は工程を承認しません。モデル、言語、元ソースの場所、工程の進め方、元のコードが動くかは AI が質問で聞き、`run_migration.mjs settings init` が作る `migration/run-settings.json` に書き込みます。出力・テストの場所や検証コマンドなど残りの欄と後からの変更はこのファイルで行い、`settings apply` で反映します。
 
@@ -73,4 +128,4 @@ node /path/to/code-migration-kit/scripts/run_migration.mjs status
 
 担当の衝突とhook変更後の失効は、`node tests/verify_plugin_resolution.mjs /absolute/path/to/runtime.node` でCLI 1.0.93の実際の探索・選択・hook APIと照合できます。この内部APIへの依存は検証用スクリプトだけです。
 
-macOSの実CLI（1.0.95・1.0.98）と疑似プロバイダーの間で、プラグイン方式の変換・独立レビュー（ツール付きレビューを含む）・ガードレールhookによる拒否を確認しました。古いCLI（1.0.40）はプラグインのエージェントを読み込めず、`doctor` が不足する担当IDを報告します。VS Code UIと認証済み実モデルでの移植品質は未検証です。実案件の前に [LIVE-SMOKE.md](LIVE-SMOKE.md) の小規模確認を行い、同文書の `migration-kit/` をプラグインの絶対パスへ読み替えてください。
+macOSの実CLI（1.0.95・1.0.98）と疑似プロバイダーの間で、プラグイン方式の変換・独立レビュー（ツール付きレビューを含む）・ガードレールhookによる拒否を確認しました。古いCLI（1.0.40）はプラグインのエージェントを読み込めず、`doctor` が不足する担当IDを報告します。VS Code UI・GitHub Copilot appでの動作と、認証済み実モデルでの移植品質は未検証です。実案件の前に [LIVE-SMOKE.md](LIVE-SMOKE.md) の小規模確認を行い、同文書の `migration-kit/` をプラグインの絶対パスへ読み替えてください。

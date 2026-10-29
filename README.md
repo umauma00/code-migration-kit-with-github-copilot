@@ -4,6 +4,8 @@
 
 Anthropicの[Code Migration Kit](https://github.com/anthropics/code-migration-kit-with-claude-code)を、GitHub Copilot CLIを中心に使える形へ変更した非公式版です。言語間移植の「事前調査 → ルール固定 → 変換 → 独立レビュー → ビルド → 新旧比較」を扱います。
 
+**0.16.0** でGitHub Copilot appからも同じプラグインを入れられるようにしました（[プラグイン導入手順](docs/PLUGIN.md)、2026-10-29の公式文書で確認）。
+
 **0.3.0** ではVS Codeのサブエージェント方式（native）を削除しました。ワーカーは常にCopilot CLIで動き、VS Codeから進める場合も同じです。利用者はAIチャットだけで移行を完遂でき、CLIの導入・サインインの開始、guardrailsの設置などのコマンドはAIが実行します。**0.2.0** はVS Code / Copilot CLIのAgent Plugins形式に対応しました。キット本体をプラグインとして導入し、案件側では設定と成果物を管理できます。[プラグイン導入手順](docs/PLUGIN.md)、[従来版の修正と再レビュー](docs/reviews/2026-10-10-copilot-rereview-fixes.md)、[既存版からの更新](docs/UPGRADING.md)を参照してください。
 
 参照したCLIは **1.0.98**（1.0.93・1.0.95でも疑似プロバイダーとの通信を確認。1.0.98ではrepository/plugin両構成の全ロールの往復、hookの読み込み、エラー出力の形式も確認）、VS Codeは **1.142** です。VS Code 1.142ではCopilot harnessが新規セッションの既定になりつつあり、prompt filesはLocal harness専用（`chat.promptFilesLocations` は非推奨）です（出典：[1.142リリースノート](https://code.visualstudio.com/updates/v1_142)、[Prompt files](https://code.visualstudio.com/docs/agent-customization/prompt-files)、[AI settings reference](https://code.visualstudio.com/docs/agents/reference/ai-settings)。2026-10-18確認）。入口はVS Code・Copilot CLIとも、エージェント一覧に出る移行オーケストレーター1つです（0.7.0から。スキルとワーカーはスラッシュメニューや一覧に出さない設定です）。固定した元コミットとSDK参照版は [UPSTREAM.json](UPSTREAM.json) に記録しています。Anthropic/GitHubの公式配布物ではありません。
@@ -57,15 +59,14 @@ Anthropicの[Code Migration Kit](https://github.com/anthropics/code-migration-ki
 
 ## プラグインとして導入する
 
-プラグイン対応ブランチを、移行対象とは別の場所にcloneします。
+GitHub Copilot CLI・VS Code・GitHub Copilot app のどれでも、同じマーケットプレイスから入れられます。リポジトリの既定ブランチに入るまでは `#` の後ろでブランチを指定します。
 
 ```bash
-git clone --branch feat/github-copilot-migration-kit https://github.com/umauma00/code-migration-kit-with-github-copilot.git /path/to/code-migration-kit
-copilot plugin marketplace add /path/to/code-migration-kit
+copilot plugin marketplace add umauma00/code-migration-kit-with-github-copilot#feat/github-copilot-migration-kit
 copilot plugin install code-migration-kit@code-migration-kit-marketplace
 ```
 
-この手順には0.2.0の変更を含むcheckoutが必要です。VS CodeはCLIでインストールしたプラグインを検出します。ローカルcheckoutを直接登録する設定、案件の初期化、更新方法は [PLUGIN.md](docs/PLUGIN.md) を参照してください。対象リポジトリをVS Codeで開き、Copilotチャットで `code-migration` スキルを使って移行開始を依頼します。
+VS Code は **Chat: Open Customizations** のマーケットプレイス追加から、app は **Customize** のマーケットプレイス設定から、同じ登録元を追加して `code-migration-kit` を入れます。VS Code は CLI で入れたプラグインも検出します。app でのセッションの設定（This computer・Current checkout）、手元のcheckoutの登録、社内 Git サーバーからの導入、案件の初期化と更新は [PLUGIN.md](docs/PLUGIN.md) を参照してください。対象リポジトリを開き、エージェントの選択欄（CLI では `/agent`）で `code-migration-plugin-orchestrator` を選んで移行開始を依頼します。
 
 ## キットを対象リポジトリへコピーして導入する
 

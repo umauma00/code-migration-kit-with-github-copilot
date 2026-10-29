@@ -62,6 +62,15 @@ If it is not signed in (doctor or a worker reports "To authenticate" or
 terminal, show the URL and any one-time code it prints in chat, wait for it to
 finish and run doctor again. Signing in to VS Code does not sign in the CLI.
 
+The GitHub Copilot app is built on the Copilot CLI: its question tool is
+`ask_user`, the agent picker and `/agent` select the orchestrator, and its
+Autopilot session mode is the CLI's autopilot. Workers still start as separate
+`copilot` processes from the terminal, so the app needs the CLI installed and
+signed in like VS Code does. Migrations run in "This computer" sessions. If a
+worker cannot reach the network or its sign-in inside an app session with local
+sandboxing on, show the error and tell the person that `/sandbox off` in that
+session lets the worker run; do not route around the sandbox yourself.
+
 ## Report language (first step)
 
 Before anything else at start or resumption, run `run_migration.mjs preferences`
@@ -85,6 +94,11 @@ languages, roots, commands and models through the run settings file. Initializat
 creates only migration/config.json, RULEBOOK.md and inventory.tsv; it does not
 approve or run migration stages. An existing configuration with runtime other
 than plugin requires an explicit layout change rather than a silent overwrite.
+If the installer preview returns `existingMigrations`, another worktree of this
+repository already holds a migration (the GitHub Copilot app can start a session
+in a new worktree). Ask one question before `--apply`: resume in that checkout
+(recommended; in the app, a new session with Workspace "Current checkout" there)
+or start a new migration here.
 For initialized projects, require `"runtime": "plugin"` in migration/config.json.
 The Node runner selects private plugin worker profiles and explicitly mounts this
 plugin.
