@@ -2,7 +2,7 @@
 
 New installs give the frozen review input more room.
 
-- New installs default `maxReviewInputBytes` to 1048576 (1 MiB, about
+- New installs default `maxReviewInputBytes` to 1048576 (1 MiB, roughly
   260k–360k tokens) instead of 262144, so fewer units fall back to
   tool-assisted review and fewer preparation audits need smaller batches.
   Existing configs keep their value, because it is part of the config
