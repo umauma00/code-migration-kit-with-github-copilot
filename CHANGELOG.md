@@ -1,4 +1,4 @@
-# 0.16.0 — 2026-10-29
+# 0.17.0 — 2026-10-29
 
 The plugin installs in the GitHub Copilot app too, alongside the Copilot CLI
 and VS Code (installation methods checked against the GitHub and VS Code
@@ -20,6 +20,35 @@ documentation on 2026-10-29).
   CLI (`ask_user`, `/agent`, Autopilot = auto mode).
 - plugin.json and the marketplace entry carry author, homepage and keywords
   for the app's and VS Code's plugin browsers (Agent Plugins 1.0 fields only).
+
+# 0.16.0 — 2026-10-29
+
+Auto mode no longer stops inside a phase, and a large survey scope no longer
+runs its parts one at a time.
+
+- Auto mode: questions inside a phase are not asked either. A preparation
+  audit or independent review that returns `changes` gets one repair round
+  (fix the confirmed findings, re-audit once with a fresh request); what is
+  still open, reviews limited by `maxReviewInputBytes`, and UNKNOWN or uncited
+  rows are listed in the phase report and the record's note instead of
+  stopping. A choice the source and RULEBOOK leave open (for example the
+  target web framework, or where non-source assets go) takes the most
+  conservative option unless the person gave one, with `TODO(port)`: in the
+  RULEBOOK before the inventory survey runs, and after that only in the
+  translated output (the RULEBOOK is part of the survey input and contextHash). It is listed as decided without the
+  person.
+- Surveys: the parts of one split scope now run side by side. One shared limit
+  keeps every surveyor call of the run within `concurrency`, so one large
+  directory left at the end uses every free slot. A transient failure waits
+  outside its slot. Each part keeps its own receipt, so a failed part reruns
+  alone.
+- Surveys: inventory and contracts rows that end uncited no longer report a
+  negative `droppedFacts` (it counted the kept rows). Only facts surveys drop
+  answer rows. Results saved by earlier versions are kept and read as 0.
+- Surveys: a part's correction or retry is served before parts still waiting
+  for their first call, rejected answers are named by call and request so
+  parallel parts never overwrite each other's evidence, and a failed scope
+  reports a run-wide failure before a part's own.
 
 # 0.15.0 — 2026-10-28
 

@@ -4,7 +4,7 @@
 
 An unofficial adaptation of Anthropic's [Code Migration Kit](https://github.com/anthropics/code-migration-kit-with-claude-code) for GitHub Copilot, centered on the Copilot CLI. It covers cross-language ports end to end: feasibility → fixed rules → translation → independent review → build → old-versus-new comparison.
 
-**0.16.0** lets the GitHub Copilot app install the same plugin (see [plugin installation](docs/PLUGIN.en.md), checked against the official documentation on 2026-10-29).
+**0.17.0** lets the GitHub Copilot app install the same plugin (see [plugin installation](docs/PLUGIN.en.md), checked against the official documentation on 2026-10-29).
 
 **0.3.0** removes the VS Code subagent (native) backend: workers always run on the Copilot CLI, also from VS Code. People complete the migration from AI chat alone; the AI runs the commands, including installing the CLI, starting its sign-in and installing the guardrails. **0.2.0** supports the Agent Plugins format for VS Code and the Copilot CLI. Install the kit itself as a plugin and keep only configuration and artifacts in the project. See [plugin installation](docs/PLUGIN.en.md), [fixes and re-review of the previous version](docs/reviews/2026-10-10-copilot-rereview-fixes.md) and [upgrading an existing install](docs/UPGRADING.en.md).
 

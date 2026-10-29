@@ -1,14 +1,23 @@
-# Upgrading (0.16.0 and earlier releases)
+# Upgrading (0.17.0 and earlier releases)
 
 [日本語](UPGRADING.md) | English
 
-## 0.16.0 (GitHub Copilot app support)
+## 0.17.0 (GitHub Copilot app support)
 
 The kit's files (plugin.json, scripts) change, so existing approvals and completion records are invalidated once. Revalidate from judge. Completed outputs are kept.
 
 1. You can switch the plugin's source from a local checkout to the GitHub repository (`umauma00/code-migration-kit-with-github-copilot#feat/github-copilot-migration-kit`). A local checkout registration keeps working. To switch, first remove it with `copilot plugin marketplace remove code-migration-kit-marketplace --force`, then add the new source (so the same name is not registered twice).
 2. To use the GitHub Copilot app, install it as in [PLUGIN.en.md](PLUGIN.en.md#github-copilot-app) and start sessions with This computer and Current checkout.
 3. For a repository copy, replace all of `migration-kit/` and the SKILL.md files in `.github/skills/` with the contents of a temporary install. The plugin picks this up with an update.
+
+## 0.16.0 (auto mode does not stop inside a phase; survey parts in parallel)
+
+The kit's files (lib, scripts) change, so existing approvals and completion records are invalidated once. Revalidate from judge. Completed outputs and survey results are kept.
+
+1. In auto mode an audit or review that returns `changes` gets one fix and one fresh re-audit; what remains goes into the report and the record's note, and the run continues. A choice the source and RULEBOOK leave open takes the most conservative option with `TODO(port)` (in the RULEBOOK before the inventory survey runs, afterwards only in the translated output). Tell the agent your choice before autopilot if you have one.
+2. Surveys run the parts of one split scope in parallel within `concurrency`. A survey in progress resumes as is.
+3. An inventory survey no longer reports a negative `droppedFacts`. Results saved by earlier versions are kept, and a negative value counts as 0.
+4. For copy installs, replace all of `migration-kit/`, `.github/agents/migration-orchestrator.agent.md` and the SKILL.md files under `.github/skills/` with the contents of a temporary install. Plugins pick it up with the update.
 
 ## 0.15.0 (verification method at setup; auto-mode handoff)
 

@@ -1,14 +1,23 @@
-# 更新手順（0.16.0 と以前の版）
+# 更新手順（0.17.0 と以前の版）
 
 日本語 | [English](UPGRADING.en.md)
 
-## 0.16.0（GitHub Copilot app 対応）
+## 0.17.0（GitHub Copilot app 対応）
 
 キットのファイル（plugin.json・scripts）が変わるため、既存の承認・完了記録は一度だけ失効します。judgeから再検証してください。完了済みの出力は保持されます。
 
 1. プラグインの登録元を、手元のcheckoutから GitHub のリポジトリ（`umauma00/code-migration-kit-with-github-copilot#feat/github-copilot-migration-kit`）に変えられます。手元のcheckoutで登録したままでも動きます。登録を変える場合は、先に `copilot plugin marketplace remove code-migration-kit-marketplace --force` で外してから追加してください（同じ名前の登録が二重にならないようにするため）。
 2. GitHub Copilot app で使う場合は [PLUGIN.md](PLUGIN.md#github-copilot-app) の手順で入れ、セッションは This computer・Current checkout で始めます。
 3. コピー導入では `migration-kit/` 全体と、`.github/skills/` の SKILL.md を一時導入先の内容に置き換えます。プラグインは更新だけで入ります。
+
+## 0.16.0（自動モードは工程の中でも止まらない・survey の部分を並列に）
+
+キットのファイル（lib・scripts）が変わるため、既存の承認・完了記録は一度だけ失効します。judgeから再検証してください。完了済みの出力と survey の結果は保持されます。
+
+1. 自動モードでは、準備監査やレビューの `changes` は1回直して再監査し、残りは報告と記録の note に載せて先へ進みます。ソースと RULEBOOK で決まらない選択は、いちばん保守的な案を `TODO(port)` 付きで残して進みます（inventory の survey を始める前は RULEBOOK、始めた後は変換結果だけ）。方針が決まっているなら autopilot の前に伝えてください。
+2. survey は1つの範囲を分けた部分も `concurrency` の上限の中で並列に動きます。途中の survey はそのまま再開できます。
+3. inventory の survey で `droppedFacts` がマイナスになる表示を直しました。以前の版で保存した結果はそのまま使い、マイナスは 0 として数えます。
+4. コピー導入では `migration-kit/` 全体と、`.github/agents/migration-orchestrator.agent.md`、`.github/skills/` の SKILL.md を一時導入先の内容に置き換えます。プラグインは更新だけで入ります。
 
 ## 0.15.0（初期設定で検証方式を決める・自動モードの引き継ぎ）
 
