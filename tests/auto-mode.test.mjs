@@ -348,3 +348,25 @@ test('review of 5d5d992: quotes are tracked as the shell does, and an in-place e
   for (const command of ["sed -i 's/normal/auto/' migration/preferences.json", "perl -pi -e 's/relaxed/auto/' migration/preferences.json"])
     assert.equal(decide(f, command)?.decision, 'ask', command);
 });
+
+test('auto mode instructions also cover audits, size-limited reviews and open choices inside a phase', () => {
+  const kit = path.resolve(import.meta.dirname, '..');
+  const read = file => fs.readFileSync(path.join(kit, file), 'utf8').replace(/\s+/g, ' ');
+  // Without these an autopilot run stops inside 00b/02 and asks the person.
+  for (const file of ['skills/code-migration/SKILL.md', '.github/skills/code-migration/SKILL.md']) {
+    const text = read(file);
+    assert.match(text, /Questions inside a phase are not asked either: an audit or independent review that returns `changes` gets one round/, file);
+    assert.match(text, /reviews limited by `maxReviewInputBytes`, and UNKNOWN or uncited rows are not fixed again/, file);
+    assert.match(text, /takes the most conservative option, the one closest to the original structure that adds no framework or dependency, unless the person already stated one/, file);
+    assert.match(text, /Before the inventory survey runs, write it into the RULEBOOK with a greppable `TODO\(port\)` naming the open choice\. After that, leave the RULEBOOK unchanged/, file);
+  }
+  for (const file of ['.github/agents/migration-orchestrator.agent.md', 'com.github.copilot/agents/code-migration-plugin-orchestrator.agent.md']) {
+    const text = read(file);
+    assert.match(text, /Inside a phase ask nothing either: an audit or review that returns changes gets one fix and one fresh re-audit/, file);
+    assert.match(text, /takes the most conservative option \(closest to the original, no new framework or dependency\) unless the person gave one, with `TODO\(port\)` in the RULEBOOK before the inventory survey runs \(later, in the translated output only, never the RULEBOOK\)/, file);
+  }
+  assert.match(read('docs/PREPARATION-AUDITS.md'), /In auto mode \(`phaseMode: auto`\) every preparation audit in 00b, 01 and 02 gets one repair round only/);
+  assert.match(read('docs/ORDERED-WORKFLOW.md'), /工程の中でも聞きません。.*いちばん保守的な案を選びます/);
+  assert.match(read('docs/ORDERED-WORKFLOW.en.md'), /Nothing inside a phase is asked either\..*takes the most conservative option/);
+  assert.match(read('docs/PHASE-HANDOFF.md'), /Questions inside a phase are not asked either/);
+});

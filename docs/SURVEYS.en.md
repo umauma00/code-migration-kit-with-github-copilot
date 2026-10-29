@@ -12,7 +12,7 @@ Phase 00 only decides whether to migrate, so by default the parent samples the s
 - The scope's source text is the frozen input; a surveyor never reads other files or other scopes' results.
 - Results go to `migration/surveys/<kind>/<scope-id>.json` with the scope's input hash. A current file means done; rerunning after an interruption runs only the remaining scopes.
 - One scope's failure does not stop the others; transient failures retry and systemic ones (sign-in, credits) stop the run, as in translation.
-- The model is `phaseModels.survey`, else the implementer model. `concurrency` limits active calls. Normal execution is continuous, including legacy configurations; only explicitly selected bounded mode enforces saved time/call budgets.
+- The model is `phaseModels.survey`, else the implementer model. `concurrency` limits active calls across scopes and across the parts of one split scope, so one large directory left at the end still uses every free slot. Normal execution is continuous, including legacy configurations; only explicitly selected bounded mode enforces saved time/call budgets.
 
 ## Kinds and phases
 
