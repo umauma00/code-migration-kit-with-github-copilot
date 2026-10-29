@@ -8,10 +8,10 @@ Node.js 22以上、Agent Plugins 1.0に対応したGitHub Copilot CLI・VS Code�
 
 GitHub Copilot CLI・VS Code・GitHub Copilot app の3つとも、同じマーケットプレイスから同じプラグインを入れます。識別子は `code-migration-kit@code-migration-kit-marketplace` です。キットは Agent Plugins 1.0 形式（ルートの `plugin.json`、`skills/`、`com.github.copilot/` の担当・hooks）で、3つともこの配置を読みます（2026-10-29 時点の GitHub・VS Code 公式文書で確認）。キット本体を移行対象リポジトリに置く必要はありません。
 
-マーケットプレイスの登録元は次のとおりです。リポジトリの既定ブランチ（main）にプラグインが入るまでは、`#` の後ろでブランチを指定します。main に入った後は `#feat/github-copilot-migration-kit` を外してください。
+マーケットプレイスの登録元は次のとおりです（リポジトリの既定ブランチ main）。0.18.0 以前の案内で `#feat/github-copilot-migration-kit` 付きで登録した場合も、そのブランチから引き続き入れられます。main に切り替える手順は [UPGRADING.md](UPGRADING.md) を参照してください。
 
 ```text
-umauma00/code-migration-kit-with-github-copilot#feat/github-copilot-migration-kit
+umauma00/code-migration-kit-with-github-copilot
 ```
 
 同じプラグインは一つの導入元で管理してください。複数の方法（マーケットプレイス・ローカルcheckout・`chat.pluginLocations`）で同時に登録すると、オーケストレーターが2つ並び、先に見つかった方が使われます。旧コピー導入の `.github/skills/code-migration/` も同名スキルとして優先されます。移行する場合は既存データを保存し、旧スキルを明示的に外して `migration/config.json` に `"runtime": "plugin"` を設定してください。既存の承認・完了記録は再確認が必要です。
@@ -19,7 +19,7 @@ umauma00/code-migration-kit-with-github-copilot#feat/github-copilot-migration-ki
 ### GitHub Copilot CLI
 
 ```bash
-copilot plugin marketplace add umauma00/code-migration-kit-with-github-copilot#feat/github-copilot-migration-kit
+copilot plugin marketplace add umauma00/code-migration-kit-with-github-copilot
 copilot plugin install code-migration-kit@code-migration-kit-marketplace
 copilot plugin list
 ```
@@ -47,7 +47,7 @@ Copilot 実行方式のチャットで使える `/plugin` コマンドは、Cust
 
 ### GitHub Copilot app
 
-1. サイドバーの **Customize** を開き、マーケットプレイスの選択欄の横にあるマーケットプレイス設定から、上の登録元を GitHub リポジトリとして追加します。リンク `ghapp://plugins/marketplace/add?source=umauma00%2Fcode-migration-kit-with-github-copilot%23feat%2Fgithub-copilot-migration-kit` を開くと入力済みのフォームが出ます（確認後に追加。`#` 付きの値が受け付けられるかは未確認）。
+1. サイドバーの **Customize** を開き、マーケットプレイスの選択欄の横にあるマーケットプレイス設定から、上の登録元を GitHub リポジトリとして追加します。リンク `ghapp://plugins/marketplace/add?source=umauma00%2Fcode-migration-kit-with-github-copilot` を開くと入力済みのフォームが出ます（確認後に追加）。
 2. **Customize** で `code-migration-kit` を検索して **Install** します。リンク `ghapp://plugins/install?source=code-migration-kit%40code-migration-kit-marketplace` でも開けます。**Installed** で有効になっていることを確認してください。
 3. app の文書は追加元を「GitHub リポジトリまたは Git URL」と書いており、`#ブランチ` の指定には触れていません（未確認）。受け付けられない場合は、main に入るまで Copilot CLI で上の手順のとおり入れてから app の **Installed** に出るか確認してください。app は Copilot CLI を土台にしていますが、CLI で入れたプラグインが app に出るかも文書には書かれていません。
 

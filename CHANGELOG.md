@@ -1,3 +1,15 @@
+# 0.18.1 — 2026-10-29
+
+The kit moves to the repository's default branch (main): no behavior change.
+
+- README, docs/PLUGIN.md and the visual guide: the marketplace source is
+  `umauma00/code-migration-kit-with-github-copilot` with no `#branch`, and the
+  chat clone request no longer names the feature branch. The GitHub Copilot app
+  deep link drops the `#` value whose acceptance was unverified.
+- docs/UPGRADING.md: how to switch an existing `#feat/github-copilot-migration-kit`
+  registration to main. Links into `history/` from copy installs, which point
+  at the default branch, now resolve.
+
 # 0.18.0 — 2026-10-29
 
 Repository cleanup: no behavior change.
