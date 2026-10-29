@@ -59,5 +59,7 @@ test('tool-assisted reviewers can search listed paths with grep, rg and glob, an
   assert.match(call('grep', { pattern: 'x', file_path: 'src', paths: ['migration/runs'] }), /may not read migration\/runs/);
   assert.match(call('grep', { pattern: 'x', path: 'src', paths: [] }), /may not read|must name/);
   assert.equal(call('grep', { pattern: 'x', path: 'src', paths: ['lib'] }), null);
+  assert.equal(call('grep', { pattern: 'x', path: null, paths: ['src'] }), null, 'an unused key sent as null');
+  for (const target of ['src/link/../runs/rec.json', 'src/..', 'src\\..\\migration']) assert.match(call('view', { path: target }), /may not read/, target);
   assert.equal(call('glob', { pattern: '**/*.py', paths: 'src' }), null);
 });

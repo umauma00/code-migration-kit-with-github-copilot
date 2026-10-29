@@ -50,7 +50,7 @@ test('a blocked write or loopback is reported with where and why', async t => {
 test('a loopback that never answers counts as blocked: a sandbox may drop the packets', async t => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sandbox-own-'));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
-  const probe = await localSandboxProbe({ dirs: [dir], timeoutMs: 0 });
+  const probe = await localSandboxProbe({ dirs: [dir], loopback: async () => 'timed out' });
   assert.deepEqual(probe.blocked, [{ access: 'loopback', host: '127.0.0.1', error: 'timed out' }]);
 });
 

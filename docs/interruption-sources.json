@@ -1005,7 +1005,7 @@
     },
     {
       "path": "lib/guardrails.mjs",
-      "sha256": "9e8ef50c5264dd57240e6af2bc6593f785bfdef416730bc8dd9cf8bf9c33fcda",
+      "sha256": "cfdbeb15222b6e01d77014d599c24a6fcd8732b2bae0d49eca4ce4ede57c1951",
       "entries": [
         {
           "line": 46,
@@ -2666,7 +2666,7 @@
     },
     {
       "path": "lib/sandbox.mjs",
-      "sha256": "647d90deebe419d691d318b8881206044071e0139427785affdc16ac636504c0",
+      "sha256": "1b176dd34710cc0484d438ced9046a59d122cd1f43a970b7b2a6745d68fc439b",
       "entries": [
         {
           "line": 32,
@@ -2681,7 +2681,7 @@
         {
           "line": 55,
           "kind": "deadline-or-observation",
-          "code": "export async function localSandboxProbe({ dirs = outsideDirs(), host = '127.0.0.1', timeoutMs = 3000 } = {}) {"
+          "code": "export async function localSandboxProbe({ dirs = outsideDirs(), host = '127.0.0.1', timeoutMs = 3000, loopback = tryLoopback } = {}) {"
         },
         {
           "line": 61,
@@ -2691,7 +2691,7 @@
         {
           "line": 62,
           "kind": "deadline-or-observation",
-          "code": "const error = await tryLoopback(host, timeoutMs);"
+          "code": "const error = await loopback(host, timeoutMs);"
         }
       ]
     },
@@ -4301,10 +4301,10 @@
     },
     {
       "path": "scripts/migration_hook.mjs",
-      "sha256": "9ac52783121894dde5ae132c2ce039736e374336f79ff2e05057c763488f8ba4",
+      "sha256": "a590c0b9288f3b7f7bf354428fc6db1a05106d101f521cebeb6cf24a2cc9a4ac",
       "entries": [
         {
-          "line": 70,
+          "line": 72,
           "kind": "error-or-exit-candidate",
           "code": "} catch (e) { console.error(`Migration hook: ${e.message}`); process.exitCode = 2; }"
         }

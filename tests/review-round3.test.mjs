@@ -58,9 +58,15 @@ test('hook: agents cannot write guardrails.json; approvals and phase records ask
   assert.equal(write('apply_patch', '*** Begin Patch\n*** Add File: migration/notes.md\n+mentions migration/guardrails.json only\n*** End Patch\n'), null, 'other files stay writable');
   assert.equal(write('bash', 'not json').decision, 'deny', 'a shell call with unreadable arguments is still denied');
   assert.equal(write('bash', JSON.stringify('rm migration/guardrails.json')).decision, 'deny', 'a JSON-quoted shell string is not an object');
+  const other = prepare(t).root;
+  setPreferences(other, { language: 'ja' });
+  assert.equal(interactiveDecision({ toolName: 'ask_user', toolArgs: JSON.stringify('実装担当のモデルを選んでください'), cwd: other }), null, 'a JSON-quoted question is read as the question');
+  if (['win32', 'darwin'].includes(process.platform)) for (const command of ['rm Migration/Guardrails.json', 'echo {} > migration/GUARDRAILS.JSON'])
+    assert.equal(shell(command).decision, 'deny', command);
   assert.equal(write('apply_patch', JSON.stringify('*** Begin Patch\n*** Add File: migration/guardrails.json\n+{}\n*** End Patch\n')).decision, 'deny', 'a JSON-quoted patch');
   assert.equal(write('apply_patch', '*** Begin Patch\n*** Update File: README.md\n*** Move to: migration/guardrails.json\n@@\n-a\n+b\n*** End Patch\n').decision, 'deny', 'a move destination');
   assert.equal(write('apply_patch', '*** Begin Patch\n  *** Add File: migration/guardrails.json\n+{}\n*** End Patch\n').decision, 'deny', 'an indented header');
+  assert.equal(write('apply_patch', '*** Begin Patch\n\u3000*** Add File: migration/guardrails.json\n+{}\n*** End Patch\n').decision, 'deny', 'a header after Unicode space');
   if (['win32', 'darwin'].includes(process.platform)) assert.equal(write('apply_patch', '*** Begin Patch\n*** Add File: Migration/Guardrails.json\n+{}\n*** End Patch\n').decision, 'deny', 'another case on a case-insensitive file system');
   assert.equal(write('create', { path: 'migration/notes.md', file_text: 'mentions migration/guardrails.json only' }), null, 'text mentions are fine');
   assert.equal(humanGate('node x/run_migration.mjs approve smoke --note ok'), 'approve smoke');

@@ -22,9 +22,11 @@ export function decide(event, role, cwd) {
     // view names one path; grep/rg and glob name `paths` (a string or an
     // array; CLI 1.0.105), and leaving it out searches the whole directory.
     // Every target key present is checked, so one key cannot hide another.
-    const present = ['path', 'file_path', 'paths'].filter(key => args?.[key] !== undefined);
+    const present = ['path', 'file_path', 'paths'].filter(key => args?.[key] != null);
     const targets = present.flatMap(key => Array.isArray(args[key]) ? args[key] : [args[key]]);
     // An empty list may mean the default, the whole directory.
+    // ".." after a link would climb from the link's target: never accepted.
+    if (targets.some(t => typeof t === 'string' && t.split(/[\\/]/).includes('..'))) return `Tool-assisted reviewers may not read ${targets.find(t => t.split(/[\\/]/).includes('..'))}; use only the listed evidence files`;
     if (!targets.length || present.some(key => Array.isArray(args[key]) && !args[key].length) || targets.some(t => typeof t !== 'string' || !t.trim())) return 'Tool-assisted reviewers must name a listed file or directory';
     // A glob pattern is relative to those paths and must stay inside them: no
     // "..", no absolute or drive-letter start, also inside {a,b} alternatives.
