@@ -185,14 +185,14 @@ test('choosing auto after setup is applied hands over at once; during setup or a
   assert.equal(JSON.parse(cli(late, 'preferences', '--phase-mode', 'auto').stdout).autoHandoff, undefined);
 });
 
-test('the specification answer: validated everywhere, recorded unasked, and the switch still asks in auto mode', t => {
+test('the specification answer: validated everywhere, recorded unasked, and the switch runs unasked in auto mode', t => {
   const root = fresh(t);
   upToMode(root, 'auto');
   assert.equal(autoModeOn(root), true);
   const kit = 'node migration-kit/scripts/run_migration.mjs';
   const decide = command => interactiveDecision({ toolName: 'bash', toolArgs: { command }, cwd: root }, root);
   assert.equal(decide(`${kit} preferences --specification unavailable`), null);
-  assert.equal(decide(`${kit} source-spec init --apply`)?.decision, 'ask');
+  assert.equal(decide(`${kit} source-spec init --apply`), null);
   assert.equal(decide(`${kit} preferences --phase-mode auto`)?.decision, 'ask');
   const bad = cli(root, 'preferences', '--specification', 'maybe');
   assert.notEqual(bad.status, 0);

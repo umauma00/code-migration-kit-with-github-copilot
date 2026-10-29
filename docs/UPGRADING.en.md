@@ -10,6 +10,14 @@ The plugin version changes, so existing approvals and completion records expire 
 2. To raise it in an existing project, edit `migration/config.json`. It is part of the config fingerprint, so phase 02 onward and approvals are reviewed again. When the reviewer model's "Context (prompt limit)" in `models list` is smaller (for example 272K), lower it to fit that limit (655360 or less for 272K); a frozen input over the model's prompt limit cannot be sent and that call fails.
 3. In a copy install, replace all of `migration-kit/` with the temporary install's. The plugin needs only an update.
 
+## 0.20.0 (recording settings no longer asks)
+
+The kit files (plugin.json, scripts) change, so existing approvals and completion records expire once. Revalidate from judge. Completed outputs are kept.
+
+1. `models set` and `settings apply` run as a command of their own no longer ask the host (Hook approval) in any mode: they record what the person chose in a question or in the file. A `settings apply` that switches auto mode on, and either command chained with another, with `--root` naming another project or with `--copilot`, still ask.
+2. In auto mode `pilot prepare` and `source-spec init --apply` run unasked too. Still asked: `sessions prune` (a deletion that cannot be undone), switching auto mode on, `guardrails install` with options or over an existing file, and kit calls the hook cannot read.
+3. In a copy install, replace all of `migration-kit/`, `.github/agents/migration-orchestrator.agent.md`, the SKILL.md in `.github/skills/` and the kit's section of `.github/copilot-instructions.md` with the temporary install's. The plugin needs only an update.
+
 ## 0.19.0 (one progress display for long commands)
 
 The kit files (plugin.json, scripts) change, so existing approvals and completion records expire once. Revalidate from judge. Completed outputs are kept.

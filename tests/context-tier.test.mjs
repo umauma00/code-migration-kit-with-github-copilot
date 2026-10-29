@@ -120,13 +120,15 @@ test('--context reaches only the workers that chose long_context', async t => {
   assert.equal(second.includes('--context'), false);
 });
 
-test('recording a context tier goes through the same human gate', () => {
+test('recording a context tier follows the model gate: unasked alone, asked when chained', () => {
   assert.equal(humanGate('node migration-kit/scripts/run_migration.mjs models set --assign "all=tiered:high:long_context"'), 'models set');
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'context-gate-'));
   try {
     fs.mkdirSync(path.join(root, 'migration'));
     fs.writeFileSync(path.join(root, 'migration/config.json'), '{}');
-    const decision = interactiveDecision({ toolName: 'bash', toolArgs: { command: 'node migration-kit/scripts/run_migration.mjs models set --role fixer --model tiered --context long_context' }, cwd: root });
+    assert.equal(interactiveDecision({ toolName: 'bash', toolArgs: { command: 'node migration-kit/scripts/run_migration.mjs models set --role fixer --model tiered --context long_context' }, cwd: root }), null);
+    // Chained with another command it still asks, and the message names the cost.
+    const decision = interactiveDecision({ toolName: 'bash', toolArgs: { command: 'node migration-kit/scripts/run_migration.mjs models set --role fixer --model tiered --context long_context && echo done' }, cwd: root });
     assert.equal(decision.decision, 'ask');
     assert.match(decision.reason, /context \(long_context costs more\)/);
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
