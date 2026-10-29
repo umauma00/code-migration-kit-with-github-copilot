@@ -183,13 +183,14 @@ test('changing only the report language through the file keeps reviewed work', a
   assert.equal(migrationStatus(f.root).runSettings.state, 'applied');
 });
 
-test('applying run settings asks the person; writing and checking the file do not', t => {
+test('applying run settings runs unasked on its own and asks when chained; writing and checking the file do not', t => {
   const runner = 'node migration-kit/scripts/run_migration.mjs';
   assert.equal(humanGate(`${runner} settings apply`), 'settings apply');
   assert.equal(humanGate(`${runner} settings init`), null);
   assert.equal(humanGate(`${runner} settings check`), null);
   const root = fresh(t);
-  const decision = interactiveDecision({ toolName: 'bash', toolArgs: { command: `${runner} settings apply` }, cwd: root });
+  assert.equal(interactiveDecision({ toolName: 'bash', toolArgs: { command: `${runner} settings apply` }, cwd: root }), null);
+  const decision = interactiveDecision({ toolName: 'bash', toolArgs: { command: `${runner} settings apply && ${runner} status` }, cwd: root });
   assert.equal(decision.decision, 'ask');
   assert.match(decision.reason, /利用者が記入した内容/);
 });
