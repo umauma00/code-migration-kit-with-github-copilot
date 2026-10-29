@@ -1,0 +1,4 @@
+file	reference	reason
+CondShared/X.cs	(whole file)	compiled by CondApp/App.csproj only under a Condition, MSBuild property or import that is not evaluated; its declarations are kept
+RemovedGlobals/AGlobals.cs	(whole file)	not compiled by RemovedGlobals/App.csproj; its declarations are ignored
+Utf16/Bin.cs	(whole file)	holds NUL bytes (binary, or an encoding without a byte order mark); not analysed

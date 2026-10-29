@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\A\A.csproj" />
+    <ProjectReference Condition="'$(X)' == ''" Include="..\B\B.csproj" />
+  </ItemGroup>
+</Project>

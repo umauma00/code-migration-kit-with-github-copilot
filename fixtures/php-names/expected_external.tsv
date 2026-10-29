@@ -1,0 +1,7 @@
+namespace	files	first_file
+Acme\Billing	1	ext/a.php
+Acme\Orders	1	ext/a.php
+Acme\Util	1	ext/a.php
+Other\Lib	1	ext/a.php
+Shop\Billing	1	nsrel2/main.php
+Shop\Payment	1	nsrel2/full.php

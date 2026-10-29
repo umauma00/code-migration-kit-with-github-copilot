@@ -1,0 +1,126 @@
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { install, kitRoot } from '../scripts/install.mjs';
+import { loadConfig, roles, writeJSON, safePath, atomicWrite, readManifest } from '../lib/core.mjs';
+import { approve, runStage } from '../lib/pipeline.mjs';
+
+export const mini = path.join(kitRoot, 'fixtures/mini');
+// Python on PATH: Windows installs (python.org, setup-python) name it python.
+export const python = process.platform === 'win32' ? 'python' : 'python3';
+// A Node script the kit launches by path as a CLI double: executable with a
+// shebang on POSIX; on Windows, where only executables and batch files spawn,
+// a .cmd wrapper next to it (run through cmd.exe like an npm shim).
+export function nodeCli(file, body) {
+  fs.writeFileSync(file, `#!/usr/bin/env node\n${body}`, { mode: 0o755 });
+  fs.chmodSync(file, 0o755);
+  if (process.platform !== 'win32') return file;
+  fs.writeFileSync(`${file}.cmd`, `@"${process.execPath}" "${file}" %*\r\n`);
+  return `${file}.cmd`;
+}
+// import() of an absolute path inside a generated script needs a file URL on Windows.
+export const importable = file => pathToFileURL(file).href;
+export function prepare(t, { realCommands = false, count = 1, model = 'test-double', root, workflow = false, layout = 'repository', executionMode = 'bounded' } = {}) {
+  root ??= fs.mkdtempSync(path.join(os.tmpdir(), 'copilot-migration-test-'));
+  t?.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  install(root, { apply: true, model, withWorkflow: workflow, layout });
+  fs.cpSync(path.join(mini, 'src'), path.join(root, 'src'), { recursive: true });
+  fs.cpSync(path.join(mini, 'tests'), path.join(root, 'tests'), { recursive: true });
+  const config = loadConfig(root);
+  // Existing engine fixtures exercise runner behavior independently of the
+  // interactive phase workflow; strict sequencing has its own integration tests.
+  config.phasePolicy = 'legacy';
+  // General engine fixtures isolate receipt/scheduling behavior. Numeric marker
+  // policy and preparation gates have dedicated user-operation coverage.
+  delete config.markerPolicy;
+  // Scheduling and fix-loop defaults for new installs have dedicated tests.
+  delete config.dependencyOrder; delete config.fixPolicy; delete config.reviewFocus;
+  // Existing budget/interruption fixtures intentionally select bounded mode;
+  // continuous-mode tests exercise the installed default separately.
+  config.executionMode = executionMode;
+  if (executionMode === 'bounded') { config.timeoutSeconds = 600; config.commandTimeoutSeconds = 600; }
+  config.concurrency = 2;
+  for (const name of ['original', 'mutation', 'build', 'smoke', 'parity']) {
+    config.commands[name] = realCommands ? [python, '-B', 'tests/judge.py', name] : [process.execPath, '-e', 'console.log("test command OK")'];
+  }
+  config.commands.typecheck = ['node', '--check', '{target}'];
+  writeJSON(safePath(root, 'migration/config.json'), config);
+  const names = ['math_ops', 'text_ops', 'main'].slice(0, count);
+  atomicWrite(safePath(root, 'migration/manifest.tsv'), 'source\ttarget\n' + names.map(n => `src/${n}.py\tported/${n}.mjs\n`).join(''));
+  atomicWrite(safePath(root, 'migration/RULEBOOK.md'), '# Fixture rules\nPreserve floor division, remainder signs, zero-division errors and Unicode code-point lengths. Keep one-to-one filenames; use .mjs imports. Inputs are safe-range integers and Unicode strings. End each file with a PORT STATUS comment.\n');
+  atomicWrite(safePath(root, 'migration/inventory.tsv'), 'file\tissue\tdecision\nsrc/math_ops.py\tnegative division\tfloor, not truncate\nsrc/text_ops.py\tUnicode length\tcode points\n');
+  writeJSON(safePath(root, 'migration/review-dependencies.json'), { schemaVersion: 1, dependencies: {
+    'src/math_ops.py': [], 'src/text_ops.py': [], 'src/main.py': ['src/math_ops.py', 'src/text_ops.py']
+  } });
+  atomicWrite(safePath(root, 'migration/feasibility.md'), 'Fixture only: three files, finite integer/string contract; no architecture redesign.\n');
+  atomicWrite(safePath(root, 'migration/stress-test/report.md'), 'TEST FIXTURE: numeric boundaries and Unicode cases are checked by tests/judge.py. This canned setup is not an AI bakeoff or a production approval.\n');
+  return { root, config, units: readManifest(root, config) };
+}
+export async function ready(t, options) {
+  const fixture = prepare(t, options);
+  await runStage(fixture.root, fixture.config, 'judge');
+  approve(fixture.root, fixture.config, 'translation', 'Automated fixture approval for tests only');
+  return fixture;
+}
+export function result(role, unit, { findings = [], decisions = [], content } = {}) {
+  const common = { schemaVersion: 1, target: unit.target };
+  if (role === 'implementer' || role === 'fixer') return { ...common, kind: 'implementation', content: content ?? fs.readFileSync(path.join(mini, 'expected', path.basename(unit.target)), 'utf8'), summary: 'Canned test implementation, not AI output' };
+  if (role === 'arbiter') return { ...common, kind: 'arbitration', decisions };
+  return { ...common, kind: 'review', verdict: findings.length ? 'changes' : 'pass', findings };
+}
+export const finding = { id: 'F1', message: 'Wrong division rounding', evidence: 'src/math_ops.py:4 uses floor division', rule: 'Fixture rules: preserve negative division' };
+export const cliOutput = value => [
+  { type: 'assistant.message', data: { content: JSON.stringify(value), toolRequests: [] } },
+  { type: 'result', exitCode: 0 }
+].map(e => JSON.stringify(e)).join('\n');
+// Exercise the process/JSONL adapter from workflow tests, including stdin and
+// actual argv. The host SDK agent must never supply worker responses.
+export function cliDouble(f, { empty = false } = {}) {
+  const responses = Object.fromEntries(f.units.flatMap(unit => roles.map(role => [`${role}:${unit.target}`, result(role, unit)])));
+  const file = safePath(f.root, 'cli-double.mjs');
+  atomicWrite(file, `import fs from 'node:fs';
+if (process.argv.includes('--version')) { console.log('GitHub Copilot CLI 0.0.0-test.'); process.exit(0); }
+let prompt = ''; for await (const c of process.stdin) prompt += c;
+const argv = process.argv.slice(2), role = process.env.MIGRATION_KIT_ROLE;
+const target = prompt.match(/Set target to "([^"]+)"/)?.[1];
+fs.appendFileSync('cli-double-calls.jsonl', JSON.stringify({role, target, argv, prompt}) + '\\n');
+const value = ${empty ? 'null' : `${JSON.stringify(responses)}[role + ':' + target]`};
+console.log(JSON.stringify({type: 'assistant.message', data: {content: JSON.stringify(value), toolRequests: []}}));
+console.log(JSON.stringify({type: 'result', exitCode: 0}));
+`);
+  return { command: process.execPath, prefixArgs: [file] };
+}
+export const fake = async ({ role, unit, extra }) => ({ result: result(role, unit,
+  role === 'arbiter' ? { decisions: extra.findings.map(f => ({ finding: f.reference, confirmed: true, reason: f.evidence })) } : {}),
+  requestedModel: 'test-double', observedModel: null, tokens: null, aiCredits: null });
+// A stand-in for `copilot --headless --stdio` that answers connect and
+// models.list with the given catalog, launched by path like the real CLI. On
+// Windows it is laid out as npm installs @github/copilot (a copilot.cmd shim
+// naming npm-loader.js), which the kit runs through node, as it does the real one.
+export function modelCatalogCli(dir, catalog) {
+  if (process.platform === 'win32') {
+    const pkg = path.join(dir, 'node_modules', '@github', 'copilot');
+    fs.mkdirSync(pkg, { recursive: true });
+    fs.writeFileSync(path.join(pkg, 'npm-loader.js'), modelCatalogScript(catalog));
+    fs.writeFileSync(path.join(dir, 'copilot.cmd'), '@node "%~dp0\\node_modules\\@github\\copilot\\npm-loader.js" %*\r\n');
+    return path.join(dir, 'copilot.cmd');
+  }
+  return nodeCli(path.join(dir, 'copilot-models.mjs'), modelCatalogScript(catalog));
+}
+const modelCatalogScript = catalog => `
+let buf = Buffer.alloc(0);
+const send = m => { const b = JSON.stringify(m); process.stdout.write('Content-Length: ' + Buffer.byteLength(b) + '\\r\\n\\r\\n' + b); };
+process.stdin.on('data', d => {
+  buf = Buffer.concat([buf, d]);
+  for (;;) {
+    const h = buf.indexOf('\\r\\n\\r\\n'); if (h < 0) return;
+    const len = Number(/Content-Length: (\\d+)/i.exec(buf.subarray(0, h).toString())[1]);
+    if (buf.length < h + 4 + len) return;
+    const msg = JSON.parse(buf.subarray(h + 4, h + 4 + len)); buf = buf.subarray(h + 4 + len);
+    if (msg.method === 'connect') send({ jsonrpc: '2.0', id: msg.id, result: { ok: true } });
+    else if (msg.method === 'models.list') send({ jsonrpc: '2.0', id: msg.id, result: { models: ${JSON.stringify(catalog)} } });
+    else send({ jsonrpc: '2.0', id: msg.id, error: { code: -32601, message: 'unknown' } });
+  }
+});
+`;

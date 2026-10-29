@@ -1,52 +1,66 @@
-# 05 — Survey build
+# 05 — Survey build and repair
 
-**When:** Step 4, after the translation queue is empty. **SKIP ENTIRELY** if
-Step 4 dissolved into Step 3 per the README — your cheap referee already ran
-in-loop. **Prerequisites:** Step 3 queue at zero (`queue_runner.mjs status`).
-**Placeholders:** `[build command]`, `[module]` (your target's module
-granularity), `[fixer model]`, `[reviewer model]` (from the Model plan
-signed off at the feasibility gate).
+Read [phase reports and user decisions](../docs/PHASE-HANDOFF.md).
+End with its report; ask for the next decision only when needed.
 
----
+Prerequisite: every translation unit has a current reviewed receipt. The user
+approves build for these outputs, then run `run_migration.mjs build` once.
 
-Use a workflow. Run ONE scripted survey build — `[build command]` over
-everything, once. Parse its diagnostics into a machine queue: a TSV of file,
-module, error code, message — sliced by [module], ordered leaves-to-root per
-the dependency map. The error list is the queue; nobody re-derives it by
-judgment.
+Read `migration/results/build.json`. Exit code, diagnostics and the source/output
+fingerprints are the evidence. A failed command never counts as a clean build.
+The retained Bash daemon writes an exit-code sidecar and --once propagates failure;
+the Node runner is the portable reference path.
 
-Fan out fixers per module slice with **no compiler access** — they write
-patches from the error text and the source alone. Fixers run on
-[fixer model], reviewers on [reviewer model], per the Model plan —
-inheriting the session default is a deviation; log it. Adversarial review on
-every fix, same contract as Step 3: separate contexts, every finding cites a
-rule or a source line. The review doubles each slice's cost; Run 1 skipped
-the per-file review pass entirely, and the exact failure class it catches
-survived to the compiler (RUN-NOTES, Run 1 deviations). The daemon that owns the build is the only process that reruns
-the survey build — once per round, to produce the next queue. Repeat to zero.
+After a failed build, run `run_migration.mjs repair-round` (or `diagnose` to
+only build the queue). The bundled parsers read the recorded build output
+(Python, Java/Maven, JavaScript/Node/ESLint/tsc, shell/ShellCheck, rustc and the
+generic FILE:LINE:COL: error form), map each error to its manifest target and
+write `migration/build-diagnostics/<build>.tsv`, `migration/repair-queue.json` and
+a row in `migration/build-rounds.tsv`. Never re-derive the list by judgment. If
+the command reports no mapped diagnostic, show the human the unmapped lines and
+build record; for an unsupported format, produce the same TSV with a reviewed
+adapter. Report the round-over-round counts from `migration/build-rounds.tsv`.
+For a single manual slice you can still use:
 
-Transport: prefer `scripts/build_daemon.sh` as the referee — I start it once
-(`./build_daemon.sh --cmd "[build command]"`), it reruns the build whenever
-the tree changes, and each round lands in `migration/build-output-rN.txt`;
-fixers consume the numbered output files and never run the compiler. Run 3
-ran this step with the human relaying every build by hand — fine for 2
-rounds, not for 50. Zero-setup fallback: I run
-`[build command] 2>&1 | tee migration/build-output-rN.txt` myself each round
-— same files, same contract.
+`run_migration.mjs repair --target ported/PATH --evidence migration/ERROR-SLICE`
 
-Fixer post-write check: after writing a file, `grep -c 'TODO(port)' <file>`
-must equal the `todos=` value in its PORT STATUS trailer — recount
-mechanically, never narrate. Run 3 shipped a trailer claiming todos=1 where
-grep said 2; the grep is the receipt, the trailer is the claim.
+For multiple independent targets, use the [single-coordinator queue](../docs/EXECUTION-SCOPES.md):
+write file/module/code/message TSV from this build, run diagnostic_queue.mjs,
+then repair --queue migration/repair-queue.json. Ensure those targets are within
+the current explicit translation/repair approval. The coordinator keeps one lock,
+caps all AI calls and waits for dependent slice reviews; do not run competing
+repair processes or disable the global lock. Join repairs before one whole build.
+The coordinator admits every queued job durably before dispatch. On Stop, inspect
+status pendingRepairs and resume translate within the existing approval; unfinished
+jobs cannot reuse their old done receipts. Keep the immutable intent archives.
+Do not replay a stale queue, drop its unstarted jobs, or replace frozen diagnostics.
+Count TODO(port) lines mechanically against the final PORT STATUS todos value;
+with todo-lines-v1 the measured check is also bound to Node's completion receipt.
 
-A recurring error pattern is a rulebook indictment, not N hand-fixes: queue
-the amendment for me and propose regenerating the slice that rule touched.
-Stop and show me the round-over-round error counts. End the report with an
-estimated duration for the next step (Step 5 — hello world, then smoke) —
-wall-clock and active-attention minutes, from the rounds you just timed.
-Append one timestamped line for this step to `migration/cost-log.tsv` —
-create it with header `step\ttimestamp\twall_clock_min\ttokens\tsubagents\tmodel`
-if absent; real values where available, `unknown` where not. Plain
-tab-separated values, no `key=` prefixes — a valid row looks exactly like:
-`3	2026-06-11T14:02Z	21	2035336	35	claude-sonnet-4-6`
-(your step number and values vary; the format doesn't).
+Reviewers verify the evidence against the code; the arbiter confirms findings;
+fixers apply confirmed changes and receive no compiler tool. Review again.
+Approve and run a fresh build after repaired outputs invalidate the previous gate.
+
+Upstream's build daemon repeats this until clean. Here, once the human agrees in
+chat, run `run_migration.mjs build-loop --note "what was agreed" [--max-rounds N]
+[--max-calls N]` (normal default: continuous until clean, without implicit
+round/call/time limits; state that in the proposal and respect any finite limits
+the person explicitly chooses; the host confirms the command). Each round
+records its approval under one grant in migration/gates/build-loop-<id>.json,
+runs validation, diagnoses failures and repairs the queue with normal reviews.
+Only bounded mode applies saved budgets and a stalled-count stop. Actual invalid
+inputs, stale approvals, unmapped failures or explicit cancellation still stop it.
+While it runs, `status` shows it and other
+runner commands are refused. Report every round's counts and the calls used.
+
+With `--through smoke` or `--through parity` (state it in the proposal) the same
+grant also approves and runs smoke, then parity, after a clean build, repairs their
+mapped failures and starts the next round from build. A failure that maps to no
+target, or a failing original suite, stops the loop for triage (05b/05c).
+
+If several rounds repeat the same error class, stop and propose a rule amendment.
+Do not have every worker independently build the whole tree. Report counts by
+round and stop at the clean-build gate. If a cheap typecheck ran in-loop, still
+perform the agreed final integration build/check before smoke.
+
+<!-- Copilot adaptation: migration control and instructions updated on 2026-10-08; see NOTICE. -->

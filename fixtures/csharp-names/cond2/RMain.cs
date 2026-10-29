@@ -1,0 +1,1 @@
+class RMain { RA a; }

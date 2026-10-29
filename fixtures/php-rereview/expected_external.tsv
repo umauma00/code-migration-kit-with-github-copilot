@@ -1,0 +1,4 @@
+namespace	files	first_file
+Acme\Billing	1	extns/main.php
+Acme\Shipping	1	extns/main.php
+Log\Core	1	extns/main.php

@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+<ItemGroup>
+  <Using Include="CA.Model" Alias="Model" Condition="'$(Configuration)' == 'Debug'" />
+  <Using Include="CB.Model" Alias="Model" Condition="'$(Configuration)' == 'Release'" />
+</ItemGroup>
+</Project>

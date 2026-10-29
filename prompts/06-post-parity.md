@@ -1,34 +1,30 @@
-# 06 — Post-parity burndown
+# 06 — Post-parity cleanup
 
-**When:** only after the Step 6 done-gate — every parity test passing AND the
-original suite re-run clean on the original code, both counts documented (see
-README Step 6). Never alongside it. **Prerequisites:** Step 6 report with
-both counts. **Placeholders:** `[target tree]`, `[reviewer model]` (from the
-Model plan signed off at the feasibility gate).
+Read [phase reports and user decisions](../docs/PHASE-HANDOFF.md).
+End with its report; ask for the next decision only when needed.
 
----
+Runtime prerequisite: both suites pass in the current parity receipt and the user has
+reviewed the final evidence. Never mix this phase with reaching initial parity.
 
-Use a workflow. The port shipped bug-for-bug; the markers are everything it
-deferred. Collect every `BUG(port)`, `TODO(port)`, and `PERF(port)` marker
-from [target tree] — mechanical grep, not memory — and open the report with
-the per-marker counts as a receipt: the grep output, not a narrated total.
+For source-only mode this is a separate smoke-to-handoff path, not post-parity.
+Prepare migration/handoff.md with current reviewed outputs, actual build/smoke
+receipts, source-inferred contracts, assumptions, unresolved risks and future runtime
+parity steps. Explicitly say behavioral equivalence unverified. After user review,
+record approve handoff then run handoff as described in [source-only](../docs/SOURCE-ONLY.md).
+Final wording: ソース基準の移植完了・動作同等性未検証. No parity receipt is created.
 
-Classify every marker: **fix now** or **document and close**, one line of
-reasoning per call. Document-and-close rows get their resolution written next
-to the marker, and the marker comes out in one reviewed change.
+In runtime mode, follow the post-parity steps below.
 
-Every fix-now ships as its own flagged change — one marker, one change. Each
-re-runs the parity referee and proves the ONLY behavior that changed is the
-marked defect; a fix that moves any other output is two changes, and a failed
-review. Reviewers run on [reviewer model], per the Model plan — inheriting
-the session default is a deviation; log it. A recurring marker pattern is a
-rulebook indictment, same as ever: queue the amendment for me.
+Mechanically collect BUG(port), TODO(port) and PERF(port) markers. Classify each
+as fix now or document and close, with a reason. Propose each behavioral change
+separately. Obtain the user's authorization for the changed specification.
 
-Stop and show me the classification table and the per-fix parity results —
-nothing merges until I sign off.
-Append one timestamped line for this step to `migration/cost-log.tsv` —
-create it with header `step\ttimestamp\twall_clock_min\ttokens\tsubagents\tmodel`
-if absent; real values where available, `unknown` where not. Plain
-tab-separated values, no `key=` prefixes — a valid row looks exactly like:
-`3	2026-06-11T14:02Z	21	2035336	35	claude-sonnet-4-6`
-(your step number and values vary; the format doesn't).
+In runtime mode, make one reviewed change per accepted issue; rerun parity with an explicitly
+reviewed adjustment for the intended behavior change. Do not silently edit the
+judge to match the new implementation. A change that affects unrelated behavior
+needs separate justification. New source or judge changes invalidate old receipts.
+
+Report marker counts, per-change verification and remaining known issues. Neither
+the runner nor this prompt automatically commits, merges, pushes or deploys.
+
+<!-- Copilot adaptation: migration control and instructions updated on 2026-10-08; see NOTICE. -->

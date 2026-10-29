@@ -1,0 +1,2 @@
+file	reference	reason
+App/Program.cs	Type.GetType(args[0])	reflection with a computed type name

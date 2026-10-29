@@ -1,63 +1,83 @@
-# 04 — Translation kickoff
+# 04 — Translation and independent review
 
-**When:** Step 3, after the stress test is signed off. **Prerequisites:**
-amended RULEBOOK.md, complete inventory, manifest at `migration/manifest.tsv`
-(source path → target path per the rulebook's naming rules), and
-`templates/settings.json` copied to the target repo's `.claude/settings.json`
-so the banned commands actually deny.
-**Placeholders:** `[100]` (batch size), `[TODO(port)]` (your
-greppable markers — TODO/PERF/BUG per rulebook §3), `[implementer model]`,
-`[reviewer model]` (from the Model plan signed off at the feasibility gate).
-Swap "file" for whatever your queue emits — modules, units.
+Read [phase reports and user decisions](../docs/PHASE-HANDOFF.md).
+End with its report; ask for the next decision only when needed.
 
-This prompt is deliberately short. By Step 3 the rulebook is the prompt — if
-your kickoff needs to be longer than this, your rulebook isn't done.
+Command guardrails: `phase start 04` refuses to start without `migration/guardrails.json`
+(adapted to this target) or a recorded waiver. Installing it is the human's act, because
+that is when they decide the referee price: propose the list from `guardrails show` in
+chat, and only after their agreement run `guardrails install` with exactly those options;
+the host asks them to confirm it. Never create, edit or relax the file any other way. If a guardrail
+denies a command, that is the design working; report it instead of routing around it.
+Run `doctor` and confirm `repository hooks load in Copilot CLI` is not failing.
 
----
+Prerequisites: reviewed feasibility/stress reports, RULEBOOK, inventory,
+manifest, audited review dependency map, validated judge, installed profiles and
+explicit translation approval.
 
-Before any fan-out, verify `.claude/settings.json`. Never install it
-yourself — installation is my act, because that's the moment I decide the
-referee price; Run 3's orchestrator detected the missing file and
-self-installed it, automating away exactly that decision. If it's missing,
-STOP and wait: tell me to install `templates/settings.json`, or record my
-explicit waiver in the deviation log — Run 2 ran end to end with the
-guardrails silently never installed. If it exists and carries deny rules for
-this migration's expensive commands — the template adapted per
-`templates/settings.README.md`, including any dissolve edit I made at a
-gate — proceed silently. Halt and ask only if it lacks deny rules entirely,
-or you can't tell whether I sanctioned what's there; never install, never
-overwrite. Set the model explicitly on every agent call: implementers on
-[implementer model], reviewers on [reviewer model]; fixers ride
-[implementer model] unless the Model plan says otherwise. Inheriting the
-session default is a deviation; log it.
+Use [bounded translation batches](../docs/EXECUTION-SCOPES.md) where the human
+wants intermediate gates: approve translation --batch N or --targets CSV binds
+concrete units, separate from maxAgentCalls. Stop after that approved scope,
+report burndown/unknown timing and wait for the next batch instruction. Never
+convert a completed batch into permission for build or remaining translation.
+When markerPolicy is configured, both reviews receive measured TODO line counts;
+the coordinator rejects a mismatched final trailer before recording done.
 
-Use a workflow. The queue is every `migration/manifest.tsv` entry with no
-translated file on disk yet — so reruns resume for free. Work down it in
-batches of [100]. Every
-agent reads the **rulebook**; each implementer translates its one file —
-[TODO(port)] anything the rulebook doesn't decide, status trailer at the
-bottom. Two adversarial **reviewers** per file, separate contexts, assume it's
-wrong, touch nothing — every finding cites a rule or a source line; a third
-rules on anything they don't agree on, defaulting to not-confirmed. **Fix
-agents** apply confirmed findings only — can't fix it, flag it. Don't run the
-compiler — it grades everything next step (exception: if Step 4 has dissolved
-into this loop per README Step 4, the rulebook's §0 names the cheap in-loop
-referee). Four agents per file is the multiplier and the product: Run 1's
-catches came from adversarial review at the map, inventory, and bakeoff
-stages — and the one run that skipped this per-file pass ate the exact
-failure class it exists to catch in the compile step (RUN-NOTES, Run 1
-deviations).
+Use `node migration-kit/scripts/run_migration.mjs translate` from the target
+repository for repository-copy installations. For plugin installations, use
+`node "<absolute-plugin-root>/scripts/run_migration.mjs" translate` with the same
+target repository as cwd. Resolve the plugin root from the loaded skill/agent.
+Do not replace the runner with fleet or an unrestricted chat loop.
+Run `translate` in a background or continuing terminal and check it with
+`status --fast --wait 600 --format markdown`. This waits for status only; keep
+polling the same job after it returns. Never kill/cancel/relaunch work for CPU
+at 100% or low CPU, silence, elapsed time or output volume. Normal execution is
+continuous even with old 600-second/maxAgentCalls settings. Finite time/call/round
+limits require the person's explicit choice (executionMode bounded or a command
+budget). Execution-policy changes retain reviewed work and approvals.
+Failures name the CLI's own cause (for example `session.error rate_limit 429`).
+The configured `fixPolicy` decides whether a fixed output is reviewed again
+(`rereview`) or judged by build/smoke/parity after one fix (`single-pass`,
+upstream); `dependencyOrder` decides whether dependents wait for reviewed
+dependencies. Report both settings with the burndown.
 
-Progress invariant: translated-file count on disk must grow between polls.
-No growth from a worker for three minutes means treat it as failed — recover
-its output from the journal or disk, and report the stall. Stalls are yours
-to heal, not mine to notice. At each batch gate, report burndown plus an
-estimated duration for the next step (survey build — or Steps 5–6 if Step 4
-dissolved) — wall-clock and active-attention minutes, from the batch timings
-you just measured.
-Append one timestamped line for this step to `migration/cost-log.tsv` —
-create it with header `step\ttimestamp\twall_clock_min\ttokens\tsubagents\tmodel`
-if absent; real values where available, `unknown` where not. Plain
-tab-separated values, no `key=` prefixes — a valid row looks exactly like:
-`3	2026-06-11T14:02Z	21	2035336	35	claude-sonnet-4-6`
-(your step number and values vary; the format doesn't).
+The runner performs implementation → two independent reviews → arbitration of
+every finding (findings both reviewers raise at the same source path:line reach
+the arbiter as a pair, since they can still ask for different changes; the
+arbiter defaults to not confirmed) → confirmed fixes → re-review (skipped with `fixPolicy: single-pass`) →
+hash-bound completion. Workers use
+explicit models from config and structured results. Reviewers have no tools and
+receive identical frozen inputs; other CLI workers have read/search-only tools.
+If a unit's evidence exceeds maxReviewInputBytes, the CLI runner automatically
+gives both reviewers the same SHA-256-bound file list on read-only `-read`
+profiles. Report every `toolAssistedReviews` target and warning to the human.
+Only the coordinator writes the assigned manifest target. Existing output files
+without reviewed receipts are unfinished and must be reviewed.
+
+Keep source, judge, rulebook, inventory, review dependency map and execution settings immutable inside
+the run. Missing decisions get TODO(port), BUG(port) or PERF(port) markers.
+No source “improvement” is mixed into faithful translation. Expensive compiler
+and test commands wait for their phases; an explicitly configured cheap
+per-target typecheck is owned by the coordinator; its failure becomes a confirmed
+finding for the fixer (maxFixRounds applies only in bounded mode) (README Step 4 dissolved into Step 3).
+
+On timeout, rejected permission, invalid JSON or interrupted execution, inspect
+`migration/state/units/` and the run summary. Reinvoke `translate` to resume.
+Do not manually fabricate done receipts. A lock whose owner process has stopped
+on this host is removed by the rerun; use `unlock --pid` only for a lock from
+another host, or a PID now reused by an unrelated process, after confirming that
+run stopped. Respect the configured call/repair limits.
+
+Report reviewed done/total, blocked targets, measured time and actual usage when
+available. Unknown usage stays unknown. Stop before build approval.
+
+<!-- Copilot adaptation: migration control and instructions updated on 2026-10-08; see NOTICE. -->
+
+Keep orchestration in the user-facing parent: launch translate in a background
+or continuing terminal and check `status --wait` while it runs; do not block the parent
+waiting for the terminal to finish. The runner refills available slots and, per
+`dependencyOrder`, orders manifest jobs by audited dependencies. Non-manifest dependencies stay
+fixed source evidence. Cycles use fixed source when typecheck is deferred; with
+unit typecheck configured, resolve/group the cycle or explicitly defer that check
+with user authorization. All AI calls, including both reviewers, share concurrency.
+Read status --format markdown for blockers and actual active roles.

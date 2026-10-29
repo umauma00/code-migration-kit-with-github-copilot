@@ -1,0 +1,3 @@
+# strongly connected components > 1 file: 2
+legacy/old_report.php	lib/db.php
+src/Models/Customer.php	src/Models/Order.php

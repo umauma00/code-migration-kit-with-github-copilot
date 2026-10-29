@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "verificationMode": "source-only",
+  "method": "Source-derived public contracts; expectations inferred, never observed on the original runtime",
+  "sources": ["src/REPLACE_WITH_REAL_SOURCE"],
+  "scenarios": [{"path": "tests/REPLACE_WITH_REAL_SCENARIOS", "contract": "Replace with the concrete public input/output/error contract", "expectationBasis": "source-inferred"}],
+  "unverified": ["Original runtime and behavioral parity have not been executed; replace/add project-specific uncertainties"]
+}

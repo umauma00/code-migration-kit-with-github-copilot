@@ -1,0 +1,16 @@
+namespace	files	first_file
+Acme	2	inline/U.cs
+Bill.One	1	bases/Local.cs
+Bill.Three	1	bases/Local.cs
+Bill.Two	1	bases/Local.cs
+Foo.Bar	1	inline/U.cs
+Net.Foo	1	inline/U2.cs
+Ship.Billing	1	bases/M.cs
+Ship.Cons	1	bases/M.cs
+Ship.Inv	1	bases/M.cs
+Ship.Orders	1	bases/M.cs
+Ship.Rec	1	bases/M.cs
+Ship.Rec2	1	bases/M.cs
+Ship.Shipping	1	bases/M.cs
+Ship.Where	1	bases/M.cs
+Zed	1	inline/U.cs

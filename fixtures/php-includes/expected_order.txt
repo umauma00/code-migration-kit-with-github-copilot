@@ -1,0 +1,14 @@
+# migration order: one batch per line, dependencies first
+hooks.php
+sorter.php
+util.php
+cb.php
+lib/a.php
+lib/b.php
+lib/c.php
+lib/d.php
+index.php
+keys.php
+order.php
+poly1.php
+poly2.php

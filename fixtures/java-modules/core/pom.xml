@@ -1,0 +1,6 @@
+<project>
+  <parent>
+    <artifactId>parent</artifactId>
+  </parent>
+  <artifactId>core</artifactId>
+</project>

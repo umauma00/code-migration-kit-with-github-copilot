@@ -1,0 +1,37 @@
+{
+  "repository": "https://github.com/anthropics/code-migration-kit-with-claude-code",
+  "commit": "cf91c9d5068d9aaf95a36164169f08c3e636c909",
+  "adaptationDate": "2026-10-08",
+  "copilotCLI": "1.0.98",
+  "vscodeReference": "1.142",
+  "copilotSDKReferenceCommit": "cf245cdf76ced14d2f61dc3d908dd37cf12e0978",
+  "status": "Unofficial adaptation; not endorsed by Anthropic or GitHub",
+  "reviewImplementation": {
+    "date": "2026-10-15",
+    "baseCommit": "81b4aad2d93547afc6e6ee25b752e3f70f5ffb3c",
+    "vscodePublicMainCommit": "47f2192f54e978366dd3dff31d7038eeb942330a",
+    "installedCopilotCLI": null,
+    "installedVSCode": null,
+    "note": "Public-main source review and offline regression tests; no authenticated AI or installed VS Code execution verified"
+  },
+  "review20261018": {
+    "date": "2026-10-18",
+    "installedCopilotCLI": "1.0.98",
+    "note": "Loopback-provider checks on CLI 1.0.98: both layouts, prompt-mode hook loading, session.error reporting, agent-scoped reader hook (native backend, removed in 0.3.0); no authenticated AI or installed VS Code execution"
+  },
+  "review20261019": {
+    "date": "2026-10-19",
+    "installedCopilotCLI": [
+      "1.0.98",
+      "1.0.100-1"
+    ],
+    "note": "Loopback-provider checks on CLI 1.0.98 (latest) and 1.0.100-1 (prerelease): transport, instruction isolation, plugin agent resolution, doctor hook probe (positive and negative). Agent-scoped frontmatter hooks did not run in prompt mode on either version; --trust-folder (1.0.99+) loads repository hooks but also the folder's other configuration, so the narrower GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS stays and doctor proves it. No authenticated AI or installed VS Code execution."
+  },
+  "review20261019Followup": {
+    "date": "2026-10-19",
+    "copilotCLIPackage": "1.0.98",
+    "githubDocsCommit": "4256ba0c02ef6f670710611bcb399b1355388bec",
+    "vscodeDocsCommit": "c391542bd563ee3a7fdf9591785b76e0dc5bf3b1",
+    "note": "Read without running the CLI: the shipped 1.0.98 package's tool schemas (ask_user takes one question with optional string choices; update_todo takes one markdown checklist string) and its changelog (autopilot auto-handles ask_user). GitHub Docs: unrecognized custom-agent tool names are ignored. VS Code docs: vscode/askQuestions and todo exist and are unavailable to Local subagents. No authenticated AI or installed VS Code execution."
+  }
+}

@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- CA may leave Sub/ out; CB always compiles T.cs. The row says so. -->
+  <ItemGroup><Compile Remove="Sub\**" Condition="'$(X)' == '1'" /></ItemGroup>
+</Project>

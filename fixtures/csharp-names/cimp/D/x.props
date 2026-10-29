@@ -1,0 +1,1 @@
+<Project><ItemGroup><Compile Remove="Gone.cs" /></ItemGroup></Project>

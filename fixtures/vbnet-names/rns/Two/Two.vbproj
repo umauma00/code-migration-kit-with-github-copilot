@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><RootNamespace>RnsFirst</RootNamespace></PropertyGroup>
+  <PropertyGroup><RootNamespace>RnsSecond</RootNamespace></PropertyGroup>
+  <PropertyGroup Condition="'$(Flavor)' == 'C'"><RootNamespace>RnsCond</RootNamespace></PropertyGroup>
+</Project>

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # Copyright 2026 Anthropic PBC
 # SPDX-License-Identifier: Apache-2.0
+# Copilot adaptation: dependency parsing/decoding updated on 2026-10-26; see NOTICE.
 """Deterministic dependency mapper for Python codebases (stdlib only).
 
 Implements the kit's dependency-map contract (prompts/01-dependency-map.md):
@@ -26,18 +27,21 @@ import ast
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # -I drops the script dir
+from depmap_common import find_files, write_outputs, checked_source_roots  # noqa: E402
+
 # Directories never walked. Any path component in this set — or starting with
 # "." — is excluded. Kept visible at the top per CONTRIBUTING's requirement
 # that the exclusion list be inspectable without reading the walker.
 SKIP_DIRS = {"venv", "node_modules", "__pycache__", "generated"}
+# A repository-copy install (migration-kit/) and run metadata (migration/) are
+# never sources to port. Skip them only at the top of --root and only when the
+# marker proves it is the kit, so a real package named "migration" is kept.
+KIT_DIRS = {"migration-kit": "scripts/run_migration.mjs", "migration": "config.json"}
 
 
-def find_py_files(root: Path):
-    return sorted(
-        p for p in root.rglob("*.py")
-        if not any(part.startswith(".") or part in SKIP_DIRS
-                   for part in p.relative_to(root).parts)
-    )
+def find_py_files(root: Path, warnings=None, source_roots=()):
+    return find_files(root, {".py"}, warnings=warnings, skip_all=SKIP_DIRS, source_roots=source_roots)
 
 
 def module_name(path: Path, root: Path) -> str:
@@ -85,7 +89,7 @@ def resolve_import(node, current_mod, is_pkg, index):
                 name = name.rpartition(".")[0]
 
 
-def extract_edges(files, root):
+def extract_edges(files, root, unresolved=None):
     """Return (sorted path edges, sorted path nodes). Import matching happens
     on dotted module names; edges are mapped back to repo-relative paths."""
     index = build_module_index(files, root)
@@ -95,9 +99,14 @@ def extract_edges(files, root):
         src_mod = module_name(path, root)
         is_pkg = path.name == "__init__.py"
         try:
-            tree = ast.parse(path.read_text(encoding="utf-8", errors="replace"))
-        except SyntaxError as e:
+            # Parsing bytes honors Python's encoding cookie and UTF-8 BOM.
+            # Replacing undecodable bytes changes identifiers and loses imports.
+            tree = ast.parse(path.read_bytes(), filename=str(path))
+        except (SyntaxError, ValueError, RecursionError, UnicodeError, LookupError, OSError) as e:
             print(f"WARN unparseable, no edges emitted: {path} ({e})", file=sys.stderr)
+            if unresolved is not None:
+                reason = getattr(e, 'msg', None) or getattr(e, 'strerror', None) or str(e)
+                unresolved.add((rel[path], "(whole file)", f"Python source not parsed: {reason}"))
             continue
         for node in ast.walk(tree):
             if isinstance(node, (ast.Import, ast.ImportFrom)):
@@ -174,29 +183,26 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--root", required=True, type=Path)
     ap.add_argument("--out", required=True, type=Path)
+    ap.add_argument("--source-root", action="append", default=[], help="source directory relative to --root; repeatable")
     args = ap.parse_args()
 
     root = args.root.resolve()
-    files = find_py_files(root)
-    edges, nodes = extract_edges(files, root)
+    if not root.is_dir():
+        ap.error(f"--root is not a directory: {args.root}")
+    warnings = []
+    files = find_py_files(root, warnings, checked_source_roots(root, args.source_root, ap))
+    unresolved = set()
+    edges, nodes = extract_edges(files, root, unresolved)
     order, cycles = migration_order(nodes, edges)
 
-    args.out.mkdir(parents=True, exist_ok=True)
-    with open(args.out / "edges.tsv", "w") as f:
-        f.write("from\tto\n")
-        for a, b in edges:
-            f.write(f"{a}\t{b}\n")
-    with open(args.out / "order.txt", "w") as f:
-        f.write("# migration order: one batch per line, dependencies first\n")
-        for scc in order:
-            f.write("\t".join(scc) + "\n")
-    with open(args.out / "cycles.txt", "w") as f:
-        f.write(f"# strongly connected components > 1 file: {len(cycles)}\n")
-        for scc in cycles:
-            f.write("\t".join(scc) + "\n")
+    write_outputs(args.out, nodes, edges, unresolved)
+    for warning in warnings:
+        print(f"WARN {warning}", file=sys.stderr)
 
     print(f"files={len(files)} edges={len(edges)} batches={len(order)} cycles={len(cycles)}")
     print(f"wrote {args.out}/edges.tsv, order.txt, cycles.txt")
+    if not files:
+        print("WARN: no Python source files under --root; check the language and source roots", file=sys.stderr)
     if len(files) > 1 and not edges:
         print(
             "WARN: 0 edges across multiple files. If these files import each "
@@ -208,4 +214,7 @@ def main():
 
 
 if __name__ == "__main__":
+    # A Windows console encoding (cp932, cp1252...) cannot print every path.
+    for stream in (sys.stdout, sys.stderr):
+        stream.reconfigure(errors="backslashreplace")
     main()

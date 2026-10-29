@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "archived": "Native worker backend evidence; 0.3.0 removed the backend, its tests and its agents, so the command below no longer runs.",
+  "date": "2026-10-14",
+  "branch": "feat/github-copilot-migration-kit",
+  "head": "164aa47fa6555bef139b7c8545ec8b881d839684",
+  "includesUncommittedChanges": true,
+  "tests": {
+    "command": "node --test tests/native-workers.test.mjs tests/copilot-compatibility.test.mjs",
+    "total": 30,
+    "passed": 30,
+    "failed": 0,
+    "responses": "test doubles",
+    "externalAI": false
+  },
+  "plugin": {
+    "plugin": "code-migration-kit",
+    "version": "0.2.0",
+    "marketplaceInstall": true,
+    "agentIDs": [
+      "code-migration-kit:code-migration-plugin-orchestrator",
+      "code-migration-kit:code-migration-plugin-implementer",
+      "code-migration-kit:code-migration-plugin-reviewer-semantics",
+      "code-migration-kit:code-migration-plugin-reviewer-rules",
+      "code-migration-kit:code-migration-plugin-arbiter",
+      "code-migration-kit:code-migration-plugin-fixer"
+    ],
+    "externalAI": false
+  },
+  "agentDiscovery": {
+    "cliVersion": "1.0.95",
+    "pluginRoot": "/workspace/code-migration-kit-with-github-copilot",
+    "cliAgents": [
+      "code-migration-kit:code-migration-plugin-orchestrator",
+      "code-migration-kit:code-migration-plugin-implementer",
+      "code-migration-kit:code-migration-plugin-reviewer-semantics",
+      "code-migration-kit:code-migration-plugin-reviewer-rules",
+      "code-migration-kit:code-migration-plugin-arbiter",
+      "code-migration-kit:code-migration-plugin-fixer"
+    ],
+    "nativeAgents": [
+      "code-migration-kit:code-migration-plugin-native-implementer",
+      "code-migration-kit:code-migration-plugin-native-reviewer-semantics",
+      "code-migration-kit:code-migration-plugin-native-reviewer-rules",
+      "code-migration-kit:code-migration-plugin-native-arbiter",
+      "code-migration-kit:code-migration-plugin-native-fixer"
+    ],
+    "invalidAgentAbortedBeforeSession": true,
+    "externalAI": false
+  },
+  "safeSyntheticTransport": {
+    "cli": "1.0.95",
+    "syntheticOnly": true,
+    "endpoint": "loopback",
+    "authenticatedGitHub": false,
+    "externalAI": false,
+    "records": [],
+    "results": [
+      {
+        "role": "implementer",
+        "code": 1,
+        "error": "Error executing prompt: Error: Request session.send failed with message: Failed to register MCP configuration watches: Too many open files (os error 24)\n"
+      }
+    ]
+  },
+  "liveVSCodeTested": false,
+  "authenticatedModelsTested": false,
+  "sourceSnapshotSHA256Prefixes": {
+    "runSubagentTool.ts": "4626b45ffd3d7ad1",
+    "languageModels.ts": "122ece9c1b8b9af5",
+    "toolCalling.tsx": "f7f65371d1b47c6c",
+    "copilotAgentSession.ts": "0bb4ab7b06af1550"
+  },
+  "assessment": {
+    "cliRoleModels": "Explicit --model and role-specific --agent; current transport blocked before provider dispatch",
+    "vscodeCopilot": "Per-call model supported by runtime; parent access to execution metadata unverified",
+    "vscodeLocal": "Per-call model supported; toolMetadata modelName is separate from parent model ToolMessage content",
+    "phaseModels": "No per-phase model or arbitrary reviewer-agent setting"
+  }
+}

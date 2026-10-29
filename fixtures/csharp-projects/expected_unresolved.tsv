@@ -1,0 +1,3 @@
+file	reference	reason
+Old/Unused.cs	(whole file)	not compiled by Old/Old.csproj; its declarations are ignored
+Web/Legacy/OldPage.cs	(whole file)	not compiled by Web/Web.csproj; its declarations are ignored

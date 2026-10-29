@@ -1,0 +1,901 @@
+#!/usr/bin/env python3
+# Copyright 2026 Anthropic PBC
+# SPDX-License-Identifier: Apache-2.0
+# Copilot adaptation: source-root selection updated on 2026-10-26; see NOTICE.
+"""Deterministic dependency mapper for C# codebases (stdlib only).
+
+Implements the kit's dependency-map contract (prompts/01-dependency-map.md) by
+reading .cs files as text. It never builds or runs the project.
+
+A C# `using` names a namespace, not a file, so edges come from type names
+(scripts/depmap_typed.py): each file's declared namespaces, types (class,
+struct, interface, enum, record, delegate) and extension methods form a table,
+and every name a file's code mentions is resolved through its enclosing
+namespaces, using directives, global usings (in .cs files and
+<Using Include> in .csproj), using aliases and using static. [Foo] in an
+attribute list also matches FooAttribute. Fully qualified names, string literals that equal a
+declared type's full name (Type.GetType("A.B")) and partial types (all parts
+linked) count too.
+
+Types used without their name being written are followed through declared
+types (scripts/depmap_typed.py, type flow): `var x = F(); x.M().N()` reaches
+F's return type, M's and N's, through members inherited from base types too;
+parameters, typed locals and foreach variables count, and an element type
+(List<Order>) passes through indexers and LINQ-style calls.
+
+Each name is resolved from the namespace block it is written in; global::
+names from the root namespace only. A using, alias or using static inside
+a namespace block applies to that block and the blocks nested in it.
+global using directives and aliases (and <Using> items in .csproj) apply to
+every file of their project; global using static gives an edge from the
+files that name a member of its type.
+
+.csproj files are read as text: a name declared in several projects only
+gives edges into the projects the file's project references
+(ProjectReference, transitively), and a file the project does not compile
+(<Compile Remove>, or left out of an old-style project's <Compile Include>
+list) declares nothing and is listed in unresolved.tsv. A file left out
+only under a Condition keeps its declarations and is listed too.
+
+Known limits, listed in unresolved.tsv where the source shows them:
+  - lambda parameters, generic method type inference, overload resolution,
+    `dynamic` and user-defined conversions are not followed. Audit these
+    with the sample/diff CLI.
+  - every #if branch is mapped (when a branch leaves a brace open, only
+    the first branch's braces count); source generators and
+    T4 output that is not checked in is invisible.
+  - reflection with a computed name (Type.GetType(x), Activator.CreateInstance,
+    Assembly.Load) is reported as unresolved.
+
+Skipped directories: bin and obj at --root or beside a .csproj, packages at
+--root or beside a .sln (a namespace folder with one of these names is
+still walked), plus
+node_modules, __pycache__ and every directory starting with ".". Each
+skipped directory holding .cs files is printed as a warning.
+
+Usage:
+  python3 depmap_csharp.py --root path/to/repo --out path/to/migration/depmap
+Output: edges.tsv, order.txt, cycles.txt (same contract as depmap_python.py)
+and unresolved.tsv (file, reference, reason).
+
+Test: python3 scripts/depmap_csharp.py --root fixtures/csharp --out /tmp/depmap-cs && diff /tmp/depmap-cs/edges.tsv fixtures/csharp/expected_edges.tsv
+"""
+
+import bisect
+import re
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # -I drops the script dir
+from depmap_common import find_files, read_source, run  # noqa: E402
+from depmap_projects import ATTRS, QUOTED, conditional_spans, dotnet_projects, drop_not_compiled  # noqa: E402
+from depmap_typed import BLOCK, CHAIN_RE, DOTNET_STANDARD, GLOBAL, Directives, FileInfo, PREDEFINED, TOKEN_RE, chains_at, dotted, enum_member_offsets, flow_c_like, join, resolve, scan_or_none, list_item_starts, strip_c_like, type_written_at  # noqa: E402
+
+EXTS = {".cs"}
+# Build output beside a project, NuGet's packages/ beside a solution (or at --root).
+SKIP_DIRS = {"bin": {".csproj"}, "obj": {".csproj"}, "packages": {".sln"}}
+TYPE_KEYWORDS = {"class", "struct", "interface", "enum", "record"}
+KEYWORDS = set("""abstract as base bool break byte case catch char checked class const continue
+decimal default delegate do double else enum event explicit extern false finally fixed float for
+foreach goto if implicit in int interface internal is lock long namespace new null object operator
+out override params private protected public readonly ref return sbyte sealed short sizeof
+stackalloc static string struct switch this throw true try typeof uint ulong unchecked unsafe
+ushort using virtual void volatile while var dynamic nameof await async yield when where get set
+init value add remove partial global record nint nuint not and or with""".split())
+REFLECTION_RE = re.compile(r"\b(Type\s*\.\s*GetType|Activator\s*\.\s*CreateInstance|Assembly\s*\.\s*Load\w*)\s*\(\s*((?:[^()]|\([^()]*\))+?)?\s*\)")
+CSPROJ_USING_RE = re.compile(r"<Using\b" + ATTRS + r"(/?)>", re.IGNORECASE)
+CSPROJ_USING_END_RE = re.compile(r"</Using\s*>", re.IGNORECASE)
+# Metadata written as child elements: <Using Include="A"><Alias>X</Alias></Using>.
+CSPROJ_META_RE = re.compile(r"<(Alias|Static)\b" + ATTRS + r"(?:/>|>\s*([^<]*?)\s*</\1\s*>)", re.IGNORECASE)
+CSPROJ_ATTR_RE = re.compile(r"\b(Include|Remove|Alias|Static|Condition)\s*=\s*" + QUOTED, re.IGNORECASE)
+
+
+# Words after which a name is a value, not a declaration (select x;, from
+# x in, return x;): query keywords and contextual words.
+VALUE_WORDS = set("""select where orderby group by into from in join on equals let ascending
+descending await yield nameof when and or not with is as return throw case goto else new typeof
+sizeof default checked unchecked""".split())
+
+
+# Words before a name that make it a type (new Acme.Billing.Invoice()).
+TYPE_BEFORE = {"new", "as", "is", "typeof(", "default(", "sizeof("}
+# Query and pattern words that may follow a value (from x in a.b.c where).
+QUERY_WORDS = {"where", "into", "equals", "by", "ascending", "descending", "select", "orderby",
+               "on", "join", "let", "group", "from", "when"}
+
+
+# A type declaration's base list starts after its ":" (class X<T>(int a) : Base, IFoo).
+BASE_LIST_RE = re.compile(r"\b(?:class|struct|interface|record(?:\s+(?:class|struct))?)\s+@?\w+\s*"
+                          r"(?:<[^{};()]*>)?\s*(?:\((?:[^()]|\([^()]*\))*\))?\s*:(?!:)"
+                          r"|\bwhere\s+@?\w+\s*:(?!:)")     # and a constraint list: where T : Acme.Base, new()
+
+
+def declared_name_at(code, start, end, name):
+    """Whether the name at code[start:end] is the name being declared in
+    string Schema { get; }, Foo bar = ..., void Run(...): a simple name right
+    after a type (an identifier, a predefined type, > ] ? or *) and before
+    { ; = ( , or ). Such a name is not a reference to a type of that name
+    (a property Schema is not the class Schema)."""
+    if "." in name or name.startswith(GLOBAL):
+        return False
+    k = end
+    while k < len(code) and code[k].isspace():
+        k += 1
+    if k >= len(code) or code[k] not in "{;=(,)":
+        return False
+    if code[k] == "=" and code[k + 1:k + 2] == "=":
+        return False        # Foo == x is a comparison
+    k = start - 1
+    while k >= 0 and code[k].isspace():
+        k -= 1
+    if k < 0:
+        return False
+    if code[k] == "]":
+        return True         # int[] Foo
+    if code[k] in ">?*":
+        # List<int> Foo, int? Foo, int* p: the type ends right at the mark;
+        # a > Foo, c ? Foo(x) : y and a * Foo(x) are expressions.
+        return k > 0 and not code[k - 1].isspace() and code[k - 1:k + 1] not in {"=>", "->"}
+    j = k
+    while j >= 0 and (code[j].isalnum() or code[j] in "_@"):
+        j -= 1
+    word = code[j + 1:k + 1].lstrip("@")
+    if not word or word[0].isdigit():
+        return False
+    return word not in VALUE_WORDS and (word in PREDEFINED or word not in KEYWORDS)
+
+
+def receiver_name(toks, j):
+    """Simple name of the type at toks[j] (an extension method's receiver,
+    after this and ref/in/scoped): string for string, List for
+    System.Collections.Generic.List<T>."""
+    while j < len(toks) and toks[j][0] in {"this", "ref", "in", "scoped", "readonly"}:
+        j += 1
+    name = ""
+    while j < len(toks):
+        t = toks[j][0]
+        if t[0].isalpha() or t[0] in "_@":
+            name = t.lstrip("@")
+            j += 1
+            if j < len(toks) and toks[j][0] in {".", ":"}:
+                while j < len(toks) and toks[j][0] in {".", ":"}:
+                    j += 1
+                continue
+        break
+    return name
+
+
+# Classes whose methods are static: Math.Min(...) and string.Join(...) are
+# not calls of an extension method named Min or Join.
+STATIC_RECEIVERS = set("""Math MathF Path File Directory Convert Console Environment Activator
+Interlocked BitConverter Regex Enumerable Queryable String Array Enum Guid Task Debug Trace Marshal
+Buffer Encoding TimeSpan DateTime DateTimeOffset Int16 Int32 Int64 UInt32 Double Single Decimal
+Boolean Char Byte Object Type Assembly Thread ThreadPool Parallel Monitor Nullable GC Process
+Tuple ValueTuple ArgumentNullException ObjectDisposedException""".split())
+MEMBER_CALL_RE = re.compile(r"(@?[^\W\d]\w*)?\s*\.\s*@?([^\W\d]\w*)")
+
+
+def member_calls(code):
+    """(receiver, name) of every name written after a dot: receiver is the
+    variable before the dot (x in x.Name) or "" when the receiver is an
+    expression. A dot after a predefined type (string.Join) is a static
+    call, never an extension method call, and is left out. A static-only
+    class name (Math.Min, File.Exists) is kept: it is a static call only
+    when no variable, parameter or member of that name is in view
+    (void M(Thing File) { File.Save(); }), which the type flow decides."""
+    out = set()
+    for m in MEMBER_CALL_RE.finditer(code):
+        head = m.group(1)
+        k = m.start(1) - 1 if head else -1
+        while k >= 0 and code[k].isspace():
+            k -= 1
+        if head and k >= 0 and code[k] in ".)]":
+            head = None         # a.Math.Min: Math is a member, not the class
+        if head and head in PREDEFINED:
+            continue
+        out.add(((head or "").lstrip("@"), m.group(2)))
+    return out
+
+
+def read_dotted(toks, j):
+    """Dotted name starting at toks[j]; returns (name, next index). A
+    global::-qualified name keeps the GLOBAL mark."""
+    parts, root = [], False
+    while j < len(toks):
+        t = toks[j][0]
+        if t == "global" and j + 2 < len(toks) and toks[j + 1][0] == ":" and toks[j + 2][0] == ":":
+            root = not parts
+            j += 3
+            continue
+        if not (t[0].isalpha() or t[0] in "_@"):
+            break
+        parts.append(t.lstrip("@"))
+        j += 1
+        if j < len(toks) and toks[j][0] == ".":
+            j += 1
+            continue
+        break
+    name = ".".join(parts)
+    return (GLOBAL + name if root and name else name), j
+
+
+def unrooted(name):
+    """A directive's name without the GLOBAL mark (outside a namespace block
+    every using is from the root anyway)."""
+    return name[len(GLOBAL):] if name.startswith(GLOBAL) else name
+
+
+def scan(rel, text):
+    info = FileInfo(rel)
+    code, info.strings = strip_c_like(text, csharp=True)
+    toks = [(m.group(0), m.start(), m.end()) for m in TOKEN_RE.finditer(code)]
+    blank = []          # spans of directives, not counted as mentions
+    globals_, global_aliases, global_static = [], {}, []
+    depth, file_ns, stack = 0, "", []  # stack: (namespace, depth before its "{", block context)
+    blocks = 0
+    file_ctx = None         # block context of a file-scoped namespace (namespace N;)
+    contexts = [(0, "")]    # (offset, context from there on)
+    type_depths = []        # (depth inside its body, name) of each enclosing type
+    type_pending = None     # name of a type declaration whose body has not opened yet
+    type_spans = []         # (body start, body end, type key as flow_c_like gives it)
+
+    def current():
+        return ".".join(p for p in [file_ns] + [n for n, _, _ in stack] if p)
+
+    def context():
+        """The namespace, tagged with the innermost namespace block (BLOCK):
+        using directives belong to the block they are written in."""
+        return stack[-1][2] if stack else file_ctx or current()
+
+    i = 0
+    while i < len(toks):
+        t, start, _ = toks[i]
+        prev = toks[i - 1][0] if i else ";"
+        if t == "{":
+            depth += 1
+            if type_pending:
+                type_depths.append((depth, type_pending))
+                type_spans.append([start, len(code), join(current(), type_pending)])
+                type_pending = None
+        elif t == ";":
+            type_pending = None     # record R(int X); has no body
+        elif t == "}":
+            if type_depths and type_depths[-1][0] == depth:
+                type_depths.pop()
+                next(span for span in reversed(type_spans) if span[1] == len(code))[1] = start
+            depth -= 1
+            popped = False
+            while stack and stack[-1][1] >= depth:
+                stack.pop()
+                popped = True
+            if popped:
+                contexts.append((start, context()))
+        elif t == "namespace":
+            name, j = read_dotted(toks, i + 1)
+            if j < len(toks) and toks[j][0] == ";":
+                # namespace N; is a block to the end of the file: a using
+                # after it belongs to N, one before it to the file.
+                file_ns = name
+                blocks += 1
+                file_ctx = f"{name}{BLOCK}{blocks}"
+                info.blocks[file_ctx] = Directives(None)
+            else:
+                blocks += 1
+                parent = stack[-1][2] if stack else None
+                stack.append((name, depth, None))
+                ctx = f"{current()}{BLOCK}{blocks}"
+                stack[-1] = (name, depth, ctx)
+                info.blocks[ctx] = Directives(parent)
+            info.namespaces.add(current())
+            contexts.append((start, context()))
+            blank.append((start, toks[j - 1][2] if j > i + 1 else toks[i][2]))
+            i = j
+            continue
+        elif t == "using" and prev in {";", "{", "}", "]", "global"}:
+            j = i + 1
+            static = j < len(toks) and toks[j][0] == "static"
+            j += static
+            name, k = read_dotted(toks, j)
+            if name and k < len(toks) and toks[k][0] in {";", "="}:
+                # global using applies to the whole project; a using inside a
+                # namespace block to that block; any other to the file.
+                block = info.blocks.get(context())
+                where = block or info
+                if toks[k][0] == "=":
+                    target, k2 = read_dotted(toks, k + 1)
+                    if target and k2 < len(toks) and toks[k2][0] == ";":
+                        (global_aliases if prev == "global" else where.aliases)[name] = target
+                    else:
+                        # using P = (A a, B b); or = List<A>; or = A[];: the
+                        # names in the target count as mentions where the
+                        # alias is written (only "using P =" is blanked).
+                        if target and k2 < len(toks) and toks[k2][0] in {"<", "["}:
+                            (global_aliases if prev == "global" else where.aliases)[name] = target
+                        blank.append((toks[i - (prev == "global")][1], toks[k][2]))
+                        while k < len(toks) and toks[k][0] != ";":
+                            k += 1
+                        i = k + 1
+                        continue
+                    k = k2
+                elif static:
+                    if prev == "global":
+                        global_static.append(unrooted(name))
+                        info.direct.add(unrooted(name))     # the declaring file names the type
+                    else:
+                        # A block keeps global:: (its usings are otherwise relative).
+                        where.direct.add(name if block else unrooted(name))
+                elif prev == "global":
+                    globals_.append(unrooted(name))
+                else:
+                    where.usings.add(name if block else unrooted(name))
+                while k < len(toks) and toks[k][0] != ";":
+                    k += 1
+                blank.append((toks[i - (prev == "global")][1], toks[min(k, len(toks) - 1)][2]))
+                i = k + 1
+                continue
+        elif t in TYPE_KEYWORDS and prev not in {".", ":", ",", "<", "(", "new", "where"}:
+            j = i + 1
+            if t == "record" and j < len(toks) and toks[j][0] in {"class", "struct"}:
+                j += 1
+            if j < len(toks) and toks[j][0] not in KEYWORDS and (toks[j][0][0].isalpha() or toks[j][0][0] in "_@"):
+                name = toks[j][0].lstrip("@")
+                ns = current()
+                info.namespaces.add(ns)
+                info.decls.append((ns, name))
+                if not type_depths:     # a nested Inner and Inner<T> stay with their own file
+                    info.arity.setdefault(join(ns, name), set()).add(type_args_at(code, toks[j][2]))
+                if type_depths:     # nested: a type of its own, not a copy of a same-named one
+                    info.nested[join(ns, name)] = join(ns, ".".join(n for _, n in type_depths) + "." + name)
+                type_pending = name
+                k = i - 1
+                while k >= 0 and toks[k][0] in KEYWORDS:
+                    if toks[k][0] == "partial":
+                        info.partial.add(f"{ns}.{name}" if ns else name)
+                    k -= 1
+        elif t == "delegate" and i + 1 < len(toks) and toks[i + 1][0] not in {"(", "{", "*"}:
+            j = i + 1
+            while j < len(toks) and toks[j][0] not in {"(", ";", "{"}:
+                j += 1
+            k = j - 1
+            if k > i and toks[k][0] == ">":
+                level = 0
+                while k > i:
+                    level += {">": 1, "<": -1}.get(toks[k][0], 0)
+                    k -= 1
+                    if level == 0:
+                        break
+            if k > i + 1 and toks[k][0] not in KEYWORDS:
+                ns = current()
+                info.namespaces.add(ns)
+                info.decls.append((ns, toks[k][0].lstrip("@")))
+                if type_depths:
+                    name = toks[k][0].lstrip("@")
+                    info.nested[join(ns, name)] = join(ns, ".".join(n for _, n in type_depths) + "." + name)
+        elif t == "(" and i + 2 < len(toks) and toks[i + 1][0] == "this" and toks[i - 1][0] not in KEYWORDS \
+                and (toks[i + 2][0][0].isalpha() or toks[i + 2][0][0] == "_"):
+            # Extension method: Name(this T x) or Name<T>(this T x).
+            k = i - 1
+            if toks[k][0] == ">":
+                level = 0
+                while k > 0:
+                    level += {">": 1, "<": -1}.get(toks[k][0], 0)
+                    k -= 1
+                    if level == 0:
+                        break
+            name = toks[k][0]
+            if name not in KEYWORDS and (name[0].isalpha() or name[0] == "_"):
+                ns = current()
+                info.namespaces.add(ns)
+                info.extensions.append((ns, name))
+                info.extension_receivers.setdefault(join(ns, name), set()).add(receiver_name(toks, i + 2))
+        elif t == "extension" and prev in {"{", "}", ";", "]"} and i + 1 < len(toks) and toks[i + 1][0] in {"(", "<"}:
+            # C# 14 extension block: extension(string s) { bool IsBlank => ...; }.
+            # Its members are called as s.IsBlank, like extension methods.
+            j, level = i + 1, 0
+            while j < len(toks):
+                level += {"(": 1, ")": -1, "<": 1, ">": -1}.get(toks[j][0], 0)
+                j += 1
+                if level == 0 and toks[j - 1][0] == ")":
+                    break
+            receiver = receiver_name(toks, next((m + 1 for m in range(i + 1, j) if toks[m][0] == "("), j))
+            if j < len(toks) and toks[j][0] == "{":
+                ns, level, j = current(), 0, j
+                while j < len(toks):
+                    tok = toks[j][0]
+                    if tok == "{":
+                        level += 1
+                    elif tok == "}":
+                        level -= 1
+                        if level == 0:
+                            break
+                    elif level == 1 and j + 1 < len(toks) and toks[j + 1][0] in {"(", "=>", "{", "<"} \
+                            and tok not in KEYWORDS and (tok[0].isalpha() or tok[0] == "_") \
+                            and (toks[j - 1][0] in {">", "]", "?"} or toks[j - 1][0][0].isalnum() or toks[j - 1][0][0] == "_") \
+                            and toks[j - 1][0] not in {"new", "return", "=>", "nameof", "typeof", "await"}:
+                        info.namespaces.add(ns)
+                        info.extensions.append((ns, tok.lstrip("@")))
+                        info.extension_receivers.setdefault(join(ns, tok.lstrip("@")), set()).add(receiver)
+                    j += 1
+        i += 1
+    if not info.namespaces:
+        info.namespaces.add("")
+    for a, b in sorted(blank, reverse=True):
+        code = code[:a] + " " * (b - a) + code[b:]
+    # Each name is resolved from the namespace it is written in.
+    offsets = [o for o, _ in contexts]
+    info.names, info.attribute_names = [], []
+    brackets = Brackets(code)
+    enum_members = enum_member_offsets(toks)
+    base_items = list_item_starts(code, BASE_LIST_RE, {"where"})
+    chains = [(pos, name, CHAIN_RE.match(code, pos).end()) for pos, name in chains_at(code, KEYWORDS)]
+    declared = {pos for pos, name, end in chains if declared_name_at(code, pos, end, name)}
+    scopes = variable_scopes(code, brackets, [(pos, name) for pos, name, _ in chains if pos in declared])
+    type_refs, owner_refs = set(), {}
+    for pos, name, end in chains:
+        if pos in enum_members or pos in declared:
+            continue
+        # Attempt.Succeed(): Attempt with no type arguments; Attempt<int> one.
+        # A constructor (public EnumerableTester(...) in EnumerableTester<T>)
+        # names its own type without them.
+        segs = name.split(".")
+        for seg in segs[:-1]:
+            info.written_arity.setdefault(seg, set()).add(0)
+        if not (CTOR_RE.search(code[max(0, pos - 40):pos]) and re.match(r"\s*\(", code[end:end + 50])):
+            info.written_arity.setdefault(segs[-1], set()).add(type_args_at(code, end))
+        head = name.split(".")[0]
+        owner = innermost_type(type_spans, pos) if not name.startswith(GLOBAL) else None
+        typed = owner is None or pos in base_items or attribute_name_at(code, pos, end, brackets) \
+            or shadowed_type_at(code, pos, end, brackets)
+        if not typed and head in scopes and any(a < pos < b for a, b in scopes[head]):
+            # Category == "food" in a class with a property Category, or
+            # status++ after int status: C# takes the member, parameter or
+            # local of that name before a type.
+            continue
+        ref = (contexts[bisect.bisect_right(offsets, pos) - 1][1], name)
+        if typed:
+            type_refs.add(ref)
+        else:   # maybe a member another part of a partial type or a base type declares
+            owner_refs.setdefault(ref, set()).add(owner)
+        info.names.append(ref)
+        if attribute_name_at(code, pos, end, brackets):
+            info.attribute_names.append(ref)
+            info.type_chains.append(ref)
+        elif "." in name and (pos in base_items or type_written_at(code, pos, end, TYPE_BEFORE, KEYWORDS | QUERY_WORDS)):
+            info.type_chains.append(ref)
+    info.member_like = {ref: owners for ref, owners in owner_refs.items() if ref not in type_refs}
+    info.member_calls = member_calls(code)
+    info.static_receivers = {head for head, _ in info.member_calls if head in STATIC_RECEIVERS}
+    # Members a project-wide using static may supply: Math.Max() names
+    # Math's Max, not one of a using static type.
+    info.members = {name for head, name in info.member_calls if head not in STATIC_RECEIVERS}
+    info.type_members, info.type_bases, info.flow, info.type_ns = flow_c_like(
+        [t for t, _, _ in toks], KEYWORDS, "csharp")
+    for m in REFLECTION_RE.finditer(code):
+        arg = (m.group(2) or "").strip()
+        if not arg.startswith('""'):
+            info.dynamic.append((f"{dotted(m.group(1), False)}({arg})", "reflection with a computed type name"))
+    return info, (globals_, global_aliases, global_static)
+
+
+# Attribute targets ([assembly: Foo], [return: Foo]).
+ATTRIBUTE_TARGETS = {"assembly", "module", "field", "event", "method", "param",
+                     "property", "return", "type", "typevar"}
+
+
+CTOR_RE = re.compile(r"(?:\b(?:public|private|protected|internal|static|extern|unsafe)|~)\s*\Z")
+
+
+def type_args_at(code, k):
+    """How many type arguments a <...> at code[k:] holds (Result<int, string>
+    2, typeof(Result<>) 1), or 0 when none follows."""
+    while k < len(code) and code[k].isspace():
+        k += 1
+    if code[k:k + 1] != "<":
+        return 0
+    depth, inner, commas = 0, 0, 0
+    for j in range(k, min(len(code), k + 2000)):
+        c = code[j]
+        if c == "<":
+            depth += 1
+        elif c == ">":
+            depth -= 1
+            if depth == 0:
+                return commas + 1
+        elif c in "([":     # Result<(int Id, string Name)>, Result<int[,]>: one
+            inner += 1
+        elif c in ")]":
+            inner -= 1
+        elif c == "," and depth == 1 and inner == 0:
+            commas += 1
+        elif c in ";{}=":
+            break
+    return 0
+
+
+BODY_START_RE = re.compile(r"\{|=>|;")
+
+
+def variable_scopes(code, brackets, declarations):
+    """name -> (start, end) spans where a member, parameter or local of that
+    name is in view: a member or local, the braces it is declared in; a
+    parameter, the body after its parameter list ({...} or => ...;)."""
+    scopes = {}
+    for pos, name in declarations:
+        o = brackets.around(pos)
+        if o < 0:
+            continue
+        if code[o] == "{":
+            scopes.setdefault(name, []).append((o, brackets.close.get(o, len(code))))
+        elif code[o] == "(":
+            k = brackets.close.get(o, len(code)) + 1
+            m = BODY_START_RE.search(code, k)
+            if not m:
+                continue
+            k = m.start()
+            if code[k] == "{":
+                scopes.setdefault(name, []).append((k, brackets.close.get(k, len(code))))
+            elif code[k] == "=":
+                scopes.setdefault(name, []).append((k, code.find(";", k) % (len(code) + 1)))
+    return scopes
+
+
+def innermost_type(spans, pos):
+    """The key of the innermost type whose body holds pos, or None."""
+    found = None
+    for start, end, key in spans:
+        if start < pos < end:
+            found = key     # spans are in source order: a nested body comes later
+    return found
+
+
+# Words after which "(" opens a cast or a tuple, not a call or a statement's
+# condition: return (Category)x; but if (Enabled) and Log(Category).
+OPEN_PAREN_WORDS = {"return", "await", "throw", "in", "case", "else", "yield", "select", "where",
+                    "when", "from", "let", "on", "equals", "by", "is", "as", "and", "or", "not"}
+# Where a member named like a type still names the type (shadowed_type_at).
+SHADOW_TYPE_BEFORE = TYPE_BEFORE | {"not", "or", "and", "operator"}
+SUFFIX_RE = re.compile(r"\s*(?:\?(?=\s*\[[\s,]*\])|\?(?![.?\[])|\*|\[[\s,]*\])")
+TYPE_ARG_CHARS = set("_.,?[]()@:* \t\r\n")
+
+
+def skip_space(code, k):
+    while k < len(code) and code[k].isspace():
+        k += 1
+    return k
+
+
+def type_args_end(code, k):
+    """Offset after the <...> type argument list starting at code[k], or -1
+    when the "<" is not one (a < b, i < Count && n > 0)."""
+    depth, paren = 0, 0
+    for j in range(k, min(len(code), k + 2000)):
+        c = code[j]
+        if c == "<":
+            depth += 1
+        elif c == ">":
+            depth -= 1
+            if depth == 0:
+                return j + 1 if paren == 0 else -1
+        elif c == "(":
+            paren += 1
+        elif c == ")":
+            paren -= 1
+            if paren < 0:
+                return -1
+        elif not (c.isalnum() or c in TYPE_ARG_CHARS):
+            return -1
+    return -1
+
+
+def in_type_args(code, pos):
+    """Whether pos lies inside a type argument list: Dictionary<int, Category>,
+    Func<(Category, int)>, but not Log(Name, Category) or Foo(a < b, Category)."""
+    depth = 0
+    for k in range(pos - 1, max(-1, pos - 2000), -1):
+        c = code[k]
+        if c in ">)":
+            depth += 1
+        elif c in "<(":
+            if depth == 0 and c == "<":
+                w = k - 1
+                while w >= 0 and code[w].isspace():
+                    w -= 1
+                e = type_args_end(code, k) if w >= 0 and (code[w].isalnum() or code[w] == "_") else -1
+                # F(a < b, c > 2): comparisons, as C# reads them.
+                return e > pos and not re.match(r"\s*[\d\"'!-]", code[e:e + 20])
+            depth = max(0, depth - 1) if c == "<" or depth else depth
+        elif not (c.isalnum() or c in TYPE_ARG_CHARS):
+            return False
+    return False
+
+
+def opens_group(code, o):
+    """Whether the "(" at code[o] starts a cast or tuple: not a call (Log(),
+    a[0](), f()()) nor an if/while/switch condition."""
+    w = o - 1
+    while w >= 0 and code[w].isspace():
+        w -= 1
+    if w < 0:
+        return True
+    if code[w] in ")]":
+        return False
+    if not (code[w].isalnum() or code[w] == "_"):
+        return True
+    v = w
+    while v >= 0 and (code[v].isalnum() or code[v] == "_"):
+        v -= 1
+    return code[v + 1:w + 1] in OPEN_PAREN_WORDS and code[v:v + 1] != "."
+
+
+def shadowed_type_at(code, start, end, brackets):
+    """Whether a name a member, parameter or local of the same name hides
+    still names the type: where only a type is written. List<Category>,
+    (Category)x, (Category, int) pair, Customer? Customer, Wrapper<int> w,
+    Wrapper<int>.Default, T?[] all, is not T, operator T(...)."""
+    k = start - 1
+    while k >= 0 and code[k].isspace():
+        k -= 1
+    before = code[k] if k >= 0 else ""
+    if before in "<," and in_type_args(code, start):
+        return True
+    j = skip_space(code, end)
+    generic = code[j:j + 1] == "<" and type_args_end(code, j) > 0
+    if generic:
+        j = type_args_end(code, j)
+    while True:
+        m = SUFFIX_RE.match(code, j)
+        if not m:
+            break
+        j = m.end()
+    j = skip_space(code, j)
+    after = code[j:j + 1]
+    if generic and after != "(":
+        return True     # Wrapper<int> w, Wrapper<int>.Default, typeof(Wrapper<int>)
+    o = brackets.around(start)
+    if before in "(," and o >= 0 and code[o] == "(" and opens_group(code, o):
+        c = brackets.close.get(o, -1)
+        if c < 0:
+            return False
+        e = c + 1
+        while True:
+            m = SUFFIX_RE.match(code, e)
+            if not m:
+                break
+            e = m.end()
+        e = skip_space(code, e)
+        if before == "(" and after == ")" and j == c and re.match(r"[\w@(]", code[e:e + 1]):
+            return True     # (Category)x, (Category?)null
+        if after in ",)" or re.match(r"[^\W\d]", after):
+            m = re.compile(r"@?[^\W\d]\w*").match(code, e)
+            if m and m.group(0) not in KEYWORDS | QUERY_WORDS:
+                return True     # (Category, int) pair
+    if j > end:
+        m = re.compile(r"@?[^\W\d]\w*").match(code, j)
+        if m and m.group(0) not in KEYWORDS | QUERY_WORDS and \
+                re.match(r"\s*(?:[{;=,)(]|=>)", code[m.end():m.end() + 40]):
+            return True     # Customer? Customer { get; set; }, T?[] all;
+    return type_written_at(code, start, end, SHADOW_TYPE_BEFORE, KEYWORDS | QUERY_WORDS)
+
+
+class Brackets:
+    """The bracket structure of code, computed once (linear): for each
+    offset the innermost open bracket around it, and each bracket's match."""
+
+    def __init__(self, code):
+        self.code = code
+        self.opens, self.inner, self.close = [], [], {}
+        stack = []
+        for k, c in enumerate(code):
+            if c in "([{":
+                stack.append(k)
+                self.opens.append(k)
+                self.inner.append(stack[-2] if len(stack) > 1 else -1)
+            elif c in ")]}" and stack:
+                self.close[stack.pop()] = k
+                self.opens.append(k)
+                self.inner.append(stack[-1] if stack else -1)
+        # inner[i]: the open bracket around the text just after opens[i].
+
+    def around(self, pos):
+        """Offset of the innermost bracket open at pos, or -1."""
+        i = bisect.bisect_right(self.opens, pos) - 1
+        if i < 0:
+            return -1
+        k = self.opens[i]
+        return k if self.code[k] in "([{" else self.inner[i]
+
+
+def attribute_name_at(code, start, end, brackets=None):
+    """Whether the name at code[start:end] is an attribute's name: the head
+    of an item of a [...] attribute list (followed by "(", ",", "]" or a
+    type argument list). A [ counts as an attribute list where a
+    declaration may begin and when a declaration follows it, not after a
+    value (a[Foo] is an indexer, x = [Foo] and F([Foo]) collections)."""
+    brackets = brackets or Brackets(code)
+    k = end
+    while k < len(code) and code[k].isspace():
+        k += 1
+    if k >= len(code) or code[k] not in "(,]<":
+        return False
+    k = start - 1
+    while k >= 0 and code[k].isspace():
+        k -= 1
+    if k >= 0 and code[k] == ":":       # [target: Foo]
+        k -= 1
+        while k >= 0 and code[k].isspace():
+            k -= 1
+        word_end = k + 1
+        while k >= 0 and (code[k].isalnum() or code[k] == "_"):
+            k -= 1
+        if code[k + 1:word_end] not in ATTRIBUTE_TARGETS:
+            return False
+        while k >= 0 and code[k].isspace():
+            k -= 1
+    elif k >= 0 and code[k] == ",":     # [A, Foo]: the open [ around it
+        k = brackets.around(k)
+    if k < 0 or code[k] != "[":
+        return False
+    open_at = k
+    k -= 1
+    while k >= 0 and code[k].isspace():
+        k -= 1
+    before = code[k] if k >= 0 else ";"
+    # What follows the list tells a declaration from an expression: an
+    # attribute list is followed by what it applies to ([Foo] class C,
+    # [Foo] int x, [Foo] T, [A][B], [Foo] ~C(), [Foo] () => 1) or ends the
+    # file ([assembly: Foo]). A collection expression or an initializer's
+    # index (F([Foo]), { [Foo] }, { [Foo] = 1 }) is followed by ")", ",",
+    # "}", "=", ";" or an operator word.
+    k = brackets.close.get(open_at)
+    if k is None:
+        return False
+    k += 1
+    while k < len(code) and code[k].isspace():
+        k += 1
+    if k == len(code):
+        return before in ";{}]"
+    if before in "=>":
+        # x = [Foo] (int a) => a: a lambda's attributes (a collection is
+        # never called).
+        return code[k] == "("
+    if before not in ";{}](<,":
+        return False
+    m = WORD_RE.match(code, k)
+    if m:
+        return m.group(0) not in EXPRESSION_WORDS
+    return code[k] in "[(#~"
+
+
+WORD_RE = re.compile(r"@?[^\W\d]\w*")
+# Words that continue an expression after a collection ([a] is [..], [a] switch ...).
+EXPRESSION_WORDS = {"is", "as", "switch", "with", "and", "or", "not", "when"}
+
+
+def csproj_usings(text):
+    """(usings, aliases, static usings, computed, conditional) of the <Using> items of a
+    .csproj. Include is an item list (A;B). Alias and Static may be
+    attributes or child elements. aliases maps a name to every target its
+    items give: Conditions are not evaluated, so Debug's and Release's alias
+    both stay. computed: names that hold an MSBuild property ($(NS).A),
+    which is not evaluated; they are left out, warned about and listed.
+    conditional: warnings for Alias/Static child elements under a Condition
+    (taken as if it held) and for a <Using Remove> under one (not applied).
+    A <Using Remove> drops the items listed before it."""
+    usings, aliases, static, computed, conditional = [], {}, [], [], []
+    spans = conditional_spans(text)
+    for m in CSPROJ_USING_RE.finditer(text):
+        attrs = {k.lower(): a or b for k, a, b in CSPROJ_ATTR_RE.findall(m.group(1))}
+        if "remove" in attrs and "include" not in attrs:
+            # <Using Remove="X" /> (often after an implicit or Directory.Build.props
+            # using) drops the items before it; under a Condition it is not
+            # evaluated and the using is kept.
+            names = {n.strip() for n in attrs["remove"].split(";") if n.strip()}
+            if "condition" in attrs or any(a <= m.start() < b for a, b in spans):
+                conditional.append(f"<Using Remove=\"{';'.join(sorted(names))}\"> is under a Condition that is not evaluated; "
+                                   "it is not applied, so the using stays")
+                continue
+            names = {n.lower() for n in names}     # item identity ignores case
+            usings[:] = [n for n in usings if n.lower() not in names]
+            static[:] = [n for n in static if n.lower() not in names]
+            for alias in list(aliases):
+                aliases[alias] = [n for n in aliases[alias] if n.lower() not in names]
+                if not aliases[alias]:
+                    del aliases[alias]
+            continue
+        # Every value the item can take: an attribute and each child element
+        # (Debug's and Release's Alias both stay).
+        metas = {key: [attrs[key]] for key in ("alias", "static") if key in attrs}
+        if not m.group(2):
+            end = CSPROJ_USING_END_RE.search(text, m.end())
+            for key, meta_attrs, value in CSPROJ_META_RE.findall(text[m.end():end.start() if end else m.end()]):
+                # A Condition on the metadata is not evaluated: the alias
+                # (or static) is taken, as an item under a Condition is.
+                metas.setdefault(key.lower(), []).append(value)
+                if re.search(r"\bCondition\s*=", meta_attrs, re.IGNORECASE):
+                    conditional.append(f"<Using> metadata {key} {value or '(empty)'} of {attrs.get('include', '').strip()} "
+                                       "is under a Condition that is not evaluated; it is applied as if the Condition held")
+        # An empty value (<Alias Condition="..." />) is the item without
+        # that metadata: a plain using under that Condition, kept beside
+        # the other values.
+        alias_values = [a.strip() for a in metas.get("alias", ())]
+        alias_names = list(dict.fromkeys(a for a in alias_values if a))
+        is_static = any(v.strip().lower() == "true" for v in metas.get("static", ()))
+        for name in (n.strip() for n in attrs.get("include", "").split(";")):
+            if not name:
+                continue
+            if "$(" in name or "@(" in name or "%(" in name:
+                computed.append(name)
+            else:
+                for alias in alias_names:
+                    aliases.setdefault(alias, []).append(name)
+                if alias_names and "" not in alias_values:
+                    continue
+                (static if is_static else usings).append(name)
+    return usings, aliases, static, computed, conditional
+
+
+def mapper(root, warnings, args):
+    files = find_files(root, EXTS, SKIP_DIRS, warnings=warnings, source_roots=getattr(args, 'source_roots', ()))
+    rels, infos, project_globals, deep = [], [], [], set()
+    for path in files:
+        rel = path.relative_to(root).as_posix()
+        info, globals_ = scan_or_none(scan, rel, read_source(path, warnings), deep) or (FileInfo(rel), (set(), {}, set()))
+        rels.append(rel)
+        infos.append(info)
+        project_globals.append(globals_)
+    visible_files, not_compiled, projects_of, texts = dotnet_projects(root, rels, ".csproj", warnings)
+    # global using, global using static, global aliases (and <Using> items in
+    # the .csproj) apply to every file of their project; files outside any
+    # project share one set. A file linked into several projects takes the
+    # directives of each, and its own global usings apply to each. A file no
+    # project compiles gives none; one compiled only under an unevaluated
+    # Condition gives its own, and an alias it shares with another file
+    # keeps both targets.
+    usings, aliases, static = {}, {}, {}
+    for info, (globals_, global_aliases, global_static) in zip(infos, project_globals):
+        if info.rel in not_compiled and not not_compiled[info.rel][1]:
+            continue
+        for d in projects_of[info.rel] or (None,):
+            usings.setdefault(d, set()).update(globals_)
+            static.setdefault(d, set()).update(global_static)
+            for name, target in global_aliases.items():
+                aliases.setdefault(d, {}).setdefault(name, set()).add(target)
+    computed_rows = set()
+    project_file = {}
+    for proj in find_files(root, {".csproj"}, SKIP_DIRS):
+        rel = proj.relative_to(root).as_posix()
+        project_file.setdefault(rel.rpartition("/")[0], rel)
+    for d, text in sorted(texts.items()):
+        names, named, statics, computed, conditional = csproj_usings(text)
+        for what in conditional:
+            warnings.append(f"{d or '.'}: {what}")
+        for name in computed:
+            warnings.append(f"{d or '.'}: <Using Include=\"{name}\"> uses an MSBuild property that is not evaluated; "
+                            "it is not applied, so names it would import may be missing")
+            computed_rows.add((project_file.get(d, d or "."), f'<Using Include="{name}">',
+                               "MSBuild property not evaluated; the names it imports may be missing"))
+        usings.setdefault(d, set()).update(names)
+        static.setdefault(d, set()).update(statics)
+        for name, targets in named.items():
+            aliases.setdefault(d, {}).setdefault(name, set()).update(targets)
+    for d, named in sorted(aliases.items(), key=lambda x: x[0] or ""):
+        for name, targets in sorted(named.items()):
+            if len(targets) > 1:
+                warnings.append(f"{d or '.'}: global alias {name} has {len(targets)} targets ({', '.join(sorted(targets))}), "
+                                "probably under Conditions that are not evaluated; files that use it get an edge to each")
+    for info in infos:
+        for d in projects_of[info.rel] or (None,):
+            info.usings.update(dotted(u, False) for u in usings.get(d, ()))
+            info.project_static.update(dotted(u, False) for u in static.get(d, ()))
+            for name, targets in sorted(aliases.get(d, {}).items()):
+                for target in sorted(targets):
+                    if info.aliases.setdefault(name, target) != target:
+                        info.alias_more.setdefault(name, set()).add(target)
+    skipped = drop_not_compiled(infos, not_compiled)
+    edges, unresolved = resolve(infos, attribute_suffix="Attribute", visible_files=visible_files,
+                                 standard=DOTNET_STANDARD)
+    return rels, edges, unresolved | skipped | deep | computed_rows
+
+
+if __name__ == "__main__":
+    run("Map file dependencies of a C# codebase from its source text.", mapper)

@@ -1,0 +1,12 @@
+# migration order: one batch per line, dependencies first
+A.cs
+B.cs
+Extra.cs
+Lib/Widget.cs
+Global.cs
+Main.cs
+Other/Other.cs
+Real.cs
+Rooted.cs
+Shadow.cs
+UsesAlias.cs

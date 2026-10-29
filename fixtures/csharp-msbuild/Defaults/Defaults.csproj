@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- EnableDefaultItems=true does not undo EnableDefaultCompileItems=false:
+       Old.cs is not compiled. -->
+  <PropertyGroup>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <EnableDefaultItems>true</EnableDefaultItems>
+  </PropertyGroup>
+  <ItemGroup><Compile Include="Main.cs;Real.cs" /></ItemGroup>
+</Project>

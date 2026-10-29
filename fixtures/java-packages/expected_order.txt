@@ -1,0 +1,7 @@
+# migration order: one batch per line, dependencies first
+mods/build/src/p/Util.java
+mods/app/src/Main2.java
+mods/other/src/p/Util.java
+src/com/acme/build/Builder.java
+src/com/acme/out/Sink.java
+src/com/acme/Main.java

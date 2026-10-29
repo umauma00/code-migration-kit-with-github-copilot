@@ -1,0 +1,19 @@
+# migration order: one batch per line, dependencies first
+app/.settings.php
+app/boot.php
+lib/Enum.php
+lib/Color.php
+lib/From.php
+lib/Match.php
+lib/keywords.php
+lib/use.php
+tpl/Column.php
+tpl/Limit.php
+tpl/Report.php
+tpl/alias.php
+tpl/Legacy.php
+tpl/Shopper.php
+tpl/Order.php
+tpl/Plain.php
+tpl/alias2.php
+tpl/UseOld.php

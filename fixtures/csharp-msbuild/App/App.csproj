@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <!-- Late.cs is removed, then included again: it is compiled. -->
+    <Compile Remove="Late.cs" />
+    <Compile Include="Late.cs" />
+    <!-- Gen/ is removed; $(GenFile) may add Made.cs back. -->
+    <Compile Remove="Gen/**" />
+    <Compile Include="$(GenFile)" />
+    <!-- A file of another directory linked into this project. -->
+    <Compile Include="..\Shared\Linked.cs" Link="Linked.cs" />
+    <!-- The real file is lib/Lib.csproj; Windows ignores the case. -->
+    <ProjectReference Include="..\LIB\LIB.CSPROJ" />
+  </ItemGroup>
+</Project>

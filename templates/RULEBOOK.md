@@ -89,8 +89,9 @@ used visibly:
 
 ## 4. Naming and output paths
 
-Done-ness is detected by output files existing on disk, so these rules are
-what make the whole run resumable. They are not style preferences.
+Completion requires a current reviewed receipt binding the input context and
+output hash. File existence alone is not completion. Output mappings must be
+unique and remain inside config outputRoots.
 
 - Source `[path pattern]` → target `[path pattern]`. One source file, one
   target file, no exceptions without a rule here.
@@ -121,6 +122,13 @@ Every translated file ends with a status trailer:
 Reviewers check the trailer against the file's actual `TODO(port)` count —
 a trailer that undercounts is a finding.
 
+For config.markerPolicy `todo-lines-v1`, count literal lines containing the marker
+(two occurrences on one line count once). Keep exactly one PORT STATUS trailer
+on the final nonempty line, with the numeric count matching this measurement.
+Both reviewers receive measured evidence; the coordinator additionally rejects
+a mismatch before done. Existing projects without this policy retain their
+explicitly agreed convention. See the kit's docs/EXECUTION-SCOPES.md.
+
 ## 7. Deviation log
 
 Every departure from the documented process gets one line here — skipped
@@ -132,3 +140,5 @@ nobody approved — Run 1's skipped review pass is the model entry.
 | ID | Date | Deviation | Sanctioned by |
 |---|---|---|---|
 | DEV-001 | [date] | [e.g., Step 3 per-file review pass skipped — budget] | [who] |
+
+<!-- Copilot adaptation: migration control and instructions updated on 2026-10-08; see NOTICE. -->

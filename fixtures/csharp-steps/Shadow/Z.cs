@@ -1,0 +1,1 @@
+namespace Z { class Foo { } }
