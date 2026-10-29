@@ -1,3 +1,13 @@
+# 0.21.0 — 2026-10-29
+
+New installs give the frozen review input more room.
+
+- New installs default `maxReviewInputBytes` to 1048576 (1 MiB, about
+  260k–360k tokens) instead of 262144, so fewer units fall back to
+  tool-assisted review and fewer preparation audits need smaller batches.
+  Existing configs keep their value, because it is part of the config
+  fingerprint. Lower it for a model whose context cannot hold that much.
+
 # 0.19.0 — 2026-10-29
 
 Long runner commands show their progress the same way. A `pilot run` piped into

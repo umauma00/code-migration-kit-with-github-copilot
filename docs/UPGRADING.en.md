@@ -1,6 +1,14 @@
-# Upgrading (0.19.0 and earlier releases)
+# Upgrading (0.21.0 and earlier releases)
 
 [日本語](UPGRADING.md) | English
+
+## 0.21.0 (1 MiB default for the frozen review input)
+
+The plugin version changes, so existing approvals and completion records expire once. Revalidate from judge. Completed outputs are kept.
+
+1. New installs set `maxReviewInputBytes` to 1048576 (1 MiB, about 260k–360k tokens). Existing `migration/config.json` files are not changed.
+2. To raise it in an existing project, edit `migration/config.json`. It is part of the config fingerprint, so phase 02 onward and approvals are reviewed again. Lower it for a model whose context cannot hold that much.
+3. In a copy install, replace all of `migration-kit/` with the temporary install's. The plugin needs only an update.
 
 ## 0.19.0 (one progress display for long commands)
 

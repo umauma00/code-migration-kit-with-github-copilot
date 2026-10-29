@@ -129,7 +129,7 @@ node migration-kit/scripts/run_migration.mjs doctor --check-cli
 | `verificationRoots` | 比較器・テスト・テストデータ。例：`["tests"]` |
 | `verificationInputs` | 追加で変更を追跡するビルド設定・依存設定等のファイル。例：`["build/config.json", "packages/api/tsconfig.json"]` |
 | `buildArtifactRoots` | コマンドが生成するバイナリ・オブジェクト・レポートのディレクトリ。例：`["artifacts", "dist"]`。既定は空配列 |
-| `maxReviewInputBytes` | 固定レビュー入力のJSONサイズ上限。新規導入は262144 bytes（256 KiB、約6.5万〜9万トークン）。既存の設定は値を保ち、項目がなければ65536。超過した単位は、自動でツール付きレビュー（下記）に切り替わる |
+| `maxReviewInputBytes` | 固定レビュー入力のJSONサイズ上限。新規導入は1048576 bytes（1 MiB、約26万〜36万トークン。文脈が足りないモデルでは下げる）。既存の設定は値を保ち、項目がなければ65536。超過した単位は、自動でツール付きレビュー（下記）に切り替わる |
 | `reviewDependencyMap` | 監査した依存宣言JSON。既定 `migration/review-dependencies.json`。phase 01で作成する必須成果物 |
 | `sourceLanguage`, `targetLanguage` | 対象言語。テンプレートのPython/JavaScriptを変更可能 |
 | `verificationMode` | `runtime`（省略時）：元環境と新旧比較を実行。`source-only`：ソース由来の準備と変換後build/smokeを検証し、動作同等性未検証として引き継ぐ。既存設定は自動変更しない |
