@@ -38,3 +38,29 @@ test('the hook limits tool-assisted reviewers to named evidence outside run reco
   assert.match(decide({ toolName: 'bash', toolArgs: { command: 'ls' } }, role), /read-only/);
   assert.match(decide(view('src/math_ops.py'), 'reviewer-semantics'), /no tools/);
 });
+
+// CLI 1.0.105 names grep/rg and glob targets `paths` (a string or an array),
+// for every model; gpt-6-luna's search tool is rg. Before, every search by a
+// tool-assisted reviewer was denied for naming no path.
+test('tool-assisted reviewers can search listed paths with grep, rg and glob, and only those', () => {
+  const root = '/repo', role = 'reviewer-rules-read', call = (toolName, toolArgs) => decide({ toolName, toolArgs, cwd: root }, role);
+  for (const tool of ['grep', 'rg', 'glob']) {
+    assert.equal(call(tool, { pattern: 'x', paths: 'src' }), null, tool);
+    assert.equal(call(tool, { pattern: 'x', paths: ['src', 'lib/util.py'] }), null, tool);
+    assert.match(call(tool, { pattern: 'x', paths: ['src', 'migration/runs'] }), /may not read migration\/runs/, tool);
+    assert.match(call(tool, { pattern: 'x', paths: '.' }), /may not read/, tool);
+    assert.match(call(tool, { pattern: 'x', paths: [] }), /must name/, tool);
+    assert.match(call(tool, { pattern: 'x' }), /must name/, tool);
+  }
+  for (const pattern of ['../migration/runs/**', '/repo/migration/runs/*', 'a/../../x', '..\\runs\\*', '{..,.}/migration/runs/*', '{/repo,src}/migration/runs/*', 'C:..\\migration\\runs\\*', '~/x', ['../migration/runs/**']])
+    assert.match(call('glob', { pattern, paths: 'src' }), /may not search/, String(pattern));
+  // One key cannot hide another.
+  assert.match(call('grep', { pattern: 'x', path: 'src', paths: ['migration/runs'] }), /may not read migration\/runs/);
+  assert.match(call('grep', { pattern: 'x', file_path: 'src', paths: ['migration/runs'] }), /may not read migration\/runs/);
+  assert.match(call('grep', { pattern: 'x', path: 'src', paths: [] }), /may not read|must name/);
+  assert.equal(call('grep', { pattern: 'x', path: 'src', paths: ['lib'] }), null);
+  assert.equal(call('grep', { pattern: 'x', path: null, paths: ['src'] }), null, 'an unused key sent as null');
+  assert.match(call('grep', { pattern: 'x', paths: [null, 'src/..'] }), /may not read|must name/, 'a non-string target with a climbing one');
+  for (const target of ['src/link/../runs/rec.json', 'src/..', 'src\\..\\migration']) assert.match(call('view', { path: target }), /may not read/, target);
+  assert.equal(call('glob', { pattern: '**/*.py', paths: 'src' }), null);
+});

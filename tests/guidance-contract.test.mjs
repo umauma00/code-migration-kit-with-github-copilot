@@ -58,6 +58,7 @@ const samples = {
   'call-limit': 'Agent call limit reached; resume with a new run after reviewing usage',
   'input-budget': 'Run input budget (maxRunInputBytes) reached; resume',
   'file-limit': 'Too many open files: the hard descriptor limit is 256',
+  'local-sandbox': 'Local sandbox blocks kit commands: write /tmp: EPERM; loopback 127.0.0.1: EPERM',
   'rate-limit': 'Copilot implementer failed (exit 1): session.error rate_limit 429',
   credits: 'Copilot implementer failed (exit 1): Your AI Credits budget has been exhausted',
   lock: 'Migration locked by pid 4242',

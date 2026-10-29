@@ -30,6 +30,7 @@ import { readGuardrails, cliFolderTrust, guardrailsProposal, installGuardrails }
 import { listAvailableModels, modelsMarkdown, setRoleModels, readConfigIfPresent, currentAssignments } from '../lib/models.mjs';
 import { initRunSettings, checkRunSettings, applyRunSettings, syncRunSettings, runSettingsFile, runSettingsState, setupEnd, phase00Started } from '../lib/run-settings.mjs';
 import { ignoredLimits, processTimeout } from '../lib/execution-policy.mjs';
+import { localSandboxProbe, sandboxCheck, sandboxQuestion, sandboxNext } from '../lib/sandbox.mjs';
 
 export const usage = `Usage: node migration-kit/scripts/run_migration.mjs COMMAND [options]
   doctor [--check-cli] [--copilot /path/to/copilot]
@@ -89,7 +90,7 @@ export const usage = `Usage: node migration-kit/scripts/run_migration.mjs COMMAN
   unlock --pid PID           Remove a lock only after its owning process has stopped
 Options: --root PATH (default cwd), --copilot PATH (default copilot)
 Configuration: migration/config.json. No command commits or pushes changes.`;
-export async function doctor(root, config, { checkCLI = false, command = 'copilot', signal } = {}) {
+export async function doctor(root, config, { checkCLI = false, command = 'copilot', signal, sandboxProbe = localSandboxProbe } = {}) {
   if (signal?.aborted) throw new Error('Interrupted');
   const timeoutMs = processTimeout(config, 'commandTimeoutSeconds');
   const checks = [{ check: 'configuration', ok: true }];
@@ -169,6 +170,11 @@ export async function doctor(root, config, { checkCLI = false, command = 'copilo
     checks.push({ check: 'repository hooks load in Copilot CLI', ok: trust !== 'untrusted', status: trust,
       note: 'Interactive Copilot CLI sessions ignore .github/hooks in untrusted folders, silently disabling the guardrails, the approval confirmations and the guardrails-file protection. Start copilot interactively in this repository once and trust the folder. Runner-started tool-assisted reviewers always load the repository hooks (GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS=true), so they stay out of other workers\' records either way; other workers follow folder trust and rely on their CLI tool flags.' });
   }
+  // A local sandbox blocks phase 03 (work outside the repository) and the
+  // loopback reviewer-hook check below; say so here instead of at phase 03.
+  const sandbox = await sandboxProbe();
+  if (signal?.aborted) throw new Error('Interrupted');
+  checks.push(sandboxCheck(sandbox));
   if (checkCLI) {
     try {
       // Same environment as workers: a launcher may pick a different build otherwise.
@@ -182,8 +188,14 @@ export async function doctor(root, config, { checkCLI = false, command = 'copilo
       checks.push({ check: 'required flags', ok: help.code === 0 && missing.length === 0, missing });
       const agents = await probeWorkerAgents(command, [], { cwd: root, layout, signal, timeoutMs });
       checks.push({ check: 'worker agents resolve', ...agents });
-      if (agents.ok) checks.push({ check: 'tool-assisted reviewer hook loads in prompt mode', ...await probeReviewerHook(command, [], { cwd: root, layout, signal, timeoutMs }),
-        note: 'Live check with a loopback model provider: no account, network or AI usage. It proves the hook keeps tool-assisted reviewers out of migration/runs.' });
+      if (agents.ok) {
+        const hook = await probeReviewerHook(command, [], { cwd: root, layout, signal, timeoutMs });
+        // Refused loopback fails this check for the sandbox's reason, not the CLI's.
+        const loopback = !hook.ok && sandbox.blocked.some(b => b.access === 'loopback');
+        checks.push({ check: 'tool-assisted reviewer hook loads in prompt mode', ...hook,
+          ...(loopback ? { cause: 'local-sandbox', detail: `Loopback is blocked in this session (see "${sandboxCheck(sandbox).check}"), so this check cannot run; it says nothing about the CLI. ${hook.detail ?? ''}`.trim() } : {}),
+          note: 'Live check with a loopback model provider: no account, network or AI usage. It proves the hook keeps tool-assisted reviewers out of migration/runs.' });
+      }
       checks.push({ check: 'file descriptor limit', ...await fileLimits({ signal, timeoutMs }), minimum: fileLimitMinimum,
         note: 'Each CLI process raises its soft open-file limit to the hard limit by itself. A hard limit below the minimum is a warning: workers may hit EMFILE "Too many open files", which stops the run with guidance.' });
     } catch (e) {
@@ -310,6 +322,13 @@ export async function main(argv = process.argv.slice(2)) {
     try {
       const result = applyRunSettings(root, models);
       if (!result.applied) process.exitCode = 1;
+      // Asked during setup (on each apply while it fails), before phase 00 and
+      // the autopilot handoff.
+      if (result.applied && !phase00Started(root)) {
+        const probe = await localSandboxProbe();
+        if (!probe.ok) Object.assign(result, { sandbox: sandboxCheck(probe), sandboxQuestion: sandboxQuestion(probe, readPreferences(root).userLanguage === 'ja' ? 'ja' : 'en'),
+          next: result.next ? `${sandboxNext} Then: ${result.next}` : sandboxNext });
+      }
       console.log(JSON.stringify(result, null, 2));
     } finally { release(); }
     return;

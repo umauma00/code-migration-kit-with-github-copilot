@@ -34,10 +34,10 @@ redesign 方式では 5〜7 の比較試験は行わず、設計文書への敵�
 mkdir /tmp/bakeoff-b && cp SOURCE_FILES /tmp/bakeoff-b/   # チェックアウトではなくコピーだけ
 cd /tmp/bakeoff-b && copilot -p "Port these files to TARGET_LANGUAGE the way a fluent TARGET_LANGUAGE engineer would write them natively. Write each translation next to its source." \
   --model STRESS_B_MODEL --no-custom-instructions --disable-builtin-mcps -s \
-  --available-tools view,create,edit,glob,grep --allow-tool write
+  --available-tools view,create,edit,apply_patch,glob,grep --allow-tool write
 ```
 
-`STRESS_B_MODEL` は `phaseModels.stressB` です。B を移行チャットのサブエージェントとして動かさないでください。VS Code Local のサブエージェントは親の指示（キットの管理ブロックを含む `.github/copilot-instructions.md`）を受け継ぎます。終わったら `/tmp/bakeoff-b` を削除し、削除したことを報告に記録します。
+`STRESS_B_MODEL` は `phaseModels.stressB` です。`apply_patch` は消せません。GPT 系の一部のモデル（CLI 1.0.105 の gpt-6-luna で確認）は `create` / `edit` を持たず、書き込みは `apply_patch` だけなので、これが無いと B は読み取り専用ツールだけになり何も書けません。B を移行チャットのサブエージェントとして動かさないでください。VS Code Local のサブエージェントは親の指示（キットの管理ブロックを含む `.github/copilot-instructions.md`）を受け継ぎます。終わったら `/tmp/bakeoff-b` を削除し、削除したことを報告に記録します。
 
 ## よくある止まり方
 
@@ -49,5 +49,6 @@ cd /tmp/bakeoff-b && copilot -p "Port these files to TARGET_LANGUAGE the way a f
 | `Pilot target must be a new directory` | pilot の作業場所が既に存在する | 新しい外部ディレクトリを指定 |
 | `unable to ask user for confirmation` | 承認の確認を出せないセッション（非対話の実行など） | 表示されたコマンドを人間が自分のターミナルで実行 |
 | `repository hooks load in Copilot CLI` が失敗 | フォルダが未信頼で hook が無効 | `copilot` を対話起動してフォルダを信頼する |
+| `commands can write outside the project and use loopback` が失敗 | ローカル sandbox が有効で、リポジトリ外への書き込み（B・pilot）とローカル通信（hook 検査）ができない | そのセッションで人が `/sandbox off` にするか、sandbox の設定で書き込み先とローカル通信を許可する。AI は設定を変えません（初期設定中の `settings apply` でも聞きます） |
 
 失敗したコマンドは、原因と選択肢（推奨付き）を自動で表示します。

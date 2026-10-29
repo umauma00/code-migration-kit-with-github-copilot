@@ -36,10 +36,10 @@ stop and ask the human for a design decision instead of a third wording.
 mkdir /tmp/bakeoff-b && cp SOURCE_FILES /tmp/bakeoff-b/   # copies only, not a checkout
 cd /tmp/bakeoff-b && copilot -p "Port these files to TARGET_LANGUAGE the way a fluent TARGET_LANGUAGE engineer would write them natively. Write each translation next to its source." \
   --model STRESS_B_MODEL --no-custom-instructions --disable-builtin-mcps -s \
-  --available-tools view,create,edit,glob,grep --allow-tool write
+  --available-tools view,create,edit,apply_patch,glob,grep --allow-tool write
 ```
 
-`STRESS_B_MODEL` is `phaseModels.stressB`. Do not run B as a subagent of the migration chat: VS Code Local subagents inherit the parent's instructions, including `.github/copilot-instructions.md` with the kit's managed block. Delete `/tmp/bakeoff-b` afterwards and record the deletion in the report.
+`STRESS_B_MODEL` is `phaseModels.stressB`. Keep `apply_patch`: some GPT models (checked with gpt-6-luna on CLI 1.0.105) have no `create` / `edit` and write only through `apply_patch`, so without it B gets read-only tools and writes nothing. Do not run B as a subagent of the migration chat: VS Code Local subagents inherit the parent's instructions, including `.github/copilot-instructions.md` with the kit's managed block. Delete `/tmp/bakeoff-b` afterwards and record the deletion in the report.
 
 ## Common stops
 
@@ -51,5 +51,6 @@ cd /tmp/bakeoff-b && copilot -p "Port these files to TARGET_LANGUAGE the way a f
 | `Pilot target must be a new directory` | The pilot workspace already exists | Choose a new outside directory |
 | `unable to ask user for confirmation` | The session cannot show the approval confirmation (non-interactive run) | The human runs the shown command in their own terminal |
 | `repository hooks load in Copilot CLI` fails | Untrusted folder, hooks off | Start `copilot` interactively and trust the folder |
+| `commands can write outside the project and use loopback` fails | A local sandbox is on: writes outside the repository (B, pilot) and local network access (hook check) are blocked | The person types `/sandbox off` in that session, or allows the write locations and local network access in the sandbox settings. The AI never changes them (`settings apply` during setup asks too) |
 
 Failed commands print their cause and choices, with a recommendation.

@@ -1,6 +1,16 @@
-# Upgrading (0.23.0 and earlier releases)
+# Upgrading (0.24.0 and earlier releases)
 
 [日本語](UPGRADING.md) | English
+
+## 0.24.0 (comparison B writes, and a local sandbox found during setup)
+
+Kit files (plugin.json, scripts) change, so existing approvals and completion records expire once. Revalidate from judge. Completed outputs are kept.
+
+1. Phase 03 comparison B's command adds `apply_patch`, so B writes with models that edit only through `apply_patch` (such as gpt-6-luna). For a phase 03 in progress, rerun B with the checklist's new command.
+   The hook is fixed too: it denies `apply_patch` writes to `migration/guardrails.json`, and tool-assisted reviewers can use `grep`, `rg` and `glob` again (CLI 1.0.105 passes their targets as `paths`).
+2. `doctor` gains the check `commands can write outside the project and use loopback`. It fails in a session with local sandboxing on and suggests `/sandbox off` or allowing the locations in the sandbox settings. The kit never changes them.
+3. During setup, `settings apply` returns `sandboxQuestion` when it finds a sandbox and asks before phase 00 and the switch to autopilot (on each apply during setup until it is resolved). For a project already past setup, run `doctor` before phase 03.
+4. For a copied install, replace all of `migration-kit/` and the SKILL.md files in `.github/skills/` with the temporary install's. A plugin only needs updating.
 
 ## 0.23.0 (one repair round, generated code and policies before the survey, faster phase next)
 

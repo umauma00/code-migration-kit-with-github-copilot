@@ -1,3 +1,50 @@
+# 0.24.0 — 2026-10-29
+
+Phase 03 comparison B can write with GPT models that edit through
+`apply_patch`, and a local sandbox no longer stops a run at phase 03 without
+warning.
+
+- Comparison B's command (03 prompt and checklist) adds `apply_patch` to
+  `--available-tools`. On CLI 1.0.105, gpt-6-luna has no `create`/`edit` tool
+  and writes only through `apply_patch` (`grep` maps to its `rg` by itself), so
+  B got read-only tools and wrote nothing. Checked with a loopback model
+  provider: with the new list both gpt-4.1 (`create`) and gpt-6-luna
+  (`apply_patch`) write. Worker roles are unaffected (read tools only).
+- The hook protects `migration/guardrails.json` (and the auto-mode record)
+  from `apply_patch` too. CLI 1.0.105 sends its input as the bare patch text,
+  not JSON; the hook skipped such a call, so a gpt-6-luna session could write
+  the guardrails file directly (reproduced with the real CLI, now denied).
+  JSON-quoted strings, `*** Move to:` destinations, indented headers and
+  (on macOS, also for shell commands) another letter case are checked too.
+- Tool-assisted reviewers can search again. On CLI 1.0.105, `grep`/`rg` and
+  `glob` name their targets `paths` (a string or an array) for every model,
+  so the hook found no path and denied every search. It now checks each of
+  `paths` like `view`'s path (every target key present, an empty list denied)
+  and denies a glob pattern with `..`, an absolute or drive-letter start (also
+  inside `{a,b}`) or a non-string value. Paths resolve with the native
+  realpath, Windows trailing dots are ignored, a `..` segment is refused (it
+  could climb from a link's target), and an unused key sent as null is skipped. Symlinks reached inside a
+  glob's own traversal are not resolved by the hook.
+
+The sandbox part: With
+sandboxing on (VS Code, Copilot CLI or the Copilot app), comparison B and the
+pilot cannot write outside the repository and doctor's reviewer-hook check
+cannot use loopback; the run found out only at phase 03 and asked then, and
+autopilot stopped there.
+
+- New `lib/sandbox.mjs`: a probe that writes a throwaway directory in the
+  temporary directory (and /tmp) and connects to itself over 127.0.0.1.
+- `doctor` (with or without `--check-cli`) reports it as `commands can write
+  outside the project and use loopback`, with guidance: `/sandbox off`
+  (recommended) or allowing the locations in the sandbox settings. The kit
+  never changes sandbox settings.
+- `settings apply`, while setup is not finished, returns `sandboxQuestion`
+  (off / allow / keep) when the probe fails, and its `next` has the parent ask
+  it before phase 00 and before the autopilot handoff.
+- A reviewer-hook check that failed because loopback is blocked now says so
+  and gets the sandbox guidance, instead of suggesting the CLI changed.
+- The skill, phase 03 prompt and checklist describe the check.
+
 # 0.23.0 — 2026-10-29
 
 Preparation reviews stop after one repair round, as upstream. In normal mode

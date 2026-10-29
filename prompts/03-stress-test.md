@@ -13,6 +13,9 @@ chat, and only after their agreement run `guardrails install` with exactly those
 the host asks them to confirm it. Never create, edit or relax the file any other way. If a guardrail
 denies a command, that is the design working; report it instead of routing around it.
 Run `doctor` and confirm `repository hooks load in Copilot CLI` is not failing.
+If `commands can write outside the project and use loopback` fails (a local
+sandbox), ask the person before comparison B and the pilot, with its guidance;
+never change sandbox settings yourself.
 
 Prerequisite: reviewed rulebook, map, inventory and judge. Produce
 `migration/stress-test/report.md`; the user reviews it before translation.
@@ -25,8 +28,11 @@ For preserve mode, run a dual translation experiment:
   and an instruction to port them idiomatically. No parent conversation, rulebook,
   inventory or migration skill is passed to B. Run B as a fresh `copilot -p` process
   in that directory with `--no-custom-instructions --disable-builtin-mcps
-  --available-tools view,create,edit,glob,grep --allow-tool write` and
+  --available-tools view,create,edit,apply_patch,glob,grep --allow-tool write` and
   `--model` set to phaseModels.stressB (the exact command is in the checklist).
+  Keep `apply_patch` in the list: some GPT models (gpt-6-luna on CLI 1.0.105)
+  have no `create`/`edit` and write only through `apply_patch`, so without it B
+  gets read-only tools.
   `--no-custom-instructions` alone still exposes user and plugin skill
   descriptions; leaving `skill` out of `--available-tools` keeps them out. Use the
   same terminal command in VS Code: a subagent of this chat inherits its context
