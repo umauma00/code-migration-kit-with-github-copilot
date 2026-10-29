@@ -14,7 +14,7 @@ import { createCopilotAdapter, requiredCopilotFlags, copilotEnv, probeWorkerAgen
 import { runtimeLayout, pluginRoot } from '../lib/runtime.mjs';
 import { migrationStatus, statusMarkdown, statusTodo, statusChecklist } from '../lib/status.mjs';
 import { statusSnapshot } from '../lib/status-snapshot.mjs';
-import { commandProgress } from '../lib/command-progress.mjs';
+import { commandProgress, progressLine } from '../lib/command-progress.mjs';
 import { failureGuidance, guidanceMarkdown, failureGuidanceList, guidanceListMarkdown, doctorGuidance } from '../lib/guidance.mjs';
 import { initSourceSpec, sourceSpecReadiness } from '../lib/source-spec.mjs';
 import { runSurvey, mergeSurvey, surveyStatus, planSurvey } from '../lib/survey.mjs';
@@ -335,7 +335,7 @@ export async function main(argv = process.argv.slice(2)) {
     let result;
     if (cmd === 'pilot' && args._[1] === 'prepare') result = preparePilot(root, config, { target: args.target, sources: args.sources?.split(','), through: args.through, note: args.note });
     else if (cmd === 'pilot' && args._[1] === 'run') {
-      result = await runPilot(root, config, createCopilotAdapter({ command: args.copilot }), { signal: controller.signal, onProgress: event => console.error(`${event.unit}: ${event.stage}`) });
+      result = await runPilot(root, config, createCopilotAdapter({ command: args.copilot }), { signal: controller.signal, onProgress: event => console.error(progressLine(event)) });
     }
     else if (cmd === 'diagnose') result = diagnoseBuild(root, config, { stage: args.stage });
     else if (cmd === 'repair-round') {
@@ -344,7 +344,7 @@ export async function main(argv = process.argv.slice(2)) {
       else {
         const repair = await translate(root, config, createCopilotAdapter({ command: args.copilot }), {
           signal: controller.signal, repairQueue: diagnosis.queue,
-          onProgress: event => console.error(`${event.unit}: ${event.stage} (agent calls ${event.calls})`) });
+          onProgress: event => console.error(progressLine(event)) });
         result = { diagnosis, repair, next: `Review the repaired outputs and the round counts in ${diagnosis.rounds}, then approve and run build${diagnosis.stage === 'build' ? '' : `, smoke${diagnosis.stage === 'parity' ? ' and parity' : ''}`} for the next round.` };
       }
     }
@@ -381,7 +381,7 @@ export async function main(argv = process.argv.slice(2)) {
       else if (action === 'merge') { const release = kind === 'inventory' ? () => {} : lockRun(root, 'survey-merge'); try { result = mergeSurvey(root, config, kind, options); } finally { release(); } }
       else if (action === 'run') {
         result = await runSurvey(root, config, kind, createCopilotAdapter({ command: args.copilot }), { signal: controller.signal, ...options,
-          onProgress: event => console.error(`${event.unit}: ${event.stage} (agent calls ${event.calls})`) });
+          onProgress: event => console.error(progressLine(event)) });
       } else throw new Error('Use survey plan|run|status|merge --kind facts|contracts|inventory [--max-files N] [--sites migration/PATH.tsv]');
     }
     else if (cmd === 'judge-prepare') result = await runJudgePreparation(root, config, { signal: controller.signal });
@@ -391,7 +391,7 @@ export async function main(argv = process.argv.slice(2)) {
       const maxRounds = args['max-rounds'] === undefined ? undefined : Number(args['max-rounds']);
       const maxCalls = args['max-calls'] === undefined ? undefined : Number(args['max-calls']);
       result = await buildLoop(root, config, createCopilotAdapter({ command: args.copilot }), { maxRounds, maxCalls, through: args.through ?? 'build', note: args.note, signal: controller.signal,
-        onProgress: event => console.error(`${event.unit}: ${event.stage}${event.calls === undefined ? '' : ` (agent calls ${event.calls})`}`) });
+        onProgress: event => console.error(progressLine(event)) });
     }
     else if (cmd === 'sessions') {
       if (args._[1] === 'status') result = sessionsStatus(root, { run: args.run });
@@ -431,7 +431,7 @@ export async function main(argv = process.argv.slice(2)) {
       result = await translate(root, config, createCopilotAdapter({ command: args.copilot }), {
         signal: controller.signal, onlyTarget: cmd === 'repair' ? args.target : undefined, repairQueue: cmd === 'repair' ? args.queue : undefined, evidence: args.evidence,
         maxCalls: args['max-calls'] === undefined ? undefined : Number(args['max-calls']),
-        onProgress: event => console.error(`${event.unit}: ${event.stage} (agent calls ${event.calls})`) });
+        onProgress: event => console.error(progressLine(event)) });
     } else throw new Error(`Unknown command ${cmd}\n${usage}`);
     console.log(JSON.stringify(result, null, 2));
   } finally { process.removeListener('SIGINT', abort); process.removeListener('SIGTERM', abort); }

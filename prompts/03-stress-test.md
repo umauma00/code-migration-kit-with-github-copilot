@@ -46,7 +46,9 @@ behavior. Do not mix disposable receipts with production receipts.
 
 Use the formal [pilot grant](../docs/PILOT.md): after current 00–02 and judge,
 `pilot prepare --target NEW_EXTERNAL_DIR --sources CSV --through STAGE --note TEXT`,
-then `pilot run --root NEW_EXTERNAL_DIR`. Obtain explicit authorization for that
+then `pilot run --root NEW_EXTERNAL_DIR` in a background terminal, never piped or
+redirected, checked with `status --root NEW_EXTERNAL_DIR --wait 600` like every
+long runner command. Obtain explicit authorization for that
 scope; default boundary is translation. Production still requires reviewed 03.
 Run independent A/B/pilot work concurrently when the host permits it, record
 isolation limitations, archive findings and verify workspace disposal. Repeated

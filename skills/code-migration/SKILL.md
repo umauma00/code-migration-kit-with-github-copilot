@@ -476,11 +476,20 @@ reviewers check semantics and rules, each from its own lens first) or
 `maxAgentCalls`, `maxFixRounds`, timeouts, retry settings, `maxRunInputBytes`,
 `maxAiCreditsPerCall`) can change between runs and keep reviewed work and approvals.
 
-Run a long `translate` or `build-loop` in a background or continuing
-terminal and check it with `status --wait 600 --format markdown`: the runner
-itself waits up to that many seconds and answers as soon as a unit finishes or
-the run stops, so each check costs one model turn, not one per poll. Never
-block the parent on the run or kill it for being slow. When status shows a worker retrying after a transient failure
+Long runner commands (`translate`, `repair`, `repair-round`, `build-loop`,
+`pilot run`, `survey run`) all run the same way. Start the command alone in a
+background or continuing terminal, calling the runner by its path, with no pipe
+or redirection to a file (`| Out-String`, `| Select-Object`, `| tee`, `> log`;
+`2>&1` is fine): they hide its progress until it ends, and the hook denies them.
+While it runs the terminal shows a heartbeat every 15 seconds and one line per
+unit change (`14:03:45 [3/12] src/a.cs: review (agent calls 14)`: time,
+finished/total of this run, unit, stage, AI calls so far). Check it with
+`status --root ROOT --wait 600 --format markdown` (ROOT is the pilot directory
+for `pilot run`): the runner itself waits up to that many seconds and answers as
+soon as a unit finishes or the run stops, so each check costs one model turn,
+not one per poll. After each check, tell the person in chat the finished count,
+the active units and any retry or blocked unit. Never block the parent on the
+run or kill it for being slow. When status shows a worker retrying after a transient failure
 (rate limit, service error), tell the user at once: the runner waits and retries
 by itself; if it persists, offer a lower `concurrency` after the run (it keeps
 reviewed work). A run that stops at its AI call budget is a budget stop: rerun

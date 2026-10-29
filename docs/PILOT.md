@@ -16,6 +16,12 @@ node migration-kit/scripts/run_migration.mjs pilot prepare --root . \
 node migration-kit/scripts/run_migration.mjs pilot run --root /absolute/path/outside-project/new-pilot
 ```
 
+Run `pilot run` alone in a background terminal, never piped or redirected
+(`| Out-String` hides its progress until the end; the hook denies it), and check
+it with `status --root PILOT_DIR --wait 600 --format markdown`. The terminal shows
+a heartbeat every 15 seconds and one timestamped line per unit change with the
+finished/total count.
+
 For plugins, use the loaded plugin's absolute script path. `--through` defaults
 to translation; build, smoke and parity require their configured commands.
 Source-only cannot authorize parity. The destination must be new and outside
