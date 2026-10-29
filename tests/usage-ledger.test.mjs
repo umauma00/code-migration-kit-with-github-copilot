@@ -24,7 +24,8 @@ const wrapper = (f, transport) => atomicWrite(safePath(f.root, 'usage-cli.mjs'),
 const argv = process.argv, at = argv.indexOf('--usage-output-file');
 const mode = fs.existsSync(${JSON.stringify(safePath(f.root, 'mode.txt'))}) ? fs.readFileSync(${JSON.stringify(safePath(f.root, 'mode.txt'))}, 'utf8') : 'ok';
 if (!argv.includes('--version') && at > 0 && mode !== 'none') fs.writeFileSync(argv[at + 1], ${JSON.stringify(usageJSON)});
-if (!argv.includes('--version') && mode === 'fail') { process.stderr.write('boom'); process.exit(1); }
+if (!argv.includes('--version') && mode.startsWith('fallback')) console.log(JSON.stringify({ type: 'model.call_final_result', data: { result: 'success', model: 'fallback-model' } }));
+if (!argv.includes('--version') && (mode === 'fail' || mode === 'fallback-fail')) { process.stderr.write('boom'); process.exit(1); }
 await import(${JSON.stringify(importable(transport.prefixArgs[0]))});
 `);
 
@@ -149,6 +150,10 @@ test('a call that fails before the CLI starts is not logged', async t => {
   const controller = new AbortController(); controller.abort();
   await assert.rejects(adapter({ ...f, config: f.config, role: 'implementer', unit: f.units[0], extra: {}, signal: controller.signal, runId: '3-cccccccc' }));
   assert.equal(lines(f.root).length, 0);
+  // A missing command: the version check only warns, then spawn fails and nothing ran.
+  const missing = createCopilotAdapter({ command: safePath(f.root, 'no-such-copilot') });
+  await assert.rejects(missing({ ...f, config: f.config, role: 'implementer', unit: f.units[0], extra: {}, runId: '4-dddddddd' }), /ENOENT|not found|no-such-copilot/);
+  assert.equal(lines(f.root).length, 0);
 });
 
 test('a survey with one unmeasured surveyor call keeps its tokens unknown', async t => {
@@ -166,4 +171,18 @@ test('a survey with one unmeasured surveyor call keeps its tokens unknown', asyn
   assert.equal(report.measuredUsage.complete, false);
   assert.equal(report.measuredUsage.unmeasuredCalls, report.agentCalls - 1);
   assert.equal(fs.readFileSync(safePath(f.root, 'migration/cost-log.tsv'), 'utf8').trimEnd().split('\n').at(-1).split('\t')[3], 'unknown');
+});
+
+test('the usage log counts a call under the model the CLI reported, on success and on failure', async t => {
+  const f = await ready(t), transport = cliDouble(f);
+  wrapper(f, transport);
+  const adapter = createCopilotAdapter({ command: process.execPath, prefixArgs: [safePath(f.root, 'usage-cli.mjs')] });
+  const call = () => adapter({ ...f, config: f.config, role: 'implementer', unit: f.units[0], extra: {}, runId: '5-eeeeeeee' });
+  atomicWrite(safePath(f.root, 'mode.txt'), 'fallback');
+  const response = await call();
+  assert.match(response.modelWarning, /fallback-model/);
+  atomicWrite(safePath(f.root, 'mode.txt'), 'fallback-fail');
+  await assert.rejects(call(), /failed \(exit 1\)/);
+  assert.deepEqual(lines(f.root).map(e => [e.ok, e.observedModel]), [[true, 'fallback-model'], [false, 'fallback-model']]);
+  assert.deepEqual(Object.keys(usageReport(f.root).byModel), ['fallback-model']);
 });

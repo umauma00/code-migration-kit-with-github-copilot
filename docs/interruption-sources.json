@@ -2240,7 +2240,7 @@
     },
     {
       "path": "lib/process.mjs",
-      "sha256": "e56c0e939a51825021efd5e6518ea97d4f77134ba56dc21d2db032ef921795fd",
+      "sha256": "f60c842c37fbed4f80cc12fcb97b68ed9534fc09de1058a5544a9f622b01c00b",
       "entries": [
         {
           "line": 90,
@@ -2273,77 +2273,77 @@
           "code": "clearTimeout(timeout); clearTimeout(killTimer); signal?.removeEventListener('abort', abort);"
         },
         {
-          "line": 171,
+          "line": 172,
           "kind": "error-or-exit-candidate",
-          "code": "if (failure) { failure.result = result; reject(failure); } else resolve(result);"
+          "code": "if (failure) { failure.result = result; failure.spawned = Boolean(child?.pid); reject(failure); } else resolve(result);"
         },
         {
-          "line": 175,
+          "line": 176,
           "kind": "deadline-or-observation",
           "code": "failure = error; clearTimeout(timeout);"
         },
         {
-          "line": 181,
+          "line": 182,
           "kind": "process-termination",
           "code": "killer.once('error', e => { failure.message += `; taskkill failed: ${e.message}`; child.kill(); terminated = true; finish(); });"
         },
         {
-          "line": 183,
+          "line": 184,
           "kind": "process-termination",
           "code": "if (status !== 0) { failure.message += `; taskkill exit ${status} (tree termination unconfirmed)`; child.kill(); }"
         },
         {
-          "line": 187,
+          "line": 188,
           "kind": "process-termination",
           "code": "try { process.kill(-child.pid, 'SIGTERM'); } catch {}"
         },
         {
-          "line": 191,
+          "line": 192,
           "kind": "process-termination",
           "code": "try { process.kill(-child.pid, 'SIGKILL'); } catch (e) { if (e.code !== 'ESRCH') failure.message += `; group kill failed: ${e.message}`; }"
         },
         {
-          "line": 196,
+          "line": 197,
           "kind": "error-or-exit-candidate",
           "code": "const abort = () => fail(new Error('Interrupted'));"
         },
         {
-          "line": 203,
+          "line": 204,
           "kind": "deadline-or-observation",
           "code": "if (timeoutMs > 0) timeout = setTimeout(() => fail(new Error(`Process timed out after ${timeoutMs}ms (explicit bounded deadline)`)), timeoutMs);"
         },
         {
-          "line": 217,
+          "line": 218,
           "kind": "error-or-exit-candidate",
           "code": "else fail(new Error(`Cannot preserve process output: ${e.message}`, { cause: e }));"
         },
         {
-          "line": 224,
+          "line": 225,
           "kind": "error-or-exit-candidate",
           "code": "child.stdin.on('error', e => { if (e.code !== 'EPIPE') fail(e); });"
         },
         {
-          "line": 251,
+          "line": 252,
           "kind": "error-or-exit-candidate",
           "code": "if (!relative.startsWith('migration/runs/process-output/') || relative.split('/').includes('..')) throw new Error('Process output file outside runner log directory');"
         },
         {
-          "line": 253,
+          "line": 254,
           "kind": "error-or-exit-candidate",
           "code": "if (fs.lstatSync(at).isSymbolicLink()) throw new Error('Symlink in process output path');"
         },
         {
-          "line": 257,
+          "line": 258,
           "kind": "error-or-exit-candidate",
           "code": "if (fs.lstatSync(file).isSymbolicLink()) throw new Error('Symlink in process output path');"
         },
         {
-          "line": 264,
+          "line": 265,
           "kind": "loop-exit-candidate",
           "code": "if (!count) break;"
         },
         {
-          "line": 273,
+          "line": 274,
           "kind": "error-or-exit-candidate",
           "code": "if ((root && typeof expected !== 'string') || (expected && hasher.digest('hex') !== expected)) throw new Error('Process output log changed or has no recorded hash; refusing altered diagnostic evidence');"
         }
@@ -3069,7 +3069,7 @@
     },
     {
       "path": "lib/usage.mjs",
-      "sha256": "ad3399dc410c0ec45d1835894556dc5a7bad197995e4a9a2022d126dbe173373",
+      "sha256": "3853da9b11493fa5850be4c63ebd0ddf737f8132d261e50693f23f112ff175d8",
       "entries": []
     },
     {
@@ -3252,7 +3252,7 @@
     },
     {
       "path": "scripts/copilot_adapter.mjs",
-      "sha256": "7ce787fae3036c52e8d1ac12b9ac8ab787e67f1bcc0651ce70153673e5b688ca",
+      "sha256": "ac1d2c57b4ba2c4dafd7ac817fac5f98378fa58c1dbf7b591ac81210e0495171",
       "entries": [
         {
           "line": 9,
@@ -3395,64 +3395,64 @@
           "code": "if (isReviewer(role) && typeof reviewInput !== 'string') throw new Error('Reviewer requires a frozen review input');"
         },
         {
-          "line": 257,
+          "line": 259,
           "kind": "deadline-or-observation",
           "code": "const currentVersion = (root, signal, timeoutMs) => {"
         },
         {
-          "line": 258,
+          "line": 260,
           "kind": "deadline-or-observation",
           "code": "if (!check || check.timeoutMs !== timeoutMs || Date.now() - check.at >= versionRecheckMs) {"
         },
         {
-          "line": 259,
+          "line": 261,
           "kind": "deadline-or-observation",
           "code": "check = { at: Date.now(), timeoutMs, result: copilotVersion(command, prefixArgs, { cwd: root, signal, timeoutMs }).then(version => ({ version }), error => ({ error })) };"
         },
         {
-          "line": 273,
+          "line": 275,
           "kind": "error-or-exit-candidate",
           "code": "if (signal?.aborted) throw new Error('Interrupted');"
         },
         {
-          "line": 305,
+          "line": 307,
           "kind": "error-or-exit-candidate",
           "code": "argv = [...prefixArgs, ...copilotArgs(worker, model, undefined, layout, session, { usageFile, maxAiCredits: executionLimits(config).aiCredits, effort, context })];"
         },
         {
-          "line": 306,
+          "line": 308,
           "kind": "deadline-or-observation",
           "code": "options = { cwd: root, signal, input: prompt, timeoutMs: processTimeout(config, 'timeoutSeconds'), outputDir: safePath(root, 'migration/runs/process-output'), env: copilotEnv(worker) };"
         },
         {
-          "line": 307,
+          "line": 309,
           "kind": "error-or-exit-candidate",
           "code": "} catch (e) { fs.rmSync(usageDir, { recursive: true, force: true }); throw e; }"
         },
         {
-          "line": 316,
+          "line": 319,
           "kind": "error-or-exit-candidate",
           "code": "Object.assign(e, versionFields, usageFields(usage)); throw e;"
         },
         {
-          "line": 320,
+          "line": 323,
           "kind": "error-or-exit-candidate",
           "code": "if (result.code !== 0) throw new Error(`Copilot ${role} failed (exit ${result.code}): ${[copilotStreamError(processOutputLines(result)), result.stderr.slice(-2000)].filter(Boolean).join('\\n')}`);"
         },
         {
-          "line": 326,
+          "line": 329,
           "kind": "error-or-exit-candidate",
           "code": "throw e;"
         },
         {
-          "line": 331,
+          "line": 334,
           "kind": "error-or-exit-candidate",
           "code": "throw e;"
         },
         {
-          "line": 343,
+          "line": 348,
           "kind": "error-or-exit-candidate",
-          "code": "} catch (e) { ledger(false); e.result = relativeProcessOutput(result, root); Object.assign(e, versionFields, usageFields(usage)); throw e; }"
+          "code": "ledger(false, observed); e.result = relativeProcessOutput(result, root); Object.assign(e, versionFields, usageFields(usage)); throw e; }"
         }
       ]
     },

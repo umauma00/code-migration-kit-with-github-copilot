@@ -247,6 +247,8 @@ Set target to ${JSON.stringify(unit.target)}.`;
 }
 // A failed call still spent tokens; its usage, when the CLI wrote it, travels
 // with the error so run totals stay complete (or are marked unknown).
+// The model the CLI reported for the call, for the usage log's by-model totals.
+const reportedModel = models => models.length ? [...models].sort().join(',') : undefined;
 const usageFields = usage => usage ? { tokens: usage.inputTokens + usage.outputTokens, cliUsage: usage } : {};
 export function createCopilotAdapter({ command = 'copilot', prefixArgs = [], versionRecheckMs = 10 * 60 * 1000 } = {}) {
   // Workers follow the user's auto-updating CLI, so a run can span versions.
@@ -312,7 +314,8 @@ export function createCopilotAdapter({ command = 'copilot', prefixArgs = [], ver
       // A killed or timed-out CLI may still have written its usage.
       usage = readUsageFile(usageFile);
       if (e.result) e.result = relativeProcessOutput(e.result, root);
-      ledger(false);
+      // A CLI that never started (missing command, interrupted first) spent nothing.
+      if (e.spawned) ledger(false);
       Object.assign(e, versionFields, usageFields(usage)); throw e;
     }
     finally { fs.rmSync(usageDir, { recursive: true, force: true }); }
@@ -338,8 +341,10 @@ export function createCopilotAdapter({ command = 'copilot', prefixArgs = [], ver
         observedModel, tokens: usage ? usage.inputTokens + usage.outputTokens : null, aiCredits: null,
         ...(cliUsage || usage ? { cliUsage: { ...cliUsage, ...usage } } : {}), ...(modelWarning ? { modelWarning } : {}),
         ...(worker !== role ? { workerProfile: worker } : {}), ...(result.outputSpooled ? { processOutput: (({ stdoutFile, stderrFile, stdoutBytes, stderrBytes, stdoutHash, stderrHash }) => ({ stdoutFile, stderrFile, stdoutBytes, stderrBytes, stdoutHash, stderrHash }))(relativeProcessOutput(result, root)) } : {}), ...versionFields };
-      ledger(true, observedModels.length === 1 ? observedModels[0] : undefined);
+      ledger(true, reportedModel(observedModels));
       return response;
-    } catch (e) { ledger(false); e.result = relativeProcessOutput(result, root); Object.assign(e, versionFields, usageFields(usage)); throw e; }
+    } catch (e) {
+      let observed; try { observed = reportedModel(copilotStreamFacts(processOutputLines(result)).observedModels); } catch {}
+      ledger(false, observed); e.result = relativeProcessOutput(result, root); Object.assign(e, versionFields, usageFields(usage)); throw e; }
   };
 }
