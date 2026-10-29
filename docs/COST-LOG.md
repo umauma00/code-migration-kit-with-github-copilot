@@ -47,6 +47,6 @@ node migration-kit/scripts/run_migration.mjs usage --format markdown
 node migration-kit/scripts/run_migration.mjs usage --run RUN_ID
 ```
 
-合計・役割別・モデル別の入力・出力・キャッシュのトークン数と AI unit（AIU、CLI の nano AIU ÷ 10億）を表示します。読むだけのコマンドで、確認は出ません。未計測の呼び出しがあれば合計は下限として示します。
+合計・役割別・モデル別の入力・出力・キャッシュのトークン数と AI unit（AIU、CLI の nano AIU ÷ 10億）を表示します。読むだけのコマンドで、確認は出ません。未計測の呼び出しや AI unit を報告しなかった呼び出しがあれば、その値は下限として示します。モデル別は、CLI が要求と違うモデルを報告した呼び出しを実際のモデルに数えます。
 
-含まないもの: オーケストレーターとの会話（親セッション。その Copilot CLI で `/usage` を実行すると見られます）、0.22.0 より前の呼び出し、pilot など別のルート（`--root` で指定）。CLI は AI Credits の額を報告しないため、請求額は GitHub の使用量画面で確認してください。
+含まないもの: オーケストレーターとの会話（親セッション。その Copilot CLI で `/usage` を実行すると見られます）、0.22.0 より前の呼び出し、pilot やレビューベンチマークの作業先など別のルート（そこで `--root` を付けて実行）。CLI は AI Credits の額を報告しないため、請求額は GitHub の使用量画面で確認してください。

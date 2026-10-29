@@ -294,16 +294,19 @@ export function createCopilotAdapter({ command = 'copilot', prefixArgs = [], ver
     let usage = null;
     // Every started CLI call goes into the kit-wide usage ledger once, measured or not.
     let logged = false;
-    const ledger = ok => {
+    const ledger = (ok, observedModel) => {
       if (logged) return; logged = true;
-      try { recordCallUsage(root, { runId, role: worker, target: unit?.target, sessionId: session.id, model, cliVersion, ok, usage }); }
+      try { recordCallUsage(root, { runId, role: worker, target: unit?.target, sessionId: session.id, model, observedModel, cliVersion, ok, usage }); }
       catch (e) { console.error(`WARNING: worker usage not recorded in the usage log: ${e.message}`); }
     };
+    // Built before the try: a failure here starts no CLI and is not a logged call.
+    let argv, options;
     try {
-      result = await runProcess(command, [...prefixArgs, ...copilotArgs(worker, model, undefined, layout, session, { usageFile, maxAiCredits: executionLimits(config).aiCredits, effort, context })], {
-        cwd: root, signal, input: prompt, timeoutMs: processTimeout(config, 'timeoutSeconds'), outputDir: safePath(root, 'migration/runs/process-output'),
-        env: copilotEnv(worker)
-      });
+      argv = [...prefixArgs, ...copilotArgs(worker, model, undefined, layout, session, { usageFile, maxAiCredits: executionLimits(config).aiCredits, effort, context })];
+      options = { cwd: root, signal, input: prompt, timeoutMs: processTimeout(config, 'timeoutSeconds'), outputDir: safePath(root, 'migration/runs/process-output'), env: copilotEnv(worker) };
+    } catch (e) { fs.rmSync(usageDir, { recursive: true, force: true }); throw e; }
+    try {
+      result = await runProcess(command, argv, options);
       usage = readUsageFile(usageFile);
     } catch (e) {
       // A killed or timed-out CLI may still have written its usage.
@@ -331,11 +334,12 @@ export function createCopilotAdapter({ command = 'copilot', prefixArgs = [], ver
       // A different reported model is a fallback or alias, never a silent pass.
       const modelWarning = observedModels.length && !observedModels.includes(model)
         ? `Copilot CLI reported model ${observedModels.join(', ')} for requested ${model}` : undefined;
-      ledger(true);
-      return { result: value, requestedModel: model, ...(effort ? { requestedEffort: effort } : {}), ...(context ? { requestedContext: context } : {}), promptBytes, responseBytes: Buffer.byteLength(JSON.stringify(value)),
+      const response = { result: value, requestedModel: model, ...(effort ? { requestedEffort: effort } : {}), ...(context ? { requestedContext: context } : {}), promptBytes, responseBytes: Buffer.byteLength(JSON.stringify(value)),
         observedModel, tokens: usage ? usage.inputTokens + usage.outputTokens : null, aiCredits: null,
         ...(cliUsage || usage ? { cliUsage: { ...cliUsage, ...usage } } : {}), ...(modelWarning ? { modelWarning } : {}),
         ...(worker !== role ? { workerProfile: worker } : {}), ...(result.outputSpooled ? { processOutput: (({ stdoutFile, stderrFile, stdoutBytes, stderrBytes, stdoutHash, stderrHash }) => ({ stdoutFile, stderrFile, stdoutBytes, stderrBytes, stdoutHash, stderrHash }))(relativeProcessOutput(result, root)) } : {}), ...versionFields };
+      ledger(true, observedModels.length === 1 ? observedModels[0] : undefined);
+      return response;
     } catch (e) { ledger(false); e.result = relativeProcessOutput(result, root); Object.assign(e, versionFields, usageFields(usage)); throw e; }
   };
 }

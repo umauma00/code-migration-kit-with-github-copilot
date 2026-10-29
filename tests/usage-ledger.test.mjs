@@ -121,3 +121,49 @@ test('survey runs total their surveyor calls from the ledger and fill cost-log t
   assert.equal(unmeasured.measuredUsage, undefined);
   assert.equal(fs.readFileSync(safePath(f.root, 'migration/cost-log.tsv'), 'utf8').trimEnd().split('\n').at(-1).split('\t')[3], 'unknown');
 });
+
+test('an empty or partly measured report is never complete, and fallback models are counted as reported', t => {
+  const f = prepare(t);
+  const none = usageReport(f.root, { runId: 'typo' });
+  assert.equal(none.total.calls, 0);
+  assert.equal(none.total.complete, false);
+  assert.match(usageMarkdown(none, 'en'), /No usage record for run typo/);
+  assert.match(usageMarkdown(none, 'ja'), /run typo の使用量記録はありません/);
+  recordCallUsage(f.root, { runId: 'r', role: 'implementer', model: 'asked', observedModel: 'fallback', ok: true, usage: { inputTokens: 1, outputTokens: 1, cacheReadTokens: 0, cacheWriteTokens: 0 } });
+  recordCallUsage(f.root, { runId: 'r', role: 'implementer', model: 'asked', observedModel: 'asked', ok: true, usage: { inputTokens: 1, outputTokens: 1, cacheReadTokens: 0, cacheWriteTokens: 0, nanoAiu: 5 } });
+  const report = usageReport(f.root);
+  assert.deepEqual(Object.keys(report.byModel), ['asked', 'fallback']);
+  assert.equal(report.total.complete, true, 'every call has tokens');
+  assert.equal(report.total.aiuComplete, false, 'one call reported no AI units');
+  assert.equal(report.total.callsWithoutAiu, 1);
+  const md = usageMarkdown(report, 'en');
+  assert.match(md, /\(lower bound\)/);
+  assert.match(md, /1 calls reported no AI units/);
+  assert.match(md, /Not included:[\s\S]*\/usage[\s\S]*0\.22\.0[\s\S]*benchmark/);
+});
+
+test('a call that fails before the CLI starts is not logged', async t => {
+  const f = await ready(t), transport = cliDouble(f);
+  wrapper(f, transport);
+  const adapter = createCopilotAdapter({ command: process.execPath, prefixArgs: [safePath(f.root, 'usage-cli.mjs')] });
+  const controller = new AbortController(); controller.abort();
+  await assert.rejects(adapter({ ...f, config: f.config, role: 'implementer', unit: f.units[0], extra: {}, signal: controller.signal, runId: '3-cccccccc' }));
+  assert.equal(lines(f.root).length, 0);
+});
+
+test('a survey with one unmeasured surveyor call keeps its tokens unknown', async t => {
+  const f = prepare(t, { count: 2 });
+  Object.assign(f.config, { transientRetryDelayMs: 1, phaseModels: { survey: 'survey-model' } });
+  writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  let n = 0;
+  const report = await runSurvey(f.root, f.config, 'facts', async args => {
+    recordCallUsage(args.root, { runId: args.runId, role: 'surveyor', model: 'survey-model', ok: true, usage: n++ ? null : { inputTokens: 3, outputTokens: 1, cacheReadTokens: 0, cacheWriteTokens: 0, nanoAiu: 1 } });
+    const input = JSON.parse(args.reviewInput);
+    return { result: { schemaVersion: 1, kind: 'survey', survey: 'facts', target: args.unit.target,
+      items: input.files.map(x => ({ file: x.path, category: 'entry-point', summary: `${x.path} defines functions`, evidence: `${x.path}:1 def` })) } };
+  }, { maxFiles: 1 });
+  assert.ok(report.agentCalls > 1);
+  assert.equal(report.measuredUsage.complete, false);
+  assert.equal(report.measuredUsage.unmeasuredCalls, report.agentCalls - 1);
+  assert.equal(fs.readFileSync(safePath(f.root, 'migration/cost-log.tsv'), 'utf8').trimEnd().split('\n').at(-1).split('\t')[3], 'unknown');
+});

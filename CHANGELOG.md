@@ -8,11 +8,15 @@ preparation audits kept them only in each receipt, and nothing added them up.
   `migration/runs/usage/calls.jsonl`: run, role, target, session, model, CLI
   version and the CLI's own usage (input, output and cache tokens, nano AIU).
   A call the CLI wrote no usage for is kept as unmeasured.
+  A call the CLI reported a different (fallback) model for counts under that
+  model; a call that never started a CLI process is not logged.
 - New read-only command `usage [--format json|markdown] [--run RUN_ID]`:
   totals by role and model, AI units, and what is not included (the parent
   chat with the orchestrator, earlier calls, other roots such as pilots). The
   CLI does not report the AI Credits amount, so the report says to check
   GitHub billing for the charge and `/usage` for the parent chat.
+  Totals with an unmeasured call, or a call without AI units, are marked as
+  lower bounds; an empty report is never complete.
 - Survey run reports get `measuredUsage`, and their cost-log rows get `tokens`
   when every surveyor call was measured (before: always unknown).
 - The skill reports `usage` when asked about AI usage and in the handoff.

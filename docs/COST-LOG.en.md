@@ -35,6 +35,6 @@ node migration-kit/scripts/run_migration.mjs usage --format markdown
 node migration-kit/scripts/run_migration.mjs usage --run RUN_ID
 ```
 
-It shows input, output and cache tokens and AI units (AIU: the CLI's nano AIU / 1e9) in total, by role and by model. It only reads, so nothing asks to confirm. With unmeasured calls the total is a lower bound.
+It shows input, output and cache tokens and AI units (AIU: the CLI's nano AIU / 1e9) in total, by role and by model. It only reads, so nothing asks to confirm. With unmeasured calls, or calls that reported no AI units, that figure is a lower bound. By model counts a call under the model the CLI reported when it differs from the requested one.
 
-Not included: the chat with the orchestrator (the parent session; run `/usage` in that Copilot CLI session), calls before 0.22.0, and other roots such as pilots (pass `--root`). The CLI does not report the AI Credits amount; check GitHub billing for the charge.
+Not included: the chat with the orchestrator (the parent session; run `/usage` in that Copilot CLI session), calls before 0.22.0, and other roots such as pilot and review benchmark directories (run it there with `--root`). The CLI does not report the AI Credits amount; check GitHub billing for the charge.
