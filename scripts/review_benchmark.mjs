@@ -35,9 +35,8 @@ try {
     // Workers read this root with view/grep/glob. Leave out what names the
     // seeded defects or holds correct code: the benchmark's own docs and code,
     // and the fixture judge's mutant and cases. The benchmark runs from the kit.
-    // Past review and validation records quote fixture code too.
-    for (const name of ['migration-kit/docs/REVIEW-BENCHMARK.md', 'migration-kit/docs/REVIEW-BENCHMARK.en.md', 'migration-kit/lib/bench.mjs', 'migration-kit/scripts/review_benchmark.mjs',
-      'migration-kit/docs/reviews', 'migration-kit/docs/validation', 'migration-kit/docs/plans', 'tests']) {
+    // Past review and validation records live in history/, which install never copies.
+    for (const name of ['migration-kit/docs/REVIEW-BENCHMARK.md', 'migration-kit/docs/REVIEW-BENCHMARK.en.md', 'migration-kit/lib/bench.mjs', 'migration-kit/scripts/review_benchmark.mjs', 'tests']) {
       fs.rmSync(safePath(root, name), { recursive: true, force: true });
     }
     const leaks = answerLeaks(root);

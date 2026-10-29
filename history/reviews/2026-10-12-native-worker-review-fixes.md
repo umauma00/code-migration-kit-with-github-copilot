@@ -38,7 +38,7 @@ native手順（`docs/NATIVE-WORKERS.md`）、各スキル、orchestratorに、
 
 ## 3. 初期化コマンド：採用・修正
 
-[プラグインスキル](../../skills/code-migration/SKILL.md)と[導入手順](../PLUGIN.md)で、
+[プラグインスキル](../../skills/code-migration/SKILL.md)と[導入手順](../../docs/PLUGIN.md)で、
 VS Code Copilotの初期化に `--worker-backend native --native-harness copilot` を明示した。
 Copilot CLIは `--worker-backend copilot-cli` とし、Localはコピー導入へ案内する。
 既存設定を上書きしないinstallerの動作は維持した。

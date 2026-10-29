@@ -36,12 +36,13 @@ lib/         共通エンジン
 prompts/     工程ごとの指示
 .github/     Copilotとの接続
 templates/   設定のひな形
-docs/        仕様・検証記録
+docs/        仕様・運用の資料
 guides/      視覚的な説明資料
 tests/       キットの自動テスト
 fixtures/    テスト用の小さな題材
 examples/    過去の移植記録
-skill/       スキルの入口</pre></div>
+history/     開発時のレビュー・検証記録
+skills/      プラグイン用のスキル</pre></div>
 <div class="install"><div class="kicker">install.mjs の導入先</div><h3>案件の実行用</h3><pre>対象プロジェクト/
 ├─ .github/       Copilotの入口・役割
 ├─ migration-kit/ キットの実行コード・文書
@@ -136,15 +137,13 @@ const groups=[
 ['mini/expected/','期待する変換後ソース','オフラインデモなどで使うJavaScriptの期待結果です。',[]],
 ['mini/tests/judge.py','デモの比較器','元実装、ビルド、smoke、parityと、意図的な破壊の検出を扱います。',[]]
 ]},
-{name:'docs/',role:'運用・契約・検証の資料',desc:'READMEを補う詳しい仕様、更新手順、レビュー記録、検証ログ、原版の資料です。',items:[
+{name:'docs/',role:'運用・契約・検証の資料',desc:'READMEを補う詳しい仕様、更新手順、原版の資料です。導入先の migration-kit/docs/ にも写ります。',items:[
 ['OPERATING-MANUAL.md','実行時のルール','元実装を残すこと、工程ごとの承認、独立レビュー、完了記録、修正上限などを定めます。',[]],
 ['CONTRACTS.md','JSONと記録の形式','ワーカーの応答やランナーが扱うデータ契約を説明します。',[]],
 ['LIVE-SMOKE.md','実環境での小規模確認','Copilot認証や実際のモデルを使う前に行う確認手順です。',[]],
 ['TESTING.md','検証範囲の説明','どの環境と動作を検証し、どの範囲が未確認かを記録します。',[]],
 ['UPGRADING.md','既存導入からの更新','導入済みのキットを更新する際の手順です。',[]],
-['DYNAMIC-WORKFLOWS.md','実験的アダプターの説明','任意のDynamic Workflows連携について説明します。',[]],
-['reviews/','レビューと修正の記録','互換性レビュー、再レビュー、修正のMarkdown・JSON記録を保存しています。',[]],
-['validation/','検証の証跡','自動テスト、オフラインデモ、CLI通信のログやJSON結果を保存しています。',[]]
+['DYNAMIC-WORKFLOWS.md','実験的アダプターの説明','任意のDynamic Workflows連携について説明します。',[]]
 ]},
 {name:'guides/',role:'視覚的な説明資料',desc:'技術ガイドとファイル構成図をまとめるディレクトリです。README.mdから目的に合った説明を選べます。',items:[
 ['README.md','ガイドの目次','各HTMLの内容と開き方をまとめます。',[]],
@@ -154,8 +153,15 @@ const groups=[
 {name:'examples/',role:'過去の移植で残した成果物',desc:'run1-toml/は、TOML処理の移植で使ったルール、差分、監査、比較用コードを保存した記録です。実行可能なデモはscripts/demo.mjsを読みます。',items:[
 ['run1-toml/README.md','保存した実行記録の説明','比較用コードをローカルのTOMLソース・TypeScript出力につなぐための情報です。',[]]
 ]},
-{name:'skill/',role:'スキルの入口文書',desc:'工程の状態から次の手順を案内するSKILL.mdを置きます。Copilot向けの配置版は.github/skills/code-migration/です。',items:[
-['SKILL.md','移植手順を選ぶ入口','READMEと運用マニュアルを読み、調査・比較器・ルール・変換・検証へ案内するスキル文書です。',[]]
+{name:'skills/',role:'プラグイン用のスキル',desc:'プラグイン導入で読み込まれるスキルです。コピー導入用の同じ内容は.github/skills/にあり、リンクの深さとキット本体の探し方だけが違います。',items:[
+['code-migration/SKILL.md','オーケストレーターの手順','プラグインのオーケストレーターが最初に読む手順です。/メニューには出しません。',[]],
+['depmap-adapter/SKILL.md','依存解析器の追加手順','対応していない言語の依存解析器を作るときの手順です。',[]]
+]},
+{name:'history/',role:'開発時のレビュー・検証記録',desc:'キットを作る過程のレビュー、修正対応表、計画、検証ログです。導入先には写しません。',items:[
+['reviews/','レビューと修正の記録','互換性レビュー、再レビュー、修正のMarkdown・JSON記録を保存しています。',[]],
+['validation/','検証の証跡','自動テスト、オフラインデモ、CLI通信のログやJSON結果を保存しています。',[]],
+['plans/','過去の作業計画','レビュー対応などの計画文書です。',[]],
+['REVIEW-FIXES.md','初期版の修正対応表','0.1.x のレビュー指摘と修正・回帰テストの対応表です。',[]]
 ]},
 {name:'ルートのファイル',prefix:'',role:'概要・由来・開発情報',desc:'リポジトリ全体の入口と配布情報です。',items:[
 ['README.md','最初に読む文書','目的、導入、設定、工程、検証範囲をまとめています。',[]],

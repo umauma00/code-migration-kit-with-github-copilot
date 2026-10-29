@@ -4394,7 +4394,7 @@
     },
     {
       "path": "scripts/review_benchmark.mjs",
-      "sha256": "26bcdf0c068988a0ab9eab9afc39a10d40f4e4b1a56eb3df67c69773f8f3c167",
+      "sha256": "703a5b4746e51abdd6a542138bd65de7c66820ffd69bf46d9c671a3e2607e773",
       "entries": [
         {
           "line": 17,
@@ -4417,22 +4417,22 @@
           "code": "if (fs.existsSync(root)) throw new Error('--target must be a new directory');"
         },
         {
-          "line": 44,
+          "line": 43,
           "kind": "error-or-exit-candidate",
           "code": "if (leaks.length) throw new Error(`Correct fixture code is still readable in the root: ${leaks.join(', ')}`);"
         },
         {
-          "line": 48,
+          "line": 47,
           "kind": "error-or-exit-candidate",
           "code": "if (!args.root) throw new Error(`${command} needs --root PATH (a directory made by setup)`);"
         },
         {
-          "line": 57,
+          "line": 56,
           "kind": "cancellation",
           "code": "process.once('SIGINT', () => controller.abort());"
         },
         {
-          "line": 65,
+          "line": 64,
           "kind": "error-or-exit-candidate",
           "code": "} catch (e) { console.error(e.message); process.exitCode = 1; }"
         }

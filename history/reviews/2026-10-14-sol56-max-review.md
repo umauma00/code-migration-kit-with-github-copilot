@@ -74,7 +74,7 @@ pilot案件自身の[実装承認](../../lib/pipeline.mjs#L61)にはreview済み
 その結果を含む03のレビューが必要になる。
 
 すべてのpilotが不可能という意味ではない。
-[LIVE-SMOKE](../LIVE-SMOKE.md#L15)のdemo setupは
+[LIVE-SMOKE](../../docs/LIVE-SMOKE.md#L15)のdemo setupは
 [demo](../../scripts/demo.mjs#L16)から[test helper](../../tests/helpers.mjs#L18)を呼び、
 `phasePolicy: legacy` に変更するため動く。
 ただし任意のrisk-weighted pilotで同じlayout/backendを使用する正式手順にはなっていない。

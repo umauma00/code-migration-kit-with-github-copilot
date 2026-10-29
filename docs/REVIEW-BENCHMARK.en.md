@@ -41,7 +41,7 @@ Model calls use quota and may cost money. The cases use the three files of `fixt
    node scripts/review_benchmark.mjs setup --target /tmp/review-bench --model MODEL_ID
    ```
 
-   Workers can read the root, so setup leaves out this benchmark's docs and code, the fixture judge's mutant, and past review and validation records (`docs/reviews`, `docs/validation`, `docs/plans`), and fails if a line of the correct code is still there. CHANGELOG and other docs still say the benchmark exists. Every role gets that model; edit `models` and `reasoningEfforts` in
+   Workers can read the root, so setup leaves out this benchmark's docs and code, and the fixture judge's mutant (past review and validation records live in `history/`, which install never copies), and fails if a line of the correct code is still there. CHANGELOG and other docs still say the benchmark exists. Every role gets that model; edit `models` and `reasoningEfforts` in
    `/tmp/review-bench/migration/config.json` to differ per role. Setup sets
    `reviewFocus: "shared"` so a single reviewer covers both lenses.
 

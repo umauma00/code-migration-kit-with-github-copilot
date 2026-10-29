@@ -1,6 +1,13 @@
-# Upgrading (0.17.0 and earlier releases)
+# Upgrading (0.18.0 and earlier releases)
 
 [日本語](UPGRADING.md) | English
+
+## 0.18.0 (repository cleanup)
+
+No behavior change. `scripts/review_benchmark.mjs` and the version number change, so existing approvals and completion records are invalidated once. Revalidate from judge. Completed outputs and survey results are kept.
+
+1. Removed `skill/SKILL.md`, an upstream file neither install path distributed. The plugin uses `skills/` and the copy install uses `.github/skills/` (unchanged).
+2. Moved the kit's development records (`docs/plans/`, `docs/reviews/`, `docs/validation/`, `docs/REVIEW-FIXES.md`) to `history/`. In a copy install you may delete the old record folders left in `migration-kit/docs/`; the kit does not read them.
 
 ## 0.17.0 (GitHub Copilot app support)
 
@@ -209,7 +216,7 @@ Existing approvals and completion records are revoked because the kit's files ch
 
 ## 2026-10-15 review changes
 
-Existing config is kept. markerPolicy, phaseModels, designInputs and packageMap are never added to existing projects automatically; the new template selects todo-lines-v1. To adopt it in an existing project, check the RULEBOOK's count rule, then redo judge and approvals after changing the setting. An existing translation gate without a batch is treated as the whole manifest, and an old receipt without purpose is production. New 00b records are also bound to the judge inputs. Updating the runtime revokes existing approvals and completion, so re-validate. Native doctor now treats real host capabilities as unknown and exits non-zero. inventory-merge.json is reserved as a generated receipt and cannot be registered as a protected input; move a conflicting existing input to another path and update the settings (nothing is overwritten automatically). The repair queue keeps a journal and review bindings for every job; after an interruption, resume with translate, and build approval stays blocked until every diagnostic, including unstarted jobs, has been reviewed. See [this change table](plans/2026-10-15-review-implementation.md).
+Existing config is kept. markerPolicy, phaseModels, designInputs and packageMap are never added to existing projects automatically; the new template selects todo-lines-v1. To adopt it in an existing project, check the RULEBOOK's count rule, then redo judge and approvals after changing the setting. An existing translation gate without a batch is treated as the whole manifest, and an old receipt without purpose is production. New 00b records are also bound to the judge inputs. Updating the runtime revokes existing approvals and completion, so re-validate. Native doctor now treats real host capabilities as unknown and exits non-zero. inventory-merge.json is reserved as a generated receipt and cannot be registered as a protected input; move a conflicting existing input to another path and update the settings (nothing is overwritten automatically). The repair queue keeps a journal and review bindings for every job; after an interruption, resume with translate, and build approval stays blocked until every diagnostic, including unstarted jobs, has been reviewed. See [this change table](../history/plans/2026-10-15-review-implementation.md).
 
 Use the README procedure for new installations. Running the 0.1.5 installer over an existing installation stops instead of overwriting files with different content; this is intended.
 

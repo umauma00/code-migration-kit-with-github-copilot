@@ -11,7 +11,7 @@ A1のsmoke再現には固定の成功コマンドを使っています。実案�
 
 言語を問わず使うため、未知のツールの `-o` を一律に出力オプションと解釈する修正は採用していません。出力先を直接引数に渡す利用者は、実行前に `"buildArtifactRoots": ["artifacts"]` 等を設定します。省略時は空配列で、旧設定の読み込みは維持します。生成物の内容は承認ハッシュの対象外なので、各検証コマンドで検査してください。元ソース・検証ルート・変換後ソース・明示入力・管理領域との重複は拒否します。
 
-`tests/astra-regressions.test.mjs` に8件追加しました。同じ8件を修正前0.1.2で実行すると6件が失敗し、修正後は8件すべて成功しました。コンパイラなしでも自動テストは実行できます。実際のCコンパイラによる確認は別途行い、結果を [検証記録](TESTING.md) に記載しています。
+`tests/astra-regressions.test.mjs` に8件追加しました。同じ8件を修正前0.1.2で実行すると6件が失敗し、修正後は8件すべて成功しました。コンパイラなしでも自動テストは実行できます。実際のCコンパイラによる確認は別途行い、結果を [検証記録](../docs/TESTING.md) に記載しています。
 
 ## 0.1.2 再レビュー指摘への対応
 
@@ -23,9 +23,9 @@ A1のsmoke再現には固定の成功コマンドを使っています。実案�
 | RR2 明示した変換先の追跡 | 出力ルートの走査に加え、manifestの全変換先をハッシュへ追加 | node_modules、__pycache__、.git配下の明示出力を検証コマンドが変更すると、終了0でも工程結果は失敗 |
 | RR3 文字コード | 生バイトをUTF-8として厳密に検査してから固定入力を作成。repairの診断にも同じ検査を適用。非対応ファイルは名前を示して停止 | Latin-1のPythonソースでレビューを呼び出さずblockedになる。非UTF-8の診断も拒否。正しいUTF-8の日本語・絵文字・BOM・実際の置換文字は保持 |
 
-`tests/rereview-regressions.test.mjs` に7件追加しました。0.1.1の42件と合わせた結果は [TESTING.md](TESTING.md) と [TAP](validation/automated-tests.tap) を参照してください。変換先の除外ディレクトリ3種と生成領域5種は、それぞれのテスト内で確認しています。
+`tests/rereview-regressions.test.mjs` に7件追加しました。0.1.1の42件と合わせた結果は [TESTING.md](../docs/TESTING.md) と [TAP](validation/automated-tests.tap) を参照してください。変換先の除外ディレクトリ3種と生成領域5種は、それぞれのテスト内で確認しています。
 
-本版はUTF-8以外の文字コードを自動変換しませんでした。0.11.1 からは、元ファイルを変えずに読み替えて担当へ渡し、使った文字コードを入力に明記します（停止して変換を求めると、仕様である元コードを書き換えることになるため）。既存導入では [UPGRADING.md](UPGRADING.md) に従い、承認とレビューを取り直します。
+本版はUTF-8以外の文字コードを自動変換しませんでした。0.11.1 からは、元ファイルを変えずに読み替えて担当へ渡し、使った文字コードを入力に明記します（停止して変換を求めると、仕様である元コードを書き換えることになるため）。既存導入では [UPGRADING.md](../docs/UPGRADING.md) に従い、承認とレビューを取り直します。
 
 実Copilot、IDE、SDKの実セッションは引き続き未検証です。この修正は入力検査・工程記録のローカルな正しさを対象としています。
 
@@ -44,7 +44,7 @@ A1のsmoke再現には固定の成功コマンドを使っています。実案�
 | R7 導入パッケージ | 配布元のtest/demoと、導入先のcheckを分ける。テスト0件は失敗にする | 導入先のdoctor実行と、空テストディレクトリが終了0にならないことを確認 |
 | C1 hook形式 | 入力キーの形式によるharness推測を廃止。Local形式にはCLI用トップレベル判断も含める | snake_case入力、CLI形式、Local形式の出力契約を確認 |
 
-回帰テストは `tests/review-regressions.test.mjs` にあります。既存27件に15件を追加しました。一括実行結果は [TESTING.md](TESTING.md) と [TAP](validation/automated-tests.tap) を参照してください。
+回帰テストは `tests/review-regressions.test.mjs` にあります。既存27件に15件を追加しました。一括実行結果は [TESTING.md](../docs/TESTING.md) と [TAP](validation/automated-tests.tap) を参照してください。
 
 工程結果は最新の記録を維持する方式です。イベントソーシング等の新しい基盤は導入していません。再実行で失効した工程結果には理由と時刻が残ります。
 
@@ -54,7 +54,7 @@ A1のsmoke再現には固定の成功コマンドを使っています。実案�
 
 POSIXでは同じプロセスグループ内の終了を検証しました。Windows向けにはtaskkill /T /Fを使いますが、Windows実機では未検証です。意図的に別グループで常駐するプロセスは対象外なので、検証コマンドはdaemon化しないでください。
 
-実Copilotモデル、VS Code UI、SDKの実セッションとhookの実消費側は引き続き未検証です。C1は出力の修正と契約テストまでで、実機互換性の保証ではありません。[LIVE-SMOKE.md](LIVE-SMOKE.md) に確認手順があります。
+実Copilotモデル、VS Code UI、SDKの実セッションとhookの実消費側は引き続き未検証です。C1は出力の修正と契約テストまでで、実機互換性の保証ではありません。[LIVE-SMOKE.md](../docs/LIVE-SMOKE.md) に確認手順があります。
 
 参照した一次資料：
 - [Custom agentsのtools設定](https://docs.github.com/en/copilot/reference/custom-agents-configuration)

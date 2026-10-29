@@ -4,9 +4,7 @@
 
 An unofficial adaptation of Anthropic's [Code Migration Kit](https://github.com/anthropics/code-migration-kit-with-claude-code) for GitHub Copilot, centered on the Copilot CLI. It covers cross-language ports end to end: feasibility → fixed rules → translation → independent review → build → old-versus-new comparison.
 
-**0.17.0** lets the GitHub Copilot app install the same plugin (see [plugin installation](docs/PLUGIN.en.md), checked against the official documentation on 2026-10-29).
-
-**0.3.0** removes the VS Code subagent (native) backend: workers always run on the Copilot CLI, also from VS Code. People complete the migration from AI chat alone; the AI runs the commands, including installing the CLI, starting its sign-in and installing the guardrails. **0.2.0** supports the Agent Plugins format for VS Code and the Copilot CLI. Install the kit itself as a plugin and keep only configuration and artifacts in the project. See [plugin installation](docs/PLUGIN.en.md), [fixes and re-review of the previous version](docs/reviews/2026-10-10-copilot-rereview-fixes.md) and [upgrading an existing install](docs/UPGRADING.en.md).
+Workers always run on the Copilot CLI, also from VS Code. Install the kit itself as an Agent Plugins plugin from the Copilot CLI, VS Code or the GitHub Copilot app, or as a copy in the repository. See [plugin installation](docs/PLUGIN.en.md), [upgrading an existing install](docs/UPGRADING.en.md) and the [changelog](CHANGELOG.md).
 
 Reference versions: Copilot CLI **1.0.98** (provider transport also checked on 1.0.93 and 1.0.95; on 1.0.98 every role's round trip in both layouts, hook loading and the error output format were checked too) and VS Code **1.142**. In VS Code 1.142 the Copilot harness is becoming the default for new sessions, and prompt files are Local-harness only (`chat.promptFilesLocations` is deprecated; sources: [1.142 release notes](https://code.visualstudio.com/updates/v1_142), [Prompt files](https://code.visualstudio.com/docs/agent-customization/prompt-files), [AI settings reference](https://code.visualstudio.com/docs/agents/reference/ai-settings), checked 2026-10-18); from 0.7.0 the only entry point, in VS Code and the Copilot CLI alike, is the migration orchestrator in the agent picker (skills and workers are set to stay out of the slash menu and the picker). The pinned upstream commit and SDK reference are recorded in [UPSTREAM.json](UPSTREAM.json). This is not an official Anthropic or GitHub distribution.
 
@@ -14,7 +12,7 @@ Reference versions: Copilot CLI **1.0.98** (provider transport also checked on 1
 
 ## Main changes
 
-Following reviews 1 and 2, this version adds [isolated pilots](docs/PILOT.md) before phase 03, early comparator validation and [preparation audit contracts](docs/PREPARATION-AUDITS.md), and [translation batches, parallel repair and TODO count checks](docs/EXECUTION-SCOPES.md). See also [scope of the changes and remaining live checks](docs/plans/2026-10-15-review-implementation.md).
+Following reviews 1 and 2, this version adds [isolated pilots](docs/PILOT.md) before phase 03, early comparator validation and [preparation audit contracts](docs/PREPARATION-AUDITS.md), and [translation batches, parallel repair and TODO count checks](docs/EXECUTION-SCOPES.md). See also [scope of the changes and remaining live checks](history/plans/2026-10-15-review-implementation.md).
 
 | Area | Behavior in this version |
 |---|---|

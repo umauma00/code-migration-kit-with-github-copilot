@@ -20,7 +20,7 @@ GPT-6 Astraによる方針レビューを実施し、最終主agent応答の判�
 
 生の検証記録: [自動テスト](../validation/copilot-compatibility-tests-2026-10-10.log)、[オフラインデモ](../validation/copilot-offline-demo-2026-10-10.log)、[実CLI 1.0.93と疑似プロバイダー](../validation/copilot-cli-1.0.93-local-provider-2026-10-10.json)、[旧1.0.40のapp runtime](../validation/copilot-cli-1.0.40-runtime-local-provider-2026-10-10.json)。
 
-実AIの移植品質、実アカウントの認証・モデル利用可否、VS CodeのUI、Dynamic Workflowsの実セッション、Windowsは未検証。[更新手順](../UPGRADING.md) と [実アカウント確認](../LIVE-SMOKE.md) を参照。
+実AIの移植品質、実アカウントの認証・モデル利用可否、VS CodeのUI、Dynamic Workflowsの実セッション、Windowsは未検証。[更新手順](../../docs/UPGRADING.md) と [実アカウント確認](../../docs/LIVE-SMOKE.md) を参照。
 
 通常テスト: npm test / npm run demo。
 実CLI通信の再現: node tests/verify_cli_transport.mjs /absolute/path/to/copilot。

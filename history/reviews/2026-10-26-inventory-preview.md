@@ -26,7 +26,7 @@ shard検証だけを通しても、その後に追加した候補writerを実行
 - coordinator所有の準備・報告helperのTypeError/SyntaxErrorは、実装と呼び出しの契約を確認して修正・検証し、同じ許可範囲で再開する。ルール・元ソース・judge・inventory判断の変更は従来のgateで扱う。
 - helperを追加・変更した際は、コメント付きTSVと通常行を含む小さな入力で、解析だけでなく候補の書き出しまで確認する。既存shardを使える場合、これらのチェックに新しいモデル呼び出しは不要。
 
-使い方・ハッシュの意味は [準備監査](../PREPARATION-AUDITS.md#inventory-02) を参照。
+使い方・ハッシュの意味は [準備監査](../../docs/PREPARATION-AUDITS.md#inventory-02) を参照。
 
 ## 検証
 

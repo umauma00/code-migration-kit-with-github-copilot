@@ -185,8 +185,7 @@ Aの実装100ms、独立Bの実装1800ms、Aに依存するCの実装1200ms、�
 重要な観測は、一群の完了待ちで早い結果の提出が遅れ、依存先の開始が遅れること。
 
 - [観測値とイベント列](../validation/copilot-parallel-orchestration-2026-10-14.json)
-- [再現用の固定応答スクリプト](../validation/copilot-parallel-queue-probe-2026-10-14.mjs)
-  は `node docs/validation/copilot-parallel-queue-probe-2026-10-14.mjs` で実行できた（0.3.0以降は実行不可）。
+- 再現用の固定応答スクリプト（`copilot-parallel-queue-probe-2026-10-14.mjs`）は 0.3.0 以降実行できなくなったため、0.18.0 で削除した（git 履歴に残る）。
   使い捨て案件を/tmpに作り、モデルやCopilot CLIは呼ばない。
 
 ## 残る検証と優先順

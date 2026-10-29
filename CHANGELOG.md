@@ -1,3 +1,21 @@
+# 0.18.0 — 2026-10-29
+
+Repository cleanup: no behavior change.
+
+- Removed `skill/SKILL.md`, the upstream Claude Code skill that neither install
+  path distributed and that had fallen behind `skills/code-migration/`. The
+  plugin uses `skills/`; the copy install uses `.github/skills/`.
+- Moved the kit's own development records (`docs/plans/`, `docs/reviews/`,
+  `docs/validation/`, `docs/REVIEW-FIXES.md`) to `history/`. The copy install
+  copies `docs/` into `migration-kit/docs/`, so these records no longer land in
+  migration projects. Links were updated.
+- Deleted the 2026-10-14 parallel-queue probe script, which could not run since
+  0.3.0 (it stays in git history).
+- The review benchmark setup no longer removes the old record folders, since
+  install does not copy them any more.
+- README: replaced the 0.2.0, 0.3.0 and 0.17.0 release notes at the top with a
+  short description and links to the plugin guide, upgrading notes and changelog.
+
 # 0.17.0 — 2026-10-29
 
 The plugin installs in the GitHub Copilot app too, alongside the Copilot CLI
@@ -1225,7 +1243,7 @@ silence or output volume; continuous execution stays continuous.
   paths and cross-package edges. Report edges originating outside the selected
   roots; reject required dependencies outside the scope without replacing a map.
 - Add rereview regressions and CLI/workflow worker transport validation. See
-  [fixes and rereview](docs/reviews/2026-10-10-copilot-rereview-fixes.md) and
+  [fixes and rereview](history/reviews/2026-10-10-copilot-rereview-fixes.md) and
   [upgrading](docs/UPGRADING.md).
 
 # 0.1.4 — 2026-10-10
@@ -1241,7 +1259,7 @@ silence or output volume; continuous execution stays continuous.
 - Use concrete view/grep/glob tools for implementer, fixer and arbiter; reviewers
   remain tool-free. Check the machine-output CLI flag in doctor.
 - Add compatibility regressions and an opt-in real-CLI/local-provider integration
-  check. See [fix verification](docs/reviews/2026-10-10-copilot-fixes.md).
+  check. See [fix verification](history/reviews/2026-10-10-copilot-fixes.md).
 
 Existing installations must create/audit the review dependency map and update
 worker profiles. See [upgrading](docs/UPGRADING.md). Actual AI migration quality,
@@ -1260,7 +1278,7 @@ account authentication, VS Code and SDK sessions remain unverified.
   omit the new field; the runner does not infer unknown output-option semantics.
 
 Live model/IDE/SDK consumption and macOS/Windows remain unverified.
-See [review fixes](docs/REVIEW-FIXES.md) and [validation](docs/TESTING.md).
+See [review fixes](history/REVIEW-FIXES.md) and [validation](docs/TESTING.md).
 
 # 0.1.2 — 2026-10-08
 
@@ -1274,7 +1292,7 @@ See [review fixes](docs/REVIEW-FIXES.md) and [validation](docs/TESTING.md).
 - Add seven rereview regression tests and update contracts and upgrade notes.
 
 Live model/IDE/SDK consumption and macOS/Windows remain unverified.
-See [review fixes](docs/REVIEW-FIXES.md) and [validation](docs/TESTING.md).
+See [review fixes](history/REVIEW-FIXES.md) and [validation](docs/TESTING.md).
 
 # 0.1.1 — 2026-10-08
 
@@ -1291,7 +1309,7 @@ See [review fixes](docs/REVIEW-FIXES.md) and [validation](docs/TESTING.md).
 - Add 15 regression tests and update setup, contracts, live checks and upgrade notes.
 
 Live model/IDE/SDK consumption and macOS/Windows remain unverified.
-See [review fixes](docs/REVIEW-FIXES.md) and [validation](docs/TESTING.md).
+See [review fixes](history/REVIEW-FIXES.md) and [validation](docs/TESTING.md).
 
 # 0.1.0 — 2026-10-08
 

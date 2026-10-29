@@ -28,7 +28,7 @@ test('runtime process termination is confined to cancellation/error handlers and
 });
 
 test('every distributed parent instruction forbids CPU/time/silence cancellation and implicit finite budgets', () => {
-  for (const file of ['skill/SKILL.md', 'skills/code-migration/SKILL.md', '.github/skills/code-migration/SKILL.md',
+  for (const file of ['skills/code-migration/SKILL.md', '.github/skills/code-migration/SKILL.md',
     '.github/agents/migration-orchestrator.agent.md', 'com.github.copilot/agents/code-migration-plugin-orchestrator.agent.md', '.github/copilot-instructions.md', 'docs/PHASE-HANDOFF.md']) {
     const text = fs.readFileSync(path.join(kitRoot, file), 'utf8');
     for (const pattern of [/100%/, /600/, /continuous/, /explicit/]) assert.match(text, pattern, file);

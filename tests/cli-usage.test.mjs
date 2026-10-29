@@ -13,7 +13,7 @@ import { humanGate } from '../lib/guardrails.mjs';
 import { specs, parseCommandLine, allOptions, resolve } from '../lib/cli.mjs';
 
 // Records of past runs and reviews quote commands as they were then.
-const skipped = /^(?:tests|fixtures|node_modules|lib\/vendor|docs\/validation|docs\/reviews|docs\/plans|\.git)(?:\/|$)|^CHANGELOG\.md$|^lib\/cli\.mjs$/;
+const skipped = /^(?:tests|fixtures|node_modules|lib\/vendor|history|\.git)(?:\/|$)|^CHANGELOG\.md$|^lib\/cli\.mjs$/;
 const textFile = /\.(?:md|mjs|js|py|sh|html|json|ya?ml|txt)$/;
 const byScript = new Map(Object.values(specs).map(spec => [spec.script, spec]));
 const scriptPattern = new RegExp(`(?:^|[\\s/\\\\"'\`(])(${[...byScript.keys()].map(s => s.replace('.', '\\.')).join('|')})(?=[\\s\`"'),;]|$)`, 'g');

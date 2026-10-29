@@ -1,6 +1,13 @@
-# 更新手順（0.17.0 と以前の版）
+# 更新手順（0.18.0 と以前の版）
 
 日本語 | [English](UPGRADING.en.md)
+
+## 0.18.0（リポジトリの整理）
+
+動作は変わりません。`scripts/review_benchmark.mjs` と版番号が変わるため、既存の承認・完了記録は一度だけ失効します。judgeから再検証してください。完了済みの出力と survey の結果は保持されます。
+
+1. 上流由来で配布されていなかった `skill/SKILL.md` を削除しました。プラグインは `skills/`、コピー導入は `.github/skills/` を使います（変更なし）。
+2. 開発時のレビュー・検証記録（`docs/plans/`・`docs/reviews/`・`docs/validation/`・`docs/REVIEW-FIXES.md`）を `history/` へ移しました。コピー導入では、導入先の `migration-kit/docs/` に残った古い記録フォルダーを削除してかまいません（キットは読みません）。
 
 ## 0.17.0（GitHub Copilot app 対応）
 
@@ -175,7 +182,7 @@ inventory-merge.jsonは生成receiptとして予約し、保護入力への登�
 衝突する既存の入力は別のパスへ移して設定を更新してください。自動上書きはしません。
 repair queueは全jobのjournalとレビューbindingを保持します。中断後はtranslateで再開し、
 未着手jobを含む全診断のレビュー完了までbuild承認は通りません。
-詳細は[今回の対応表](plans/2026-10-15-review-implementation.md)を参照してください。
+詳細は[今回の対応表](../history/plans/2026-10-15-review-implementation.md)を参照してください。
 
 新規導入はREADMEの手順を使います。既存の導入先に0.1.5のinstallerを実行すると、内容が違うファイルは上書きせず停止します。これは意図した動作です。
 

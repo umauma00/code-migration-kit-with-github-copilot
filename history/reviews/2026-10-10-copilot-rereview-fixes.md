@@ -12,9 +12,9 @@
 
 `tools: []` だけではCLIのsession agentへの自動指示注入を止められないため、全ワーカーを新しいCLIプロセスで起動し、暗黙指示を無効にした。[GitHubのCLI仕様](https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-command-reference)にあるフラグを実際のprovider requestでも検証した。役割プロファイルとランナーの応答契約は引き続き適用される。案件の移植方針は、承認対象のRULEBOOK/inventoryへ取り込む。
 
-実験的workflowはSDKで工程を登録し、ワーカーを通常CLIと同じアダプターから起動する。参照SDKの `WorkflowAgentOptions` には暗黙指示を無効化する呼び出し単位の設定がないため、`ctx.agent` を使う経路を廃止した。SDKのdurable agent resultとschema retryを使わず、ランナーの記録、JSON検証、concurrency・maxAgentCalls・timeoutSeconds・キャンセル伝播を使う。実行ファイルはworkflow argsの `copilot` で選択できる。詳細は [Dynamic Workflows](../DYNAMIC-WORKFLOWS.md) を参照。
+実験的workflowはSDKで工程を登録し、ワーカーを通常CLIと同じアダプターから起動する。参照SDKの `WorkflowAgentOptions` には暗黙指示を無効化する呼び出し単位の設定がないため、`ctx.agent` を使う経路を廃止した。SDKのdurable agent resultとschema retryを使わず、ランナーの記録、JSON検証、concurrency・maxAgentCalls・timeoutSeconds・キャンセル伝播を使う。実行ファイルはworkflow argsの `copilot` で選択できる。詳細は [Dynamic Workflows](../../docs/DYNAMIC-WORKFLOWS.md) を参照。
 
-root AGENTSを変えても自動ワーカーの入力は変わらない。RULEBOOK、役割プロファイル、依存宣言等の明示入力と実行コードの変更は従来どおりhashで検出する。更新後は古い承認を再利用せず、[更新手順](../UPGRADING.md)に従って再検証・再承認する。
+root AGENTSを変えても自動ワーカーの入力は変わらない。RULEBOOK、役割プロファイル、依存宣言等の明示入力と実行コードの変更は従来どおりhashで検出する。更新後は古い承認を再利用せず、[更新手順](../../docs/UPGRADING.md)に従って再検証・再承認する。
 
 ## 依存マップ生成
 
