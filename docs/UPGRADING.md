@@ -7,6 +7,7 @@
 キットのファイル（plugin.json・scripts）が変わるため、既存の承認・完了記録は一度だけ失効します。judgeから再検証してください。完了済みの出力は保持されます。
 
 1. 03 の比較試験 B のコマンドに `apply_patch` が加わりました。gpt-6-luna など `apply_patch` でしか書けないモデルでも B が書き込めます。途中の 03 はチェックリストの新しいコマンドで B をやり直してください。
+   hook も直しました：`apply_patch` による `migration/guardrails.json` の書き換えを拒否し、ツール付きレビューの `grep`・`rg`・`glob`（CLI 1.0.105 では対象を `paths` で渡します）が再び使えます。
 2. `doctor` に `commands can write outside the project and use loopback` の確認が加わりました。ローカル sandbox が有効なセッションでは失敗し、`/sandbox off` か sandbox の設定での許可を案内します。キットは設定を変えません。
 3. 初期設定中の `settings apply` は、sandbox を見つけると `sandboxQuestion` を返し、工程 00 と autopilot への切り替えの前に聞きます（解消するまで、初期設定中の apply のたびに聞きます）。初期設定が済んだ案件では、03 の前に `doctor` で確かめてください。
 4. コピー導入では `migration-kit/` 全体と `.github/skills/` の SKILL.md を一時導入先の内容に置き換えます。プラグインは更新だけで入ります。

@@ -1005,7 +1005,7 @@
     },
     {
       "path": "lib/guardrails.mjs",
-      "sha256": "49b75697d1b8fab5e1ef5b55e3a2f9302a929dde26e0a499135938c613498f35",
+      "sha256": "156882ea3e71baec50bff72d144ec33f4760db926cf8482a371e9a0a8b44916b",
       "entries": [
         {
           "line": 46,
@@ -1076,7 +1076,7 @@
     },
     {
       "path": "lib/guidance.mjs",
-      "sha256": "3a57e7883802425fa874d5d7168e8b9d0f7e6066154f5889ead7e9b938bee107",
+      "sha256": "2b3c79704543ba4387ef3eb68eb9fef92af41d30ec0b08f30108370cc6b543e5",
       "entries": [
         {
           "line": 73,
@@ -2666,7 +2666,7 @@
     },
     {
       "path": "lib/sandbox.mjs",
-      "sha256": "fc4743278e76cfa3c87169607e140d8029f5213d565f5ce9eb5ba647d70b9431",
+      "sha256": "972aca7b4bddd90f99c86d14da17bce73d1a931c03394d8abccf3c472ddfca77",
       "entries": [
         {
           "line": 32,
@@ -2685,6 +2685,11 @@
         },
         {
           "line": 61,
+          "kind": "deadline-or-observation",
+          "code": "// A connect slower than the timeout is a loaded machine, not a refusal."
+        },
+        {
+          "line": 62,
           "kind": "deadline-or-observation",
           "code": "const error = await tryLoopback(host, timeoutMs);"
         }
@@ -4296,10 +4301,10 @@
     },
     {
       "path": "scripts/migration_hook.mjs",
-      "sha256": "cd3bc214030356a4fa54a196437eadc12a2054f3afcaabf18666c6bb06d7c1de",
+      "sha256": "dd0385b24c9ca1aaef0bfdd9d8fc2d7d6123eeae5ccdb1c9881c399b2b64d697",
       "entries": [
         {
-          "line": 58,
+          "line": 65,
           "kind": "error-or-exit-candidate",
           "code": "} catch (e) { console.error(`Migration hook: ${e.message}`); process.exitCode = 2; }"
         }
@@ -4476,7 +4481,7 @@
     },
     {
       "path": "scripts/run_migration.mjs",
-      "sha256": "c2c30187872f65c7b3c00f3c7e0950f0305c39f91f950c5cc78bc396832bf284",
+      "sha256": "b11c7840cace56c74d611d1f59e15682d94ffa0729f1b41a0cc277c7fa1dbf31",
       "entries": [
         {
           "line": 86,
@@ -4564,82 +4569,82 @@
           "code": "const hook = await probeReviewerHook(command, [], { cwd: root, layout, signal, timeoutMs });"
         },
         {
-          "line": 198,
+          "line": 197,
           "kind": "deadline-or-observation",
           "code": "checks.push({ check: 'file descriptor limit', ...await fileLimits({ signal, timeoutMs }), minimum: fileLimitMinimum,"
         },
         {
-          "line": 201,
+          "line": 200,
           "kind": "error-or-exit-candidate",
           "code": "if (signal?.aborted) throw new Error('Interrupted');"
         },
         {
-          "line": 218,
+          "line": 217,
           "kind": "error-or-exit-candidate",
           "code": "if (!Number.isInteger(seconds) || seconds < 1 || seconds > 1800) throw new Error('--wait must be a number of seconds from 1 to 1800');"
         },
         {
-          "line": 226,
+          "line": 225,
           "kind": "loop-exit-candidate",
           "code": "if (progressKey(report) !== start) break;"
         },
         {
-          "line": 242,
+          "line": 241,
           "kind": "error-or-exit-candidate",
           "code": "throw new Error('Specify the exact lock owner PID');"
         },
         {
-          "line": 248,
+          "line": 247,
           "kind": "pid-probe",
           "code": "if (alive) try { process.kill(pid, 0); } catch (e) { if (e.code === 'ESRCH') alive = false; else throw e; }"
         },
         {
-          "line": 249,
+          "line": 248,
           "kind": "error-or-exit-candidate",
           "code": "if (alive) throw new Error('Lock owner is still running; refusing to unlock');"
         },
         {
-          "line": 281,
+          "line": 280,
           "kind": "error-or-exit-candidate",
           "code": "if (!['list', 'set'].includes(args._[1])) throw new Error('Use models list [--format json|markdown] | models set --assign ROLE=ID[:EFFORT][:long_context],... | models set --role ROLE --model ID [--effort LEVEL|default] [--context default|long_context]');"
         },
         {
-          "line": 282,
+          "line": 281,
           "kind": "error-or-exit-candidate",
           "code": "if (args.format !== undefined && !['json', 'markdown'].includes(args.format)) throw new Error('models list format must be json or markdown');"
         },
         {
-          "line": 285,
+          "line": 284,
           "kind": "error-or-exit-candidate",
           "code": "if (!readConfigIfPresent(root)) throw new Error('migration/config.json is missing: initialize the project (install.mjs) before recording model choices');"
         },
         {
-          "line": 303,
+          "line": 302,
           "kind": "error-or-exit-candidate",
           "code": "if (!readConfigIfPresent(root)) throw new Error('migration/config.json is missing: initialize the project (install.mjs) before run settings');"
         },
         {
-          "line": 311,
+          "line": 310,
           "kind": "error-or-exit-candidate",
           "code": "if (!fs.existsSync(file)) throw new Error(`${runSettingsFile} is missing: run settings init first`);"
         },
         {
-          "line": 313,
+          "line": 312,
           "kind": "error-or-exit-candidate",
           "code": "try { settings = JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\\uFEFF/, '')); } catch (e) { throw new Error(`${runSettingsFile} is not valid JSON: ${e.message}`); }"
         },
         {
-          "line": 315,
+          "line": 314,
           "kind": "error-or-exit-candidate",
           "code": "if (errors.length) process.exitCode = 1;"
         },
         {
-          "line": 319,
+          "line": 318,
           "kind": "error-or-exit-candidate",
           "code": "if (action !== 'apply') throw new Error('Use settings init | check | apply');"
         },
         {
-          "line": 323,
+          "line": 322,
           "kind": "error-or-exit-candidate",
           "code": "if (!result.applied) process.exitCode = 1;"
         },
@@ -4790,5 +4795,5 @@
       ]
     }
   ],
-  "candidateLines": 868
+  "candidateLines": 869
 }

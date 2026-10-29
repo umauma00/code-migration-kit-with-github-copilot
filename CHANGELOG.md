@@ -10,6 +10,14 @@ warning.
   B got read-only tools and wrote nothing. Checked with a loopback model
   provider: with the new list both gpt-4.1 (`create`) and gpt-6-luna
   (`apply_patch`) write. Worker roles are unaffected (read tools only).
+- The hook protects `migration/guardrails.json` (and the auto-mode record)
+  from `apply_patch` too. CLI 1.0.105 sends its input as the bare patch text,
+  not JSON; the hook skipped such a call, so a gpt-6-luna session could write
+  the guardrails file directly (reproduced with the real CLI, now denied).
+- Tool-assisted reviewers can search again. On CLI 1.0.105, `grep`/`rg` and
+  `glob` name their targets `paths` (a string or an array) for every model,
+  so the hook found no path and denied every search. It now checks each of
+  `paths` like `view`'s path, and denies a glob pattern that climbs out of them.
 
 The sandbox part: With
 sandboxing on (VS Code, Copilot CLI or the Copilot app), comparison B and the

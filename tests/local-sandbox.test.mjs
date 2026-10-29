@@ -2,7 +2,7 @@
 // A local sandbox (2026-10-29 report): phase 03 could not write comparison B
 // outside the repository, and doctor's reviewer-hook check could not use
 // loopback, so the run stopped at 03 with a question about the sandbox. The
-// kit now finds this during setup and asks once, before phase 00.
+// kit now finds this during setup and asks there, before phase 00.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -77,7 +77,7 @@ test('doctor reports a sandboxed session as a failed check with sandbox guidance
   assert.equal(entry.guidance.id, 'local-sandbox');
   assert.equal(entry.guidance.options[0].id, 'sandbox-off');
   assert.equal(entry.guidance.options[0].command, '/sandbox off');
-  const passing = await doctor(f.root, f.config);
+  const passing = await doctor(f.root, f.config, { sandboxProbe: async () => ({ ok: true, blocked: [] }) });
   assert.equal(passing.checks.find(c => c.check === sandboxCheckName).ok, true, 'an unrestricted session passes');
 });
 
@@ -110,7 +110,10 @@ function setupProject(t, phaseMode) {
   writeJSON(safePath(root, runSettingsFile), s);
   return { root, run, sandboxed };
 }
-test('settings apply asks the sandbox question during setup, and not once phase 00 started', t => {
+// The subprocess cases use the real probe for the unrestricted runs, so they
+// cannot say anything inside a sandboxed session (the kit's own use case).
+const hostOpen = (await localSandboxProbe()).ok;
+test('settings apply asks the sandbox question during setup, and not once phase 00 started', { skip: !hostOpen && 'this session itself is sandboxed' }, t => {
   const { run, sandboxed } = setupProject(t, 'normal');
   let out = run(sandboxed, 'settings', 'apply');
   assert.equal(out.status, 0, out.stdout + out.stderr);

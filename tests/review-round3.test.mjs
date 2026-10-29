@@ -51,6 +51,12 @@ test('hook: agents cannot write guardrails.json; approvals and phase records ask
   assert.equal(write('create', { path: 'migration/guardrails.json', file_text: '{}' }).decision, 'deny');
   assert.equal(write('replace_string_in_file', { filePath: path.join(root, 'migration/guardrails.json') }).decision, 'deny');
   assert.equal(write('apply_patch', { input: '*** Begin Patch\n*** Update File: migration/guardrails.json\n*** End Patch' }).decision, 'deny');
+  // CLI 1.0.105 sends apply_patch's input as the bare patch string (seen in a
+  // live preToolUse event with gpt-6-luna); it is protected the same way.
+  assert.equal(write('apply_patch', '*** Begin Patch\n*** Update File: migration/guardrails.json\n@@\n-{}\n+{}\n*** End Patch\n').decision, 'deny');
+  assert.equal(write('apply_patch', `*** Begin Patch\n*** Add File: ${path.join(root, 'migration/guardrails.json')}\n+{}\n*** End Patch\n`).decision, 'deny');
+  assert.equal(write('apply_patch', '*** Begin Patch\n*** Add File: migration/notes.md\n+mentions migration/guardrails.json only\n*** End Patch\n'), null, 'other files stay writable');
+  assert.equal(write('bash', 'not json').decision, 'deny', 'a shell call with unreadable arguments is still denied');
   assert.equal(write('create', { path: 'migration/notes.md', file_text: 'mentions migration/guardrails.json only' }), null, 'text mentions are fine');
   assert.equal(humanGate('node x/run_migration.mjs approve smoke --note ok'), 'approve smoke');
   const ask = decisionOutput({ decision: 'ask', reason: 'confirm' });
