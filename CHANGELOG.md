@@ -1,3 +1,28 @@
+# 0.25.0 — 2026-10-29
+
+The kit reads which file tools each model has instead of assuming them, so a
+new model family does not leave a role without tools at phase 03 or in review.
+Model families differ (CLI 1.0.105: gpt-6-luna has view, rg, glob and
+apply_patch; gpt-4.1 has view, grep, glob, create and edit), and
+`--available-tools` drops a name a model does not have without saying so.
+
+- `probeModelTools` asks the real CLI with a loopback model provider which tools
+  a model gets under given flags: no account, network or AI usage.
+- New `stress-b command --dir DIR [--model ID]` writes phase 03 comparison B's
+  exact command (bash and PowerShell) with only the file tools this model has,
+  at least one of them writing. A model with no writing tool stops with
+  guidance (`model-tools`: choose another model, or update the kit). When the
+  CLI makes no loopback request, the command uses the fallback list and says
+  it is unverified, never a stop. The 03 prompt and checklist use it; the
+  fixed command stays as the fallback.
+- `doctor --check-cli` checks per model that tool-assisted reviewers get a
+  reading and a search tool, and that comparison B's model gets a writing tool
+  (`model tools: ...`). Unverifiable probes are reported as not verified.
+- The PowerShell line quotes the tool list (a bare comma is an array there)
+  and curly single quotes; a directory named `..x` inside the repository is
+  refused; a request without a tool list is not read as "no tools"; each probe
+  is bounded to 2 minutes when commands are not.
+
 # 0.24.0 — 2026-10-29
 
 Phase 03 comparison B can write with GPT models that edit through
