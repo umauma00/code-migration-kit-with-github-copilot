@@ -163,7 +163,7 @@ about) still stop the run. Questions inside a phase are not asked either: an
 audit or review that returns `changes` gets one fix and one fresh re-audit, and
 whatever remains is listed in the report and the record's note; a choice the
 source and RULEBOOK leave open takes the most conservative option with a
-`TODO(port)`, in the RULEBOOK before 02 is recorded and only in the translated
+`TODO(port)`, in the RULEBOOK before the inventory survey runs and only in the translated
 output after that, and is listed as decided without the person.
 
 At an ordinary successful boundary, ask one question with these choices adapted
@@ -175,7 +175,8 @@ to the actual next phase:
 - **Pause:** stop and leave the saved artifacts available for later resumption.
 
 Route translated-code revisions through the runner's repair/review flow. Handle
-rulebook or judge amendments at a phase boundary and refresh affected validation;
+rulebook or judge amendments at a phase boundary (in auto mode the RULEBOOK is
+not edited after the inventory survey runs) and refresh affected validation;
 the revise choice does not permit bypassing those existing controls.
 
 For translation/build/smoke and runtime parity/post-parity or source-only handoff, the proceed choice must explicitly

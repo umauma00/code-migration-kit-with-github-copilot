@@ -358,12 +358,12 @@ test('auto mode instructions also cover audits, size-limited reviews and open ch
     assert.match(text, /Questions inside a phase are not asked either: an audit or independent review that returns `changes` gets one round/, file);
     assert.match(text, /reviews limited by `maxReviewInputBytes`, and UNKNOWN or uncited rows are not fixed again/, file);
     assert.match(text, /takes the most conservative option, the one closest to the original structure that adds no framework or dependency, unless the person already stated one/, file);
-    assert.match(text, /Before 02 is recorded, write it into the RULEBOOK with a greppable `TODO\(port\)` naming the open choice\. After that, leave the RULEBOOK unchanged/, file);
+    assert.match(text, /Before the inventory survey runs, write it into the RULEBOOK with a greppable `TODO\(port\)` naming the open choice\. After that, leave the RULEBOOK unchanged/, file);
   }
   for (const file of ['.github/agents/migration-orchestrator.agent.md', 'com.github.copilot/agents/code-migration-plugin-orchestrator.agent.md']) {
     const text = read(file);
     assert.match(text, /Inside a phase ask nothing either: an audit or review that returns changes gets one fix and one fresh re-audit/, file);
-    assert.match(text, /takes the most conservative option \(closest to the original, no new framework or dependency\) unless the person gave one, with `TODO\(port\)` in the RULEBOOK before 02 is recorded \(later, in the translated output only, never the RULEBOOK\)/, file);
+    assert.match(text, /takes the most conservative option \(closest to the original, no new framework or dependency\) unless the person gave one, with `TODO\(port\)` in the RULEBOOK before the inventory survey runs \(later, in the translated output only, never the RULEBOOK\)/, file);
   }
   assert.match(read('docs/PREPARATION-AUDITS.md'), /In auto mode \(`phaseMode: auto`\) every preparation audit in 00b, 01 and 02 gets one repair round only/);
   assert.match(read('docs/ORDERED-WORKFLOW.md'), /工程の中でも聞きません。.*いちばん保守的な案を選びます/);

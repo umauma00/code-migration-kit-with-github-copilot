@@ -11,8 +11,8 @@ runs its parts one at a time.
   stopping. A choice the source and RULEBOOK leave open (for example the
   target web framework, or where non-source assets go) takes the most
   conservative option unless the person gave one, with `TODO(port)`: in the
-  RULEBOOK before 02 is recorded, and after that only in the translated output
-  (the RULEBOOK is part of contextHash). It is listed as decided without the
+  RULEBOOK before the inventory survey runs, and after that only in the
+  translated output (the RULEBOOK is part of the survey input and contextHash). It is listed as decided without the
   person.
 - Surveys: the parts of one split scope now run side by side. One shared limit
   keeps every surveyor call of the run within `concurrency`, so one large

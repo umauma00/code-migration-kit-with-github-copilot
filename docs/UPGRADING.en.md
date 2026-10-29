@@ -6,7 +6,7 @@
 
 The kit's files (lib, scripts) change, so existing approvals and completion records are invalidated once. Revalidate from judge. Completed outputs and survey results are kept.
 
-1. In auto mode an audit or review that returns `changes` gets one fix and one fresh re-audit; what remains goes into the report and the record's note, and the run continues. A choice the source and RULEBOOK leave open takes the most conservative option with `TODO(port)` (in the RULEBOOK before 02 is recorded, afterwards only in the translated output). Tell the agent your choice before autopilot if you have one.
+1. In auto mode an audit or review that returns `changes` gets one fix and one fresh re-audit; what remains goes into the report and the record's note, and the run continues. A choice the source and RULEBOOK leave open takes the most conservative option with `TODO(port)` (in the RULEBOOK before the inventory survey runs, afterwards only in the translated output). Tell the agent your choice before autopilot if you have one.
 2. Surveys run the parts of one split scope in parallel within `concurrency`. A survey in progress resumes as is.
 3. An inventory survey no longer reports a negative `droppedFacts`. Results saved by earlier versions are kept, and a negative value counts as 0.
 4. For copy installs, replace all of `migration-kit/`, `.github/agents/migration-orchestrator.agent.md` and the SKILL.md files under `.github/skills/` with the contents of a temporary install. Plugins pick it up with the update.

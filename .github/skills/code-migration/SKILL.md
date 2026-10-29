@@ -397,10 +397,11 @@ and in the `phase complete` (or waiver) note, then continue. A choice neither th
 source nor the RULEBOOK decides (for example the target web framework, or where
 non-source assets go) takes the most conservative option, the one closest to the
 original structure that adds no framework or dependency, unless the person
-already stated one. Before 02 is recorded, write it into the RULEBOOK with a
-greppable `TODO(port)` naming the open choice. After that, leave the RULEBOOK
-unchanged (it is part of contextHash, so an edit would make the recorded phases
-stale) and put the conservative representation with `TODO(port)` into the
+already stated one. Before the inventory survey runs, write it into the RULEBOOK
+with a greppable `TODO(port)` naming the open choice. After that, leave the
+RULEBOOK unchanged (it is part of every inventory survey input and of
+contextHash, so an edit would force a full re-survey and make the recorded
+phases stale) and put the conservative representation with `TODO(port)` into the
 translated output (upstream rule 8). List each as decided without the person. Missing guardrails are installed from the template
 automatically. Everything else still stops: safety checks, sign-in and credits,
 unfilled run settings, and the commands the hook still asks about (models set,
