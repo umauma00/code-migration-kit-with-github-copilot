@@ -33,6 +33,7 @@ test('a piped or file-redirected long runner command is detected, the plain form
     [`${kit} build-loop --note "go" | tee loop.log`]: 'build-loop',
     [`node C:\\kit\\scripts\\run_migration.mjs repair-round | Out-File r.txt`]: 'repair-round',
     [`${kit} repair --target out/a.ts --evidence migration/x.txt | Out-String`]: 'repair',
+    [`$r='C:\\kit\\scripts\\run_migration.mjs'; & $r pilot run --root X 2>&1 | Out-String`]: 'pilot run',
     [`& node "$r" pilot run --root p | Out-String`]: null, // no runner path anywhere in the command
   };
   for (const [command, name] of Object.entries(hidden)) assert.equal(hiddenLongRun(command), name, command);
@@ -40,7 +41,8 @@ test('a piped or file-redirected long runner command is detected, the plain form
     `${kit} translate`, `${kit} translate 2>&1`, `${kit} translate *>&1`, `${kit} pilot run --root /tmp/p`,
     `$r='C:\\kit\\scripts\\run_migration.mjs'; node $r pilot run --root 'C:\\p' 2>&1`,
     `${kit} status --wait 600 --format markdown | Out-String`, `${kit} pilot prepare --target /x | Out-String`,
-    `${kit} build-loop --note "a | b > c"`, `${kit} translate --help | head`, `${kit} translate || echo failed`,
+    `${kit} build-loop --note "a | b > c"`, `${kit} translate --root $(git rev-parse --show-toplevel | head -1)`,
+    `$r='C:\\kit\\scripts\\run_migration.mjs'; & $r pilot run --root X 2>&1`, `${kit} translate --help | head`, `${kit} translate || echo failed`,
   ]) assert.equal(hiddenLongRun(command), null, command);
 });
 
