@@ -326,6 +326,14 @@ worker with `--model` set to the planned phaseModels entry, recording the model
 the CLI reports. Two requests on disjoint batches can run in parallel;
 `audit_inputs.mjs run-pending` runs every unsubmitted request. Never hand a
 request or its path to a task/agent subagent: the auditor has no tools.
+In every mode an audit or independent review (00b/01/02, the source-as-spec
+package review included) gets one repair round, as upstream: confirm each finding
+against the source, fix the confirmed ones and re-audit only the fixed items once
+with a fresh request. Never a third round: a row still contested becomes UNKNOWN
+with a conservative `TODO(port)`, any other finding stays open. Report the fixed
+findings, the open ones with evidence and the rows made UNKNOWN (with counts) in
+the phase report; the person decides at the gate, not mid-phase (in auto mode
+the same list goes into the record's note and the run continues).
 
 ## When a step fails
 
@@ -409,7 +417,8 @@ the phase's own work can supply what is missing, do that work; only otherwise
 run `phase waive ID --note "<why>"` and retry. Never waive phases ahead of the
 one that blocked. Questions inside a phase are not asked either: an audit or
 independent review that returns `changes` gets one round (confirm each finding
-against the source, fix the confirmed ones, re-audit once with a fresh request).
+against the source, fix the confirmed ones, re-audit only the fixed items once
+with a fresh request).
 Findings still open after that round, reviews limited by `maxReviewInputBytes`,
 and UNKNOWN or uncited rows are not fixed again: list them in the phase report
 and in the `phase complete` (or waiver) note, then continue. A choice neither the

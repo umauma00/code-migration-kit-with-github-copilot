@@ -5,8 +5,11 @@ rows to the human before fan-out, give every batch to two independent auditors
 of the SAME batch, and keep classification workers on separately owned category
 shards. Only the coordinator merges against a complete site census using the
 file/symbol/source_construct key. Confirm findings, fix and independently
-re-audit. Finish with a joint RULEBOOK/inventory audit citing rule, row and a
-concrete wrong translation example. Do not silently authorize rule amendments.
+re-audit the fixed rows once; a row still contested after that one round becomes
+UNKNOWN with a conservative `TODO(port)` and is reported, not revised again.
+Finish with a joint RULEBOOK/inventory audit citing rule, row and a
+concrete wrong translation example; apply its confirmed inventory fixes once
+without re-running it. Do not silently authorize rule amendments.
 Run each audit request with `audit_inputs.mjs freeze` then `audit_inputs.mjs run
 --directory DIR` (`run-pending` runs every unsubmitted request). Never pass a
 request or its path to a task/agent subagent.
@@ -48,10 +51,14 @@ Save the concrete phase report to `migration/gap-report.md`. After its actual us
 With `preparationProfile: source-as-spec`, draft RULEBOOK and inventory from how the
 source actually behaves, without the first-20-rows stop or paired batch audits.
 Run one independent review of the whole package (cited source lines, RULEBOOK,
-inventory, dependency map) in a separate context, fix its findings, then show ONE
+inventory, dependency map) in a separate context, fix its confirmed findings and
+re-review only the fixed items once (one repair round; what is still contested
+becomes UNKNOWN or an open finding, never fixed again), then show ONE
 report for 00b–02 with links, review points (high-impact inferences, UNKNOWN rows
-including the survey's `uncited` count and `unsurveyedOversizedFiles`, open
-findings) and choices: proceed to migration (recommended), revise, pause.
+including the survey's `uncited` count and `unsurveyedOversizedFiles`, the
+findings fixed in the repair round, open findings with their evidence) and
+choices: proceed to migration (recommended), revise, pause (in auto mode, put the
+same list into the record's note and continue without asking).
 Only after the user's OK run `phase complete 00b,01,02 --note TEXT`, then `judge`.
 See [source-as-spec](../docs/SOURCE-AS-SPEC.md).
 

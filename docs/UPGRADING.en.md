@@ -1,6 +1,15 @@
-# Upgrading (0.22.0 and earlier releases)
+# Upgrading (0.23.0 and earlier releases)
 
 [日本語](UPGRADING.md) | English
+
+## 0.23.0 (one repair round for preparation reviews)
+
+The kit files (plugin.json, scripts) change, so existing approvals and completion records expire once. Revalidate from judge. Completed outputs are kept.
+
+1. Preparation audits and independent reviews in 00b–02 (the source-as-spec package review included) get one repair round in every mode, as upstream: confirm findings against the source, fix them and re-review only the fixed items once.
+2. What is still open is not fixed again: inventory rows become UNKNOWN (most conservative translation plus TODO(port)), other findings stay as open limitations in judge-report.md or depmap/report.md. The phase report lists the fixed findings, the open ones with evidence and the rows made UNKNOWN (with counts); the person decides at the phase gate (in auto mode the list goes into the record's note and the run continues).
+3. The 02 joint RULEBOOK/inventory audit is not re-run after its fixes, as upstream. Sampling audits of a hand-written dependency graph keep their three rounds.
+4. In a copy install, replace all of `migration-kit/`, `.github/agents/migration-orchestrator.agent.md`, the SKILL.md in `.github/skills/` and the kit's section of `.github/copilot-instructions.md` with the temporary install's. The plugin needs only an update.
 
 ## 0.22.0 (kit-wide AI usage)
 

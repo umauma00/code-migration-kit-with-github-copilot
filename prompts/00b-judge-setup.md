@@ -36,7 +36,9 @@ build a language-neutral parity harness before any production translation.
 - Follow the [preparation audit contract](../docs/PREPARATION-AUDITS.md): when
   assertions are ported, two independent hostile auditors compare disjoint
   assertion batches against the old assertions and narrow normalization rules.
-  Confirm weaknesses, repair and re-audit with fresh contexts. Mutation detection
+  Confirm weaknesses, repair and re-audit the repaired assertions once with fresh
+  contexts; report weaknesses still confirmed after that one round as open
+  limitations instead of repairing again. Mutation detection
   is an additional check, not a substitute for assertion comparison.
   Run each audit request with `audit_inputs.mjs freeze` then `audit_inputs.mjs run
   --directory DIR` (`run-pending` runs every unsubmitted request). Never pass a

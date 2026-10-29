@@ -52,10 +52,16 @@ for later changes and resuming).
 In relaxed mode a gate failure that names `phase waive ID` is a question for the
 person (fix first, recommended; or proceed): run `phase waive ID --note` only on
 their answer, and list remaining waivers in every report and the handoff.
+In every mode a preparation audit or independent review that returns changes
+gets one fix and one fresh re-audit of the fixed items, as upstream; what is still
+contested (inventory rows become UNKNOWN with `TODO(port)`) is never fixed again;
+the phase report lists the fixed findings, the open ones with their evidence and
+the UNKNOWN counts, and the person decides at the gate (in auto mode the list goes
+into the record's note and the run continues).
 In auto mode (`phaseMode: auto`, for autopilot) ask no phase-boundary question:
 do each phase's work, record it (the hook does not ask), waive only what the
 work cannot supply, and continue. Inside a phase ask nothing either: an audit or
-review that returns changes gets one fix and one fresh re-audit, and what remains
+review that returns changes gets one fix and one fresh re-audit of the fixed items, and what remains
 (with size-limited reviews and UNKNOWN rows) is listed and noted, not fixed again;
 a choice the source and RULEBOOK leave open takes the most conservative option
 (closest to the original, no new framework or dependency) unless the person gave

@@ -1,3 +1,22 @@
+# 0.23.0 — 2026-10-29
+
+Preparation reviews stop after one repair round, as upstream. In normal mode
+the 00b–02 independent review could go fix → re-review → fix with no limit.
+
+- Every preparation audit and independent review in 00b, 01 and 02 (the
+  source-as-spec package review included) gets one repair round in every mode:
+  confirm each finding against the source, fix the confirmed ones and re-audit
+  only the fixed items once. Upstream 02 says "revise once and resubmit; still
+  contested, the row is UNKNOWN".
+- What is still contested is not fixed again: an inventory row becomes UNKNOWN
+  with a conservative `TODO(port)`, other findings are open limitations in
+  `judge-report.md` or `depmap/report.md`.
+- The phase report lists the fixed findings, the open ones with their evidence
+  and the rows made UNKNOWN (with counts); the person decides at the gate (in
+  auto mode the list goes into the record's note and the run continues).
+- The 02 joint RULEBOOK/inventory audit is not re-run after its fixes, as
+  upstream. The hand-written dependency graph keeps its three sampling rounds.
+
 # 0.22.0 — 2026-10-29
 
 The kit's whole AI usage can be read in one place. Before, only translation and

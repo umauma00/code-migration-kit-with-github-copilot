@@ -83,8 +83,15 @@ audits in 02) are replaced by **one independent review of the whole specificatio
 - One reviewer in a separate context reads the source, RULEBOOK, inventory and
   the dependency map together and lists statements that contradict the source,
   statements without cited lines, and rule/inventory contradictions.
-- Fix the findings, then report **both the fixed findings and the open points**
-  to the user.
+- Confirm each finding against the source, fix only the confirmed ones and
+  re-review **only the fixed items, once**, with a fresh request (one repair
+  round as upstream, in every mode). Findings still open after that are not
+  fixed again; inventory rows become UNKNOWN (most conservative translation
+  plus TODO(port)).
+- Report **the fixed findings, the open points with their evidence and the rows
+  made UNKNOWN this way (with counts)** to the user, who decides at the one
+  package review whether to proceed or have them fixed (in auto mode the same
+  list goes into the record's note and the run continues).
 - The dependency map is mechanical, so agent edge-sampling audits are skipped;
   record unsupported syntax and exclusions in `depmap/report.md`.
 

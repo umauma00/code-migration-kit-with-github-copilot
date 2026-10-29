@@ -7,9 +7,25 @@ The parent coordinates fresh workers within an explicit call/concurrency budget,
 confirms findings against source, fixes only confirmed problems, then obtains
 fresh independent review. Never share one reviewer's findings with the other.
 
+## One repair round (all modes)
+
+As upstream ("revise once and resubmit; still contested, the row is UNKNOWN"),
+every preparation audit and independent review in 00b, 01 and 02, including the
+source-as-spec package review, gets one repair round in every mode: confirm each
+finding against the source, fix the confirmed ones, and re-audit only the fixed
+items once with a fresh request. Do not fix or re-audit a third time. What is
+still contested after that round stays open: an inventory row becomes UNKNOWN
+with the most conservative `TODO(port)` translation and the open question in
+its evidence; a judge or dependency finding is written as an open limitation in
+`judge-report.md` or `depmap/report.md`. The hand-written dependency graph keeps
+its own rule below (at most three sampling rounds), as upstream.
+
+Report every open item to the person in the phase report: the findings fixed,
+the findings still open with their evidence, and the rows made UNKNOWN this way
+(with counts). In normal and relaxed mode the person decides at the phase gate
+whether to proceed or have them fixed; do not ask in the middle of the phase.
 In auto mode (`phaseMode: auto`) every preparation audit in 00b, 01 and 02 gets
-one repair round only: fix the confirmed findings, re-audit once with a fresh
-request, and list what is still open in the phase report and the `phase complete`
+one repair round only (re-audit of the fixed items only), and the same list also goes into the `phase complete`
 (or waiver) note instead of stopping (see
 [auto mode](ORDERED-WORKFLOW.en.md#auto-mode)).
 
@@ -30,9 +46,10 @@ assertion batches, with the original assertions, new harness, fixtures, exact
 normalization/tolerance rules and expected public contract. Each compares old
 and new assertions for removed fields, relaxed tolerances, truthy replacements,
 ignored errors and ordering/Unicode/numeric changes. Report the original/new
-assertion, weakening example and proposed fix. Confirm, repair and re-audit with
-fresh contexts until no confirmed issue remains; stop if coverage or proof is
-missing. Mutation testing complements this comparison and cannot replace it.
+assertion, weakening example and proposed fix. Confirm, repair and re-audit the
+repaired assertions once with fresh contexts (one repair round, above); a
+weakening still confirmed after that is reported as an open judge limitation,
+not repaired again. Stop if coverage or proof is missing. Mutation testing complements this comparison and cannot replace it.
 
 ## Dependency map (01)
 
@@ -141,7 +158,9 @@ answers without changing the old inventory. Identical retries deduplicate and
 sorting is deterministic. The merge receipt proves mechanical coverage, not
 semantic correctness or independent review. Finally run a joint RULEBOOK/inventory
 audit; each contradiction cites rule, row key, source evidence and a concrete
-wrong translation example. Reconcile and re-audit before completing 02.
+wrong translation example. Apply confirmed fixes on the inventory side once and
+queue RULEBOOK changes for the person, as upstream; the joint audit is not run
+again. Report the conflict list, the fixes and the UNKNOWN rows at the 02 gate.
 
 To review a combined candidate before publishing, use the built-in preview with
 the existing shards. It uses the SAME TSV parser, comment handling, validation
