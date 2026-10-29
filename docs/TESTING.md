@@ -11,28 +11,28 @@
 ## 2026-10-26 大規模C# OSSでの準備処理検証
 
 - `npm test` は440件中438成功、失敗0、Windows専用skip 2。`npm run demo` は成功し、比較12件・差分0・skip 0。追加したsurvey・停止索引の重点35件も成功。
-- DNN Platform、nopCommerce、NHibernateの固定版で、C#計8,780ファイルの分割・再開、依存解析とinventory候補生成を機械検証。最大本文は原本938,745 bytes。[検証範囲・結果・再現方法](reviews/2026-10-26-legacy-csharp-oss.md)。
+- DNN Platform、nopCommerce、NHibernateの固定版で、C#計8,780ファイルの分割・再開、依存解析とinventory候補生成を機械検証。最大本文は原本938,745 bytes。[検証範囲・結果・再現方法](../history/reviews/2026-10-26-legacy-csharp-oss.md)。
 - 大きい本文と628件の合成censusでは、同一入力の分割要求が3,144→34、5,997→91、7,565→97になった。各census項目が全本文の断片を受け取ることを確認。
 - 読めないファイル、欠落census、空の入力があれば未完了として報告し、正常なscopeを保持する。実モデルはCopilot APIへの接続が拒否されて使えず、意味分析・独立監査を含む正式step 02は未完了。旧文字コードの検証用コピーは明示したCP1252等の仮定で、実際の意味の正しさは未確認。
 
 ## 2026-10-26 Astraによる変更全体のレビューと修正後検証
 
 - 最終 `npm test`：435件中433成功、失敗0、skip 2（Windows専用）。`npm run demo` はcontinuousでoriginal・mutation・変換・build・smoke・parity成功、比較12件・差分0・skip 0。`git diff --check` 成功。元のfixture期待出力は変更なし。
-- Astraが全作業差分・新規ファイルをレビューし、P2を6件検出。全件修正後の再レビューは追加の確定指摘なし。[指摘と対応・検証範囲](reviews/2026-10-26-astra-full-review.md)。
+- Astraが全作業差分・新規ファイルをレビューし、P2を6件検出。全件修正後の再レビューは追加の確定指摘なし。[指摘と対応・検証範囲](../history/reviews/2026-10-26-astra-full-review.md)。
 - `tests/astra-full-review.test.mjs` の新9件で、実adapterの不正JSON/schema/target/itemsの保存・1回補正、doctorの3プローブへのcancel伝播、実mainへのSIGINT、SIGTERM後の両ストリームの完全保存を確認。JSX後のimport、全8mapperの未選択ソース・不正選択、quota+429の優先分類、bounded/continuousのversion確認切替も検証。
 - 停止候補の索引は70ファイル・796行で現コードと一致。CPU・無出力・600秒による自動中断を戻さず、明示キャンセルと復旧不能な障害を正しく扱う。認証済みモデル・実案件・Windows実機の結果とは区別する。
 
 ## 2026-10-26 言語別依存解析の精査
 
 - 最終 `npm test`：422件中420成功、失敗0、Windows専用skip 2。追加の言語別34件はすべて成功。`npm run demo` はcontinuousモードでoriginal・mutation・変換・build・smoke・parity成功、12ケースの比較差分・skipとも0。`git diff --check` も成功。
-- Python・PHP・C#・Java・VB.NET・COBOL・C/C++・JS/TSの8系統を確認。言語別の不具合・修正・制限は[調査記録](reviews/2026-10-26-dependency-parsers.md)に記載。
+- Python・PHP・C#・Java・VB.NET・COBOL・C/C++・JS/TSの8系統を確認。言語別の不具合・修正・制限は[調査記録](../history/reviews/2026-10-26-dependency-parsers.md)に記載。
 - `tests/dependency-parsers.test.mjs` はBOM/coding宣言、UTF-16/32・読取不可・binary、composer型ずれ、1200段Import、root外Import、1050段ディレクトリ、C/JSの偽の辺とTS出力拡張子、全言語の複数rootコマンド・manifest・依存宣言、出力の決定性を検証。
 - 元のアプリやビルドツールを動かさず、パーサーCLIと生成した準備コマンドだけを実行。既存fixtureの期待ファイルは変更していない。実案件・Windows実機での検証は行っていない。
 
 ## 2026-10-26 inventory候補生成helperの型ずれ対策
 
 - 最終 `npm test`：388件中386成功、失敗0、skip 2（Windows専用）。`npm run demo` はcontinuousモードで成功し、12ケースの比較差分・skipとも0。`git diff --check` も成功。停止候補の索引は69ファイル・760行へ更新済み。
-- 画像の `parseTsv` / `writeReviewCandidate` はこのキット・workspace内に存在せず、移行先に追加されたhelperの実装とログは未入手。画像の原因説明と、コードで確認した同梱パーサーの `{notes, rows}` 契約を区別して記録した。[調査記録](reviews/2026-10-26-inventory-preview.md)。
+- 画像の `parseTsv` / `writeReviewCandidate` はこのキット・workspace内に存在せず、移行先に追加されたhelperの実装とログは未入手。画像の原因説明と、コードで確認した同梱パーサーの `{notes, rows}` 契約を区別して記録した。[調査記録](../history/reviews/2026-10-26-inventory-preview.md)。
 - `tests/inventory-preview.test.mjs` の7件で、標準preview→正式mergeの同一出力、BOM/CRLF・コメント・重複の保持、未網羅・不正行・矛盾・UNKNOWN不備・ハッシュ不一致での非更新を検証。出力先とcensus/shard/正式receiptの衝突・hardlinkも拒否する。
 - 628箇所・16shard＋再試行shardの合成データで、欠落・重複なく候補を生成し、正式mergeのhash一致を確認。独立監査・工程承認をpreviewで代替しない。導入済みCLIの候補生成と正式mergeの往復も実行した。
 - 構文チェック・shard検証だけでなく、候補writerまで実行する回帰テストを追加。型ずれhelperの修正・機械的検証は同じ許可範囲で行い、候補や検証の省略を利用者へ選ばせない指示を全親skill/agentに反映した。
@@ -81,7 +81,7 @@
 - Astra指摘への追加7件は、依存待ち/一部完了/worker前/最終検査中のStop、全repair intentの保存と旧doneの拒否、journal改変、固定receiptと保護入力の衝突・alias、掲載CLIの実引数を検証。全jobの診断を再開後の独立2レビューへ渡し、未処理のままbuild承認へ進めないことを確認。
 - 認証済みCopilot AI、実VS CodeのUI・model metadata・完成順dispatch・子cancel、大規模移行、redesign module runnerの実行は未実施。fixtureのレビューや承認記録を実AI品質・人間承認の実績に含めない。
 
-[変更対応表と残る実装](plans/2026-10-15-review-implementation.md)を参照。以下は以前の検証記録です。
+[変更対応表と残る実装](../history/plans/2026-10-15-review-implementation.md)を参照。以下は以前の検証記録です。
 
 VS Codeのnative方式は0.3.0で削除しました。以下のnative関連の記録は当時の履歴です。
 実VS Codeのモデル委譲はオフライン接続テストとは区別します。
@@ -93,14 +93,14 @@ VS Codeのnative方式は0.3.0で削除しました。以下のnative関連の�
 2026-10-12のレビュー精査・修正後：全体112件中111成功・失敗0・skip 1。
 追加した3件のうち、過去タスク破損とnativeプラグイン名衝突の2件は修正前に失敗を再現し、
 修正後に成功。現在のタスク破損を引き続き拒否する対照も成功しました。
-判断根拠と対応は [nativeレビュー4件の精査](reviews/2026-10-12-native-worker-review-fixes.md) を参照してください。
+判断根拠と対応は [nativeレビュー4件の精査](../history/reviews/2026-10-12-native-worker-review-fixes.md) を参照してください。
 
 同日のnative初期実装時の確認結果：全体109件中108成功・失敗0・skip 1
 （大文字小文字を区別するファイルシステム専用ケース）。nativeプロンプトの最終調整後も
 追加12件を再実行して全件成功。既存オフラインデモは3ファイル完了、build/smoke成功、
 original/parity各12ケース・差分0。ワーカー応答は用意済みデータで、実モデルは未使用です。
 
-0.1.5の2026-10-10検証は [再レビュー3件の修正](reviews/2026-10-10-copilot-rereview-fixes.md)、0.1.4は [Copilot互換性の修正](reviews/2026-10-10-copilot-fixes.md) を参照してください。以下は0.1.3までの歴史的記録です。
+0.1.5の2026-10-10検証は [再レビュー3件の修正](../history/reviews/2026-10-10-copilot-rereview-fixes.md)、0.1.4は [Copilot互換性の修正](../history/reviews/2026-10-10-copilot-fixes.md) を参照してください。以下は0.1.3までの歴史的記録です。
 
 この記録は本Copilot対応版の検証です。元の `RUN-NOTES.md` はAnthropic版の過去の実験で、本版の実績を示すものではありません。
 
@@ -118,7 +118,7 @@ original/parity各12ケース・差分0。ワーカー応答は用意済みデ�
 | parity | **12ケース、差分0、skip 0** |
 | 実際のCLIの診断（前回確認） | Copilot CLI 1.0.93の起動・version・help・必要なオプションを確認 |
 
-生の結果：[自動テストTAP](validation/automated-tests.tap)、[オフライン実行結果](validation/offline-demo.json)。
+生の結果：[自動テストTAP](../history/validation/automated-tests.tap)、[オフライン実行結果](../history/validation/offline-demo.json)。
 
 ## 0.1.3で追加した回帰検証
 
@@ -131,7 +131,7 @@ Astraの指摘A1・A2は親エージェントも実コンパイラで独立再�
 - 元ソース・変換後ソース・テスト・明示入力・管理領域等を生成物として宣言できないこと。
 - 新しい設定の省略を受け入れ、未知ツールの `-o` の意味を推測しないこと。doctorに入力と生成物の宣言を別々に表示すること。
 
-実Cコンパイラによる修正前・修正後の確認はLinux/GCC 13.3.0で実施しました。通常の自動テストにはCコンパイラを要求しません。詳細は [コマンド検証結果](validation/astra-command-checks.json) を参照してください。
+実Cコンパイラによる修正前・修正後の確認はLinux/GCC 13.3.0で実施しました。通常の自動テストにはCコンパイラを要求しません。詳細は [コマンド検証結果](../history/validation/astra-command-checks.json) を参照してください。
 
 ## 0.1.2で追加した回帰検証
 
@@ -146,7 +146,7 @@ Astraの指摘A1・A2は親エージェントも実コンパイラで独立再�
 
 ## 0.1.1で追加した回帰検証
 
-レビュー指摘R1〜R7とhook契約C1について15件を追加しました。詳細は [修正対応表](REVIEW-FIXES.md) を参照してください。
+レビュー指摘R1〜R7とhook契約C1について15件を追加しました。詳細は [修正対応表](../history/REVIEW-FIXES.md) を参照してください。
 
 - 明示した除外ディレクトリ内ソース、ビルドスクリプト、依存設定の変更検出。
 - 上流の再実行が失敗・成功した両方で、下流の古い結果・承認を拒否。

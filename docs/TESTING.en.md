@@ -34,17 +34,17 @@
 - 7 tests added for the Astra findings cover Stop while waiting on dependencies, partly complete, before a worker and during the final check; saving every repair intent and rejecting old done; journal tampering; collisions and aliases between fixed receipts and protected inputs; and the actual arguments of the published CLI. Diagnostics of every job reach the independent double review after resumption, and build approval cannot proceed with any left unprocessed.
 - Authenticated Copilot AI, the real VS Code UI, model metadata, completion-order dispatch, child cancel, large migrations and running a redesign module runner were not done. Fixture reviews and approval records are not counted as real AI quality or human approvals.
 
-See [the change table and remaining implementation](plans/2026-10-15-review-implementation.md). The records below are older.
+See [the change table and remaining implementation](../history/plans/2026-10-15-review-implementation.md). The records below are older.
 
 The VS Code native backend was removed in 0.3.0; the native records below are history.
 
 In the 2026-10-12 pre-commit re-verification, a race where a native client read an empty run lock during startup was found. A deterministic reproduction test was added and the lock is now published atomically; afterwards 112 of 113 passed, 0 failed, 1 skipped.
 
-After the 2026-10-12 review triage and fixes: 111 of 112 passed, 0 failed, 1 skipped. Of the 3 added tests, the 2 for corrupted past tasks and native plugin name collisions failed before the fix and passed after it; the control that still rejects corruption of a current task also passed. See [triage of the four native review findings](reviews/2026-10-12-native-worker-review-fixes.md) for the reasoning and fixes.
+After the 2026-10-12 review triage and fixes: 111 of 112 passed, 0 failed, 1 skipped. Of the 3 added tests, the 2 for corrupted past tasks and native plugin name collisions failed before the fix and passed after it; the control that still rejects corruption of a current task also passed. See [triage of the four native review findings](../history/reviews/2026-10-12-native-worker-review-fixes.md) for the reasoning and fixes.
 
 At the initial native implementation the same day: 108 of 109 passed, 0 failed, 1 skipped (a case for case-sensitive filesystems only). After final adjustments to the native prompts, the 12 added tests were re-run and all passed. The existing offline demo completed 3 files, build/smoke passed, and original/parity had 12 cases each with 0 differences. Worker responses are prepared data; no real model was used.
 
-For 0.1.5's 2026-10-10 verification see [fixes for the three re-review findings](reviews/2026-10-10-copilot-rereview-fixes.md), and for 0.1.4 [Copilot compatibility fixes](reviews/2026-10-10-copilot-fixes.md). The rest is the historical record up to 0.1.3.
+For 0.1.5's 2026-10-10 verification see [fixes for the three re-review findings](../history/reviews/2026-10-10-copilot-rereview-fixes.md), and for 0.1.4 [Copilot compatibility fixes](../history/reviews/2026-10-10-copilot-fixes.md). The rest is the historical record up to 0.1.3.
 
 This record verifies this Copilot adaptation. The original `RUN-NOTES.md` covers Anthropic's earlier experiments and is not evidence for this version.
 
@@ -62,7 +62,7 @@ This record verifies this Copilot adaptation. The original `RUN-NOTES.md` covers
 | parity | **12 cases, 0 differences, 0 skipped** |
 | Real CLI diagnosis (earlier) | Copilot CLI 1.0.93 startup, version, help and required options checked |
 
-Raw results: [automated test TAP](validation/automated-tests.tap), [offline run results](validation/offline-demo.json).
+Raw results: [automated test TAP](../history/validation/automated-tests.tap), [offline run results](../history/validation/offline-demo.json).
 
 ## Regression checks added in 0.1.3
 
@@ -75,7 +75,7 @@ Astra's findings A1 and A2 were also reproduced independently by the parent agen
 - Sources, translated sources, tests, explicit inputs, managed areas and the like cannot be declared as artifacts.
 - New settings may be omitted, and the meaning of an unknown tool's `-o` is not guessed. doctor shows inputs and artifact declarations separately.
 
-The before/after checks with a real C compiler were done on Linux with GCC 13.3.0; the normal automated tests do not require a C compiler. See [command verification results](validation/astra-command-checks.json).
+The before/after checks with a real C compiler were done on Linux with GCC 13.3.0; the normal automated tests do not require a C compiler. See [command verification results](../history/validation/astra-command-checks.json).
 
 ## Regression checks added in 0.1.2
 
@@ -90,7 +90,7 @@ The before/after checks with a real C compiler were done on Linux with GCC 13.3.
 
 ## Regression checks added in 0.1.1
 
-15 tests for review findings R1–R7 and hook contract C1. See [the fix table](REVIEW-FIXES.md).
+15 tests for review findings R1–R7 and hook contract C1. See [the fix table](../history/REVIEW-FIXES.md).
 
 - Detection of changes to sources inside explicitly excluded directories, build scripts and dependency settings.
 - Rejection of stale downstream results and approvals after an upstream re-run, whether it fails or succeeds.

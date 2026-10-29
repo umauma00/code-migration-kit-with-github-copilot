@@ -4,9 +4,7 @@
 
 Anthropicの[Code Migration Kit](https://github.com/anthropics/code-migration-kit-with-claude-code)を、GitHub Copilot CLIを中心に使える形へ変更した非公式版です。言語間移植の「事前調査 → ルール固定 → 変換 → 独立レビュー → ビルド → 新旧比較」を扱います。
 
-**0.17.0** でGitHub Copilot appからも同じプラグインを入れられるようにしました（[プラグイン導入手順](docs/PLUGIN.md)、2026-10-29の公式文書で確認）。
-
-**0.3.0** ではVS Codeのサブエージェント方式（native）を削除しました。ワーカーは常にCopilot CLIで動き、VS Codeから進める場合も同じです。利用者はAIチャットだけで移行を完遂でき、CLIの導入・サインインの開始、guardrailsの設置などのコマンドはAIが実行します。**0.2.0** はVS Code / Copilot CLIのAgent Plugins形式に対応しました。キット本体をプラグインとして導入し、案件側では設定と成果物を管理できます。[プラグイン導入手順](docs/PLUGIN.md)、[従来版の修正と再レビュー](docs/reviews/2026-10-10-copilot-rereview-fixes.md)、[既存版からの更新](docs/UPGRADING.md)を参照してください。
+ワーカーは常にCopilot CLIで動き、VS Codeから進める場合も同じです。キット本体は、Copilot CLI・VS Code・GitHub Copilot app のどれからもAgent Plugins形式のプラグインとして入れられ、リポジトリへのコピーとしても導入できます。[プラグイン導入手順](docs/PLUGIN.md)、[既存版からの更新](docs/UPGRADING.md)、[変更履歴](CHANGELOG.md)を参照してください。
 
 参照したCLIは **1.0.98**（1.0.93・1.0.95でも疑似プロバイダーとの通信を確認。1.0.98ではrepository/plugin両構成の全ロールの往復、hookの読み込み、エラー出力の形式も確認）、VS Codeは **1.142** です。VS Code 1.142ではCopilot harnessが新規セッションの既定になりつつあり、prompt filesはLocal harness専用（`chat.promptFilesLocations` は非推奨）です（出典：[1.142リリースノート](https://code.visualstudio.com/updates/v1_142)、[Prompt files](https://code.visualstudio.com/docs/agent-customization/prompt-files)、[AI settings reference](https://code.visualstudio.com/docs/agents/reference/ai-settings)。2026-10-18確認）。入口はVS Code・Copilot CLIとも、エージェント一覧に出る移行オーケストレーター1つです（0.7.0から。スキルとワーカーはスラッシュメニューや一覧に出さない設定です）。固定した元コミットとSDK参照版は [UPSTREAM.json](UPSTREAM.json) に記録しています。Anthropic/GitHubの公式配布物ではありません。
 
@@ -16,7 +14,7 @@ Anthropicの[Code Migration Kit](https://github.com/anthropics/code-migration-ki
 
 レビュー1・2を反映し、03前の[隔離pilot](docs/PILOT.md)、比較器の早期検証と
 [準備工程の監査契約](docs/PREPARATION-AUDITS.md)、[翻訳batch・並列repair・TODO件数検査](docs/EXECUTION-SCOPES.md)
-を追加しています。[変更の対応範囲と残る実機検証](docs/plans/2026-10-15-review-implementation.md)も参照してください。
+を追加しています。[変更の対応範囲と残る実機検証](history/plans/2026-10-15-review-implementation.md)も参照してください。
 
 | 項目 | この版の動作 |
 |---|---|

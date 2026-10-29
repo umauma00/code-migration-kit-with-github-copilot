@@ -40,7 +40,7 @@ Example of what to record: CLI version, OS, Node version, model ID, phase, unit 
 
 ## Human gates and worker sessions (live checks, not run yet)
 
-Automated tests and the loopback checks cover prompt-mode workers only. Check the following on a real setup and record the results under `liveChecks` in `docs/validation/copilot-cli-1.0.98-review-2026-10-18.json` (`null` means not run).
+Automated tests and the loopback checks cover prompt-mode workers only. Check the following on a real setup and record the results under `liveChecks` in `history/validation/copilot-cli-1.0.98-review-2026-10-18.json` of the kit repository (`null` means not run).
 
 - **Interactive CLI (trusted folder):** have the AI run `node migration-kit/scripts/run_migration.mjs approve translation --note test`. Record that the question appears, that "No" stops the command, and whether the CLI shows its own permission prompt again after "Yes" ([copilot-cli#3042](https://github.com/github/copilot-cli/issues/3042)) (`liveCLIInteractiveAsk`).
 - **Autopilot:** confirm the same command is denied without a question (CLI 1.0.97 and later, `liveCLIAutopilot`). Also record whether `--allow-all` / `--yolo` shows the question (not documented, `liveCLIAllowAll`).

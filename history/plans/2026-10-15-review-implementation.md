@@ -63,4 +63,4 @@ Node v24.19.0 / Python 3.12.14 on Linux. Nineteen initial and seven Astra follow
 regression cases cover the changes above; live setup also uses strict/default count policy without a
 synthetic phase-03 report or approval. Worker replies are fixed test responses;
 Node/Python fixture commands execute for real. No authenticated Copilot, VS Code
-UI, large migration or redesign result is claimed. See [testing](../TESTING.md).
+UI, large migration or redesign result is claimed. See [testing](../../docs/TESTING.md).

@@ -42,5 +42,5 @@ mainでの実際のファイル名はmigration/cost-log.tsvで、各プロンプ
 
 ログは `/tmp/ordered-workflow-full.log`、`/tmp/ordered-workflow-demo.log`。
 実際のVS Codeの画面、実モデルによる委譲はこの環境では未検証。
-操作は[工程順序](../ORDERED-WORKFLOW.md)、出力は[cost-log](../COST-LOG.md)を参照。
+操作は[工程順序](../../docs/ORDERED-WORKFLOW.md)、出力は[cost-log](../../docs/COST-LOG.md)を参照。
 変更は未コミット。

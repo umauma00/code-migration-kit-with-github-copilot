@@ -43,7 +43,7 @@ R1のレビュー中に、最初のテストが単位内の検査で止まるケ
 
 テストはローカルのテストダブルと通信処理を利用し、外部AIは呼び出していない。
 実際のVS Code上のTODO描画、組み込みRubber Duck、実モデルへの委譲の検証状況は
-今回の結果では変わらない。[実機チェックリスト](../LIVE-SMOKE.md)を参照。
+今回の結果では変わらない。[実機チェックリスト](../../docs/LIVE-SMOKE.md)を参照。
 
 実行ログは作業環境の `/tmp/rereview-npm-test-final.log`、
 `/tmp/rereview-relevant-final.log`、`/tmp/rereview-demo.log`、
