@@ -1,6 +1,14 @@
-# Upgrading (0.24.0 and earlier releases)
+# Upgrading (0.25.0 and earlier releases)
 
 [日本語](UPGRADING.md) | English
+
+## 0.25.0 (per-model tool check)
+
+Kit files (plugin.json, scripts) change, so existing approvals and completion records expire once. Revalidate from judge. Completed outputs are kept.
+
+1. Run phase 03 comparison B with the command `stress-b command --dir DIR` writes. It lists only the file tools that model has (no AI usage).
+2. `doctor --check-cli` checks that tool-assisted reviewers' models have reading and search tools and that B's model has a writing tool.
+3. For a copied install, replace all of `migration-kit/` and the SKILL.md files in `.github/skills/` with the temporary install's. A plugin only needs updating.
 
 ## 0.24.0 (comparison B writes, and a local sandbox found during setup)
 

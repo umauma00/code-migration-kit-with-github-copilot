@@ -10,7 +10,7 @@ import { validateWorkerProfile, assistedReviewerRoles } from '../lib/review.mjs'
 import { runProcess } from '../lib/process.mjs';
 import { approve, runStage, translate, runPilot, runJudgePreparation } from '../lib/pipeline.mjs';
 import { preparePilot } from '../lib/pilot.mjs';
-import { createCopilotAdapter, requiredCopilotFlags, copilotEnv, probeWorkerAgents, probeReviewerHook, fileLimits, fileLimitMinimum } from './copilot_adapter.mjs';
+import { createCopilotAdapter, requiredCopilotFlags, copilotEnv, copilotArgs, probeWorkerAgents, probeReviewerHook, probeModelTools, stressBTools, stressBCommand, fileReadTools, fileLimits, fileLimitMinimum } from './copilot_adapter.mjs';
 import { runtimeLayout, pluginRoot } from '../lib/runtime.mjs';
 import { migrationStatus, statusMarkdown, statusTodo, statusChecklist } from '../lib/status.mjs';
 import { statusSnapshot } from '../lib/status-snapshot.mjs';
@@ -73,6 +73,8 @@ export const usage = `Usage: node migration-kit/scripts/run_migration.mjs COMMAN
                               to record the reviewed phase 03 in the same confirmation
   translate [--max-calls N]  Run/resume translation with Copilot CLI workers; --max-calls is this run's
                               explicit AI call budget, agreed with the person (normal default: continuous)
+  stress-b command --dir DIR [--model ID]
+                              Phase 03 comparison B: the exact isolated copilot -p command, with the model's own file tools
   pilot prepare --target NEW_DIR --sources src/a,src/b --note TEXT [--through translation|build|smoke|parity]
   pilot run --root PILOT_DIR  Run only the explicitly authorized, isolated pilot
   repair --target PATH --evidence migration/PATH | repair --queue migration/QUEUE.json [--max-calls N]
@@ -88,6 +90,43 @@ export const usage = `Usage: node migration-kit/scripts/run_migration.mjs COMMAN
   unlock --pid PID           Remove a lock only after its owning process has stopped
 Options: --root PATH (default cwd), --copilot PATH (default copilot)
 Configuration: migration/config.json. No command commits or pushes changes.`;
+// Comparison B runs outside the repository, in a directory holding only the
+// copied source files, so no repository instruction or skill reaches it.
+export async function stressB(root, config, { dir, model, command = 'copilot', signal } = {}) {
+  if (typeof dir !== 'string' || !path.isAbsolute(dir)) throw new Error('stress-b command needs --dir with an absolute path outside the repository');
+  let stat; try { stat = fs.statSync(dir); } catch {}
+  if (!stat?.isDirectory()) throw new Error(`stress-b command: ${dir} is not a directory; create it and copy only the selected source files into it first`);
+  const inside = path.relative(fs.realpathSync.native(root), fs.realpathSync.native(dir));
+  if (!inside || (!inside.startsWith('..') && !path.isAbsolute(inside))) throw new Error(`stress-b command: ${dir} is inside the repository; B must run in a directory outside it`);
+  model ??= config.phaseModels?.stressB ?? config.models.implementer;
+  if (typeof config.targetLanguage !== 'string' || !config.targetLanguage.trim()) throw new Error('stress-b command needs targetLanguage in migration/config.json');
+  const found = await stressBTools(command, model, { signal, timeoutMs: processTimeout(config, 'commandTimeoutSeconds') });
+  return { dir, model, tools: found.tools, verified: found.verified, ...(found.verified ? {} : { note: `The CLI's tools for ${model} could not be read here (${found.detail}); the command lists the file tools of every model family the kit knows.` }),
+    ...stressBCommand({ command, model, dir, targetLanguage: config.targetLanguage, tools: found.tools }),
+    next: 'Run the command for this shell (bash or powershell) in a terminal as it is, then check that B wrote its files. Do not run B as a subagent of this chat.' };
+}
+// Each tool-assisted reviewer's model must get a reading and a search tool
+// under the kit's flags, and comparison B's model a writing tool. A CLI that
+// makes no loopback request here leaves it unverified, never failed.
+export async function modelToolChecks(root, config, layout, { command, signal, timeoutMs }) {
+  const checks = [];
+  for (const role of assistedReviewerRoles) {
+    const base = role.replace(/-read$/, ''), model = config.models?.[base];
+    if (typeof model !== 'string' || unsetModels(config).includes(base)) continue;
+    const probe = await probeModelTools(command, copilotArgs(role, model, undefined, layout), { cwd: root, model, env: copilotEnv(role), signal, timeoutMs });
+    if (!probe.ok) { checks.push({ check: `model tools: ${role}`, ok: true, status: 'not-verified', model, detail: probe.detail }); continue; }
+    const missing = [['view'], ['grep', 'rg']].filter(any => !any.some(name => probe.tools.includes(name))).map(any => any.join('|'));
+    checks.push({ check: `model tools: ${role}`, ok: missing.length === 0, model, tools: probe.tools.filter(name => fileReadTools.includes(name)), ...(missing.length ? { missing } : {}) });
+  }
+  const model = config.phaseModels?.stressB ?? config.models?.implementer;
+  if (typeof model === 'string' && !unsetModels(config).includes('implementer')) {
+    try {
+      const found = await stressBTools(command, model, { signal, timeoutMs });
+      checks.push({ check: 'model tools: comparison B', ok: true, model, tools: found.tools, ...(found.verified ? {} : { status: 'not-verified', detail: found.detail }) });
+    } catch (e) { if (signal?.aborted) throw e; checks.push({ check: 'model tools: comparison B', ok: false, model, detail: e.message }); }
+  }
+  return checks;
+}
 export async function doctor(root, config, { checkCLI = false, command = 'copilot', signal, sandboxProbe = localSandboxProbe } = {}) {
   if (signal?.aborted) throw new Error('Interrupted');
   const timeoutMs = processTimeout(config, 'commandTimeoutSeconds');
@@ -194,6 +233,7 @@ export async function doctor(root, config, { checkCLI = false, command = 'copilo
           ...(loopback ? { cause: 'local-sandbox', detail: `Loopback is blocked in this session (see "${sandboxCheck(sandbox).check}"), so this check cannot run; it says nothing about the CLI. ${hook.detail ?? ''}`.trim() } : {}),
           note: 'Live check with a loopback model provider: no account, network or AI usage. It proves the hook keeps tool-assisted reviewers out of migration/runs.' });
       }
+      if (agents.ok) checks.push(...await modelToolChecks(root, config, layout, { command, signal, timeoutMs }));
       checks.push({ check: 'file descriptor limit', ...await fileLimits({ signal, timeoutMs }), minimum: fileLimitMinimum,
         note: 'Each CLI process raises its soft open-file limit to the hard limit by itself. A hard limit below the minimum is a warning: workers may hit EMFILE "Too many open files", which stops the run with guidance.' });
     } catch (e) {
@@ -361,7 +401,11 @@ export async function main(argv = process.argv.slice(2)) {
   process.once('SIGINT', abort); process.once('SIGTERM', abort);
   try {
     let result;
-    if (cmd === 'pilot' && args._[1] === 'prepare') result = preparePilot(root, config, { target: args.target, sources: args.sources?.split(','), through: args.through, note: args.note });
+    if (cmd === 'stress-b') {
+      if (args._[1] !== 'command') throw new Error('Use stress-b command --dir DIR [--model ID]');
+      result = await stressB(root, config, { dir: args.dir, model: args.model, command: args.copilot, signal: controller.signal });
+    }
+    else if (cmd === 'pilot' && args._[1] === 'prepare') result = preparePilot(root, config, { target: args.target, sources: args.sources?.split(','), through: args.through, note: args.note });
     else if (cmd === 'pilot' && args._[1] === 'run') {
       result = await runPilot(root, config, createCopilotAdapter({ command: args.copilot }), { signal: controller.signal, onProgress: event => console.error(progressLine(event)) });
     }

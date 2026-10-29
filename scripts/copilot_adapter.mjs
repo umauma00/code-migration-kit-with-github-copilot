@@ -135,9 +135,7 @@ export async function probeReviewerHook(command = 'copilot', prefixArgs = [], { 
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'migration-kit-hook-probe-'));
   try {
     await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
-    const env = { ...copilotEnv(role), COPILOT_HOME: home, COPILOT_OFFLINE: 'true', COPILOT_PROVIDER_BASE_URL: `http://127.0.0.1:${server.address().port}/v1`,
-      COPILOT_PROVIDER_TYPE: 'openai', COPILOT_PROVIDER_API_KEY: 'loopback-probe', COPILOT_PROVIDER_BEARER_TOKEN: '', COPILOT_PROVIDER_WIRE_API: 'completions',
-      COPILOT_MODEL: 'gpt-4.1', COPILOT_GITHUB_TOKEN: '', GH_TOKEN: '', GITHUB_TOKEN: '' };
+    const env = { ...copilotEnv(role), ...loopbackEnv(home, server.address().port, 'gpt-4.1') };
     const result = await runProcess(command, [...prefixArgs, ...copilotArgs(role, 'gpt-4.1', undefined, layout)], { cwd, env, signal, timeoutMs, input: 'Hook probe. Follow the tool call.' });
     if (denied) return { ok: true };
     return { ok: false, requests, detail: requests < 2
@@ -145,6 +143,62 @@ export async function probeReviewerHook(command = 'copilot', prefixArgs = [], { 
       : 'The worker hook did not deny a tool-assisted reviewer\'s read of migration/runs: this CLI no longer loads repository/plugin hooks in prompt mode through GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS. Oversized reviews are not isolated from other workers\' records; keep maxReviewInputBytes high enough that reviews stay frozen, or pin a CLI version that passes this check.' };
   } catch (e) { if (signal?.aborted) throw new Error('Interrupted'); return { ok: false, detail: e.message }; }
   finally { server.closeAllConnections?.(); server.close(); fs.rmSync(home, { recursive: true, force: true }); }
+}
+// The tools a model gets from this CLI, read from the first request the CLI
+// sends a loopback model provider: no account, network or AI usage. Model
+// families differ (CLI 1.0.105: gpt-6-luna has view, rg, glob and apply_patch,
+// gpt-4.1 has view, grep, glob, create and edit), and --available-tools drops
+// a name the model does not have without saying so. { ok, tools } or
+// { ok: false, detail } when the CLI made no request.
+export async function probeModelTools(command = 'copilot', args = [], { cwd, model, env = {}, signal, timeoutMs = 0 } = {}) {
+  if (signal?.aborted) throw new Error('Interrupted');
+  let tools = null;
+  const server = http.createServer(async (req, res) => {
+    let body = ''; for await (const chunk of req) body += chunk;
+    let request = {}; try { request = JSON.parse(body); } catch {}
+    tools ??= (Array.isArray(request.tools) ? request.tools : []).map(t => t?.function?.name ?? t?.custom?.name ?? t?.name).filter(name => typeof name === 'string');
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ id: 'tool-probe', object: 'chat.completion', created: 1, model: request.model ?? model,
+      usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 }, choices: [{ index: 0, message: { role: 'assistant', content: '{}' }, finish_reason: 'stop' }] }));
+  });
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'migration-kit-tool-probe-'));
+  try {
+    await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
+    const result = await runProcess(command, args, { cwd, signal, timeoutMs, input: 'Tool probe. Reply {}.', env: { ...process.env, ...env, ...loopbackEnv(home, server.address().port, model) } });
+    if (tools) return { ok: true, tools };
+    return { ok: false, detail: `The CLI made no model request (exit ${result.code}): ${(result.stderr || result.stdout).slice(-400)}` };
+  } catch (e) { if (signal?.aborted) throw new Error('Interrupted'); return { ok: false, detail: e.message }; }
+  finally { server.closeAllConnections?.(); server.close(); fs.rmSync(home, { recursive: true, force: true }); }
+}
+const loopbackEnv = (home, port, model) => ({ COPILOT_HOME: home, COPILOT_OFFLINE: 'true', COPILOT_PROVIDER_BASE_URL: `http://127.0.0.1:${port}/v1`,
+  COPILOT_PROVIDER_TYPE: 'openai', COPILOT_PROVIDER_API_KEY: 'loopback-probe', COPILOT_PROVIDER_BEARER_TOKEN: '', COPILOT_PROVIDER_WIRE_API: 'completions',
+  COPILOT_MODEL: model, COPILOT_GITHUB_TOKEN: '', GH_TOKEN: '', GITHUB_TOKEN: '' });
+// Phase 03 comparison B: a fresh `copilot -p` in a directory outside the
+// repository, limited to file tools. Only the file tools this model actually
+// has are listed, and at least one must write.
+export const fileReadTools = ['view', 'glob', 'grep', 'rg'], fileWriteTools = ['create', 'edit', 'apply_patch'];
+const fallbackBTools = ['view', 'create', 'edit', 'apply_patch', 'glob', 'grep'];
+export const stressBFlags = ['--no-custom-instructions', '--disable-builtin-mcps', '-s'];
+export async function stressBTools(command = 'copilot', model, { signal, timeoutMs = 0 } = {}) {
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'migration-kit-b-probe-'));
+  try {
+    const probe = await probeModelTools(command, ['-p', 'Tool probe.', '--model', model, ...stressBFlags], { cwd, model, signal, timeoutMs });
+    // Unverified (the CLI made no loopback request here): the list that covers
+    // every model family seen so far, never a stop.
+    if (!probe.ok) return { verified: false, tools: fallbackBTools, detail: probe.detail };
+    const tools = [...fileReadTools, ...fileWriteTools].filter(name => probe.tools.includes(name));
+    if (!tools.some(name => fileWriteTools.includes(name)))
+      throw new Error(`Comparison B: model ${model} has no file-writing tool in this Copilot CLI (it offers ${probe.tools.join(', ') || 'no tools'}). Choose another phaseModels.stressB, or update the kit for this model's tools.`);
+    return { verified: true, tools, offered: probe.tools };
+  } finally { fs.rmSync(cwd, { recursive: true, force: true }); }
+}
+// The exact B command for bash and PowerShell, with the model's own tools.
+export function stressBCommand({ command = 'copilot', model, dir, targetLanguage, tools }) {
+  const prompt = `Port these files to ${targetLanguage} the way a fluent ${targetLanguage} engineer would write them natively. Write each translation next to its source.`;
+  const argv = ['-p', prompt, '--model', model, ...stressBFlags, '--available-tools', tools.join(','), '--allow-tool', 'write'];
+  const sh = v => /^[\w@%+=:,./-]+$/.test(v) ? v : `'${v.replace(/'/g, `'\\''`)}'`;
+  const ps = v => /^[\w@%+=:,./\\-]+$/.test(v) ? v : `'${v.replace(/'/g, "''")}'`;
+  return { argv, bash: `cd ${sh(dir)} && ${[command, ...argv].map(sh).join(' ')}`, powershell: `Set-Location ${ps(dir)}; & ${[command, ...argv].map(ps).join(' ')}` };
 }
 // In JSON mode the CLI reports model and session failures (rate limits, 5xx,
 // authentication, quota) only as session.error events on stdout; stderr stays

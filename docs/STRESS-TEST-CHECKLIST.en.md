@@ -17,7 +17,7 @@ replace `migration-kit/` with the plugin's absolute path.
 | 3 | `phase start 03` | AI | A start record exists |
 | 4 | Pick 3 files that exercise the most risky rulebook sections and inventory rows; write the scores and file:line proof to `migration/stress-test/report.md` | AI | The report has a selection table |
 | 5 | Bakeoff A: translate by the rulebook to the letter (disposable workspace, never production) | AI (separate context) | Every nontrivial choice cites its rule |
-| 6 | Bakeoff B: copy only the source files to an empty directory outside the repo and have them ported natively, without the rules. Run the "B isolation command" below in that directory (in VS Code too, from a terminal) | AI (separate context) | B saw no rulebook, inventory, conversation or skill |
+| 6 | Bakeoff B: copy only the source files to an empty directory outside the repo and have them ported natively, without the rules. Run the "B isolation command" below (written by `stress-b command`) in that directory (in VS Code too, from a terminal) | AI (separate context) | B saw no rulebook, inventory, conversation or skill |
 | 7 | Diff inspection: format A and B, then judge each difference (rulebook right / native right / both defensible / both wrong) | AI (separate context) | Each verdict has evidence |
 | 8 | Pilot: `pilot prepare --target /new/outside/dir --sources … --note …`, then `pilot run --root …` | AI runs it, the **human** approves (the host asks) | Same workers/reviews/fixes as production; were the rules obeyed? |
 | 9 | Report: amendment queue (never edit RULEBOOK), adherence findings, timing and usage (`usageEstimate` in the run summary), workspace deletion confirmed, estimated duration for 04 (`status`) | AI | `migration/stress-test/report.md` |
@@ -32,8 +32,16 @@ stop and ask the human for a design decision instead of a third wording.
 
 `--no-custom-instructions` stops AGENTS.md and Copilot instructions, but user and plugin skill descriptions (including this kit's `code-migration` skill) still reach the model. With CLI 1.0.98, leaving `skill` out of `--available-tools` kept them out.
 
+First create the directory and copy only the source files, then have the runner write the exact command. The runner reads which file tools the model has in this CLI (from the CLI, without AI usage) and lists only those; for a model with no writing tool it stops with the reason and choices. Run the printed `bash` or `powershell` line in a terminal as it is.
+
 ```bash
 mkdir /tmp/bakeoff-b && cp SOURCE_FILES /tmp/bakeoff-b/   # copies only, not a checkout
+node migration-kit/scripts/run_migration.mjs stress-b command --dir /tmp/bakeoff-b
+```
+
+Only when the runner cannot be used, use this fixed command.
+
+```bash
 cd /tmp/bakeoff-b && copilot -p "Port these files to TARGET_LANGUAGE the way a fluent TARGET_LANGUAGE engineer would write them natively. Write each translation next to its source." \
   --model STRESS_B_MODEL --no-custom-instructions --disable-builtin-mcps -s \
   --available-tools view,create,edit,apply_patch,glob,grep --allow-tool write

@@ -29,10 +29,13 @@ For preserve mode, run a dual translation experiment:
   inventory or migration skill is passed to B. Run B as a fresh `copilot -p` process
   in that directory with `--no-custom-instructions --disable-builtin-mcps
   --available-tools view,create,edit,apply_patch,glob,grep --allow-tool write` and
-  `--model` set to phaseModels.stressB (the exact command is in the checklist).
-  Keep `apply_patch` in the list: some GPT models (gpt-6-luna on CLI 1.0.105)
-  have no `create`/`edit` and write only through `apply_patch`, so without it B
-  gets read-only tools.
+  `--model` set to phaseModels.stressB. Get the exact command from
+  `run_migration.mjs stress-b command --dir DIR` (DIR: that directory, absolute)
+  and run the line for your shell as it is: the runner reads which file tools
+  this model has from the CLI (no AI usage) and lists only those, with at least
+  one that writes. Model families differ (gpt-6-luna on CLI 1.0.105 writes only
+  through `apply_patch`). Only when the runner cannot be used, use the
+  checklist's fallback command, which keeps `apply_patch` in the list.
   `--no-custom-instructions` alone still exposes user and plugin skill
   descriptions; leaving `skill` out of `--available-tools` keeps them out. Use the
   same terminal command in VS Code: a subagent of this chat inherits its context
