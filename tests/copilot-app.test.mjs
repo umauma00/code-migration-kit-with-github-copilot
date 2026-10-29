@@ -8,7 +8,7 @@ import { install, kitRoot, otherWorktreeMigrations } from '../scripts/install.mj
 
 const read = rel => fs.readFileSync(path.join(kitRoot, rel), 'utf8');
 const json = rel => JSON.parse(read(rel));
-const marketplaceSource = 'umauma00/code-migration-kit-with-github-copilot#feat/github-copilot-migration-kit';
+const marketplaceSource = 'umauma00/code-migration-kit-with-github-copilot';
 
 test('plugin.json keeps to the closed Agent Plugins 1.0 manifest that the CLI, VS Code and the app read', () => {
   const manifest = json('plugin.json');
@@ -75,6 +75,18 @@ test('installation docs give every surface the same marketplace source and plugi
     assert.ok(text.includes('GitHub Copilot app'), doc);
     assert.doesNotMatch(text.slice(text.indexOf('copilot plugin install')), /^.*`code-migration` (skill|スキル)/m, doc);
   }
+});
+
+test('install instructions register the marketplace from the default branch (main)', () => {
+  for (const doc of ['README.md', 'README.en.md', 'docs/PLUGIN.md', 'docs/PLUGIN.en.md']) {
+    const text = read(doc);
+    const sources = [...text.matchAll(/copilot plugin marketplace add (umauma00\/[^\s`]+)/g)].map(m => m[1]);
+    assert.ok(sources.length > 0, doc);
+    for (const source of sources) assert.equal(source, marketplaceSource, doc);
+    assert.doesNotMatch(text, /%23feat|feat\/github-copilot-migration-kit` (ブランチ|branch)/, doc);
+  }
+  const guide = read('guides/migration-guide.html');
+  assert.match(guide, /"branch":"main"/);
 });
 
 test('both copies of the code-migration skill describe the GitHub Copilot app host', () => {

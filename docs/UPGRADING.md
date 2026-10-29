@@ -1,6 +1,14 @@
-# 更新手順（0.18.0 と以前の版）
+# 更新手順（0.18.1 と以前の版）
 
 日本語 | [English](UPGRADING.en.md)
+
+## 0.18.1（配布元を main に）
+
+動作は変わりません。プラグインでは版番号が変わるため、既存の承認・完了記録は一度だけ失効します。judgeから再検証してください。完了済みの出力は保持されます。
+
+1. キットがリポジトリの既定ブランチ（main）に入り、マーケットプレイスの登録元が `umauma00/code-migration-kit-with-github-copilot`（ブランチ指定なし）になりました。
+2. 以前の案内どおり `#feat/github-copilot-migration-kit` 付きで登録したままでも、そのブランチが残っている間は入れられますが、今後の更新は main に入ります。切り替える場合は、先に `copilot plugin marketplace remove code-migration-kit-marketplace --force` で外してから、[PLUGIN.md](PLUGIN.md) の登録元で追加し直してください（同じ名前の登録が二重にならないようにするため）。
+3. コピー導入の文書から `history/` の記録へのリンクは既定ブランチを指すため、main に入ったことでリンク切れが解消します。
 
 ## 0.18.0（リポジトリの整理）
 

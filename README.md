@@ -33,7 +33,7 @@ Anthropicの[Code Migration Kit](https://github.com/anthropics/code-migration-ki
 
 利用者はコマンドを打たず、VS Code（またはCopilot CLI）のAIチャットだけで移行を完遂できます。対象リポジトリを開き、Copilot Chatで次のように依頼してください。
 
-> https://github.com/umauma00/code-migration-kit-with-github-copilot の `feat/github-copilot-migration-kit` ブランチを `../code-migration-kit` にcloneし、`scripts/install.mjs` でこのリポジトリへ導入して
+> https://github.com/umauma00/code-migration-kit-with-github-copilot を `../code-migration-kit` にcloneし、`scripts/install.mjs` でこのリポジトリへ導入して
 
 導入後は新しいチャットを開き、エージェント一覧から `migration-orchestrator`（プラグイン導入では `code-migration-plugin-orchestrator`、Copilot CLIでは `/agent` で選択）を選んで、「PythonからTypeScriptへの移行を始めて」「移行の続きを進めて」などと依頼します。ほかのエージェントでは工程を始めず、オーケストレーターへの切り替えを案内します。AIは次をすべて自分で実行し、結果をチャットで報告します。
 
@@ -57,10 +57,10 @@ Anthropicの[Code Migration Kit](https://github.com/anthropics/code-migration-ki
 
 ## プラグインとして導入する
 
-GitHub Copilot CLI・VS Code・GitHub Copilot app のどれでも、同じマーケットプレイスから入れられます。リポジトリの既定ブランチに入るまでは `#` の後ろでブランチを指定します。
+GitHub Copilot CLI・VS Code・GitHub Copilot app のどれでも、同じマーケットプレイスから入れられます。登録元はリポジトリの既定ブランチ（main）です。
 
 ```bash
-copilot plugin marketplace add umauma00/code-migration-kit-with-github-copilot#feat/github-copilot-migration-kit
+copilot plugin marketplace add umauma00/code-migration-kit-with-github-copilot
 copilot plugin install code-migration-kit@code-migration-kit-marketplace
 ```
 

@@ -8,10 +8,10 @@ Requires Node.js 22 or later and GitHub Copilot CLI, VS Code or the GitHub Copil
 
 GitHub Copilot CLI, VS Code and the GitHub Copilot app all install the same plugin from the same marketplace. Its identifier is `code-migration-kit@code-migration-kit-marketplace`. The kit uses the Agent Plugins 1.0 layout (root `plugin.json`, `skills/`, and the workers and hooks in `com.github.copilot/`), which all three read (checked against the GitHub and VS Code documentation as of 2026-10-29). The kit itself does not need to live in the project being migrated.
 
-Register the marketplace from the source below. Until the repository's default branch (main) has the plugin, name the branch after `#`. Once it is on main, drop `#feat/github-copilot-migration-kit`.
+Register the marketplace from the source below (the repository's default branch, main). A marketplace registered with `#feat/github-copilot-migration-kit` by the 0.18.0 and earlier instructions keeps working while that branch exists, but updates now land on main; see [UPGRADING.en.md](UPGRADING.en.md) to switch.
 
 ```text
-umauma00/code-migration-kit-with-github-copilot#feat/github-copilot-migration-kit
+umauma00/code-migration-kit-with-github-copilot
 ```
 
 Manage the plugin from one source only. If it is registered several ways at once (marketplace, local checkout, `chat.pluginLocations`), two orchestrators appear and the first one found wins. An older repository copy's `.github/skills/code-migration/` also takes precedence as a skill of the same name. To switch, keep the existing data, explicitly remove the old skill and set `"runtime": "plugin"` in `migration/config.json`. Existing approvals and completion records must be re-checked.
@@ -19,7 +19,7 @@ Manage the plugin from one source only. If it is registered several ways at once
 ### GitHub Copilot CLI
 
 ```bash
-copilot plugin marketplace add umauma00/code-migration-kit-with-github-copilot#feat/github-copilot-migration-kit
+copilot plugin marketplace add umauma00/code-migration-kit-with-github-copilot
 copilot plugin install code-migration-kit@code-migration-kit-marketplace
 copilot plugin list
 ```
@@ -47,9 +47,8 @@ The `/plugin` commands in Copilot harness chats keep a separate inventory from t
 
 ### GitHub Copilot app
 
-1. Open **Customize** in the sidebar and, from the marketplace settings next to the marketplace dropdown, add the source above as a GitHub repository. Opening `ghapp://plugins/marketplace/add?source=umauma00%2Fcode-migration-kit-with-github-copilot%23feat%2Fgithub-copilot-migration-kit` shows the form filled in (it is added after you confirm; whether a value with `#` is accepted is unverified).
+1. Open **Customize** in the sidebar and, from the marketplace settings next to the marketplace dropdown, add the source above as a GitHub repository. Opening `ghapp://plugins/marketplace/add?source=umauma00%2Fcode-migration-kit-with-github-copilot` shows the form filled in (it is added after you confirm).
 2. In **Customize**, search for `code-migration-kit` and click **Install**. `ghapp://plugins/install?source=code-migration-kit%40code-migration-kit-marketplace` opens it too. Check that it is turned on under **Installed**.
-3. The app documentation describes the source as "a GitHub repository or Git URL" and does not mention a `#branch` suffix (unverified). If it is not accepted, until the plugin is on main install it with the Copilot CLI as above and check whether it appears under **Installed** in the app. The app is built on the Copilot CLI, but the documentation does not say whether CLI-installed plugins appear in the app either.
 
 When you start a session in the app:
 
@@ -65,7 +64,7 @@ A checkout on GitLab or another Git server can be added in all three with its Gi
 
 ### Make it the project default (optional)
 
-Once the plugin is on main, add the following to the migration target's `.github/copilot/settings.json` to enable it by default in the Copilot CLI, VS Code (Copilot harness) and the app for people working in that repository. Personal opt-outs and organization managed settings take precedence.
+Add the following to the migration target's `.github/copilot/settings.json` to enable it by default in the Copilot CLI, VS Code (Copilot harness) and the app for people working in that repository. Personal opt-outs and organization managed settings take precedence.
 
 ```json
 {

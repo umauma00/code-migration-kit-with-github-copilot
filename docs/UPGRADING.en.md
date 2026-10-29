@@ -1,6 +1,14 @@
-# Upgrading (0.18.0 and earlier releases)
+# Upgrading (0.18.1 and earlier releases)
 
 [日本語](UPGRADING.md) | English
+
+## 0.18.1 (distributed from main)
+
+No behavior change. For the plugin the version number changes, so existing approvals and completion records are invalidated once. Revalidate from judge. Completed outputs are kept.
+
+1. The kit is now on the repository's default branch (main), and the marketplace source is `umauma00/code-migration-kit-with-github-copilot` with no branch.
+2. A marketplace registered with `#feat/github-copilot-migration-kit` per the earlier instructions keeps installing from that branch while it exists, but updates now land on main. To switch, first remove it with `copilot plugin marketplace remove code-migration-kit-marketplace --force`, then add the source in [PLUGIN.en.md](PLUGIN.en.md) again (so the same name is not registered twice).
+3. Links from copy-installed documents to the records in `history/` point at the default branch, so they resolve now that the kit is on main.
 
 ## 0.18.0 (repository cleanup)
 

@@ -31,7 +31,7 @@ Following reviews 1 and 2, this version adds [isolated pilots](docs/PILOT.md) be
 
 People never type commands: the whole migration runs from AI chat in VS Code (or the Copilot CLI). Open the target repository and ask Copilot Chat, for example:
 
-> Clone the `feat/github-copilot-migration-kit` branch of https://github.com/umauma00/code-migration-kit-with-github-copilot into `../code-migration-kit`, and install it into this repository with `scripts/install.mjs`
+> Clone https://github.com/umauma00/code-migration-kit-with-github-copilot into `../code-migration-kit`, and install it into this repository with `scripts/install.mjs`
 
 After installation, open a new chat, select `migration-orchestrator` in the agent picker (`code-migration-plugin-orchestrator` for a plugin install; `/agent` in the Copilot CLI), and ask, for example, "start a Python to TypeScript migration" or "continue the migration". Other agents do not start phases; they point you to the orchestrator. The AI runs everything itself and reports in chat:
 
@@ -55,10 +55,10 @@ Workers are always Copilot CLI processes: `--model` fixes each role's model, and
 
 ## Installing as a plugin
 
-GitHub Copilot CLI, VS Code and the GitHub Copilot app all install it from the same marketplace. Until it is on the repository's default branch, name the branch after `#`.
+GitHub Copilot CLI, VS Code and the GitHub Copilot app all install it from the same marketplace. The source is the repository's default branch (main).
 
 ```bash
-copilot plugin marketplace add umauma00/code-migration-kit-with-github-copilot#feat/github-copilot-migration-kit
+copilot plugin marketplace add umauma00/code-migration-kit-with-github-copilot
 copilot plugin install code-migration-kit@code-migration-kit-marketplace
 ```
 
