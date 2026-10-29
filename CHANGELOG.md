@@ -1,3 +1,26 @@
+# 0.17.0 — 2026-10-29
+
+The plugin installs in the GitHub Copilot app too, alongside the Copilot CLI
+and VS Code (installation methods checked against the GitHub and VS Code
+documentation on 2026-10-29).
+
+- docs/PLUGIN.md and README: installation per surface from the GitHub-hosted
+  marketplace (`owner/repo#branch` until the plugin is on the default branch):
+  CLI commands, VS Code Customizations and `chat.plugins.marketplaces`, and the
+  app's Customize page with `ghapp://` deep links. App session settings (This
+  computer, Current checkout, tool permissions, `/sandbox off` when a worker is
+  blocked), installing from an internal Git server, and an optional
+  `.github/copilot/settings.json` project default.
+- `install.mjs` returns `existingMigrations` when another git worktree of the
+  target already holds `migration/config.json` (the app can start each session
+  in a new worktree, and migration state is not committed). Both skill copies
+  tell the orchestrator to ask whether to resume there before `--apply`; the
+  installer itself only reports it.
+- The code-migration skill describes the app as a host built on the Copilot
+  CLI (`ask_user`, `/agent`, Autopilot = auto mode).
+- plugin.json and the marketplace entry carry author, homepage and keywords
+  for the app's and VS Code's plugin browsers (Agent Plugins 1.0 fields only).
+
 # 0.16.0 — 2026-10-29
 
 Auto mode no longer stops inside a phase, and a large survey scope no longer

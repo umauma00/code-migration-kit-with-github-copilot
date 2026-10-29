@@ -1,6 +1,14 @@
-# 更新手順（0.16.0 と以前の版）
+# 更新手順（0.17.0 と以前の版）
 
 日本語 | [English](UPGRADING.en.md)
+
+## 0.17.0（GitHub Copilot app 対応）
+
+キットのファイル（plugin.json・scripts）が変わるため、既存の承認・完了記録は一度だけ失効します。judgeから再検証してください。完了済みの出力は保持されます。
+
+1. プラグインの登録元を、手元のcheckoutから GitHub のリポジトリ（`umauma00/code-migration-kit-with-github-copilot#feat/github-copilot-migration-kit`）に変えられます。手元のcheckoutで登録したままでも動きます。登録を変える場合は、先に `copilot plugin marketplace remove code-migration-kit-marketplace --force` で外してから追加してください（同じ名前の登録が二重にならないようにするため）。
+2. GitHub Copilot app で使う場合は [PLUGIN.md](PLUGIN.md#github-copilot-app) の手順で入れ、セッションは This computer・Current checkout で始めます。
+3. コピー導入では `migration-kit/` 全体と、`.github/skills/` の SKILL.md を一時導入先の内容に置き換えます。プラグインは更新だけで入ります。
 
 ## 0.16.0（自動モードは工程の中でも止まらない・survey の部分を並列に）
 

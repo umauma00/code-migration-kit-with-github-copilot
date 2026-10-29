@@ -4,6 +4,8 @@
 
 An unofficial adaptation of Anthropic's [Code Migration Kit](https://github.com/anthropics/code-migration-kit-with-claude-code) for GitHub Copilot, centered on the Copilot CLI. It covers cross-language ports end to end: feasibility → fixed rules → translation → independent review → build → old-versus-new comparison.
 
+**0.17.0** lets the GitHub Copilot app install the same plugin (see [plugin installation](docs/PLUGIN.en.md), checked against the official documentation on 2026-10-29).
+
 **0.3.0** removes the VS Code subagent (native) backend: workers always run on the Copilot CLI, also from VS Code. People complete the migration from AI chat alone; the AI runs the commands, including installing the CLI, starting its sign-in and installing the guardrails. **0.2.0** supports the Agent Plugins format for VS Code and the Copilot CLI. Install the kit itself as a plugin and keep only configuration and artifacts in the project. See [plugin installation](docs/PLUGIN.en.md), [fixes and re-review of the previous version](docs/reviews/2026-10-10-copilot-rereview-fixes.md) and [upgrading an existing install](docs/UPGRADING.en.md).
 
 Reference versions: Copilot CLI **1.0.98** (provider transport also checked on 1.0.93 and 1.0.95; on 1.0.98 every role's round trip in both layouts, hook loading and the error output format were checked too) and VS Code **1.142**. In VS Code 1.142 the Copilot harness is becoming the default for new sessions, and prompt files are Local-harness only (`chat.promptFilesLocations` is deprecated; sources: [1.142 release notes](https://code.visualstudio.com/updates/v1_142), [Prompt files](https://code.visualstudio.com/docs/agent-customization/prompt-files), [AI settings reference](https://code.visualstudio.com/docs/agents/reference/ai-settings), checked 2026-10-18); from 0.7.0 the only entry point, in VS Code and the Copilot CLI alike, is the migration orchestrator in the agent picker (skills and workers are set to stay out of the slash menu and the picker). The pinned upstream commit and SDK reference are recorded in [UPSTREAM.json](UPSTREAM.json). This is not an official Anthropic or GitHub distribution.
@@ -55,15 +57,14 @@ Workers are always Copilot CLI processes: `--model` fixes each role's model, and
 
 ## Installing as a plugin
 
-Clone the plugin branch somewhere other than the project being migrated.
+GitHub Copilot CLI, VS Code and the GitHub Copilot app all install it from the same marketplace. Until it is on the repository's default branch, name the branch after `#`.
 
 ```bash
-git clone --branch feat/github-copilot-migration-kit https://github.com/umauma00/code-migration-kit-with-github-copilot.git /path/to/code-migration-kit
-copilot plugin marketplace add /path/to/code-migration-kit
+copilot plugin marketplace add umauma00/code-migration-kit-with-github-copilot#feat/github-copilot-migration-kit
 copilot plugin install code-migration-kit@code-migration-kit-marketplace
 ```
 
-This needs a checkout that includes the 0.2.0 changes. VS Code detects plugins installed by the CLI. For registering a local checkout directly, project initialization and updates, see [PLUGIN.en.md](docs/PLUGIN.en.md). Open the target repository in VS Code and ask Copilot Chat to start the migration with the `code-migration` skill.
+In VS Code, add the same source from the marketplace settings in **Chat: Open Customizations**; in the app, from the marketplace settings in **Customize**; then install `code-migration-kit`. VS Code also detects plugins installed by the CLI. For app session settings (This computer, Current checkout), registering a local checkout, installing from an internal Git server, project initialization and updates, see [PLUGIN.en.md](docs/PLUGIN.en.md). Open the target repository, select `code-migration-plugin-orchestrator` in the agent picker (`/agent` in the CLI) and ask it to start the migration.
 
 ## Copying the kit into the target repository
 

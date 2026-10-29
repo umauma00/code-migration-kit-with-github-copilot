@@ -1,8 +1,11 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "code-migration-kit",
-  "version": "0.16.0",
+  "version": "0.17.0",
   "description": "Staged language migration with explicit approvals and independent reviews.",
+  "author": { "name": "umauma00", "url": "https://github.com/umauma00" },
+  "homepage": "https://github.com/umauma00/code-migration-kit-with-github-copilot",
   "repository": "https://github.com/umauma00/code-migration-kit-with-github-copilot",
-  "license": "Apache-2.0"
+  "license": "Apache-2.0",
+  "keywords": ["migration", "language-migration", "code-translation", "copilot-cli", "agent-plugins"]
 }
