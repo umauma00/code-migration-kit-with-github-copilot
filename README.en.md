@@ -151,7 +151,7 @@ The minimum settings in `migration/config.json`:
 | `transientRetries`, `transientRetryDelayMs` | Retry rate limits, 5xx and network failures with backoff (5 seconds initially, up to 60). Continuous mode has no retry-count stop; bounded mode defaults to two retries |
 | `maxConsecutiveFailures` | Stop new dispatch after consecutive failures (default 3) in bounded mode only. Continuous mode still processes independent units. Authentication/credits and other actual shared failures are reported |
 | `timeoutSeconds` | CLI call deadline in bounded mode only; 0 means no deadline. Normal execution ignores legacy values such as 600 |
-| `commandTimeoutSeconds` | Build/comparison deadline in bounded mode only; 0 means no deadline. CPU, silence and elapsed time do not interrupt normal work. The model-tool probes of `doctor --check-cli` and `stress-b command` stop after 2 minutes when this is 0 and report the tools as unverified |
+| `commandTimeoutSeconds` | Build/comparison deadline in bounded mode only; 0 means no deadline. CPU, silence and elapsed time do not interrupt normal work. The model-tool probes of `doctor --check-cli` and `stress-b command` use this deadline in bounded mode; in continuous mode or when it is 0 they stop after 2 minutes. Either way an unanswered probe reports the tools as unverified |
 
 `commands` are argument arrays, not shell strings. Put pipes or several commands in a separate script, and configure only commands you trust.
 
