@@ -20,7 +20,7 @@ so behavioral equivalence is handed off as unverified.
 Setup (`settings init`) asks whether the original can run and, only when it
 cannot, whether a specification or a test suite the target can use exists. If
 that is no as well, after `settings apply` and before phase 00, `source-spec
-init` shows the changes and `source-spec init --apply` (the host asks once)
+init` shows the changes and `source-spec init --apply` (the host asks once; not in auto mode)
 switches to this profile.
 
 ## Getting started

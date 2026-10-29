@@ -37,15 +37,18 @@ const kit = 'node migration-kit/scripts/run_migration.mjs';
 const decide = (f, command) => interactiveDecision({ toolName: 'bash', toolArgs: { command }, cwd: f.root }, f.root);
 const gateCommands = [`${kit} approve translation --note "Reviewed"`, `${kit} approve translation --complete-phase 03 --note "Reviewed"`,
   `${kit} phase complete 02 --note "Reviewed"`, `${kit} phase waive 03 --note "shape first"`, `${kit} build-loop --note "go"`,
-  `${kit} approve build --note "Reviewed"`];
-const stillAsked = [`${kit} models set --role all --model gpt-5`, `${kit} settings apply`, `${kit} sessions prune`, `${kit} pilot prepare --note x`,
-  `${kit} source-spec init --apply`, 'node -e "import(\'./migration-kit/scripts/run_migration.mjs\')" approve', `${kit} guardrails install`];
+  `${kit} approve build --note "Reviewed"`, `${kit} pilot prepare --note x`, `${kit} source-spec init --apply`];
+// Recording settings the person chose runs unasked in every mode, as its own command.
+const settingsCommands = [`${kit} models set --role all --model gpt-5`, `${kit} settings apply`];
+const stillAsked = [`${kit} sessions prune`, 'node -e "import(\'./migration-kit/scripts/run_migration.mjs\')" approve', `${kit} guardrails install`,
+  `${kit} preferences --phase-mode auto`, `${kit} settings apply && ${kit} approve translation --note x`, `${kit} models set --role all --model gpt-5; ${kit} sessions prune`];
 
-test('normal and relaxed mode keep every gate asking; auto mode is never recorded for them', t => {
+test('normal and relaxed mode keep the gates asking (settings apply unasked); auto mode is never recorded for them', t => {
   for (const mode of [undefined, 'normal', 'relaxed']) {
     const f = fixture(t, { mode });
     fs.rmSync(safePath(f.root, 'migration/guardrails.json'));
     for (const command of [...gateCommands, ...stillAsked]) assert.equal(decide(f, command)?.decision, 'ask', `${mode}: ${command}`);
+    for (const command of settingsCommands) assert.equal(decide(f, command), null, `${mode}: ${command}`);
     assert.equal(fs.existsSync(safePath(f.root, autoModeFile)), false);
     complete(f, '00');
     assert.equal(readJSON(safePath(f.root, 'migration/phases/00.json')).auto, undefined);
@@ -63,7 +66,7 @@ test('normal and relaxed mode keep every gate asking; auto mode is never recorde
 
 test('auto mode lets the gate commands run unasked and keeps the rest asking', t => {
   const f = fixture(t, { mode: 'auto' });
-  for (const command of gateCommands) assert.equal(decide(f, command), null, command);
+  for (const command of [...gateCommands, ...settingsCommands]) assert.equal(decide(f, command), null, command);
   for (const command of stillAsked) assert.equal(decide(f, command)?.decision, 'ask', command);
   // guardrails install runs unasked only as the plain template install while no file exists.
   fs.rmSync(safePath(f.root, 'migration/guardrails.json'));
@@ -214,7 +217,8 @@ test('review of 333c70f: settings apply that switches auto on says so; the build
   assert.equal(ask?.decision, 'ask');
   assert.match(ask.reason, /switches to auto mode.*rule 3/s);
   writeJSON(safePath(f.root, runSettingsFile), { schemaVersion: 1, phaseMode: 'relaxed' });
-  assert.doesNotMatch(decide(f, `${kit} settings apply`).reason, /auto mode/);
+  assert.equal(decide(f, `${kit} settings apply`), null, 'settings without the auto switch apply unasked');
+  assert.doesNotMatch(decide(f, `${kit} settings apply && ${kit} status`).reason, /auto mode/);
   // A person's current approval is kept when auto mode approves again.
   for (const id of ['00', '00b', '01', '02']) complete(f, id);
   const { runStage } = await import('../lib/pipeline.mjs');

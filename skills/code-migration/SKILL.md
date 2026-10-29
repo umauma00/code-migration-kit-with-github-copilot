@@ -140,8 +140,9 @@ first. A changed model, effort or context makes reviewed units be reviewed again
 After initialization, choose the models first with **one** question for every
 role: run `run_migration.mjs models list --format markdown`, show it, and offer
 each enabled model as a choice ("every role on MODEL"). Record the answer with
-`run_migration.mjs models set --role all --model ID` (the host asks the person
-to confirm once; every role then runs the model's default effort and context).
+`run_migration.mjs models set --role all --model ID` as a command of its own
+(the person already chose, so the host does not ask again; every role then runs
+the model's default effort and context).
 If the list cannot be read, offer no models: sign the CLI in first. Then run `run_migration.mjs settings init`. It writes
 `migration/run-settings.json` from the current configuration: report language,
 whether the original can still run, migration languages, preserve or redesign,
@@ -214,7 +215,7 @@ use too? Ask it as **one** question and record the answer with
 `run_migration.mjs preferences --specification available|unavailable`, then run
 `settings init` again. Unavailable means the source is the only specification:
 after `settings apply`, its `next` has you run `source-spec init`, show the
-changes, and run `source-spec init --apply` (the host asks once) during setup,
+changes, and run `source-spec init --apply` (the host asks once, except in auto mode) during setup,
 so phase 00b never stops on that switch.
 
 Whenever a `settings init`, `settings apply` or `source-spec init` result
@@ -233,9 +234,11 @@ they have a question? Offer two choices, "filled in" and "I have a question"
 - Filled in: run `run_migration.mjs settings apply`. It checks every entry
   (the account's model list, each model's efforts and the runner's own
   configuration checks), writes nothing unless all pass, and records the values
-  in migration/config.json and migration/preferences.json; the host asks the
-  person to confirm once. If it returns `errors`, show every error and ask the
-  same question again.
+  in migration/config.json and migration/preferences.json. Run it as a command of
+  its own: the person's answer is the approval, so the host does not ask again
+  (it asks only when the file switches auto mode on, or when the command is
+  chained with another). If it returns `errors`, show every error and ask the
+  same question again. Batch setting changes into the file and apply them once.
 - A question: answer it, then ask the same question again. Edit the file only
   when the person asks you to; never choose a value for them. You may explain
   the upstream model plan as information, never as a preselected answer.
@@ -436,9 +439,10 @@ contextHash, so an edit would force a full re-survey and make the recorded
 phases stale) and put the conservative representation with `TODO(port)` into the
 translated output (upstream rule 8). List each as decided without the person. Missing guardrails are installed from the template
 automatically. Everything else still stops: safety checks, sign-in and credits,
-unfilled run settings, and the commands the hook still asks about (models set,
-settings apply, sessions prune, pilot prepare, source-spec init --apply); report
-them and stop. If phase 00 finds that a setup answer was wrong (the original does
+unfilled run settings, and the commands the hook still asks about (sessions
+prune, switching auto mode on, guardrails install with options or over an
+existing file); report them and stop. `models set`, `settings apply`, `pilot
+prepare` and `source-spec init --apply` run unasked as commands of their own. If phase 00 finds that a setup answer was wrong (the original does
 not run after all, or a specification turns up), say which answer and why, and
 ask the person to leave autopilot and decide in chat; never switch the profile
 yourself. Never switch auto mode on yourself, neither with `preferences --phase-mode

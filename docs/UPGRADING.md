@@ -1,6 +1,14 @@
-# 更新手順（0.19.0 と以前の版）
+# 更新手順（0.20.0 と以前の版）
 
 日本語 | [English](UPGRADING.en.md)
+
+## 0.20.0（設定の記録で確認を出さない）
+
+キットのファイル（plugin.json・scripts）が変わるため、既存の承認・完了記録は一度だけ失効します。judgeから再検証してください。完了済みの出力は保持されます。
+
+1. `models set` と `settings apply` は、単独のコマンドならどのモードでもホストの確認（Hook approval）が出なくなりました。利用者が質問への答えやファイルで選んだ内容を記録するだけだからです。自動モードへ切り替える内容の `settings apply` と、他のコマンドとつないだ場合は今までどおり確認します。
+2. 自動モードでは `pilot prepare` と `source-spec init --apply` も確認なしで進みます。確認が残るのは `sessions prune`（元に戻せない削除）、自動モードへの切り替え、オプション付きまたは設置済みのときの `guardrails install`、読み取れない形のキット呼び出しです。
+3. コピー導入では `migration-kit/` 全体と、`.github/agents/migration-orchestrator.agent.md`、`.github/skills/` の SKILL.md、`.github/copilot-instructions.md` のキットの区間を一時導入先の内容に置き換えます。プラグインは更新だけで入ります。
 
 ## 0.19.0（長時間コマンドの進捗表示を統一）
 

@@ -1,3 +1,19 @@
+# 0.20.0 — 2026-10-29
+
+Fewer host confirmations, so the kit runs on its own as far as it can. The
+GitHub Copilot app showed a "Hook approval" for every `settings apply`, even
+though the person had just chosen those values in a question.
+
+- `models set` and `settings apply` no longer ask in any mode when run as a
+  command of their own: they record what the person already chose. A
+  `settings apply` that switches auto mode on still asks and says so, and either
+  command chained with another (`&&`, `;`, a pipe, `$(...)`) still asks.
+- Auto mode also runs `pilot prepare` and `source-spec init --apply` unasked.
+  `sessions prune`, switching auto mode on, `guardrails install` with options or
+  over an existing file, and kit calls the hook cannot read still ask.
+- The skill no longer tells autopilot to stop at those commands, and asks to
+  batch setting changes into the file and apply them once.
+
 # 0.19.0 — 2026-10-29
 
 Long runner commands show their progress the same way. A `pilot run` piped into
