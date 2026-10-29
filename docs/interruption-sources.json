@@ -3252,7 +3252,7 @@
     },
     {
       "path": "scripts/copilot_adapter.mjs",
-      "sha256": "ac1d2c57b4ba2c4dafd7ac817fac5f98378fa58c1dbf7b591ac81210e0495171",
+      "sha256": "4f4b4e81c2f7544de4f9a82a3a2ebbc165434ff89418397956174a1d44cefba3",
       "entries": [
         {
           "line": 9,
@@ -3395,64 +3395,64 @@
           "code": "if (isReviewer(role) && typeof reviewInput !== 'string') throw new Error('Reviewer requires a frozen review input');"
         },
         {
-          "line": 259,
+          "line": 261,
           "kind": "deadline-or-observation",
           "code": "const currentVersion = (root, signal, timeoutMs) => {"
         },
         {
-          "line": 260,
+          "line": 262,
           "kind": "deadline-or-observation",
           "code": "if (!check || check.timeoutMs !== timeoutMs || Date.now() - check.at >= versionRecheckMs) {"
         },
         {
-          "line": 261,
+          "line": 263,
           "kind": "deadline-or-observation",
           "code": "check = { at: Date.now(), timeoutMs, result: copilotVersion(command, prefixArgs, { cwd: root, signal, timeoutMs }).then(version => ({ version }), error => ({ error })) };"
         },
         {
-          "line": 275,
+          "line": 277,
           "kind": "error-or-exit-candidate",
           "code": "if (signal?.aborted) throw new Error('Interrupted');"
         },
         {
-          "line": 307,
+          "line": 309,
           "kind": "error-or-exit-candidate",
           "code": "argv = [...prefixArgs, ...copilotArgs(worker, model, undefined, layout, session, { usageFile, maxAiCredits: executionLimits(config).aiCredits, effort, context })];"
         },
         {
-          "line": 308,
+          "line": 310,
           "kind": "deadline-or-observation",
           "code": "options = { cwd: root, signal, input: prompt, timeoutMs: processTimeout(config, 'timeoutSeconds'), outputDir: safePath(root, 'migration/runs/process-output'), env: copilotEnv(worker) };"
         },
         {
-          "line": 309,
+          "line": 311,
           "kind": "error-or-exit-candidate",
           "code": "} catch (e) { fs.rmSync(usageDir, { recursive: true, force: true }); throw e; }"
         },
         {
-          "line": 319,
+          "line": 322,
           "kind": "error-or-exit-candidate",
           "code": "Object.assign(e, versionFields, usageFields(usage)); throw e;"
         },
         {
-          "line": 323,
+          "line": 326,
           "kind": "error-or-exit-candidate",
           "code": "if (result.code !== 0) throw new Error(`Copilot ${role} failed (exit ${result.code}): ${[copilotStreamError(processOutputLines(result)), result.stderr.slice(-2000)].filter(Boolean).join('\\n')}`);"
         },
         {
-          "line": 329,
+          "line": 332,
           "kind": "error-or-exit-candidate",
           "code": "throw e;"
         },
         {
-          "line": 334,
+          "line": 337,
           "kind": "error-or-exit-candidate",
           "code": "throw e;"
         },
         {
-          "line": 348,
+          "line": 350,
           "kind": "error-or-exit-candidate",
-          "code": "ledger(false, observed); e.result = relativeProcessOutput(result, root); Object.assign(e, versionFields, usageFields(usage)); throw e; }"
+          "code": "ledger(false, reportedModelOf(result)); e.result = relativeProcessOutput(result, root); Object.assign(e, versionFields, usageFields(usage)); throw e; }"
         }
       ]
     },
