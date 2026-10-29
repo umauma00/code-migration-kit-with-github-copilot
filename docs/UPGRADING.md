@@ -4,10 +4,10 @@
 
 ## 0.18.0（リポジトリの整理）
 
-動作は変わりません。`scripts/review_benchmark.mjs` と版番号が変わるため、既存の承認・完了記録は一度だけ失効します。judgeから再検証してください。完了済みの出力と survey の結果は保持されます。
+動作は変わりません。`scripts/` のファイル（プラグインでは版番号も）が変わるため、既存の承認・完了記録は一度だけ失効します。judgeから再検証してください。完了済みの出力と survey の結果は保持されます。
 
-1. 上流由来で配布されていなかった `skill/SKILL.md` を削除しました。プラグインは `skills/`、コピー導入は `.github/skills/` を使います（変更なし）。
-2. 開発時のレビュー・検証記録（`docs/plans/`・`docs/reviews/`・`docs/validation/`・`docs/REVIEW-FIXES.md`）を `history/` へ移しました。コピー導入では、導入先の `migration-kit/docs/` に残った古い記録フォルダーを削除してかまいません（キットは読みません）。
+1. 上流由来で、どの導入でも読み込まれていなかった `skill/SKILL.md` を削除しました。プラグインは `skills/`、コピー導入は `.github/skills/` を使います（変更なし）。
+2. 開発時のレビュー・検証記録（`docs/plans/`・`docs/reviews/`・`docs/validation/`・`docs/REVIEW-FIXES.md`）を `history/` へ移しました。コピー導入では、導入先の `migration-kit/docs/` に残った古い記録フォルダーを削除してかまいません（キットは読みません。文書内の記録へのリンクは GitHub のリポジトリを指します）。
 
 ## 0.17.0（GitHub Copilot app 対応）
 

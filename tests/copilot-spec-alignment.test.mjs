@@ -78,8 +78,8 @@ test('the orchestrator is the only entry point: skills leave the slash menu but 
 });
 
 test('current documents no longer offer the removed slash entry points', () => {
-  // History (CHANGELOG, reviews, plans, validation) and upgrade notes may name them.
-  const history = /^(CHANGELOG\.md|docs\/(reviews|plans|validation)\/|docs\/UPGRADING(\.en)?\.md$)/;
+  // History (CHANGELOG, history/) and upgrade notes may name them.
+  const history = /^(CHANGELOG\.md|docs\/UPGRADING(\.en)?\.md$)/;
   const files = ['README.md', 'README.en.md', ...filesUnder(kitRoot, 'docs'), ...filesUnder(kitRoot, '.github'), ...filesUnder(kitRoot, 'skills'), ...filesUnder(kitRoot, 'com.github.copilot')]
     .filter(f => /\.(md|json)$/.test(f) && !history.test(f));
   for (const file of files) {

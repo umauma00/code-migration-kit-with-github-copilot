@@ -7,12 +7,22 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { safePath, readJSON, filesUnder, atomicWrite } from '../lib/core.mjs';
 import { parseCommandLine, specs } from '../lib/cli.mjs';
 export const kitRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+const repositoryUrl = readJSON(path.join(kitRoot, 'plugin.json')).repository;
 function rewriteLinks(text, relativeFile) {
   return text.replace(/\]\(([^)#]+)(#[^)]*)?\)/g, (whole, link, fragment = '') => {
     if (/^[a-z]+:/.test(link) || link.startsWith('/')) return whole;
     const resolved = path.posix.normalize(path.posix.join(path.posix.dirname(relativeFile), link));
     if (resolved.startsWith('../') || resolved.startsWith('.github/')) return whole;
     return `](${path.posix.relative(path.posix.dirname(relativeFile), `migration-kit/${resolved}`)}${fragment})`;
+  });
+}
+// Development records stay in the kit repository (history/ is not copied); point copied documents at it.
+function linkHistory(text, relativeFile) {
+  if (!relativeFile.endsWith('.md')) return text;
+  return text.replace(/\]\(([^)#]+)(#[^)]*)?\)/g, (whole, link, fragment = '') => {
+    if (/^[a-z]+:/.test(link) || link.startsWith('/')) return whole;
+    const resolved = path.posix.normalize(path.posix.join(path.posix.dirname(relativeFile), link));
+    return resolved.startsWith('history/') ? `](${repositoryUrl}/blob/HEAD/${resolved}${fragment})` : whole;
   });
 }
 // The GitHub Copilot app can start each session in a new git worktree. Migration
@@ -112,9 +122,9 @@ export function install(target, { apply = false, model, harness = 'copilot', wit
   const files = new Map();
   for (const dir of ['lib', 'scripts', 'prompts', 'templates', 'docs']) for (const rel of filesUnder(kitRoot, dir)) {
     if (rel === 'scripts/demo.mjs') continue;
-    files.set(`migration-kit/${rel}`, fs.readFileSync(safePath(kitRoot, rel), 'utf8'));
+    files.set(`migration-kit/${rel}`, linkHistory(fs.readFileSync(safePath(kitRoot, rel), 'utf8'), rel));
   }
-  for (const rel of ['README.md', 'README.en.md', 'LICENSE', 'NOTICE', 'CHANGELOG.md', 'UPSTREAM.json']) files.set(`migration-kit/${rel}`, fs.readFileSync(path.join(kitRoot, rel), 'utf8'));
+  for (const rel of ['README.md', 'README.en.md', 'LICENSE', 'NOTICE', 'CHANGELOG.md', 'UPSTREAM.json']) files.set(`migration-kit/${rel}`, linkHistory(fs.readFileSync(path.join(kitRoot, rel), 'utf8'), rel));
   const runtimePackage = readJSON(path.join(kitRoot, 'package.json'));
   runtimePackage.scripts = { check: 'node scripts/run_migration.mjs doctor --root ..' };
   files.set('migration-kit/package.json', `${JSON.stringify(runtimePackage, null, 2)}\n`);

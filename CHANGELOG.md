@@ -2,13 +2,15 @@
 
 Repository cleanup: no behavior change.
 
-- Removed `skill/SKILL.md`, the upstream Claude Code skill that neither install
-  path distributed and that had fallen behind `skills/code-migration/`. The
-  plugin uses `skills/`; the copy install uses `.github/skills/`.
+- Removed `skill/SKILL.md`, the upstream Claude Code skill that no install
+  loaded (the copy install never copied it) and that had fallen behind
+  `skills/code-migration/`. The plugin uses `skills/`; the copy install uses
+  `.github/skills/`.
 - Moved the kit's own development records (`docs/plans/`, `docs/reviews/`,
   `docs/validation/`, `docs/REVIEW-FIXES.md`) to `history/`. The copy install
   copies `docs/` into `migration-kit/docs/`, so these records no longer land in
-  migration projects. Links were updated.
+  migration projects. Links were updated; in a copy install, links into
+  `history/` point at the kit's GitHub repository.
 - Deleted the 2026-10-14 parallel-queue probe script, which could not run since
   0.3.0 (it stays in git history).
 - The review benchmark setup no longer removes the old record folders, since

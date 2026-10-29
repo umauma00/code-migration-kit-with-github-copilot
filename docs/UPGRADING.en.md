@@ -4,10 +4,10 @@
 
 ## 0.18.0 (repository cleanup)
 
-No behavior change. `scripts/review_benchmark.mjs` and the version number change, so existing approvals and completion records are invalidated once. Revalidate from judge. Completed outputs and survey results are kept.
+No behavior change. Files under `scripts/` (and, for the plugin, the version number) change, so existing approvals and completion records are invalidated once. Revalidate from judge. Completed outputs and survey results are kept.
 
-1. Removed `skill/SKILL.md`, an upstream file neither install path distributed. The plugin uses `skills/` and the copy install uses `.github/skills/` (unchanged).
-2. Moved the kit's development records (`docs/plans/`, `docs/reviews/`, `docs/validation/`, `docs/REVIEW-FIXES.md`) to `history/`. In a copy install you may delete the old record folders left in `migration-kit/docs/`; the kit does not read them.
+1. Removed `skill/SKILL.md`, an upstream file no install loaded. The plugin uses `skills/` and the copy install uses `.github/skills/` (unchanged).
+2. Moved the kit's development records (`docs/plans/`, `docs/reviews/`, `docs/validation/`, `docs/REVIEW-FIXES.md`) to `history/`. In a copy install you may delete the old record folders left in `migration-kit/docs/`; the kit does not read them, and links to the records point at the GitHub repository.
 
 ## 0.17.0 (GitHub Copilot app support)
 

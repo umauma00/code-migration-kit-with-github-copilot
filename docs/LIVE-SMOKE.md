@@ -40,7 +40,7 @@ Dynamic Workflowsは [専用の確認事項](DYNAMIC-WORKFLOWS.md) を追加し�
 
 ## 人間ゲートとワーカーセッションの実機確認（未実施）
 
-自動テストとloopbackでの確認は、プロンプトモードのワーカーまでです。次の項目は実機で確認し、結果を `history/validation/copilot-cli-1.0.98-review-2026-10-18.json` の `liveChecks`（未実施は `null`）に記録してください。
+自動テストとloopbackでの確認は、プロンプトモードのワーカーまでです。次の項目は実機で確認し、結果をキット本体のリポジトリの `history/validation/copilot-cli-1.0.98-review-2026-10-18.json` の `liveChecks`（未実施は `null`）に記録してください。
 
 - **対話CLI（信頼済みフォルダ）**：`node migration-kit/scripts/run_migration.mjs approve translation --note test` をAIに実行させます。確認が出ること、「No」で実行されないこと、「Yes」の後にCLI自身の許可確認がもう一度出るか（[copilot-cli#3042](https://github.com/github/copilot-cli/issues/3042)）を記録します（`liveCLIInteractiveAsk`）。
 - **autopilot**：同じコマンドが確認なしに拒否されることを確認します（CLI 1.0.97以降の仕様、`liveCLIAutopilot`）。`--allow-all` / `--yolo` のときに確認が出るかも記録します（公式の記載なし、`liveCLIAllowAll`）。

@@ -4017,105 +4017,105 @@
     },
     {
       "path": "scripts/install.mjs",
-      "sha256": "70797c2cb42e8f917c5d86cb4c1045059adc16d2e44c070f7fee991b5fcc5825",
+      "sha256": "6201f66448bbb6e84604e22ec7fb7e59ca5e8dab183d6f97b1f57fa3ce115e2c",
       "entries": [
         {
-          "line": 47,
+          "line": 57,
           "kind": "error-or-exit-candidate",
           "code": "if (!id || roles.some(r => !workerRoles.includes(r))) throw new Error(`--models takes role=MODEL_ID pairs for ${workerRoles.join(', ')} (or reviewers=MODEL_ID); got ${pair}`);"
         },
         {
-          "line": 57,
+          "line": 67,
           "kind": "error-or-exit-candidate",
           "code": "if (language !== undefined && !['ja', 'en'].includes(language)) throw new Error('language must be ja or en');"
         },
         {
-          "line": 64,
+          "line": 74,
           "kind": "error-or-exit-candidate",
           "code": "if (verificationMode !== undefined && !['runtime', 'source-only'].includes(verificationMode)) throw new Error('verificationMode must be runtime or source-only');"
         },
         {
-          "line": 65,
+          "line": 75,
           "kind": "error-or-exit-candidate",
           "code": "if (preparationProfile !== undefined && !['standard', 'source-as-spec'].includes(preparationProfile)) throw new Error('preparationProfile must be standard or source-as-spec');"
         },
         {
-          "line": 68,
+          "line": 78,
           "kind": "error-or-exit-candidate",
           "code": "if (verificationMode === 'runtime') throw new Error('source-as-spec requires verificationMode source-only');"
         },
         {
-          "line": 71,
+          "line": 81,
           "kind": "error-or-exit-candidate",
           "code": "if (!['repository', 'plugin'].includes(layout)) throw new Error('layout must be repository or plugin');"
         },
         {
-          "line": 72,
+          "line": 82,
           "kind": "error-or-exit-candidate",
           "code": "if (!['copilot', 'vscode-local'].includes(harness)) throw new Error('harness must be copilot or vscode-local');"
         },
         {
-          "line": 75,
+          "line": 85,
           "kind": "error-or-exit-candidate",
           "code": "if (workerBackend !== 'copilot-cli') throw new Error('The native worker backend was removed: workers always run as Copilot CLI processes, also from VS Code chat. Install and sign in to the Copilot CLI, then omit --worker-backend');"
         },
         {
-          "line": 76,
+          "line": 86,
           "kind": "error-or-exit-candidate",
           "code": "if (fixPolicy !== undefined && !['rereview', 'single-pass'].includes(fixPolicy)) throw new Error('fixPolicy must be rereview or single-pass');"
         },
         {
-          "line": 83,
+          "line": 93,
           "kind": "error-or-exit-candidate",
           "code": "if (layout === 'plugin' && (harness !== 'copilot' || withWorkflow)) throw new Error('Plugin layout uses Copilot hooks and does not include the experimental workflow extension');"
         },
         {
-          "line": 85,
+          "line": 95,
           "kind": "error-or-exit-candidate",
           "code": "if (root === kitRoot || kitRoot.startsWith(`${root}${path.sep}`)) throw new Error('Install into a separate migration target repository');"
         },
         {
-          "line": 87,
+          "line": 97,
           "kind": "error-or-exit-candidate",
           "code": "if (layout === 'repository' && fs.existsSync(existingConfig) && readJSON(existingConfig).runtime === 'plugin') throw new Error('Existing configuration uses plugin layout; reconcile it explicitly before switching to repository layout');"
         },
         {
-          "line": 93,
+          "line": 103,
           "kind": "error-or-exit-candidate",
           "code": "if (readJSON(configPath).runtime !== 'plugin') throw new Error('Existing configuration uses repository layout; reconcile it explicitly before switching to plugin layout');"
         },
         {
-          "line": 104,
+          "line": 114,
           "kind": "error-or-exit-candidate",
           "code": "if (!fs.statSync(file).isFile()) throw new Error(`Destination is not a regular file: ${name}`);"
         },
         {
-          "line": 131,
+          "line": 141,
           "kind": "error-or-exit-candidate",
           "code": "if (!old.includes(managed.trim())) throw new Error('Existing managed instructions differ; reconcile them before reinstalling');"
         },
         {
-          "line": 145,
+          "line": 155,
           "kind": "error-or-exit-candidate",
           "code": "if (!fs.statSync(file).isFile()) throw new Error(`Destination is not a regular file: ${rel}`);"
         },
         {
-          "line": 147,
+          "line": 157,
           "kind": "error-or-exit-candidate",
           "code": "if (rel !== instructions) throw new Error(`Refusing to overwrite an existing different file: ${rel}`);"
         },
         {
-          "line": 159,
+          "line": 169,
           "kind": "error-or-exit-candidate",
           "code": "if (args.help) { console.log(usage); process.exit(0); }"
         },
         {
-          "line": 160,
+          "line": 170,
           "kind": "error-or-exit-candidate",
           "code": "if (!args.target) throw new Error(usage);"
         },
         {
-          "line": 162,
+          "line": 172,
           "kind": "error-or-exit-candidate",
           "code": "} catch (e) { console.error(`ERROR: ${e.message}`); process.exitCode = 1; }"
         }
