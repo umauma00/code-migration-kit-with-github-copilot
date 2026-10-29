@@ -20,6 +20,18 @@ Kit files (plugin.json, scripts) change, so existing approvals and completion re
 3. During setup, `settings apply` returns `sandboxQuestion` when it finds a sandbox and asks before phase 00 and the switch to autopilot (on each apply during setup until it is resolved). For a project already past setup, run `doctor` before phase 03.
 4. For a copied install, replace all of `migration-kit/` and the SKILL.md files in `.github/skills/` with the temporary install's. A plugin only needs updating.
 
+## 0.23.0 (one repair round, generated code and policies before the survey, faster phase next)
+
+The kit files (plugin.json, scripts) change, so existing approvals and completion records expire once. Revalidate from judge. Completed outputs are kept.
+
+1. Preparation audits and independent reviews in 00b–02 (the source-as-spec package review included) get one repair round in every mode, as upstream: confirm findings against the source, fix them and re-review only the fixed items once.
+2. What is still open is not fixed again: inventory rows become UNKNOWN (most conservative translation plus TODO(port)), other findings stay as open limitations in judge-report.md or depmap/report.md. The phase report lists the fixed findings, the open ones with evidence and the rows made UNKNOWN (with counts); the person decides at the phase gate (in auto mode the list goes into the record's note and the run continues).
+3. The 02 joint RULEBOOK/inventory audit is not re-run after its fixes, as upstream. Sampling audits of a hand-written dependency graph keep their three rounds.
+4. Before the 02 inventory survey run `preparation_cli.mjs generated-files --write` and `policy-questions`. Sites in generated files become GENERATED rows without a model; report counts only. They are translated as ordinary code, and only files the person chose to regenerate with a target generator are regenerated (build approval waits until the target exists). Ask the policy questions once together and record answers with `policy-record` in the RULEBOOK's managed block (auto mode: the most conservative option).
+5. Before the full survey, `rulebook-coverage --sites PATH` and `survey run --kind inventory --sites PATH --trial 3` show constructs without a rule and constructs that come back mostly UNKNOWN. In a project already surveyed, a RULEBOOK change means the inventory survey runs again.
+6. `phase next` and `status` are faster on large projects (no configuration change).
+7. In a copy install, replace all of `migration-kit/`, `.github/agents/migration-orchestrator.agent.md`, the SKILL.md in `.github/skills/` and the kit's section of `.github/copilot-instructions.md` with the temporary install's. The plugin needs only an update.
+
 ## 0.22.0 (kit-wide AI usage)
 
 Kit files (plugin.json, scripts) change, so existing approvals and completion records expire once. Revalidate from judge. Completed outputs are kept.

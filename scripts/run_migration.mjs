@@ -64,6 +64,8 @@ export const usage = `Usage: node migration-kit/scripts/run_migration.mjs COMMAN
                               waive (relaxed mode only) proceeds past an unfinished phase with the person's reason
   survey plan|run|status|merge --kind facts|contracts|inventory [--max-files N] [--sites migration/SITES.tsv]
                               Split preparation reading into scopes for fresh tool-free workers; results are files
+  survey run --kind inventory --sites migration/SITES.tsv --trial N
+                              try N sites per source_construct first; reports the UNKNOWN share per construct, merges nothing
   source-spec init [--apply] | check
                               Source as the only specification: scaffold source-only preparation
   judge                       Runtime: original/mutation; source-only: validate preparation
@@ -97,7 +99,7 @@ export async function stressB(root, config, { dir, model, command = 'copilot', s
   let stat; try { stat = fs.statSync(dir); } catch {}
   if (!stat?.isDirectory()) throw new Error(`stress-b command: ${dir} is not a directory; create it and copy only the selected source files into it first`);
   const inside = path.relative(fs.realpathSync.native(root), fs.realpathSync.native(dir));
-  if (!inside || (!inside.startsWith('..') && !path.isAbsolute(inside))) throw new Error(`stress-b command: ${dir} is inside the repository; B must run in a directory outside it`);
+  if (!inside || (inside !== '..' && !inside.startsWith(`..${path.sep}`) && !path.isAbsolute(inside))) throw new Error(`stress-b command: ${dir} is inside the repository; B must run in a directory outside it`);
   model ??= config.phaseModels?.stressB ?? config.models.implementer;
   if (typeof config.targetLanguage !== 'string' || !config.targetLanguage.trim()) throw new Error('stress-b command needs targetLanguage in migration/config.json');
   const found = await stressBTools(command, model, { signal, timeoutMs: processTimeout(config, 'commandTimeoutSeconds') });
@@ -444,7 +446,8 @@ export async function main(argv = process.argv.slice(2)) {
     else if (cmd === 'source-spec') throw new Error('Use source-spec init [--apply] | check');
     else if (cmd === 'survey') {
       // Delegated preparation surveys: scopes go to fresh tool-free surveyor workers.
-      const kind = args.kind, options = { maxFiles: args['max-files'] === undefined ? undefined : Number(args['max-files']), sitesFile: args.sites };
+      const kind = args.kind, options = { maxFiles: args['max-files'] === undefined ? undefined : Number(args['max-files']), sitesFile: args.sites,
+        ...(args.trial !== undefined ? { trial: Number(args.trial) } : {}) };
       const action = args._[1];
       if (action === 'plan') result = planSurvey(root, config, kind, options);
       else if (action === 'status') result = surveyStatus(root, config, kind, options);

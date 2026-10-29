@@ -30,7 +30,7 @@ redesign 方式では 5〜7 の比較試験は行わず、設計文書への敵�
 
 `--no-custom-instructions` は AGENTS.md や Copilot 指示を止めますが、ユーザー／plugin の skill（本キットの `code-migration` skill を含む）の説明文は残ります。CLI 1.0.98 では `--available-tools` から `skill` を外すと、その説明文はモデルに届きませんでした。
 
-まず作業場所を作って元ファイルだけをコピーし、runner に正確なコマンドを作らせます。runner は、そのモデルがこの CLI で持つファイル操作ツールを AI を使わずに CLI から読み取り、それだけを並べます（書き込みツールが無いモデルなら理由と選択肢を出して止まります）。表示された `bash` か `powershell` の行を、そのまま端末で実行します。
+まず作業場所を作って元ファイルだけをコピーし、runner に正確なコマンドを作らせます。runner は、そのモデルがこの CLI で持つファイル操作ツールを AI を使わずに CLI から読み取り、それだけを並べます（書き込みツールが無いモデルなら理由と選択肢を出して止まります。CLI に聞けない環境では `verified: false` と表示し、知られている全系統のツールを並べます）。表示された `bash` か `powershell` の行を、そのまま端末で実行します。
 
 ```bash
 mkdir /tmp/bakeoff-b && cp SOURCE_FILES /tmp/bakeoff-b/   # チェックアウトではなくコピーだけ

@@ -32,7 +32,7 @@ stop and ask the human for a design decision instead of a third wording.
 
 `--no-custom-instructions` stops AGENTS.md and Copilot instructions, but user and plugin skill descriptions (including this kit's `code-migration` skill) still reach the model. With CLI 1.0.98, leaving `skill` out of `--available-tools` kept them out.
 
-First create the directory and copy only the source files, then have the runner write the exact command. The runner reads which file tools the model has in this CLI (from the CLI, without AI usage) and lists only those; for a model with no writing tool it stops with the reason and choices. Run the printed `bash` or `powershell` line in a terminal as it is.
+First create the directory and copy only the source files, then have the runner write the exact command. The runner reads which file tools the model has in this CLI (from the CLI, without AI usage) and lists only those; for a model with no writing tool it stops with the reason and choices. Where the CLI cannot be asked, it says `verified: false` and lists the file tools of every known model family. Run the printed `bash` or `powershell` line in a terminal as it is.
 
 ```bash
 mkdir /tmp/bakeoff-b && cp SOURCE_FILES /tmp/bakeoff-b/   # copies only, not a checkout

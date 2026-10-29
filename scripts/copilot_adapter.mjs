@@ -154,9 +154,12 @@ export async function probeModelTools(command = 'copilot', args = [], { cwd, mod
   if (signal?.aborted) throw new Error('Interrupted');
   let tools = null;
   const server = http.createServer(async (req, res) => {
-    let body = ''; for await (const chunk of req) body += chunk;
+    let body = '';
+    try { for await (const chunk of req) body += chunk; } catch { return; }
     let request = {}; try { request = JSON.parse(body); } catch {}
-    tools ??= (Array.isArray(request.tools) ? request.tools : []).map(t => t?.function?.name ?? t?.custom?.name ?? t?.name).filter(name => typeof name === 'string');
+    // The first request that lists tools; a request without a list (such as
+    // a title request) says nothing about them.
+    if (!tools && Array.isArray(request.tools)) tools = request.tools.map(t => t?.function?.name ?? t?.custom?.name ?? t?.name).filter(name => typeof name === 'string');
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ id: 'tool-probe', object: 'chat.completion', created: 1, model: request.model ?? model,
       usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 }, choices: [{ index: 0, message: { role: 'assistant', content: '{}' }, finish_reason: 'stop' }] }));
@@ -164,7 +167,8 @@ export async function probeModelTools(command = 'copilot', args = [], { cwd, mod
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'migration-kit-tool-probe-'));
   try {
     await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
-    const result = await runProcess(command, args, { cwd, signal, timeoutMs, input: 'Tool probe. Reply {}.', env: { ...process.env, ...env, ...loopbackEnv(home, server.address().port, model) } });
+    // Bounded even when commands are not: a CLI that keeps retrying is unverified.
+    const result = await runProcess(command, args, { cwd, signal, timeoutMs: timeoutMs || 120000, input: 'Tool probe. Reply {}.', env: { ...process.env, ...env, ...loopbackEnv(home, server.address().port, model) } });
     if (tools) return { ok: true, tools };
     return { ok: false, detail: `The CLI made no model request (exit ${result.code}): ${(result.stderr || result.stdout).slice(-400)}` };
   } catch (e) { if (signal?.aborted) throw new Error('Interrupted'); return { ok: false, detail: e.message }; }
@@ -197,7 +201,9 @@ export function stressBCommand({ command = 'copilot', model, dir, targetLanguage
   const prompt = `Port these files to ${targetLanguage} the way a fluent ${targetLanguage} engineer would write them natively. Write each translation next to its source.`;
   const argv = ['-p', prompt, '--model', model, ...stressBFlags, '--available-tools', tools.join(','), '--allow-tool', 'write'];
   const sh = v => /^[\w@%+=:,./-]+$/.test(v) ? v : `'${v.replace(/'/g, `'\\''`)}'`;
-  const ps = v => /^[\w@%+=:,./\\-]+$/.test(v) ? v : `'${v.replace(/'/g, "''")}'`;
+  // PowerShell: a bare comma builds an array, and curly single quotes end a
+  // quoted string like ' does.
+  const ps = v => /^[\w@%+=:./\\-]+$/.test(v) ? v : `'${v.replace(/['\u2018\u2019\u201A\u201B]/g, q => q + q)}'`;
   return { argv, bash: `cd ${sh(dir)} && ${[command, ...argv].map(sh).join(' ')}`, powershell: `Set-Location ${ps(dir)}; & ${[command, ...argv].map(ps).join(' ')}` };
 }
 // In JSON mode the CLI reports model and session failures (rate limits, 5xx,

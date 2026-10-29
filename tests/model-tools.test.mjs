@@ -30,6 +30,7 @@ if (argv.includes('--available-tools')) {
   const wanted = at('--available-tools').split(',').map(n => n === 'grep' && tools.includes('rg') ? 'rg' : n);
   tools = tools.filter(n => wanted.includes(n));
 }
+if (model === 'title-first') { await (await fetch(process.env.COPILOT_PROVIDER_BASE_URL + '/chat/completions', { method: 'POST', body: JSON.stringify({ model, messages: [] }), headers: { 'content-type': 'application/json' } })).text(); }
 const body = JSON.stringify({ model, messages: [], tools: tools.map(n => n === 'apply_patch' ? { type: 'custom', custom: { name: n } } : { type: 'function', function: { name: n } }) });
 const res = await fetch(process.env.COPILOT_PROVIDER_BASE_URL + '/chat/completions', { method: 'POST', body, headers: { 'content-type': 'application/json' } });
 await res.text();
@@ -45,6 +46,7 @@ test('comparison B gets the file tools the model really has, and at least one th
   const classic = await stressBTools(cli, 'gpt-4.1');
   assert.deepEqual(classic.tools, ['view', 'glob', 'grep', 'create', 'edit']);
   for (const found of [luna, classic]) assert.ok(!found.tools.includes('skill') && !found.tools.includes('bash'), 'B never gets skills or a shell');
+  assert.ok((await stressBTools(cli, 'title-first')).tools.includes('create'), 'a first request without tools is not read as "no tools"');
   await assert.rejects(stressBTools(cli, 'read-only'), /model read-only has no file-writing tool/);
   assert.equal(failureGuidance('Comparison B: model read-only has no file-writing tool in this Copilot CLI (it offers view, glob).', { language: 'ja' }).id, 'model-tools');
 });
@@ -61,6 +63,11 @@ test('the B command quotes for bash and PowerShell and keeps the isolation flags
   assert.deepEqual(c.argv.slice(2), ['--model', 'gpt-6-luna', '--no-custom-instructions', '--disable-builtin-mcps', '-s', '--available-tools', 'view,apply_patch', '--allow-tool', 'write']);
   assert.match(c.bash, /^cd '\/tmp\/bake off\/it'\\''s' && copilot -p 'Port these files to Java /);
   assert.match(c.powershell, /^Set-Location '\/tmp\/bake off\/it''s'; & copilot -p 'Port these files to Java /);
+  // A bare comma is an array in PowerShell: the tool list stays one argument.
+  assert.match(c.powershell, / --available-tools 'view,apply_patch' --allow-tool write$/);
+  assert.match(c.bash, / --available-tools view,apply_patch --allow-tool write$/);
+  const curly = stressBCommand({ model: 'm', dir: 'C:\\work\\O\u2019Brien', targetLanguage: 'Java', tools: ['view', 'edit'] });
+  assert.match(curly.powershell, /^Set-Location 'C:\\work\\O\u2019\u2019Brien'; /);
 });
 
 test('stress-b command refuses a directory inside the repository and runs from the runner', async t => {
@@ -68,6 +75,9 @@ test('stress-b command refuses a directory inside the repository and runs from t
   const config = { ...f.config, targetLanguage: 'TypeScript', phaseModels: { stressB: 'gpt-6-luna' } };
   await assert.rejects(stressB(f.root, config, { dir: path.join(f.root, 'src'), command: cli }), /inside the repository/);
   await assert.rejects(stressB(f.root, config, { dir: 'relative/dir', command: cli }), /absolute path/);
+  fs.mkdirSync(path.join(f.root, '..bakeoff'));
+  await assert.rejects(stressB(f.root, config, { dir: path.join(f.root, '..bakeoff'), command: cli }), /inside the repository/, 'a child named ..x is inside');
+  await assert.rejects(stressB(f.root, config, { dir: f.root, command: cli }), /inside the repository/);
   await assert.rejects(stressB(f.root, config, { dir: path.join(outside, 'missing'), command: cli }), /not a directory/);
   const result = await stressB(f.root, config, { dir: outside, command: cli });
   assert.equal(result.model, 'gpt-6-luna');
