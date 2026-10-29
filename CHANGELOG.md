@@ -11,6 +11,9 @@ though the person had just chosen those values in a question.
 - Auto mode also runs `pilot prepare` and `source-spec init --apply` unasked.
   `sessions prune`, switching auto mode on, `guardrails install` with options or
   over an existing file, and kit calls the hook cannot read still ask.
+- They ask again with `--root` naming another project or with `--copilot`.
+  A `--note` value that quotes a kit command is text: it no longer stands in
+  for the gate it is attached to.
 - The skill no longer tells autopilot to stop at those commands, and asks to
   batch setting changes into the file and apply them once.
 

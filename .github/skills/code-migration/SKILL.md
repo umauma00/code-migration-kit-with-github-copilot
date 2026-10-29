@@ -112,7 +112,7 @@ arbiter on a mid model; higher effort costs more tokens — as information, neve
 as a preselected answer, and never choose for them. Record the whole answer with
 one `run_migration.mjs models set --assign "ROLE=ID:EFFORT,..."` (a single
 choice for everyone may use `--role all --model ID --effort LEVEL|default`);
-the host asks them to confirm once. Every entry is checked before anything is
+run as a command of its own, the host does not ask again. Every entry is checked before anything is
 written: if one is refused (unlisted model, unsupported effort or context), nothing
 changes, so ask again about that entry only and record the full answer again.
 If `models list` reports that the CLI is not signed in, start `copilot login`
@@ -369,6 +369,7 @@ work through and show the [one-page checklist](../../../docs/STRESS-TEST-CHECKLI
 reason), and after their agreement in chat run `guardrails install` with exactly
 those options. Never write the file any other way (the hook denies it). Outside
 auto mode the host asks the person to confirm every `approve` / `phase complete` /
+`phase waive` / `build-loop` / `pilot prepare` / `source-spec init --apply` /
 `guardrails install` command; if it cannot ask (autopilot denies the request),
 tell the person to leave autopilot and retry instead of working around it. In
 auto mode these run unasked (see the auto mode paragraph below) only as one
@@ -424,7 +425,8 @@ translated output (upstream rule 8). List each as decided without the person. Mi
 automatically. Everything else still stops: safety checks, sign-in and credits,
 unfilled run settings, and the commands the hook still asks about (sessions
 prune, switching auto mode on, guardrails install with options or over an
-existing file); report them and stop. `models set`, `settings apply`, `pilot
+existing file, kit calls it cannot read, and any gate chained with another
+command); report them and stop. `models set`, `settings apply`, `pilot
 prepare` and `source-spec init --apply` run unasked as commands of their own. If phase 00 finds that a setup answer was wrong (the original does
 not run after all, or a specification turns up), say which answer and why, and
 ask the person to leave autopilot and decide in chat; never switch the profile

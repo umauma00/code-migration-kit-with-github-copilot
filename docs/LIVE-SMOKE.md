@@ -60,7 +60,7 @@ These checks require actual VS Code; offline fixtures do not establish UI behavi
   failed or reported invisible TODO. Local children never use TODO/question tools.
 - Drive the whole fixture from chat only: the agent checks/installs the Copilot CLI,
   starts `copilot login` and relays its code, proposes and runs `guardrails install`,
-  and the host asks before every human-gate command. Nothing is typed by the person.
+  and the host asks before every human-gate command (not for `models set` and `settings apply`, which record the person's choice). Nothing is typed by the person.
 - During translate, confirm the background terminal and a responsive parent, slot
   refill, the reviewer cap and the CLI-reported models in the run summary.
 - Invoke actual built-in Rubber Duck if exposed; record unavailable otherwise.

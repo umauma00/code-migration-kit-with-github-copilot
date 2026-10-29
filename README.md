@@ -43,7 +43,7 @@ Anthropicの[Code Migration Kit](https://github.com/anthropics/code-migration-ki
 利用者が行うのは、次の3つだけです。
 
 1. チャットでの質問への回答（言語・モデル・方針・各工程の判断）
-2. 人間が判断する操作の確認ダイアログでの許可（`approve`、`phase complete`、`pilot prepare`、`source-spec init --apply`、`guardrails install`）。AIが実行しようとすると、ホストが利用者に確認を求めます。
+2. 人間が判断する操作の確認ダイアログでの許可（`approve`、`phase complete`、`pilot prepare`、`source-spec init --apply`、`guardrails install`）。AIが実行しようとすると、ホストが利用者に確認を求めます（自動モードでは、オプションなしの初回の `guardrails install` を含めて確認なしで進みます）。
 3. Copilot CLIのサインインのブラウザでの承認（初回のみ）
 
 ワーカーは常にCopilot CLIのプロセスです。`--model` で担当ごとのモデルを固定し、ツール制限と暗黙指示の隔離は実CLIで確認しています。0.2.0までのnative方式の設定（`workerBackend: "native"` など）は停止して移行方法を表示します。AIが内容を示し、同意を得て設定を直します。

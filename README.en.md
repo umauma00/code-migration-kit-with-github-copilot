@@ -41,7 +41,7 @@ After installation, open a new chat, select `migration-orchestrator` in the agen
 Your part is limited to three things:
 
 1. Answering questions in chat (language, models, policies, each phase's decisions).
-2. Allowing the host's confirmation prompt for human-decision commands (`approve`, `phase complete`, `pilot prepare`, `source-spec init --apply`, `guardrails install`). When the AI runs one, the host asks you first.
+2. Allowing the host's confirmation prompt for human-decision commands (`approve`, `phase complete`, `pilot prepare`, `source-spec init --apply`, `guardrails install`). When the AI runs one, the host asks you first (in auto mode they run unasked, `guardrails install` only as the plain first install).
 3. Approving the Copilot CLI sign-in in the browser (first time only).
 
 Workers are always Copilot CLI processes: `--model` fixes each role's model, and tool limits and implicit-instruction isolation are verified on a real CLI. A 0.2.0 configuration with the native backend (`workerBackend: "native"` and so on) stops with migration instructions; the AI shows them and fixes the configuration after you agree.

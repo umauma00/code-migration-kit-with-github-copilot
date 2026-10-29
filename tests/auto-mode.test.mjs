@@ -374,3 +374,27 @@ test('auto mode instructions also cover audits, size-limited reviews and open ch
   assert.match(read('docs/ORDERED-WORKFLOW.en.md'), /Nothing inside a phase is asked either\..*takes the most conservative option/);
   assert.match(read('docs/PHASE-HANDOFF.md'), /Questions inside a phase are not asked either/);
 });
+
+test('review of 0.20.0: a note quoting a settings command keeps its gate; settings for another project or CLI keep asking', t => {
+  for (const mode of [undefined, 'relaxed', 'auto']) {
+    const f = fixture(t, { mode });
+    const expected = mode === 'auto' ? null : 'ask';
+    for (const inner of ['settings apply', 'models set --role all --model gpt-5', 'pilot prepare'])
+      for (const command of [`${kit} approve translation --note "Reviewed; next: run_migration.mjs ${inner}"`, `${kit} phase complete 03 --note "Reviewed; next: run_migration.mjs ${inner}"`,
+        `${kit} phase waive 03 --note "later: run_migration.mjs ${inner}"`, `${kit} build-loop --note "then run_migration.mjs ${inner}"`])
+        assert.equal(decide(f, command)?.decision ?? null, expected, `${mode}: ${command}`);
+    // sessions prune is never let through by a note naming an unasked gate.
+    assert.equal(decide(f, `${kit} sessions prune --note "after run_migration.mjs approve translation"`)?.decision, 'ask', `${mode}: prune`);
+    // Another project's settings, or a CLI of the agent's choosing, keep asking.
+    const other = fixture(t, { mode: 'normal' });
+    writeJSON(safePath(other.root, runSettingsFile), { schemaVersion: 1, phaseMode: 'auto' });
+    for (const command of [`${kit} settings apply --root ${other.root}`, `${kit} settings apply --root=${other.root}`, `${kit} models set --role all --model gpt-5 --root ${other.root}`,
+      `${kit} settings apply --copilot ./fake`, `${kit} models set --role all --model gpt-5 --copilot=./fake`])
+      assert.equal(decide(f, command)?.decision, 'ask', `${mode}: ${command}`);
+    assert.equal(decide(f, `${kit} settings apply --root ${f.root}`), null, `${mode}: own --root`);
+    assert.equal(decide(f, `${kit} settings apply --root .`), null, `${mode}: --root .`);
+    // In auto mode, the two newly unasked gates still ask when chained.
+    for (const command of [`${kit} pilot prepare --note x && ${kit} sessions prune`, `cd src && ${kit} source-spec init --apply`])
+      assert.equal(decide(f, command)?.decision, 'ask', `${mode}: ${command}`);
+  }
+});
