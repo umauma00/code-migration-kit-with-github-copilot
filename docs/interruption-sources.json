@@ -1005,7 +1005,7 @@
     },
     {
       "path": "lib/guardrails.mjs",
-      "sha256": "cfdbeb15222b6e01d77014d599c24a6fcd8732b2bae0d49eca4ce4ede57c1951",
+      "sha256": "5d704522cefdf92a79387f9ee82dd21b619bf6fb1dad780582461f1c0307f9d7",
       "entries": [
         {
           "line": 46,
@@ -4301,10 +4301,10 @@
     },
     {
       "path": "scripts/migration_hook.mjs",
-      "sha256": "a590c0b9288f3b7f7bf354428fc6db1a05106d101f521cebeb6cf24a2cc9a4ac",
+      "sha256": "8ffa8d7a2f376720aedfba8c8494c75305cfd0877a10eeb6c1fde5aec0ffecdf",
       "entries": [
         {
-          "line": 72,
+          "line": 73,
           "kind": "error-or-exit-candidate",
           "code": "} catch (e) { console.error(`Migration hook: ${e.message}`); process.exitCode = 2; }"
         }

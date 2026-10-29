@@ -26,7 +26,8 @@ export function decide(event, role, cwd) {
     const targets = present.flatMap(key => Array.isArray(args[key]) ? args[key] : [args[key]]);
     // An empty list may mean the default, the whole directory.
     // ".." after a link would climb from the link's target: never accepted.
-    if (targets.some(t => typeof t === 'string' && t.split(/[\\/]/).includes('..'))) return `Tool-assisted reviewers may not read ${targets.find(t => t.split(/[\\/]/).includes('..'))}; use only the listed evidence files`;
+    const climbing = targets.find(t => typeof t === 'string' && t.split(/[\\/]/).includes('..'));
+    if (climbing) return `Tool-assisted reviewers may not read ${climbing}; use only the listed evidence files`;
     if (!targets.length || present.some(key => Array.isArray(args[key]) && !args[key].length) || targets.some(t => typeof t !== 'string' || !t.trim())) return 'Tool-assisted reviewers must name a listed file or directory';
     // A glob pattern is relative to those paths and must stay inside them: no
     // "..", no absolute or drive-letter start, also inside {a,b} alternatives.
