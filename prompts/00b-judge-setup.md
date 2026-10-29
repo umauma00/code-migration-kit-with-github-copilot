@@ -36,7 +36,9 @@ build a language-neutral parity harness before any production translation.
 - Follow the [preparation audit contract](../docs/PREPARATION-AUDITS.md): when
   assertions are ported, two independent hostile auditors compare disjoint
   assertion batches against the old assertions and narrow normalization rules.
-  Confirm weaknesses, repair and re-audit with fresh contexts. Mutation detection
+  Confirm weaknesses, repair and re-audit the repaired assertions once with fresh
+  contexts; report weaknesses still confirmed after that one round as open
+  limitations instead of repairing again. Mutation detection
   is an additional check, not a substitute for assertion comparison.
   Run each audit request with `audit_inputs.mjs freeze` then `audit_inputs.mjs run
   --directory DIR` (`run-pending` runs every unsubmitted request). Never pass a
@@ -58,6 +60,9 @@ per-file contract memo to draft: the source is the specification and reviewers
 read cited source lines directly. Write `judge-report.md` (scope, method and the
 unverified limits), and continue straight into 01 and 02 without stopping for a
 00b-only review. The user reviews 00b–02 once as a package.
+
+Before its inventory survey, follow 02's "Before the survey: generated files and
+policies" (generated files, policy questions, coverage and a trial).
 
 Do not run the `contracts` survey kind for source-as-spec. It is kept only for
 projects whose judge plan, drafted before 0.10.0, still names

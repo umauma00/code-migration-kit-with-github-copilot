@@ -343,12 +343,33 @@ anything but a small repository. Use [surveys](../../docs/SURVEYS.md): `survey r
 inventory` sends each scope to a fresh tool-free surveyor (a new
 Copilot CLI process) and saves its answer as a file; `survey merge` builds the draft you review. Check cited lines before relying
 on them; merged drafts still go through the phase's audits and the human gate.
+Before the inventory survey (at setup, once the run settings are confirmed), run
+`preparation_cli.mjs generated-files --write` and `preparation_cli.mjs policy-questions`.
+Report generated files as counts only and never ask the person to review the
+list: their census sites get mechanical GENERATED rows, and each file is
+translated as ordinary code unless the person names a target generator for its
+input (`generated-files --regenerate FILE --how TEXT`; build approval waits until
+the regenerated target exists, and `--translate FILE` switches back). Ask every
+policy question in one `ask_user` call, recommending an option, and record each
+answer with `policy-record --topic ID --answer TEXT` (auto mode: the conservative
+option with `--topic ID --answer TEXT --auto`, without asking). Then run `rulebook-coverage --sites PATH`
+and `survey run --kind inventory --sites PATH --trial 3`; decide the constructs
+in `uncovered` and `trial.decide` the same way (one question, or conservative in
+auto mode) before the one full survey.
 Run each independent preparation audit (00b/01/02) as `audit_inputs.mjs freeze`
 then `audit_inputs.mjs run --directory DIR`: a fresh tool-free Copilot CLI
 worker with `--model` set to the planned phaseModels entry, recording the model
 the CLI reports. Two requests on disjoint batches can run in parallel;
 `audit_inputs.mjs run-pending` runs every unsubmitted request. Never hand a
 request or its path to a task/agent subagent: the auditor has no tools.
+In every mode an audit or independent review (00b/01/02, the source-as-spec
+package review included) gets one repair round, as upstream: confirm each finding
+against the source, fix the confirmed ones and re-audit only the fixed items once
+with a fresh request. Never a third round: a row still contested becomes UNKNOWN
+with a conservative `TODO(port)`, any other finding stays open. Report the fixed
+findings, the open ones with evidence and the rows made UNKNOWN (with counts) in
+the phase report; the person decides at the gate, not mid-phase (in auto mode
+the same list goes into the record's note and the run continues).
 
 ## When a step fails
 
@@ -432,7 +453,8 @@ the phase's own work can supply what is missing, do that work; only otherwise
 run `phase waive ID --note "<why>"` and retry. Never waive phases ahead of the
 one that blocked. Questions inside a phase are not asked either: an audit or
 independent review that returns `changes` gets one round (confirm each finding
-against the source, fix the confirmed ones, re-audit once with a fresh request).
+against the source, fix the confirmed ones, re-audit only the fixed items once
+with a fresh request).
 Findings still open after that round, reviews limited by `maxReviewInputBytes`,
 and UNKNOWN or uncited rows are not fixed again: list them in the phase report
 and in the `phase complete` (or waiver) note, then continue. A choice neither the

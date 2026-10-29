@@ -154,13 +154,22 @@ Before a question tool call, publish a concise report in chat containing:
 5. **Next action:** provide a copyable natural-language instruction that names
    the intended phase. This remains useful even when a question UI is available.
 
+In every mode a preparation audit or independent review that returns `changes`
+gets one repair round, as upstream: fix the confirmed findings and re-audit only
+the fixed items once. Whatever is still contested is not fixed again (an inventory
+row becomes UNKNOWN with `TODO(port)`); the phase report lists the fixed findings,
+the open ones with their evidence and the rows made UNKNOWN (with counts), and
+the person decides at the gate; in auto mode the list goes into the record's note
+instead (see [preparation audits](PREPARATION-AUDITS.md#one-repair-round-all-modes)).
+
 In auto mode (`phaseMode: auto`) the person chose beforehand not to be asked at
 phase boundaries: publish the report, then record the phase and continue with
 the next one without a question. The report lists the records made without the
 person (`status` `autoMode.records`) as well as the waivers. Questions that are
 not phase gates (unfilled settings, sign-in, a command the hook still asks
 about) still stop the run. Questions inside a phase are not asked either: an
-audit or review that returns `changes` gets one fix and one fresh re-audit, and
+audit or review that returns `changes` gets one fix and one fresh re-audit of the
+fixed items (the same one round as in every mode), and
 whatever remains is listed in the report and the record's note; a choice the
 source and RULEBOOK leave open takes the most conservative option with a
 `TODO(port)`, in the RULEBOOK before the inventory survey runs and only in the translated

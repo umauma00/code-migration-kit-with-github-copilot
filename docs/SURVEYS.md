@@ -34,7 +34,13 @@ $R survey merge  --kind facts                      # 全範囲がそろったら
 # inventory は、先に grep やスクリプトで箇所一覧を作る（判断ではなく機械的に）
 $R survey run   --kind inventory --sites migration/inventory-sites.tsv
 $R survey merge --kind inventory --sites migration/inventory-sites.tsv
+# 全体の前に、構文ごと最大3箇所だけ試す（別の保存先。inventory.tsv は変えない）
+$R survey run   --kind inventory --sites migration/inventory-sites.tsv --trial 3
 ```
+
+**生成コード**：`preparation_cli.mjs generated-files --write` で見つけたファイル（`migration/generated-files.json`）の箇所は、担当に送らず、merge 時に GENERATED の行として機械的に書きます（根拠はファイル全体と検出の手がかり）。報告は件数だけで、一覧の確認は求めません。移行では普通のコードとして訳します。人が移行先の生成手段を決めたもの（`--regenerate FILE --how TEXT`）は変換対象から外れ、生成先ができるまでビルド承認が止まります。
+
+**試し調査**：`--trial N`（1〜50）は census から構文ごとに小さいファイルの箇所を N 件選び、`migration/surveys/inventory-trial/` に保存します。結果の `trial.constructs` に構文ごとの UNKNOWN 率、`trial.decide` に半分以上が UNKNOWN の構文が出ます。それを RULEBOOK で決めてから全体を1回だけ実行します。`preparation_cli.mjs rulebook-coverage --sites PATH` はモデルを呼ばずに、RULEBOOK に規則がない構文を箇所数の多い順に示します。
 
 範囲は「同じディレクトリのファイルをまとめ、`--max-files` 件ごと、かつ固定入力の上限（`maxReviewInputBytes`）以内」で機械的に決まります。
 1ファイルの本文が上限を超えると、facts / contractsは元の行範囲を保った断片に分割します。inventoryでは、RULEBOOKと1箇所と一緒に1回の入力に収まらないファイルの箇所を、モデルを呼ばずにUNKNOWN / TODO(port)として記録します（断片ごとの答えは結合時に必ずUNKNOWNになり、数時間かけて同じ結果になっていたため）。scope記録の `unsurveyedOversizedFiles` に一覧が残ります。1行自体が大きい場合も文字位置で分け、Unicodeのペアや本文を欠落させません。
