@@ -1,6 +1,14 @@
-# 更新手順（0.19.0 と以前の版）
+# 更新手順（0.22.0 と以前の版）
 
 日本語 | [English](UPGRADING.en.md)
+
+## 0.22.0（キット全体の AI 使用量）
+
+キットのファイル（plugin.json・scripts）が変わるため、既存の承認・完了記録は一度だけ失効します。judgeから再検証してください。完了済みの出力は保持されます。
+
+1. ワーカー呼び出しごとの使用量が `migration/runs/usage/calls.jsonl` に記録され、`usage --format markdown` でキット全体の合計を見られます。記録はこの版から始まるため、以前の呼び出しは含まれません。
+2. survey の実行要約に `measuredUsage` が入り、cost-log.tsv の survey 行の `tokens` が埋まるようになりました。
+3. コピー導入では `migration-kit/` 全体と `.github/skills/` の SKILL.md を一時導入先の内容に置き換えます。プラグインは更新だけで入ります。
 
 ## 0.19.0（長時間コマンドの進捗表示を統一）
 

@@ -24,4 +24,17 @@ Automatic time and usage cover activity inside the runner; they are not the tota
 
 Existing upstream rows in the TSV are kept. Event IDs are tracked in migration/phases/cost-index.json so re-exporting the same completion record does not duplicate rows. A deleted TSV or one interrupted mid-write can be re-exported from the index. If a managed row is edited by hand, the mismatch is reported and the run stops. New rows appended by hand are kept.
 
-`usageEstimate` in the run summary `migration/runs/RUN_ID/summary.json` holds the measured bytes sent to and received from workers and tokens estimated as bytes ÷ 4. It is not AI Credits billing data and never goes into cost-log.tsv. CLI workers record the CLI's own usage per call with `--usage-output-file` (input, output and cache tokens, AI units), summed as `measuredUsage` in the run summary. When every call of a run was measured, cost-log.tsv records input plus output tokens as `tokens`.
+`usageEstimate` in the run summary `migration/runs/RUN_ID/summary.json` holds the measured bytes sent to and received from workers and tokens estimated as bytes ÷ 4. It is not AI Credits billing data and never goes into cost-log.tsv. CLI workers record the CLI's own usage per call with `--usage-output-file` (input, output and cache tokens, AI units), summed as `measuredUsage` in the run summary. When every call of a run was measured, cost-log.tsv records input plus output tokens as `tokens`. Survey run reports (`migration/surveys/KIND/runs/RUN_ID.json`) carry `measuredUsage` the same way, and fill `tokens` only when every call was measured.
+
+## Kit-wide usage
+
+Every translation, repair, survey and preparation audit worker call, successful or not, adds one line to `migration/runs/usage/calls.jsonl` (role, target, model and the CLI's usage; a call the CLI wrote no usage for stays as unmeasured).
+
+```bash
+node migration-kit/scripts/run_migration.mjs usage --format markdown
+node migration-kit/scripts/run_migration.mjs usage --run RUN_ID
+```
+
+It shows input, output and cache tokens and AI units (AIU: the CLI's nano AIU / 1e9) in total, by role and by model. It only reads, so nothing asks to confirm. With unmeasured calls the total is a lower bound.
+
+Not included: the chat with the orchestrator (the parent session; run `/usage` in that Copilot CLI session), calls before 0.22.0, and other roots such as pilots (pass `--root`). The CLI does not report the AI Credits amount; check GitHub billing for the charge.

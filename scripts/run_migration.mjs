@@ -22,6 +22,7 @@ import { phaseCommand } from './phase_cli.mjs';
 import { parseCommandLine, specs } from '../lib/cli.mjs';
 import { diagnoseBuild } from './diagnostic_queue.mjs';
 import { sessionsStatus, pruneSessions } from '../lib/sessions.mjs';
+import { usageReport, usageMarkdown } from '../lib/usage.mjs';
 import { buildLoop } from '../lib/build-loop.mjs';
 import { readPreferences, setPreferences, preferencesReport } from '../lib/preferences.mjs';
 import { autoModeOn } from '../lib/auto-mode.mjs';
@@ -51,6 +52,8 @@ export const usage = `Usage: node migration-kit/scripts/run_migration.mjs COMMAN
                               as choices go to migration/run-settings.help.md) with a guess
                               of the source language (init; --source/--target and --source-roots record the answers to its questions),
                               check every entry (check), or check and record it in config.json and preferences.json (apply)
+  usage [--format json|markdown] [--run RUN_ID]
+                             AI usage of the kit's own worker calls (tokens, AI units), in total, by role and model
   sessions status | prune [--run RUN_ID]
                              Report / delete the local Copilot CLI transcripts of the kit's own workers
   guardrails show | install [--add CSV] [--remove CSV] [--deny CSV] [--waiver NOTE] [--replace]
@@ -320,6 +323,12 @@ export async function main(argv = process.argv.slice(2)) {
     console.log(args.format === 'markdown' ? `${statusChecklist(report, language)}\n\n${statusMarkdown(report, language)}${actions}`
       : args.format === 'checklist' ? statusChecklist(report, language)
       : args.format === 'todo' ? JSON.stringify(statusTodo(report, language), null, 2) : JSON.stringify(report, null, 2));
+    return;
+  }
+  if (cmd === 'usage') {
+    if (args.format && !['json', 'markdown'].includes(args.format)) throw new Error('usage format must be json or markdown');
+    const report = usageReport(root, { runId: args.run });
+    console.log(args.format === 'markdown' ? usageMarkdown(report, language) : JSON.stringify(report, null, 2));
     return;
   }
   if (cmd === 'guidance') {
