@@ -401,6 +401,15 @@ wait/poll it. Normal execution is continuous, including legacy configurations;
 never add a finite timeout or call/round budget without the person's choice.
 Respect explicit user cancellation and actual input/permission failures.
 `status --wait 600` returning is only the end of that status wait, not the job.
+A phase recorded earlier can go out of date when a file it recorded changes
+(a pilot or repair fix, a kit update). `status --fast` does not revalidate;
+`phase next` does and then returns `stale` with what changed, `action`
+(`record-again` when only files the phase recorded, an earlier record or the
+kit changed: check that change and record again; `redo` when sources, settings
+or verification inputs changed) and the
+exact `phase complete` command. Follow `stale.next`: in auto mode record again
+(or redo) without asking; otherwise ask once, recommending it and naming the
+changed files. Never ask why `status --fast` and `phase next` differ.
 
 ## Ordered workflow entry
 

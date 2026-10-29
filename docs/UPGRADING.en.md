@@ -1,6 +1,15 @@
-# Upgrading (0.25.0 and earlier releases)
+# Upgrading (0.26.0 and earlier releases)
 
 [日本語](UPGRADING.md) | English
+
+## 0.26.0 (why a phase record is out of date, and what to do)
+
+Kit files (plugin.json, scripts) change, so existing approvals and completion records expire once. From this release `phase next` explains it in `stale`. Records of 02 onward made before it have no breakdown: when no settings, verification or outside-source file was written after the record, the kit update is the cause and the action is `record-again`; otherwise it is `redo`.
+
+1. `phase next`, `phase check` and the phase gate error name what changed after the record (its files, the sources or settings, the predecessor's record, and for 02 onward which part of the approved inputs) and the next step: `record-again` when only the phase's recorded files, an earlier record or the kit changed (check that change and record again, not a new review of the whole phase), `redo` when sources, settings, commands or verification files changed (rework what changed), with the exact `phase complete` command and the later phases to record again.
+2. `status --fast` still does not hash, but marks a phase whose recorded files were written after its record and points to `phase next`.
+3. The orchestrator follows `stale.next`: auto mode records again (or redoes) without asking; other modes ask once, recommending it. It never asks about the difference between the two views.
+4. In a copy install, replace all of `migration-kit/`, `.github/agents/migration-orchestrator.agent.md`, the SKILL.md in `.github/skills/` and the kit's section of `.github/copilot-instructions.md` with the temporary install's. The plugin needs only an update.
 
 ## 0.25.0 (per-model tool check)
 

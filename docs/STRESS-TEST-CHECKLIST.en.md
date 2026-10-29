@@ -54,7 +54,7 @@ cd /tmp/bakeoff-b && copilot -p "Port these files to TARGET_LANGUAGE the way a f
 | Message | Cause | What to do |
 |---|---|---|
 | `Phase 03 requires human-installed command guardrails` | Step 2 not done | Agree the deny list and allow `guardrails install` when the host asks; the AI cannot write the file directly (the hook denies it) |
-| `Phase 02 is not reviewed for current inputs` | RULEBOOK or another input changed, invalidating 02 | Review the change, record 02 again, rerun `judge` |
+| `Phase 02 is not reviewed for current inputs` / `Phase 02's record is out of date` | RULEBOOK or another input changed, invalidating 02 (the second names what changed and the next step) | Follow the named step (check the change and record 02 again, or redo it), then rerun `judge` |
 | `Run judge successfully for these inputs` | Inputs changed since judge | Rerun `judge` |
 | `Pilot target must be a new directory` | The pilot workspace already exists | Choose a new outside directory |
 | `unable to ask user for confirmation` | The session cannot show the approval confirmation (non-interactive run) | The human runs the shown command in their own terminal |

@@ -238,7 +238,7 @@ test('review of 304f781: a phase\'s own waiver never completes it, and real comp
   assert.equal(fs.readdirSync(safePath(f.root, 'migration/phases/waivers/retired')).filter(n => n.startsWith('01-')).length, 1);
   // When 01 later goes stale, the gate asks again instead of passing silently.
   atomicWrite(safePath(f.root, 'migration/depmap/report.md'), 'Changed after review.');
-  assert.throws(() => requirePhase(f.root, f.config, '01'), e => /Phase 01 is not reviewed.*phase waive 01/s.test(e.message));
+  assert.throws(() => requirePhase(f.root, f.config, '01'), e => /Phase 01's record is out of date.*migration\/depmap\/report\.md changed.*phase waive 01/s.test(e.message));
 });
 
 test('review of 304f781: fast status lists waivers, a waived 04 records what was missing, and a late report makes the approval stale', async t => {

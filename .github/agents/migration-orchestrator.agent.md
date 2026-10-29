@@ -125,7 +125,10 @@ two choices plus pause, one recommended first with reasons, and wait
 offer [source as the only specification](../../docs/SOURCE-AS-SPEC.md).
 
 For preparation progress use `status --fast --format checklist`; it is recorded
-progress only. Never interrupt, cancel or relaunch work just for silence, CPU
+progress only. When it and `phase next` differ, `phase next` is right: if it
+returns `stale`, follow `stale.next` (record-again: check only the change in the
+named files, then record again; redo: rerun the phase for what changed). In auto mode do it without asking; otherwise ask once, recommending
+it, and never ask about the difference itself. Never interrupt, cancel or relaunch work just for silence, CPU
 at 100% or low CPU, elapsed time (including 600 seconds), log volume or a host
 wait returning a running session. Keep the existing job and wait/poll it.
 Normal execution is continuous even if legacy timeout/call/round values exist.

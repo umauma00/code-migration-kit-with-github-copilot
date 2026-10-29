@@ -52,7 +52,7 @@ cd /tmp/bakeoff-b && copilot -p "Port these files to TARGET_LANGUAGE the way a f
 | 表示 | 原因 | 対処 |
 |---|---|---|
 | `Phase 03 requires human-installed command guardrails` | 手順2が未実施 | 禁止リストに合意し、`guardrails install` の確認で許可する。AI がファイルを直接作ることはできません（hook が拒否します） |
-| `Phase 02 is not reviewed for current inputs` | RULEBOOK などを変えたため 02 の記録が失効 | 変更を確認して 02 を記録し直し、`judge` を再実行 |
+| `Phase 02 is not reviewed for current inputs` / `Phase 02's record is out of date` | RULEBOOK などを変えたため 02 の記録が失効（後者は変わったものと次の一手を示す） | 表示された次の一手に従う（変更を確認して 02 を記録し直す、またはやり直す）。その後 `judge` を再実行 |
 | `Run judge successfully for these inputs` | 入力が変わり judge の結果が古い | `judge` を再実行 |
 | `Pilot target must be a new directory` | pilot の作業場所が既に存在する | 新しい外部ディレクトリを指定 |
 | `unable to ask user for confirmation` | 承認の確認を出せないセッション（非対話の実行など） | 表示されたコマンドを人間が自分のターミナルで実行 |

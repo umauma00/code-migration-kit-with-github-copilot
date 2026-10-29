@@ -1,3 +1,32 @@
+# 0.26.0 — 2026-10-29
+
+A phase recorded earlier that goes out of date now says why. A pilot fix
+changed a file phase 01 had recorded: `status --fast` still showed 4/10,
+`phase next` returned "done: 2, next: 01" with no reason, and the host asked an
+unclear three-way question.
+
+- `phase next` (`stale`), `phase check` and the gate error name what changed
+  since the record: the recorded files, the source tree or settings, the
+  predecessor's record, or for 02 and later the part of the approved inputs
+  (rules and inventory, manifest, review dependencies, settings, kit files).
+  New records keep the fingerprint parts; older ones say the reason is unsure.
+- `action` says what to do. `record-again`: only files the phase recorded, an
+  earlier record or the kit changed; check that change, fix what it affects and
+  record again (not a new review of the whole phase). `redo`: sources,
+  settings, commands or verification files changed, or the record is
+  unreadable; rerun the phase for what changed. A record older than this release has no
+  breakdown of its inputs: a settings, verification or outside-source file
+  written after the record means `redo`, none means the kit changed and
+  `record-again`. Each comes with the exact `phase complete`
+  command (a source-as-spec package from that phase to 02) and the later
+  phases to record again after it. The gate error keeps its phase-order
+  guidance.
+- `status --fast` still does not hash, but marks a phase whose recorded files
+  were written after its record and points to `phase next`.
+- The orchestrators and skills follow `stale.next`: auto mode records again (or
+  redoes) without asking; other modes ask once, recommending it. They never ask
+  about the difference between the two status views.
+
 # 0.25.0 — 2026-10-29
 
 The kit reads which file tools each model has instead of assuming them, so a
