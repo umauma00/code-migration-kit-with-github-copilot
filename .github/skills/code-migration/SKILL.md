@@ -66,6 +66,12 @@ worker cannot reach the network or its sign-in inside an app session with local
 sandboxing on, show the error and tell the person that `/sandbox off` in that
 session lets the worker run, and that commands in that session then run without
 the sandbox's limits; do not route around the sandbox yourself.
+A sandbox also blocks phase 03, which writes comparison B and the pilot outside
+the repository, in VS Code and the Copilot CLI too. So setup finds it first:
+when `settings apply` returns `sandboxQuestion`, ask it once as its `next` says,
+before phase 00 and before showing `autoHandoff`; doctor reports the same as
+`commands can write outside the project and use loopback`. Autopilot cannot
+answer it, and only the person changes sandbox settings.
 If the installer preview returns `existingMigrations`, another worktree of this
 repository already holds a migration (the app can start a session in a new
 worktree). Ask one question before `--apply`: resume in that checkout

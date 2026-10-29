@@ -51,5 +51,6 @@ cd /tmp/bakeoff-b && copilot -p "Port these files to TARGET_LANGUAGE the way a f
 | `Pilot target must be a new directory` | The pilot workspace already exists | Choose a new outside directory |
 | `unable to ask user for confirmation` | The session cannot show the approval confirmation (non-interactive run) | The human runs the shown command in their own terminal |
 | `repository hooks load in Copilot CLI` fails | Untrusted folder, hooks off | Start `copilot` interactively and trust the folder |
+| `commands can write outside the project and use loopback` fails | A local sandbox is on: writes outside the repository (B, pilot) and local network access (hook check) are blocked | The person types `/sandbox off` in that session, or allows the write locations and local network access in the sandbox settings. The AI never changes them (setup's `settings apply` asks once too) |
 
 Failed commands print their cause and choices, with a recommendation.

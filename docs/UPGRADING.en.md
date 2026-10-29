@@ -1,6 +1,14 @@
-# Upgrading (0.22.0 and earlier releases)
+# Upgrading (0.24.0 and earlier releases)
 
 [日本語](UPGRADING.md) | English
+
+## 0.24.0 (local sandbox found during setup)
+
+Kit files (plugin.json, scripts) change, so existing approvals and completion records expire once. Revalidate from judge. Completed outputs are kept.
+
+1. `doctor` gains the check `commands can write outside the project and use loopback`. It fails in a session with local sandboxing on and suggests `/sandbox off` or allowing the locations in the sandbox settings. The kit never changes them.
+2. During setup, `settings apply` returns `sandboxQuestion` when it finds a sandbox and asks once, before phase 00 and the switch to autopilot. For a project already past setup, run `doctor` before phase 03.
+3. For a copied install, replace all of `migration-kit/` and the SKILL.md files in `.github/skills/` with the temporary install's. A plugin only needs updating.
 
 ## 0.22.0 (kit-wide AI usage)
 

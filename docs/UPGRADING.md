@@ -1,6 +1,14 @@
-# 更新手順（0.22.0 と以前の版）
+# 更新手順（0.24.0 と以前の版）
 
 日本語 | [English](UPGRADING.en.md)
+
+## 0.24.0（ローカル sandbox を初期設定で検出）
+
+キットのファイル（plugin.json・scripts）が変わるため、既存の承認・完了記録は一度だけ失効します。judgeから再検証してください。完了済みの出力は保持されます。
+
+1. `doctor` に `commands can write outside the project and use loopback` の確認が加わりました。ローカル sandbox が有効なセッションでは失敗し、`/sandbox off` か sandbox の設定での許可を案内します。キットは設定を変えません。
+2. 初期設定中の `settings apply` は、sandbox を見つけると `sandboxQuestion` を返し、工程 00 と autopilot への切り替えの前に一度だけ聞きます。初期設定が済んだ案件では、03 の前に `doctor` で確かめてください。
+3. コピー導入では `migration-kit/` 全体と `.github/skills/` の SKILL.md を一時導入先の内容に置き換えます。プラグインは更新だけで入ります。
 
 ## 0.22.0（キット全体の AI 使用量）
 

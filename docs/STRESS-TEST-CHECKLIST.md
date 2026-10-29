@@ -49,5 +49,6 @@ cd /tmp/bakeoff-b && copilot -p "Port these files to TARGET_LANGUAGE the way a f
 | `Pilot target must be a new directory` | pilot の作業場所が既に存在する | 新しい外部ディレクトリを指定 |
 | `unable to ask user for confirmation` | 承認の確認を出せないセッション（非対話の実行など） | 表示されたコマンドを人間が自分のターミナルで実行 |
 | `repository hooks load in Copilot CLI` が失敗 | フォルダが未信頼で hook が無効 | `copilot` を対話起動してフォルダを信頼する |
+| `commands can write outside the project and use loopback` が失敗 | ローカル sandbox が有効で、リポジトリ外への書き込み（B・pilot）とローカル通信（hook 検査）ができない | そのセッションで人が `/sandbox off` にするか、sandbox の設定で書き込み先とローカル通信を許可する。AI は設定を変えません（初期設定の `settings apply` でも一度聞きます） |
 
 失敗したコマンドは、原因と選択肢（推奨付き）を自動で表示します。

@@ -1,3 +1,24 @@
+# 0.24.0 — 2026-10-29
+
+A local sandbox no longer stops a run at phase 03 without warning. With
+sandboxing on (VS Code, Copilot CLI or the Copilot app), comparison B and the
+pilot cannot write outside the repository and doctor's reviewer-hook check
+cannot use loopback; the run found out only at phase 03 and asked then, and
+autopilot stopped there.
+
+- New `lib/sandbox.mjs`: a probe that writes a throwaway directory in the
+  temporary directory (and /tmp) and connects to itself over 127.0.0.1.
+- `doctor` (with or without `--check-cli`) reports it as `commands can write
+  outside the project and use loopback`, with guidance: `/sandbox off`
+  (recommended) or allowing the locations in the sandbox settings. The kit
+  never changes sandbox settings.
+- `settings apply`, while setup is not finished, returns `sandboxQuestion`
+  (off / allow / keep) when the probe fails, and its `next` has the parent ask
+  it before phase 00 and before the autopilot handoff.
+- A reviewer-hook check that failed because loopback is blocked now says so
+  and gets the sandbox guidance, instead of suggesting the CLI changed.
+- The skill, phase 03 prompt and checklist describe the check.
+
 # 0.22.0 — 2026-10-29
 
 The kit's whole AI usage can be read in one place. Before, only translation and

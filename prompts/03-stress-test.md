@@ -13,6 +13,9 @@ chat, and only after their agreement run `guardrails install` with exactly those
 the host asks them to confirm it. Never create, edit or relax the file any other way. If a guardrail
 denies a command, that is the design working; report it instead of routing around it.
 Run `doctor` and confirm `repository hooks load in Copilot CLI` is not failing.
+If `commands can write outside the project and use loopback` fails (a local
+sandbox), ask the person before comparison B and the pilot, with its guidance;
+never change sandbox settings yourself.
 
 Prerequisite: reviewed rulebook, map, inventory and judge. Produce
 `migration/stress-test/report.md`; the user reviews it before translation.
