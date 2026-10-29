@@ -1,6 +1,18 @@
-# 更新手順（0.22.0 と以前の版）
+# 更新手順（0.23.0 と以前の版）
 
 日本語 | [English](UPGRADING.en.md)
+
+## 0.23.0（準備レビューの修正は1回まで・生成コードと方針の事前確認・phase next の高速化）
+
+キットのファイル（plugin.json・scripts）が変わるため、既存の承認・完了記録は一度だけ失効します。judgeから再検証してください。完了済みの出力は保持されます。
+
+1. 00b〜02 の準備監査・独立レビュー（source-as-spec の仕様一式レビューを含む）は、どのモードでも修正1回までになりました（フォーク元と同じ）。指摘をソースで確かめて直し、直した箇所だけを1回だけ再レビューします。
+2. それでも残った指摘はもう直しません。inventory の行は UNKNOWN（最も保守的な訳と TODO(port)）になり、それ以外は judge-report.md や depmap/report.md に未解決として残ります。工程の報告に、直した指摘・残った指摘（根拠つき）・UNKNOWN にした行（件数つき）が載り、進むか直すかは工程の確認で決めます（自動モードでは同じ一覧を記録の note に書いて先へ進みます）。
+3. 02 の RULEBOOK と inventory の合同監査は、修正後にやり直しません（フォーク元と同じ）。手書きの依存グラフの抜き取り監査は今までどおり最大3ラウンドです。
+4. 02 の inventory 調査の前に `preparation_cli.mjs generated-files --write` と `policy-questions` を実行します。生成コードの箇所はモデルを呼ばずに GENERATED の行になり、件数だけを報告します。移行では普通のコードとして訳し、人が移行先の生成手段を決めたものだけ再生成します（生成先ができるまでビルド承認が止まります）。方針の質問はまとめて1回聞き、`policy-record` で RULEBOOK の管理区間に記録します（自動モードは最も保守的な案）。
+5. 全体の調査の前に `rulebook-coverage --sites PATH` と `survey run --kind inventory --sites PATH --trial 3` で、規則のない構文と UNKNOWN の多い構文を先に決められます。調査済みのプロジェクトでは、RULEBOOK を変えると inventory 調査はやり直しになります。
+6. `phase next` と `status` が大きいプロジェクトで速くなりました（設定の変更は不要です）。
+7. コピー導入では `migration-kit/` 全体と、`.github/agents/migration-orchestrator.agent.md`、`.github/skills/` の SKILL.md、`.github/copilot-instructions.md` のキットの区間を一時導入先の内容に置き換えます。プラグインは更新だけで入ります。
 
 ## 0.22.0（キット全体の AI 使用量）
 

@@ -86,7 +86,13 @@ $R survey merge  --kind facts                      # merge once every scope is d
 # inventory needs a mechanical site census first (grep or a script, not judgment)
 $R survey run   --kind inventory --sites migration/inventory-sites.tsv
 $R survey merge --kind inventory --sites migration/inventory-sites.tsv
+# Before the full survey, try up to three sites per construct (own store; inventory.tsv unchanged)
+$R survey run   --kind inventory --sites migration/inventory-sites.tsv --trial 3
 ```
+
+**Generated files**: sites in files found by `preparation_cli.mjs generated-files --write` (`migration/generated-files.json`) are not sent to a surveyor; the merge writes them as GENERATED rows (evidence: the whole file and the detection signals). Report counts only, never ask for a review of the list. They are translated as ordinary code; a file the person chose to regenerate with a target generator (`--regenerate FILE --how TEXT`) leaves the translation units, and build approval waits until its target exists.
+
+**Trial**: `--trial N` (1–50) picks N sites per construct from the census's smallest files and stores results under `migration/surveys/inventory-trial/`. `trial.constructs` gives the UNKNOWN share per construct and `trial.decide` the constructs with at least half UNKNOWN. Decide those in the RULEBOOK, then run the full survey once. `preparation_cli.mjs rulebook-coverage --sites PATH` lists, without a model, the census constructs no RULEBOOK rule covers, largest first.
 
 Scopes are mechanical: files of one directory together, at most `--max-files`
 each, with fitting work requests under `maxReviewInputBytes`. A single file

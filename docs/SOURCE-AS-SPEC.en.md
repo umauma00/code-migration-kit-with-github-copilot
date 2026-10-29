@@ -69,6 +69,8 @@ for consent to its own scaffold. 00b to 02 are recorded as one package, so
 | 01 | `depmap/`, `manifest.tsv`, `review-dependencies.json`, `depmap/report.md` | Generated mechanically by the bundled parsers, never guessed. They read source only and never run the original. For a language without one, [write an adapter](DEPENDENCY-MAPPERS.en.md) |
 | 02 | `RULEBOOK.md`, `inventory.tsv`, `gap-report.md` | Decide policy from how the source actually behaves; undecidable sites stay UNKNOWN in the inventory with the most conservative translation and a TODO(port) |
 
+Before 02's inventory survey: detect generated files (`generated-files --write`, report counts only), ask the policy questions found in the source (`policy-questions`, in one ask_user call; record answers in the RULEBOOK with `policy-record`; auto mode takes the most conservative option), list constructs without a rule (`rulebook-coverage`) and try a few sites per construct (`survey run --trial 3`). See [surveys](SURVEYS.en.md) and prompts/02.
+
 A judge plan drafted before 0.10.0 that names `contracts.md` keeps its rule:
 00b cannot be recorded while that memo still contains `TODO(spec)`. To move to
 the source index, delete `migration/judge-plan.json` and rerun `source-spec init`; config does not change, so 00 stays recorded and 00b–02 are reviewed
@@ -83,8 +85,15 @@ audits in 02) are replaced by **one independent review of the whole specificatio
 - One reviewer in a separate context reads the source, RULEBOOK, inventory and
   the dependency map together and lists statements that contradict the source,
   statements without cited lines, and rule/inventory contradictions.
-- Fix the findings, then report **both the fixed findings and the open points**
-  to the user.
+- Confirm each finding against the source, fix only the confirmed ones and
+  re-review **only the fixed items, once**, with a fresh request (one repair
+  round as upstream, in every mode). Findings still open after that are not
+  fixed again; inventory rows become UNKNOWN (most conservative translation
+  plus TODO(port)).
+- Report **the fixed findings, the open points with their evidence and the rows
+  made UNKNOWN this way (with counts)** to the user, who decides at the one
+  package review whether to proceed or have them fixed (in auto mode the same
+  list goes into the record's note and the run continues).
 - The dependency map is mechanical, so agent edge-sampling audits are skipped;
   record unsupported syntax and exclusions in `depmap/report.md`.
 
