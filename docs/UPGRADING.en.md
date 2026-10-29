@@ -1,6 +1,15 @@
-# Upgrading (0.15.0 and earlier releases)
+# Upgrading (0.16.0 and earlier releases)
 
 [日本語](UPGRADING.md) | English
+
+## 0.16.0 (auto mode does not stop inside a phase; survey parts in parallel)
+
+The kit's files (lib, scripts) change, so existing approvals and completion records are invalidated once. Revalidate from judge. Completed outputs and survey results are kept.
+
+1. In auto mode an audit or review that returns `changes` gets one fix and one fresh re-audit; what remains goes into the report and the record's note, and the run continues. A choice the source and RULEBOOK leave open takes the most conservative option, written into the RULEBOOK with `TODO(port)`. Tell the agent your choice before autopilot if you have one.
+2. Surveys run the parts of one split scope in parallel within `concurrency`. A survey in progress resumes as is.
+3. An inventory survey no longer reports a negative `droppedFacts`.
+4. For copy installs, replace all of `migration-kit/`, `.github/agents/migration-orchestrator.agent.md` and the SKILL.md files under `.github/skills/` with the contents of a temporary install. Plugins pick it up with the update.
 
 ## 0.15.0 (verification method at setup; auto-mode handoff)
 

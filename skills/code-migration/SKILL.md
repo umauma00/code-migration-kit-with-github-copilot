@@ -405,7 +405,18 @@ phase report as usual but ask no question: do the phase's work, record it
 with the next phase. A gate failure ending `Relaxed mode (auto): ...` means: if
 the phase's own work can supply what is missing, do that work; only otherwise
 run `phase waive ID --note "<why>"` and retry. Never waive phases ahead of the
-one that blocked. Missing guardrails are installed from the template
+one that blocked. Questions inside a phase are not asked either: an audit or
+independent review that returns `changes` gets one round (confirm each finding
+against the source, fix the confirmed ones, re-audit once with a fresh request).
+Findings still open after that round, reviews limited by `maxReviewInputBytes`,
+and UNKNOWN or uncited rows are not fixed again: list them in the phase report
+and in the `phase complete` (or waiver) note, then continue. A choice neither the
+source nor the RULEBOOK decides (for example the target web framework, or where
+non-source assets go) takes the most conservative option, the one closest to the
+original structure that adds no framework or dependency, unless the person
+already stated one: write it into the RULEBOOK at the phase boundary with a
+greppable `TODO(port)` naming the open choice, and list it in the report as
+decided without the person. Missing guardrails are installed from the template
 automatically. Everything else still stops: safety checks, sign-in and credits,
 unfilled run settings, and the commands the hook still asks about (models set,
 settings apply, sessions prune, pilot prepare, source-spec init --apply); report

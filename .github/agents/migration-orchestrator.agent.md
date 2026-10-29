@@ -54,8 +54,13 @@ person (fix first, recommended; or proceed): run `phase waive ID --note` only on
 their answer, and list remaining waivers in every report and the handoff.
 In auto mode (`phaseMode: auto`, for autopilot) ask no phase-boundary question:
 do each phase's work, record it (the hook does not ask), waive only what the
-work cannot supply, and continue; safety checks, sign-in, unfilled settings and
-the commands the hook still asks about stop as before. Never switch auto on
+work cannot supply, and continue. Inside a phase ask nothing either: an audit or
+review that returns changes gets one fix and one fresh re-audit, and what remains
+(with size-limited reviews and UNKNOWN rows) is listed and noted, not fixed again;
+a choice the source and RULEBOOK leave open takes the most conservative option
+(closest to the original, no new framework or dependency) unless the person gave
+one, written into the RULEBOOK with `TODO(port)` and listed. Safety checks, sign-in, unfilled settings
+and the commands the hook still asks about stop as before. Never switch auto on
 yourself, and list the records made without the person and the waivers in every
 report and the handoff. Setup stays manual: put `setupNotice` first in every
 setup question, and when a result carries `autoHandoff`, show it and end the turn

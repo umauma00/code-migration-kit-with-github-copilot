@@ -1,6 +1,15 @@
-# 更新手順（0.15.0 と以前の版）
+# 更新手順（0.16.0 と以前の版）
 
 日本語 | [English](UPGRADING.en.md)
+
+## 0.16.0（自動モードは工程の中でも止まらない・survey の部分を並列に）
+
+キットのファイル（lib・scripts）が変わるため、既存の承認・完了記録は一度だけ失効します。judgeから再検証してください。完了済みの出力と survey の結果は保持されます。
+
+1. 自動モードでは、準備監査やレビューの `changes` は1回直して再監査し、残りは報告と記録の note に載せて先へ進みます。ソースと RULEBOOK で決まらない選択は、いちばん保守的な案を `TODO(port)` 付きで RULEBOOK に書いて進みます。方針が決まっているなら autopilot の前に伝えてください。
+2. survey は1つの範囲を分けた部分も `concurrency` の上限の中で並列に動きます。途中の survey はそのまま再開できます。
+3. inventory の survey で `droppedFacts` がマイナスになる表示を直しました。
+4. コピー導入では `migration-kit/` 全体と、`.github/agents/migration-orchestrator.agent.md`、`.github/skills/` の SKILL.md を一時導入先の内容に置き換えます。プラグインは更新だけで入ります。
 
 ## 0.15.0（初期設定で検証方式を決める・自動モードの引き継ぎ）
 

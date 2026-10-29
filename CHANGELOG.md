@@ -1,3 +1,26 @@
+# 0.16.0 — 2026-10-29
+
+Auto mode no longer stops inside a phase, and a large survey scope no longer
+runs its parts one at a time.
+
+- Auto mode: questions inside a phase are not asked either. A preparation
+  audit or independent review that returns `changes` gets one repair round
+  (fix the confirmed findings, re-audit once with a fresh request); what is
+  still open, reviews limited by `maxReviewInputBytes`, and UNKNOWN or uncited
+  rows are listed in the phase report and the record's note instead of
+  stopping. A choice the source and RULEBOOK leave open (for example the
+  target web framework, or where non-source assets go) takes the most
+  conservative option unless the person gave one, written into the RULEBOOK
+  with `TODO(port)` and listed as decided without the person.
+- Surveys: the parts of one split scope now run side by side. One shared limit
+  keeps every surveyor call of the run within `concurrency`, so one large
+  directory left at the end uses every free slot. A transient failure waits
+  outside its slot. Each part keeps its own receipt, so a failed part reruns
+  alone.
+- Surveys: inventory and contracts rows that end uncited no longer report a
+  negative `droppedFacts` (it counted the kept rows). Only facts surveys drop
+  answer rows.
+
 # 0.15.0 — 2026-10-28
 
 Setup settles the verification method, and auto mode hands over to autopilot

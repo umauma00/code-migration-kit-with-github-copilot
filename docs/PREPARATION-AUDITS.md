@@ -7,6 +7,12 @@ The parent coordinates fresh workers within an explicit call/concurrency budget,
 confirms findings against source, fixes only confirmed problems, then obtains
 fresh independent review. Never share one reviewer's findings with the other.
 
+In auto mode (`phaseMode: auto`) every preparation audit in 00b, 01 and 02 gets
+one repair round only: fix the confirmed findings, re-audit once with a fresh
+request, and list what is still open in the phase report and the `phase complete`
+(or waiver) note instead of stopping (see
+[auto mode](ORDERED-WORKFLOW.en.md#auto-mode)).
+
 ## Comparator (00b)
 
 Reuse adequate public-surface tests; do not rebuild an existing judge just to
