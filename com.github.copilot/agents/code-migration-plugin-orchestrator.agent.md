@@ -66,7 +66,10 @@ review that returns changes gets one fix and one fresh re-audit of the fixed ite
 a choice the source and RULEBOOK leave open takes the most conservative option
 (closest to the original, no new framework or dependency) unless the person gave
 one, with `TODO(port)` in the RULEBOOK before the inventory survey runs (later, in the
-translated output only, never the RULEBOOK) and listed. Safety checks, sign-in,
+translated output only, never the RULEBOOK) and listed. Before the inventory
+survey, run `generated-files --write` and `policy-questions` (all questions in one
+`ask_user` call; auto mode records the conservative option with `policy-record --topic ID --answer TEXT --auto`),
+then `rulebook-coverage` and `survey run --trial 3`; report generated files as counts only. Safety checks, sign-in,
 unfilled settings and the commands the hook still asks about stop as before. Never switch auto on
 yourself, and list the records made without the person and the waivers in every
 report and the handoff. Setup stays manual: put `setupNotice` first in every

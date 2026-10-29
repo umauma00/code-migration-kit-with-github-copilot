@@ -59,6 +59,8 @@ node migration-kit/scripts/run_migration.mjs source-spec init --apply  # ユー�
 | 01 | `depmap/`、`manifest.tsv`、`review-dependencies.json`、`depmap/report.md` | 同梱の解析器で機械的に生成（推測しない）。ソースを読むだけで元のアプリは実行しない。同梱版のない言語は[アダプタを自作](DEPENDENCY-MAPPERS.md) |
 | 02 | `RULEBOOK.md`、`inventory.tsv`、`gap-report.md` | ソースの実際の使われ方から方針を決める。判断できない箇所はinventoryにUNKNOWNとして残し、最も保守的な訳とTODO(port)を指定 |
 
+02 の inventory 調査の前に、生成コードの検出（`generated-files --write`、件数だけ報告）、ソースから作った方針の質問（`policy-questions` を ask_user でまとめて1回、答えは `policy-record` で RULEBOOK に記録。自動モードは最も保守的な案）、規則のない構文の確認（`rulebook-coverage`）と構文ごとの試し調査（`survey run --trial 3`）を行います。詳しくは [調査](SURVEYS.md) と prompts/02 を参照してください。
+
 0.10.0 より前に作った judge-plan が `contracts.md` を指している場合は、従来どおり `TODO(spec)` が残っている間は00bを記録できません。
 新しい方式に移るには、`migration/judge-plan.json` を削除してから `source-spec init` をやり直します（設定は変わらないので00の記録は残り、00b〜02は一括確認をやり直します）。
 

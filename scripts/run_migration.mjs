@@ -63,6 +63,8 @@ export const usage = `Usage: node migration-kit/scripts/run_migration.mjs COMMAN
                               waive (relaxed mode only) proceeds past an unfinished phase with the person's reason
   survey plan|run|status|merge --kind facts|contracts|inventory [--max-files N] [--sites migration/SITES.tsv]
                               Split preparation reading into scopes for fresh tool-free workers; results are files
+  survey run --kind inventory --sites migration/SITES.tsv --trial N
+                              try N sites per source_construct first; reports the UNKNOWN share per construct, merges nothing
   source-spec init [--apply] | check
                               Source as the only specification: scaffold source-only preparation
   judge                       Runtime: original/mutation; source-only: validate preparation
@@ -381,7 +383,8 @@ export async function main(argv = process.argv.slice(2)) {
     else if (cmd === 'source-spec') throw new Error('Use source-spec init [--apply] | check');
     else if (cmd === 'survey') {
       // Delegated preparation surveys: scopes go to fresh tool-free surveyor workers.
-      const kind = args.kind, options = { maxFiles: args['max-files'] === undefined ? undefined : Number(args['max-files']), sitesFile: args.sites };
+      const kind = args.kind, options = { maxFiles: args['max-files'] === undefined ? undefined : Number(args['max-files']), sitesFile: args.sites,
+        ...(args.trial !== undefined ? { trial: Number(args.trial) } : {}) };
       const action = args._[1];
       if (action === 'plan') result = planSurvey(root, config, kind, options);
       else if (action === 'status') result = surveyStatus(root, config, kind, options);

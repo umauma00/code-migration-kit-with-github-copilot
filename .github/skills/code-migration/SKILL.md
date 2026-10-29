@@ -320,6 +320,19 @@ anything but a small repository. Use [surveys](../../../docs/SURVEYS.md): `surve
 inventory` sends each scope to a fresh tool-free surveyor (a new
 Copilot CLI process) and saves its answer as a file; `survey merge` builds the draft you review. Check cited lines before relying
 on them; merged drafts still go through the phase's audits and the human gate.
+Before the inventory survey (at setup, once the run settings are confirmed), run
+`preparation_cli.mjs generated-files --write` and `preparation_cli.mjs policy-questions`.
+Report generated files as counts only and never ask the person to review the
+list: their census sites get mechanical GENERATED rows, and each file is
+translated as ordinary code unless the person names a target generator for its
+input (`generated-files --regenerate FILE --how TEXT`; build approval waits until
+the regenerated target exists, and `--translate FILE` switches back). Ask every
+policy question in one `ask_user` call, recommending an option, and record each
+answer with `policy-record --topic ID --answer TEXT` (auto mode: the conservative
+option with `--topic ID --answer TEXT --auto`, without asking). Then run `rulebook-coverage --sites PATH`
+and `survey run --kind inventory --sites PATH --trial 3`; decide the constructs
+in `uncovered` and `trial.decide` the same way (one question, or conservative in
+auto mode) before the one full survey.
 Run each independent preparation audit (00b/01/02) as `audit_inputs.mjs freeze`
 then `audit_inputs.mjs run --directory DIR`: a fresh tool-free Copilot CLI
 worker with `--model` set to the planned phaseModels entry, recording the model

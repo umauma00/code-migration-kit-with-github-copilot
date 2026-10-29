@@ -61,6 +61,9 @@ read cited source lines directly. Write `judge-report.md` (scope, method and the
 unverified limits), and continue straight into 01 and 02 without stopping for a
 00b-only review. The user reviews 00b–02 once as a package.
 
+Before its inventory survey, follow 02's "Before the survey: generated files and
+policies" (generated files, policy questions, coverage and a trial).
+
 Do not run the `contracts` survey kind for source-as-spec. It is kept only for
 projects whose judge plan, drafted before 0.10.0, still names
 `migration/source-spec/contracts.md`. See [surveys](../docs/SURVEYS.md).
