@@ -13,8 +13,9 @@ documentation on 2026-10-29).
   `.github/copilot/settings.json` project default.
 - `install.mjs` returns `existingMigrations` when another git worktree of the
   target already holds `migration/config.json` (the app can start each session
-  in a new worktree, and migration state is not committed). The orchestrator
-  asks whether to resume there before `--apply`.
+  in a new worktree, and migration state is not committed). Both skill copies
+  tell the orchestrator to ask whether to resume there before `--apply`; the
+  installer itself only reports it.
 - The code-migration skill describes the app as a host built on the Copilot
   CLI (`ask_user`, `/agent`, Autopilot = auto mode).
 - plugin.json and the marketplace entry carry author, homepage and keywords

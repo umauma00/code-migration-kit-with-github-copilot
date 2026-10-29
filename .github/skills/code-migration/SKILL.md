@@ -64,7 +64,13 @@ Autopilot session mode is the CLI's autopilot. Workers still start as separate
 signed in like VS Code does. Migrations run in "This computer" sessions. If a
 worker cannot reach the network or its sign-in inside an app session with local
 sandboxing on, show the error and tell the person that `/sandbox off` in that
-session lets the worker run; do not route around the sandbox yourself.
+session lets the worker run, and that commands in that session then run without
+the sandbox's limits; do not route around the sandbox yourself.
+If the installer preview returns `existingMigrations`, another worktree of this
+repository already holds a migration (the app can start a session in a new
+worktree). Ask one question before `--apply`: resume in that checkout
+(recommended; in the app, a new session with Workspace "Current checkout" there)
+or start a new migration here.
 
 ## Report language (first step)
 

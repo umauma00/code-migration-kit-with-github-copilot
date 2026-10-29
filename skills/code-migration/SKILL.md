@@ -69,7 +69,8 @@ Autopilot session mode is the CLI's autopilot. Workers still start as separate
 signed in like VS Code does. Migrations run in "This computer" sessions. If a
 worker cannot reach the network or its sign-in inside an app session with local
 sandboxing on, show the error and tell the person that `/sandbox off` in that
-session lets the worker run; do not route around the sandbox yourself.
+session lets the worker run, and that commands in that session then run without
+the sandbox's limits; do not route around the sandbox yourself.
 
 ## Report language (first step)
 

@@ -24,7 +24,7 @@ export function otherWorktreeMigrations(root) {
   let top, list;
   try { top = fs.realpathSync.native(git(['rev-parse', '--show-toplevel']).trim()); list = git(['worktree', 'list', '--porcelain']); } catch { return []; }
   const rel = path.relative(top, fs.realpathSync.native(root));
-  if (rel.startsWith('..') || path.isAbsolute(rel)) return [];
+  if (rel === '..' || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel)) return [];
   const found = [];
   for (const line of list.split(/\r?\n/)) {
     if (!line.startsWith('worktree ')) continue;

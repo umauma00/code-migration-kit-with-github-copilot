@@ -47,17 +47,17 @@ The `/plugin` commands in Copilot harness chats keep a separate inventory from t
 
 ### GitHub Copilot app
 
-1. Open **Customize** in the sidebar and, from the marketplace settings next to the marketplace dropdown, add the source above as a GitHub repository. Opening `ghapp://plugins/marketplace/add?source=umauma00%2Fcode-migration-kit-with-github-copilot%23feat%2Fgithub-copilot-migration-kit` shows the form filled in (it is added after you confirm).
+1. Open **Customize** in the sidebar and, from the marketplace settings next to the marketplace dropdown, add the source above as a GitHub repository. Opening `ghapp://plugins/marketplace/add?source=umauma00%2Fcode-migration-kit-with-github-copilot%23feat%2Fgithub-copilot-migration-kit` shows the form filled in (it is added after you confirm; whether a value with `#` is accepted is unverified).
 2. In **Customize**, search for `code-migration-kit` and click **Install**. `ghapp://plugins/install?source=code-migration-kit%40code-migration-kit-marketplace` opens it too. Check that it is turned on under **Installed**.
 3. The app documentation describes the source as "a GitHub repository or Git URL" and does not mention a `#branch` suffix (unverified). If it is not accepted, until the plugin is on main install it with the Copilot CLI as above and check whether it appears under **Installed** in the app. The app is built on the Copilot CLI, but the documentation does not say whether CLI-installed plugins appear in the app either.
 
 When you start a session in the app:
 
 - Set **Environment** to **This computer**. The kit runs workers with your local Copilot CLI and writes the migration record to local files (Cloud is unverified).
-- Set **Workspace** to **Current checkout**. **New worktree** creates a separate working copy per session, and the uncommitted `migration/` does not carry over. If another worktree already holds a migration when you initialize, the kit shows where (`existingMigrations`) and asks whether to resume there.
+- Set **Workspace** to **Current checkout**. **New worktree** creates a separate working copy per session, and the uncommitted `migration/` does not carry over. If another worktree already holds a migration when you initialize, the initialization preview returns where (`existingMigrations`) and the orchestrator asks whether to resume there.
 - Select `code-migration-plugin-orchestrator` in the agent picker (or with `/agent`). The **Autopilot** session mode matches the kit's auto mode (`phaseMode: auto`).
 - Set tool permissions to **Ask every time** or **Assisted**. Gate commands rely on a confirmation; whether **Approve all** shows it is unverified.
-- If a worker cannot reach the network or its sign-in in a session with local sandboxing on, turn it off in that session with `/sandbox off`.
+- If a worker cannot reach the network or its sign-in in a session with local sandboxing on, turn it off in that session with `/sandbox off`. Commands in that session then run without the sandbox's limits, so do this only for repositories you trust.
 
 ### Install from an internal Git server
 
@@ -124,7 +124,7 @@ If a custom agent in the project, a parent directory or your personal settings u
 
 This plugin targets the Copilot session type. Choose VS Code Local hooks and the experimental Dynamic Workflows extension with the repository-copy installation.
 
-Automated tests check translation of three files, independent review and build/smoke/parity without any `.github/` or `migration-kit/` in the project; model responses are test doubles. Plugin recognition, marketplace installation and resolution of the named worker IDs were also checked on the real CLI; re-check with `node tests/verify_plugin.mjs /absolute/path/to/copilot` (no external AI). `doctor --check-cli` also proves, under the same conditions as the workers, that every worker ID resolves.
+Automated tests check translation of three files, independent review and build/smoke/parity without any `.github/` or `migration-kit/` in the project; model responses are test doubles. Plugin recognition, installation from a local marketplace and resolution of the named worker IDs were also checked on the real CLI (installation from the GitHub-hosted marketplace is not); re-check with `node tests/verify_plugin.mjs /absolute/path/to/copilot` (no external AI). `doctor --check-cli` also proves, under the same conditions as the workers, that every worker ID resolves.
 
 `node tests/verify_plugin_resolution.mjs /absolute/path/to/runtime.node` compares worker collisions and post-hook invalidation with CLI 1.0.93's actual discovery, selection and hook APIs. Only this verification script depends on those internal APIs.
 

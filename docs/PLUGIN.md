@@ -47,17 +47,17 @@ Copilot 実行方式のチャットで使える `/plugin` コマンドは、Cust
 
 ### GitHub Copilot app
 
-1. サイドバーの **Customize** を開き、マーケットプレイスの選択欄の横にあるマーケットプレイス設定から、上の登録元を GitHub リポジトリとして追加します。リンク `ghapp://plugins/marketplace/add?source=umauma00%2Fcode-migration-kit-with-github-copilot%23feat%2Fgithub-copilot-migration-kit` を開くと入力済みのフォームが出ます（確認後に追加）。
+1. サイドバーの **Customize** を開き、マーケットプレイスの選択欄の横にあるマーケットプレイス設定から、上の登録元を GitHub リポジトリとして追加します。リンク `ghapp://plugins/marketplace/add?source=umauma00%2Fcode-migration-kit-with-github-copilot%23feat%2Fgithub-copilot-migration-kit` を開くと入力済みのフォームが出ます（確認後に追加。`#` 付きの値が受け付けられるかは未確認）。
 2. **Customize** で `code-migration-kit` を検索して **Install** します。リンク `ghapp://plugins/install?source=code-migration-kit%40code-migration-kit-marketplace` でも開けます。**Installed** で有効になっていることを確認してください。
 3. app の文書は追加元を「GitHub リポジトリまたは Git URL」と書いており、`#ブランチ` の指定には触れていません（未確認）。受け付けられない場合は、main に入るまで Copilot CLI で上の手順のとおり入れてから app の **Installed** に出るか確認してください。app は Copilot CLI を土台にしていますが、CLI で入れたプラグインが app に出るかも文書には書かれていません。
 
 app でセッションを始めるときは次のようにします。
 
 - **Environment** は **This computer** にします。キットは手元の Copilot CLI でワーカーを動かし、移行の記録を手元のファイルに書くためです（Cloud は未確認）。
-- **Workspace** は **Current checkout** にします。**New worktree** はセッションごとに別の作業コピーを作り、未コミットの `migration/` が引き継がれません。別のワークツリーに移行がある状態で初期化しようとすると、キットはその場所（`existingMigrations`）を示して、そちらで再開するか質問します。
+- **Workspace** は **Current checkout** にします。**New worktree** はセッションごとに別の作業コピーを作り、未コミットの `migration/` が引き継がれません。別のワークツリーに移行がある状態で初期化しようとすると、初期化のプレビューがその場所（`existingMigrations`）を返し、オーケストレーターがそちらで再開するか質問します。
 - エージェントの選択欄（または `/agent`）で `code-migration-plugin-orchestrator` を選びます。セッションモードの **Autopilot** はキットの自動モード（`phaseMode: auto`）に対応します。
 - ツールの権限は **Ask every time** か **Assisted** にします。ゲートのコマンドは確認を前提にしています。**Approve all** で確認が出るかは未確認です。
-- ローカルのサンドボックスが有効なセッションでワーカーがネットワークやサインインに届かない場合は、そのセッションで `/sandbox off` にします。
+- ローカルのサンドボックスが有効なセッションでワーカーがネットワークやサインインに届かない場合は、そのセッションで `/sandbox off` にします。オフにするとそのセッションのコマンドはサンドボックスの制限なしで動くため、信頼できるリポジトリでだけ行ってください。
 
 ### 社内の Git サーバーから入れる
 
@@ -124,7 +124,7 @@ node /path/to/code-migration-kit/scripts/run_migration.mjs status
 
 このプラグインはCopilot実行方式を対象とします。VS Code Local用hooksと実験的Dynamic Workflows拡張は従来のコピー導入で選択してください。
 
-自動テストでは案件側に `.github/` や `migration-kit/` を置かずに、3ファイルの変換・独立レビュー・build/smoke/parityを確認します。モデル応答はテスト用です。実CLIでのプラグイン認識・マーケットプレイス導入・担当の名前付きID解決も確認しています。これは `node tests/verify_plugin.mjs /absolute/path/to/copilot` で再確認できます。外部AIは呼びません。`doctor --check-cli` も、ワーカーと同じ条件で全担当IDが解決できるかを確認します。
+自動テストでは案件側に `.github/` や `migration-kit/` を置かずに、3ファイルの変換・独立レビュー・build/smoke/parityを確認します。モデル応答はテスト用です。実CLIでのプラグイン認識・ローカルのマーケットプレイスからの導入・担当の名前付きID解決も確認しています（GitHub上のマーケットプレイスからの導入は未確認）。これは `node tests/verify_plugin.mjs /absolute/path/to/copilot` で再確認できます。外部AIは呼びません。`doctor --check-cli` も、ワーカーと同じ条件で全担当IDが解決できるかを確認します。
 
 担当の衝突とhook変更後の失効は、`node tests/verify_plugin_resolution.mjs /absolute/path/to/runtime.node` でCLI 1.0.93の実際の探索・選択・hook APIと照合できます。この内部APIへの依存は検証用スクリプトだけです。
 

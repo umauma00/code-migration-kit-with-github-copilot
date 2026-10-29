@@ -82,8 +82,9 @@ test('both copies of the code-migration skill describe the GitHub Copilot app ho
     const text = read(rel);
     assert.match(text, /The GitHub Copilot app is built on the Copilot CLI/, rel);
     assert.match(text, /`\/sandbox off`/, rel);
+    assert.match(text, /`existingMigrations`/, rel);
+    assert.match(text, /without\nthe sandbox's limits/, rel);
   }
-  assert.match(read('skills/code-migration/SKILL.md'), /`existingMigrations`/);
 });
 
 function gitRepo(t) {
@@ -129,4 +130,14 @@ test('a target outside git has no other worktrees', t => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'migration-app-nogit-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   assert.deepEqual(otherWorktreeMigrations(fs.realpathSync(root)), []);
+});
+
+test('the other worktree is found from either side, for a repository copy too, and for directory names starting with two dots', t => {
+  const { main, session } = gitRepo(t);
+  install(session, { layout: 'plugin', apply: true });
+  assert.deepEqual(install(main, { layout: 'plugin' }).existingMigrations, [session]);
+  assert.deepEqual(install(main, { model: 'm' }).existingMigrations, [session]);
+  for (const root of [main, session]) fs.mkdirSync(path.join(root, '..cache/app'), { recursive: true });
+  install(path.join(session, '..cache/app'), { layout: 'plugin', apply: true });
+  assert.deepEqual(otherWorktreeMigrations(path.join(main, '..cache/app')), [path.join(session, '..cache/app')]);
 });
