@@ -414,9 +414,11 @@ and in the `phase complete` (or waiver) note, then continue. A choice neither th
 source nor the RULEBOOK decides (for example the target web framework, or where
 non-source assets go) takes the most conservative option, the one closest to the
 original structure that adds no framework or dependency, unless the person
-already stated one: write it into the RULEBOOK at the phase boundary with a
-greppable `TODO(port)` naming the open choice, and list it in the report as
-decided without the person. Missing guardrails are installed from the template
+already stated one. Before 02 is recorded, write it into the RULEBOOK with a
+greppable `TODO(port)` naming the open choice. After that, leave the RULEBOOK
+unchanged (it is part of contextHash, so an edit would make the recorded phases
+stale) and put the conservative representation with `TODO(port)` into the
+translated output (upstream rule 8). List each as decided without the person. Missing guardrails are installed from the template
 automatically. Everything else still stops: safety checks, sign-in and credits,
 unfilled run settings, and the commands the hook still asks about (models set,
 settings apply, sessions prune, pilot prepare, source-spec init --apply); report

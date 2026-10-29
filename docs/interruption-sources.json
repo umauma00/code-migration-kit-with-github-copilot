@@ -2812,7 +2812,7 @@
     },
     {
       "path": "lib/survey.mjs",
-      "sha256": "c2d3ce9eaea0342955c574aae6e45737ae3505c46dd56c66c16483b7e0a68962",
+      "sha256": "677d582514eddba06b97e41dfafbe9da7377cd2d424d5120ea43b92c7a0af9e7",
       "entries": [
         {
           "line": 21,
@@ -2820,212 +2820,212 @@
           "code": "import { executionLimits, ignoredLimits } from './execution-policy.mjs';"
         },
         {
-          "line": 43,
+          "line": 45,
           "kind": "error-or-exit-candidate",
           "code": "const requireKind = kind => { if (!surveyKinds[kind]) throw new Error(`Survey kind must be one of ${Object.keys(surveyKinds).join(', ')}`); return surveyKinds[kind]; };"
         },
         {
-          "line": 75,
+          "line": 77,
           "kind": "error-or-exit-candidate",
           "code": "if (!sitesFile?.startsWith('migration/')) throw new Error('The inventory survey needs a mechanical site census: --sites migration/PATH.tsv (file<TAB>symbol<TAB>source_construct)');"
         },
         {
-          "line": 77,
+          "line": 79,
           "kind": "error-or-exit-candidate",
           "code": "if (lines.shift() !== 'file\\tsymbol\\tsource_construct') throw new Error(`Unexpected TSV header: ${sitesFile}`);"
         },
         {
-          "line": 88,
+          "line": 90,
           "kind": "error-or-exit-candidate",
           "code": "if (!Number.isInteger(maxFiles) || maxFiles < 1 || maxFiles > 200) throw new Error('--max-files must be an integer from 1 to 200');"
         },
         {
-          "line": 89,
+          "line": 91,
           "kind": "error-or-exit-candidate",
           "code": "const limit = config.maxReviewInputBytes ?? 65536;"
         },
         {
-          "line": 179,
+          "line": 181,
           "kind": "error-or-exit-candidate",
           "code": "if (!Array.isArray(items)) throw new Error('Survey result requires an items array');"
         },
         {
-          "line": 182,
+          "line": 184,
           "kind": "error-or-exit-candidate",
           "code": "const text = (v, f) => { if (typeof v !== 'string' || !v.trim()) throw new Error(`Survey item requires ${f}`); };"
         },
         {
-          "line": 185,
+          "line": 187,
           "kind": "error-or-exit-candidate",
           "code": "if (!inScope(item.file)) throw new Error(`Survey item outside its scope: ${item.file}`);"
         },
         {
-          "line": 186,
+          "line": 188,
           "kind": "error-or-exit-candidate",
           "code": "if (!cited(item)) throw new Error(`Survey item must cite PATH:LINE inside its scope: ${item.file}`);"
         },
         {
-          "line": 190,
+          "line": 192,
           "kind": "error-or-exit-candidate",
           "code": "throw new Error(`Survey citation outside source lines: ${a.file}:${a.line}${a.end === a.line ? '' : `-${a.end}`} (allowed ${ranges?.[a.file]?.map(r => `${r.first}-${r.last}`).join(', ') ?? `1-${lines?.[a.file] ?? 0}`})`);"
         },
         {
-          "line": 194,
+          "line": 196,
           "kind": "error-or-exit-candidate",
           "code": "if (kind === 'facts') for (const item of items) { text(item.summary, 'summary'); if (!factCategories.includes(item.category)) throw new Error(`Unknown fact category: ${item.category}`); }"
         },
         {
-          "line": 198,
+          "line": 200,
           "kind": "error-or-exit-candidate",
           "code": "if (JSON.stringify(covered) !== JSON.stringify([...scope.files].sort())) throw new Error('Contracts survey must return exactly one item per scope file');"
         },
         {
-          "line": 205,
+          "line": 207,
           "kind": "error-or-exit-candidate",
           "code": "if (/[\\t\\r\\n]/.test(Object.values(item).join(''))) throw new Error('Inventory cells cannot contain tabs or newlines');"
         },
         {
-          "line": 206,
+          "line": 208,
           "kind": "error-or-exit-candidate",
           "code": "if (!expected.has(key(item)) || seen.has(key(item))) throw new Error(`Inventory item is not a scope census site or is duplicated: ${item.file}:${item.symbol}`);"
         },
         {
-          "line": 207,
+          "line": 209,
           "kind": "error-or-exit-candidate",
           "code": "if (!['confirmed', 'unknown'].includes(item.status)) throw new Error('Inventory items must be confirmed or unknown');"
         },
         {
-          "line": 208,
+          "line": 210,
           "kind": "error-or-exit-candidate",
           "code": "if (item.status === 'unknown' && (item.classification !== 'UNKNOWN' || !item.target_translation.includes('TODO(port)'))) throw new Error('UNKNOWN requires a deterministic target representation plus TODO(port) and the open question');"
         },
         {
-          "line": 211,
+          "line": 213,
           "kind": "error-or-exit-candidate",
           "code": "if (seen.size !== expected.size) throw new Error(`Inventory survey covered ${seen.size} of ${expected.size} scope sites`);"
         },
         {
-          "line": 298,
+          "line": 300,
           "kind": "error-or-exit-candidate",
           "code": "const limits = executionLimits(config);"
         },
         {
-          "line": 338,
+          "line": 340,
           "kind": "error-or-exit-candidate",
           "code": "const parts = surveyRequests(kind, request, config.maxReviewInputBytes ?? 65536), finished = [];"
         },
         {
-          "line": 372,
+          "line": 376,
           "kind": "error-or-exit-candidate",
           "code": "if (signal?.aborted) throw new Error('Interrupted');"
         },
         {
-          "line": 373,
+          "line": 377,
           "kind": "error-or-exit-candidate",
           "code": "if (systemic) throw systemic;"
         },
         {
-          "line": 374,
+          "line": 378,
           "kind": "error-or-exit-candidate",
           "code": "if (reservations >= limits.calls) throw new Error('Agent call limit reached; resume with a new run after reviewing usage');"
         },
         {
-          "line": 378,
+          "line": 382,
           "kind": "error-or-exit-candidate",
           "code": "if (Buffer.byteLength(pending.input.text) > (config.maxReviewInputBytes ?? 65536)) {"
         },
         {
-          "line": 382,
+          "line": 386,
           "kind": "error-or-exit-candidate",
           "code": "if (Buffer.byteLength(pending.input.text) > (config.maxReviewInputBytes ?? 65536)) throw new Error('Survey metadata exceeds maxReviewInputBytes during correction');"
         },
         {
-          "line": 395,
+          "line": 399,
           "kind": "error-or-exit-candidate",
           "code": "if (result?.schemaVersion !== 1 || result.kind !== 'survey' || result.survey !== kind || result.target !== unit.target) throw new Error('Invalid survey result: schemaVersion/kind/survey/target mismatch');"
         },
         {
-          "line": 402,
+          "line": 406,
           "kind": "error-or-exit-candidate",
           "code": "if (!response && e.code !== 'SURVEY_VALIDATION') throw e;"
         },
         {
-          "line": 417,
+          "line": 421,
           "kind": "error-or-exit-candidate",
           "code": "if (!repaired && reservations < limits.calls && !signal?.aborted) {"
         },
         {
-          "line": 420,
+          "line": 424,
           "kind": "error-or-exit-candidate",
           "code": "if (signal?.aborted) throw e;"
         },
         {
-          "line": 423,
+          "line": 427,
           "kind": "error-or-exit-candidate",
           "code": "if (!repaired) throw new Error(`Agent call limit reached (${limits.calls}) before the survey correction; validated rows are kept. Resume with a larger --max-calls`);"
         },
         {
-          "line": 446,
+          "line": 450,
           "kind": "error-or-exit-candidate",
           "code": "if (e.code === 'SURVEY_VALIDATION') throw e;"
         },
         {
-          "line": 447,
+          "line": 451,
           "kind": "error-or-exit-candidate",
           "code": "if (isSystemicFailure(e)) { systemic ??= e; throw e; }"
         },
         {
-          "line": 448,
+          "line": 452,
           "kind": "error-or-exit-candidate",
           "code": "if (!isTransientFailure(e) || retry >= limits.retries || signal?.aborted) throw e;"
         },
         {
-          "line": 454,
+          "line": 458,
           "kind": "error-or-exit-candidate",
           "code": "if (wait !== null) await sleep(wait, undefined, { signal }).catch(() => { throw new Error('Interrupted'); });"
         },
         {
-          "line": 461,
+          "line": 465,
           "kind": "error-or-exit-candidate",
           "code": "if (signal?.aborted || systemic) throw new Error(signal?.aborted ? 'Interrupted' : systemic.message);"
         },
         {
-          "line": 470,
+          "line": 475,
           "kind": "error-or-exit-candidate",
-          "code": "if (failures.length) throw failures[0];"
+          "code": "if (failures.length) throw failures.find(e => e === systemic) ?? failures.find(e => e.message !== 'Interrupted') ?? failures[0];"
         },
         {
-          "line": 475,
+          "line": 480,
           "kind": "error-or-exit-candidate",
           "code": "if (surveyInput(root, config, kind, scope, { sitesFile }).hash !== input.hash) throw new Error('Survey scope inputs changed during the worker call');"
         },
         {
-          "line": 496,
+          "line": 501,
           "kind": "loop-exit-candidate",
           "code": "if (signal?.aborted || systemic) break;"
         },
         {
-          "line": 498,
+          "line": 503,
           "kind": "loop-exit-candidate",
           "code": "if (signal?.aborted || systemic) break;"
         },
         {
-          "line": 504,
+          "line": 509,
           "kind": "error-or-exit-candidate",
           "code": "const report = { runId, kind, executionMode: config.executionMode ?? 'continuous', ...(ignoredLimits(config).length ? { ignoredLimits: ignoredLimits(config) } : {}), startedAt, finishedAt: stamp(), agentCalls: calls, completed, done: status.done, total: status.total,"
         },
         {
-          "line": 517,
+          "line": 522,
           "kind": "error-or-exit-candidate",
           "code": "throw Object.assign(new Error(`Survey stopped: ${message || 'Interrupted'}`), { report });"
         },
         {
-          "line": 527,
+          "line": 532,
           "kind": "error-or-exit-candidate",
           "code": "if (plan.skipped.length) throw new Error(`Survey incomplete: ${plan.skipped.length} source files could not be read or found (${plan.skipped.slice(0, 5).map(s => s.file).join(', ')}); inspect skipped reasons, correct the census paths or source roots and resume. Completed scopes are preserved.`);"
         },
         {
-          "line": 530,
+          "line": 535,
           "kind": "error-or-exit-candidate",
           "code": "if (missing.length) throw new Error(`Survey incomplete: ${missing.length} of ${plan.scopes.length} scopes have no current result (${missing.slice(0, 10).join(', ')}); resume survey run --kind ${kind}`);"
         }

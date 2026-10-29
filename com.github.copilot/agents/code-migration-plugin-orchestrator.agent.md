@@ -59,8 +59,9 @@ review that returns changes gets one fix and one fresh re-audit, and what remain
 (with size-limited reviews and UNKNOWN rows) is listed and noted, not fixed again;
 a choice the source and RULEBOOK leave open takes the most conservative option
 (closest to the original, no new framework or dependency) unless the person gave
-one, written into the RULEBOOK with `TODO(port)` and listed. Safety checks, sign-in, unfilled settings
-and the commands the hook still asks about stop as before. Never switch auto on
+one, with `TODO(port)` in the RULEBOOK before 02 is recorded (later, in the
+translated output only, never the RULEBOOK) and listed. Safety checks, sign-in,
+unfilled settings and the commands the hook still asks about stop as before. Never switch auto on
 yourself, and list the records made without the person and the waivers in every
 report and the handoff. Setup stays manual: put `setupNotice` first in every
 setup question, and when a result carries `autoHandoff`, show it and end the turn

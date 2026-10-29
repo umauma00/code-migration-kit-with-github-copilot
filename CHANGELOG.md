@@ -10,8 +10,10 @@ runs its parts one at a time.
   rows are listed in the phase report and the record's note instead of
   stopping. A choice the source and RULEBOOK leave open (for example the
   target web framework, or where non-source assets go) takes the most
-  conservative option unless the person gave one, written into the RULEBOOK
-  with `TODO(port)` and listed as decided without the person.
+  conservative option unless the person gave one, with `TODO(port)`: in the
+  RULEBOOK before 02 is recorded, and after that only in the translated output
+  (the RULEBOOK is part of contextHash). It is listed as decided without the
+  person.
 - Surveys: the parts of one split scope now run side by side. One shared limit
   keeps every surveyor call of the run within `concurrency`, so one large
   directory left at the end uses every free slot. A transient failure waits
@@ -19,7 +21,11 @@ runs its parts one at a time.
   alone.
 - Surveys: inventory and contracts rows that end uncited no longer report a
   negative `droppedFacts` (it counted the kept rows). Only facts surveys drop
-  answer rows.
+  answer rows. Results saved by earlier versions are kept and read as 0.
+- Surveys: a part's correction or retry is served before parts still waiting
+  for their first call, rejected answers are named by call and request so
+  parallel parts never overwrite each other's evidence, and a failed scope
+  reports a run-wide failure before a part's own.
 
 # 0.15.0 — 2026-10-28
 

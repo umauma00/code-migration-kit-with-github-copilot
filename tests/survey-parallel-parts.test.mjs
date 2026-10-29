@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { prepare } from './helpers.mjs';
 import { atomicWrite, safePath, readJSON, writeJSON } from '../lib/core.mjs';
@@ -96,4 +97,44 @@ test('inventory rows that stay uncited are not counted as negative dropped facts
   const merged = mergeSurvey(f.root, f.config, 'inventory', { sitesFile });
   assert.equal(merged.droppedFacts, undefined);
   assert.equal(merged.uncited, 2);
+});
+
+test('review of 55e38d5: parallel rejections keep one evidence file each', async t => {
+  const f = fixture(t, { concurrency: 3, sites: 1200 });
+  let calls = 0;
+  const report = await runSurvey(f.root, f.config, 'inventory', async args => { calls++; await sleep(5); return answer(args, 'case/A.cs:99'); }, { sitesFile });
+  assert.equal(report.done, 1);
+  const rejected = fs.readdirSync(safePath(f.root, 'migration/surveys/inventory/runs')).filter(n => n.endsWith('-rejected.json'));
+  assert.equal(rejected.length, calls, 'every rejected answer is kept under its own name');
+});
+
+test('review of 55e38d5: a correction goes before parts still waiting for their first call', async t => {
+  const f = fixture(t, { concurrency: 1, sites: 1200 });
+  const order = [];
+  await runSurvey(f.root, f.config, 'inventory', async args => {
+    const data = JSON.parse(args.reviewInput), first = data.sites[0].symbol, repair = Boolean(data.repair) || args.extra.survey.validationError !== undefined;
+    order.push(`${args.extra.survey.part}${repair ? 'r' : ''}`);
+    return answer(args, first.endsWith('_0') && !repair ? 'case/A.cs:99' : 'case/A.cs:1-3');
+  }, { sitesFile });
+  assert.deepEqual(order.slice(0, 3), ['1', '1r', '2']);
+});
+
+test('review of 55e38d5: a saved negative droppedFacts from an earlier version counts as 0', async t => {
+  const f = fixture(t, { concurrency: 1, sites: 3 });
+  const report = await runSurvey(f.root, f.config, 'inventory', async args => answer(args), { sitesFile });
+  const file = safePath(f.root, `migration/surveys/inventory/${report.completed[0]}.json`), record = readJSON(file);
+  writeJSON(file, { ...record, droppedFacts: -46 });
+  assert.equal(mergeSurvey(f.root, f.config, 'inventory', { sitesFile }).droppedFacts, undefined);
+});
+
+test('review of 55e38d5: a failed scope reports the systemic failure, not the lowest part', async t => {
+  const f = fixture(t, { concurrency: 2, sites: 1200 });
+  let calls = 0;
+  const error = await runSurvey(f.root, f.config, 'inventory', async args => {
+    const n = ++calls;
+    if (n === 1) { await sleep(30); throw new Error('worker crashed'); }
+    if (n === 2) throw Object.assign(new Error('authentication required'), {});
+    return answer(args);
+  }, { sitesFile }).catch(e => e);
+  assert.match(error.message, /authentication required/);
 });
