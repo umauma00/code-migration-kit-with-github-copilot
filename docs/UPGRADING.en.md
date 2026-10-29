@@ -1,6 +1,14 @@
-# Upgrading (0.18.1 and earlier releases)
+# Upgrading (0.19.0 and earlier releases)
 
 [日本語](UPGRADING.md) | English
+
+## 0.19.0 (one progress display for long commands)
+
+The kit files (plugin.json, scripts) change, so existing approvals and completion records expire once. Revalidate from judge. Completed outputs are kept.
+
+1. `translate`, `repair`, `repair-round`, `build-loop`, `pilot run` and `survey run` all run the same way: start the command alone in a background terminal and check it with `status --root TARGET --wait 600 --format markdown`. The hook denies a pipe such as `| Out-String` or a redirection to a file, which hide all progress until the end (`2>&1` alone is allowed).
+2. Progress lines have one format: `14:03:45 [3/12] src/a.cs: review (agent calls 14)` (time, finished/total of this run, unit, stage, AI calls). A unit that becomes blocked prints a `blocked` line at once.
+3. In a copy install, replace all of `migration-kit/`, `.github/agents/migration-orchestrator.agent.md`, the SKILL.md in `.github/skills/` and the kit's section of `.github/copilot-instructions.md` (from `code-migration-kit:start` to `end`) with the temporary install's. The plugin needs only an update.
 
 ## 0.18.1 (distributed from main)
 

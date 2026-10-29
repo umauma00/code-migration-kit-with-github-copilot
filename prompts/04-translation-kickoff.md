@@ -74,7 +74,8 @@ available. Unknown usage stays unknown. Stop before build approval.
 <!-- Copilot adaptation: migration control and instructions updated on 2026-10-08; see NOTICE. -->
 
 Keep orchestration in the user-facing parent: launch translate in a background
-or continuing terminal and check `status --wait` while it runs; do not block the parent
+or continuing terminal, never piped or redirected (`| Out-String` hides its progress
+until the end), and check `status --wait` while it runs; do not block the parent
 waiting for the terminal to finish. The runner refills available slots and, per
 `dependencyOrder`, orders manifest jobs by audited dependencies. Non-manifest dependencies stay
 fixed source evidence. Cycles use fixed source when typecheck is deferred; with

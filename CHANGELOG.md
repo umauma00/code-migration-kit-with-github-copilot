@@ -1,3 +1,27 @@
+# 0.19.0 — 2026-10-29
+
+Long runner commands show their progress the same way. A `pilot run` piped into
+`| Out-String` showed nothing for over an hour, because the pipe held back the
+heartbeat and the unit lines until the command ended.
+
+- One rule for every long runner command (`translate`, `repair`,
+  `repair-round`, `build-loop`, `pilot run`, `survey run`) in the skill, both
+  orchestrator agents, the Copilot instructions and prompts 03/04: start it
+  alone in a background terminal with no pipe or file redirection, check it
+  with `status --root ROOT --wait 600 --format markdown`, and tell the person
+  the finished count and active units after each check. Before, only
+  `translate` and `build-loop` were named.
+- The hook denies a long runner command whose output goes through a pipe or
+  into a file (`| Out-String`, `| Select-Object`, `| tee`, `> log`), including
+  the runner path held in a variable (`node $r pilot run ...`), and its reason
+  gives the way to run it. `2>&1` alone is still allowed.
+- One progress line format for all of them:
+  `14:03:45 [3/12] src/a.cs: review (agent calls 14)` (local time,
+  finished/total of this run, unit, stage, AI calls so far). `pilot run`
+  showed no counts or calls before; `survey run` counts scopes.
+- A unit that becomes blocked prints a `blocked` line at once instead of
+  appearing only in the final result.
+
 # 0.18.1 — 2026-10-29
 
 The kit moves to the repository's default branch (main): no behavior change.

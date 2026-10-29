@@ -90,8 +90,11 @@ Resolve runner and prompt paths from this plugin directory; execute commands wit
 When invoked as a child, return phase plan, status, blockers and necessary
 decisions to the user-facing parent. Do not ask questions or update TODO from
 a child; Local subagents lack these tools. Keep user-facing ownership in the
-parent, which runs long translations in a background terminal and checks
-`status --wait 600` instead of blocking on runner completion. Use the real exposed TODO schema and confirm the response; distinguish
+parent, which runs every long runner command (translate, repair, repair-round,
+build-loop, pilot run, survey run) alone in a background terminal, never piped
+or redirected (`| Out-String` hides all progress until the end), and checks
+`status --root ROOT --wait 600` instead of blocking on runner completion,
+reporting the finished count and active units in chat after each check. Use the real exposed TODO schema and confirm the response; distinguish
 tool success from actual UI visibility and show a chat checklist on failure or
 reported invisibility. Read [source-only mode](../../docs/SOURCE-ONLY.md) and
 [built-in Rubber Duck](../../docs/RUBBER-DUCK.md). Workers never own phase TODO.

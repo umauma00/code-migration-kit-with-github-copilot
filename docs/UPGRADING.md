@@ -1,6 +1,14 @@
-# 更新手順（0.18.1 と以前の版）
+# 更新手順（0.19.0 と以前の版）
 
 日本語 | [English](UPGRADING.en.md)
+
+## 0.19.0（長時間コマンドの進捗表示を統一）
+
+キットのファイル（plugin.json・scripts）が変わるため、既存の承認・完了記録は一度だけ失効します。judgeから再検証してください。完了済みの出力は保持されます。
+
+1. `translate`・`repair`・`repair-round`・`build-loop`・`pilot run`・`survey run` は、すべて同じ方法で動かします。コマンドだけをバックグラウンドのターミナルで起動し、`status --root 対象 --wait 600 --format markdown` で進捗を確認します。`| Out-String` などのパイプやファイルへのリダイレクトは、終わるまで進捗を隠すため hook が拒否します（`2>&1` だけなら使えます）。
+2. 進捗行は `14:03:45 [3/12] src/a.cs: review (agent calls 14)`（時刻・この実行の完了数/全体・単位・段階・AI 呼び出し数）の1形式になりました。止まった単位は `blocked` の行ですぐ表示されます。
+3. コピー導入では `migration-kit/` 全体と、`.github/agents/migration-orchestrator.agent.md`、`.github/skills/` の SKILL.md、`.github/copilot-instructions.md` のキットの区間（`code-migration-kit:start` から `end` まで）を一時導入先の内容に置き換えます。プラグインは更新だけで入ります。
 
 ## 0.18.1（配布元を main に）
 
