@@ -188,7 +188,8 @@ Outside auto mode the kit's hook makes the host ask the person to confirm every
 `approve`, `phase complete`, `pilot prepare`, `source-spec init --apply`,
 `guardrails install`, `build-loop` and `sessions prune` command (auto mode
 asks only for `sessions prune`, switching auto on and guardrails changes;
-`models set` and `settings apply` record the person's choice and never ask), and it refuses any other agent write of
+`models set` and `settings apply` for this project, run on their own, record the
+person's choice and do not ask), and it refuses any other agent write of
 `migration/guardrails.json`. That host confirmation is the person's act; never ask
 them to switch it off. The person works from chat only: run every command
 yourself. When the session cannot ask (autopilot or a non-interactive run reports

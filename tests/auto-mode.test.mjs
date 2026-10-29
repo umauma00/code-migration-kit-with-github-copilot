@@ -393,6 +393,12 @@ test('review of 0.20.0: a note quoting a settings command keeps its gate; settin
       assert.equal(decide(f, command)?.decision, 'ask', `${mode}: ${command}`);
     assert.equal(decide(f, `${kit} settings apply --root ${f.root}`), null, `${mode}: own --root`);
     assert.equal(decide(f, `${kit} settings apply --root .`), null, `${mode}: --root .`);
+    for (const command of [`${kit} settings apply --root . --root ${other.root}`, `${kit} models set --role all --model gpt-5 --root . --root=${other.root}`])
+      assert.equal(decide(f, command)?.decision, 'ask', `${mode}: ${command}`);
+    // A substitution in a note runs, so the command inside it is still a gate.
+    for (const inner of ['approve translation --note ok', 'phase complete 03 --note ok', 'sessions prune'])
+      for (const command of [`${kit} status --note "$(node migration-kit/scripts/run_migration.mjs ${inner})"`, `${kit} models list --note "\`node migration-kit/scripts/run_migration.mjs ${inner}\`"`])
+        assert.equal(decide(f, command)?.decision, 'ask', `${mode}: ${command}`);
     // In auto mode, the two newly unasked gates still ask when chained.
     for (const command of [`${kit} pilot prepare --note x && ${kit} sessions prune`, `cd src && ${kit} source-spec init --apply`])
       assert.equal(decide(f, command)?.decision, 'ask', `${mode}: ${command}`);

@@ -6,7 +6,7 @@
 
 The kit files (plugin.json, scripts) change, so existing approvals and completion records expire once. Revalidate from judge. Completed outputs are kept.
 
-1. `models set` and `settings apply` run as a command of their own no longer ask the host (Hook approval) in any mode: they record what the person chose in a question or in the file. A `settings apply` that switches auto mode on, and either command chained with another, still ask.
+1. `models set` and `settings apply` run as a command of their own no longer ask the host (Hook approval) in any mode: they record what the person chose in a question or in the file. A `settings apply` that switches auto mode on, and either command chained with another, with `--root` naming another project or with `--copilot`, still ask.
 2. In auto mode `pilot prepare` and `source-spec init --apply` run unasked too. Still asked: `sessions prune` (a deletion that cannot be undone), switching auto mode on, `guardrails install` with options or over an existing file, and kit calls the hook cannot read.
 3. In a copy install, replace all of `migration-kit/`, `.github/agents/migration-orchestrator.agent.md`, the SKILL.md in `.github/skills/` and the kit's section of `.github/copilot-instructions.md` with the temporary install's. The plugin needs only an update.
 
