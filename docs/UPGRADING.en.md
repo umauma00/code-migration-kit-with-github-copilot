@@ -6,8 +6,8 @@
 
 The plugin version changes, so existing approvals and completion records expire once. Revalidate from judge. Completed outputs are kept.
 
-1. New installs set `maxReviewInputBytes` to 1048576 (1 MiB, about 260k–360k tokens). Existing `migration/config.json` files are not changed.
-2. To raise it in an existing project, edit `migration/config.json`. It is part of the config fingerprint, so phase 02 onward and approvals are reviewed again. Lower it for a model whose context cannot hold that much.
+1. New installs set `maxReviewInputBytes` to 1048576 (1 MiB, roughly 260k–360k tokens). Existing `migration/config.json` files are not changed.
+2. To raise it in an existing project, edit `migration/config.json`. It is part of the config fingerprint, so phase 02 onward and approvals are reviewed again. When the reviewer model's "Context (prompt limit)" in `models list` is smaller (for example 272K), lower it to fit that limit (655360 or less for 272K); a unit over the limit cannot be sent whole and fails.
 3. In a copy install, replace all of `migration-kit/` with the temporary install's. The plugin needs only an update.
 
 ## 0.19.0 (one progress display for long commands)

@@ -127,7 +127,7 @@ The minimum settings in `migration/config.json`:
 | `verificationRoots` | Comparators, tests and test data, e.g. `["tests"]` |
 | `verificationInputs` | Extra build/dependency settings whose changes are tracked, e.g. `["build/config.json", "packages/api/tsconfig.json"]` |
 | `buildArtifactRoots` | Directories where commands write binaries, objects and reports, e.g. `["artifacts", "dist"]`. Defaults to an empty array |
-| `maxReviewInputBytes` | JSON size limit of the frozen review input; new installs use 1048576 bytes (1 MiB, about 260k–360k tokens; lower it for models with a smaller context), older configs keep their value and an omitted key means 65536. An oversized unit switches automatically to tool-assisted review (below) |
+| `maxReviewInputBytes` | JSON size limit of the frozen review input; new installs use 1048576 bytes (1 MiB, roughly 260k–360k tokens). When the reviewer model's "Context (prompt limit)" in `models list` is smaller, lower it to fit that limit (for example 655360 or less for 272K), older configs keep their value and an omitted key means 65536. An oversized unit switches automatically to tool-assisted review (below) |
 | `reviewDependencyMap` | Audited dependency declaration JSON; default `migration/review-dependencies.json`. A required phase 01 artifact |
 | `sourceLanguage`, `targetLanguage` | The languages; the template's Python/JavaScript can be changed |
 | `verificationMode` | `runtime` (default): runs the original environment and old-versus-new comparison. `source-only`: validates source-derived preparation and the translated build/smoke, and hands off with behavioral equivalence unverified. Existing settings are never changed automatically |

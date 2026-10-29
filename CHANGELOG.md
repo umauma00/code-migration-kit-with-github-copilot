@@ -6,7 +6,8 @@ New installs give the frozen review input more room.
   260k–360k tokens) instead of 262144, so fewer units fall back to
   tool-assisted review and fewer preparation audits need smaller batches.
   Existing configs keep their value, because it is part of the config
-  fingerprint. Lower it for a model whose context cannot hold that much.
+  fingerprint. Lower it when the reviewer model's prompt limit in `models list` is
+  smaller (for example 655360 or less for a 272K limit).
 
 # 0.19.0 — 2026-10-29
 
