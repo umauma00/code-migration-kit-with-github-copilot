@@ -36,10 +36,10 @@ stop and ask the human for a design decision instead of a third wording.
 mkdir /tmp/bakeoff-b && cp SOURCE_FILES /tmp/bakeoff-b/   # copies only, not a checkout
 cd /tmp/bakeoff-b && copilot -p "Port these files to TARGET_LANGUAGE the way a fluent TARGET_LANGUAGE engineer would write them natively. Write each translation next to its source." \
   --model STRESS_B_MODEL --no-custom-instructions --disable-builtin-mcps -s \
-  --available-tools view,create,edit,glob,grep --allow-tool write
+  --available-tools view,create,edit,apply_patch,glob,grep --allow-tool write
 ```
 
-`STRESS_B_MODEL` is `phaseModels.stressB`. Do not run B as a subagent of the migration chat: VS Code Local subagents inherit the parent's instructions, including `.github/copilot-instructions.md` with the kit's managed block. Delete `/tmp/bakeoff-b` afterwards and record the deletion in the report.
+`STRESS_B_MODEL` is `phaseModels.stressB`. Keep `apply_patch`: some GPT models (checked with gpt-6-luna on CLI 1.0.105) have no `create` / `edit` and write only through `apply_patch`, so without it B gets read-only tools and writes nothing. Do not run B as a subagent of the migration chat: VS Code Local subagents inherit the parent's instructions, including `.github/copilot-instructions.md` with the kit's managed block. Delete `/tmp/bakeoff-b` afterwards and record the deletion in the report.
 
 ## Common stops
 

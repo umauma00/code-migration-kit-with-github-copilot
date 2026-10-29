@@ -188,8 +188,9 @@ export async function doctor(root, config, { checkCLI = false, command = 'copilo
       checks.push({ check: 'worker agents resolve', ...agents });
       if (agents.ok) {
         const hook = await probeReviewerHook(command, [], { cwd: root, layout, signal, timeoutMs });
-        // Blocked loopback fails this check for the sandbox's reason, not the CLI's.
-        const loopback = !hook.ok && sandbox.blocked.some(b => b.access === 'loopback');
+        // Refused loopback fails this check for the sandbox's reason, not the CLI's
+        // (a slow connect on a loaded machine is not attributed).
+        const loopback = !hook.ok && sandbox.blocked.some(b => b.access === 'loopback' && b.error !== 'timed out');
         checks.push({ check: 'tool-assisted reviewer hook loads in prompt mode', ...hook,
           ...(loopback ? { cause: 'local-sandbox', detail: `Loopback is blocked in this session (see "${sandboxCheck(sandbox).check}"), so this check cannot run; it says nothing about the CLI. ${hook.detail ?? ''}`.trim() } : {}),
           note: 'Live check with a loopback model provider: no account, network or AI usage. It proves the hook keeps tool-assisted reviewers out of migration/runs.' });

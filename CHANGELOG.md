@@ -1,6 +1,17 @@
 # 0.24.0 — 2026-10-29
 
-A local sandbox no longer stops a run at phase 03 without warning. With
+Phase 03 comparison B can write with GPT models that edit through
+`apply_patch`, and a local sandbox no longer stops a run at phase 03 without
+warning.
+
+- Comparison B's command (03 prompt and checklist) adds `apply_patch` to
+  `--available-tools`. On CLI 1.0.105, gpt-6-luna has no `create`/`edit` tool
+  and writes only through `apply_patch` (`grep` maps to its `rg` by itself), so
+  B got read-only tools and wrote nothing. Checked with a loopback model
+  provider: with the new list both gpt-4.1 (`create`) and gpt-6-luna
+  (`apply_patch`) write. Worker roles are unaffected (read tools only).
+
+The sandbox part: With
 sandboxing on (VS Code, Copilot CLI or the Copilot app), comparison B and the
 pilot cannot write outside the repository and doctor's reviewer-hook check
 cannot use loopback; the run found out only at phase 03 and asked then, and

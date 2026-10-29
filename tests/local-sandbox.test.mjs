@@ -25,13 +25,13 @@ function blockedDir(t) {
   return path.join(dir, 'file', 'below');
 }
 
-test('the probe passes where commands may write the temporary directory and use loopback, and leaves nothing behind', async () => {
-  const before = new Set(fs.readdirSync(os.tmpdir()).filter(n => n.startsWith('migration-kit-sandbox-')));
-  const probe = await localSandboxProbe();
+test('the probe passes where commands may write the temporary directory and use loopback, and leaves nothing behind', async t => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sandbox-own-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const probe = await localSandboxProbe({ dirs: [dir] });
   assert.deepEqual(probe, { ok: true, blocked: [] });
   assert.ok(outsideDirs().includes(path.resolve(os.tmpdir())));
-  const after = fs.readdirSync(os.tmpdir()).filter(n => n.startsWith('migration-kit-sandbox-') && !before.has(n));
-  assert.deepEqual(after, [], 'the probe directory is removed');
+  assert.deepEqual(fs.readdirSync(dir), [], 'the probe directory is removed');
   assert.deepEqual(sandboxCheck(probe), { check: sandboxCheckName, ok: true });
 });
 
@@ -59,8 +59,11 @@ test('the setup question names what is blocked, recommends /sandbox off and neve
   assert.match(ja.choices[0].label, /推奨/);
   assert.match(ja.question, /AI は変えません/);
   assert.match(en.choices[0].label, /recommended/);
-  // Only the parts that are blocked are named.
-  assert.doesNotMatch(sandboxQuestion({ ok: false, blocked: [probe.blocked[1]] }, 'ja').question, /書き込み/);
+  // Only the parts that are blocked are named, in the question and the allow choice.
+  const loopbackOnly = { ok: false, blocked: [probe.blocked[1]] };
+  assert.doesNotMatch(sandboxQuestion(loopbackOnly, 'ja').question, /書き込み/);
+  assert.doesNotMatch(sandboxQuestion(loopbackOnly, 'ja').choices[1].label, /フォルダ/);
+  assert.doesNotMatch(sandboxQuestion(loopbackOnly, 'en').choices[1].label, /folders/);
 });
 
 test('doctor reports a sandboxed session as a failed check with sandbox guidance, without --check-cli', async t => {
