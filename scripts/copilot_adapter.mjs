@@ -181,7 +181,7 @@ const loopbackEnv = (home, port, model) => ({ COPILOT_HOME: home, COPILOT_OFFLIN
 // repository, limited to file tools. Only the file tools this model actually
 // has are listed, and at least one must write.
 export const fileReadTools = ['view', 'glob', 'grep', 'rg'], fileWriteTools = ['create', 'edit', 'apply_patch'];
-const fallbackBTools = ['view', 'create', 'edit', 'apply_patch', 'glob', 'grep'];
+const fallbackBTools = ['view', 'create', 'edit', 'apply_patch', 'glob', 'grep', 'rg'];
 export const stressBFlags = ['--no-custom-instructions', '--disable-builtin-mcps', '-s'];
 export async function stressBTools(command = 'copilot', model, { signal, timeoutMs = 0 } = {}) {
   const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'migration-kit-b-probe-'));

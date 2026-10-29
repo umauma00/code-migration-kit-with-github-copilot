@@ -54,7 +54,7 @@ test('comparison B gets the file tools the model really has, and at least one th
 test('a CLI that makes no loopback request leaves the tools unverified and still gives a command, never a stop', async t => {
   const found = await stressBTools(fakeCli(tmp(t)), 'no-request');
   assert.equal(found.verified, false);
-  assert.deepEqual(found.tools, ['view', 'create', 'edit', 'apply_patch', 'glob', 'grep']);
+  assert.deepEqual(found.tools, ['view', 'create', 'edit', 'apply_patch', 'glob', 'grep', 'rg']);
   assert.match(found.detail, /no model request/);
 });
 
