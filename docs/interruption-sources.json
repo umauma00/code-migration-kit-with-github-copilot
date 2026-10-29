@@ -2812,7 +2812,7 @@
     },
     {
       "path": "lib/survey.mjs",
-      "sha256": "677d582514eddba06b97e41dfafbe9da7377cd2d424d5120ea43b92c7a0af9e7",
+      "sha256": "01bc416f7f5e08b7cda423cd9c1072798e46749aecc339e41d514daaeb68116c",
       "entries": [
         {
           "line": 21,
@@ -2915,94 +2915,89 @@
           "code": "const parts = surveyRequests(kind, request, config.maxReviewInputBytes ?? 65536), finished = [];"
         },
         {
-          "line": 376,
+          "line": 378,
           "kind": "error-or-exit-candidate",
           "code": "if (signal?.aborted) throw new Error('Interrupted');"
         },
         {
-          "line": 377,
+          "line": 379,
           "kind": "error-or-exit-candidate",
           "code": "if (systemic) throw systemic;"
         },
         {
-          "line": 378,
+          "line": 380,
           "kind": "error-or-exit-candidate",
           "code": "if (reservations >= limits.calls) throw new Error('Agent call limit reached; resume with a new run after reviewing usage');"
         },
         {
-          "line": 382,
+          "line": 384,
           "kind": "error-or-exit-candidate",
           "code": "if (Buffer.byteLength(pending.input.text) > (config.maxReviewInputBytes ?? 65536)) {"
         },
         {
-          "line": 386,
+          "line": 388,
           "kind": "error-or-exit-candidate",
           "code": "if (Buffer.byteLength(pending.input.text) > (config.maxReviewInputBytes ?? 65536)) throw new Error('Survey metadata exceeds maxReviewInputBytes during correction');"
         },
         {
-          "line": 399,
+          "line": 401,
           "kind": "error-or-exit-candidate",
           "code": "if (result?.schemaVersion !== 1 || result.kind !== 'survey' || result.survey !== kind || result.target !== unit.target) throw new Error('Invalid survey result: schemaVersion/kind/survey/target mismatch');"
         },
         {
-          "line": 406,
+          "line": 408,
           "kind": "error-or-exit-candidate",
           "code": "if (!response && e.code !== 'SURVEY_VALIDATION') throw e;"
         },
         {
-          "line": 421,
+          "line": 423,
           "kind": "error-or-exit-candidate",
           "code": "if (!repaired && reservations < limits.calls && !signal?.aborted) {"
         },
         {
-          "line": 424,
+          "line": 426,
           "kind": "error-or-exit-candidate",
           "code": "if (signal?.aborted) throw e;"
         },
         {
-          "line": 427,
+          "line": 429,
           "kind": "error-or-exit-candidate",
           "code": "if (!repaired) throw new Error(`Agent call limit reached (${limits.calls}) before the survey correction; validated rows are kept. Resume with a larger --max-calls`);"
         },
         {
-          "line": 450,
+          "line": 452,
           "kind": "error-or-exit-candidate",
           "code": "if (e.code === 'SURVEY_VALIDATION') throw e;"
         },
         {
-          "line": 451,
+          "line": 453,
           "kind": "error-or-exit-candidate",
           "code": "if (isSystemicFailure(e)) { systemic ??= e; throw e; }"
         },
         {
-          "line": 452,
+          "line": 454,
           "kind": "error-or-exit-candidate",
           "code": "if (!isTransientFailure(e) || retry >= limits.retries || signal?.aborted) throw e;"
         },
         {
-          "line": 458,
+          "line": 460,
           "kind": "error-or-exit-candidate",
           "code": "if (wait !== null) await sleep(wait, undefined, { signal }).catch(() => { throw new Error('Interrupted'); });"
         },
         {
-          "line": 465,
+          "line": 467,
           "kind": "error-or-exit-candidate",
           "code": "if (signal?.aborted || systemic) throw new Error(signal?.aborted ? 'Interrupted' : systemic.message);"
         },
         {
-          "line": 475,
+          "line": 477,
           "kind": "error-or-exit-candidate",
           "code": "if (failures.length) throw failures.find(e => e === systemic) ?? failures.find(e => e.message !== 'Interrupted') ?? failures[0];"
         },
         {
-          "line": 480,
+          "line": 482,
           "kind": "error-or-exit-candidate",
           "code": "if (surveyInput(root, config, kind, scope, { sitesFile }).hash !== input.hash) throw new Error('Survey scope inputs changed during the worker call');"
-        },
-        {
-          "line": 501,
-          "kind": "loop-exit-candidate",
-          "code": "if (signal?.aborted || systemic) break;"
         },
         {
           "line": 503,
@@ -3010,22 +3005,27 @@
           "code": "if (signal?.aborted || systemic) break;"
         },
         {
-          "line": 509,
+          "line": 505,
+          "kind": "loop-exit-candidate",
+          "code": "if (signal?.aborted || systemic) break;"
+        },
+        {
+          "line": 511,
           "kind": "error-or-exit-candidate",
           "code": "const report = { runId, kind, executionMode: config.executionMode ?? 'continuous', ...(ignoredLimits(config).length ? { ignoredLimits: ignoredLimits(config) } : {}), startedAt, finishedAt: stamp(), agentCalls: calls, completed, done: status.done, total: status.total,"
         },
         {
-          "line": 522,
+          "line": 524,
           "kind": "error-or-exit-candidate",
           "code": "throw Object.assign(new Error(`Survey stopped: ${message || 'Interrupted'}`), { report });"
         },
         {
-          "line": 532,
+          "line": 534,
           "kind": "error-or-exit-candidate",
           "code": "if (plan.skipped.length) throw new Error(`Survey incomplete: ${plan.skipped.length} source files could not be read or found (${plan.skipped.slice(0, 5).map(s => s.file).join(', ')}); inspect skipped reasons, correct the census paths or source roots and resume. Completed scopes are preserved.`);"
         },
         {
-          "line": 535,
+          "line": 537,
           "kind": "error-or-exit-candidate",
           "code": "if (missing.length) throw new Error(`Survey incomplete: ${missing.length} of ${plan.scopes.length} scopes have no current result (${missing.slice(0, 10).join(', ')}); resume survey run --kind ${kind}`);"
         }

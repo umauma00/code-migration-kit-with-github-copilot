@@ -52,7 +52,7 @@ test('concurrency 1 still runs one call at a time', async t => {
 });
 
 test('a transient failure waits outside its slot and other parts keep going', async t => {
-  const f = fixture(t, { concurrency: 2 });
+  const f = fixture(t, { concurrency: 2, sites: 1200 });
   f.config.transientRetryDelayMs = 50;
   let failed = false, duringWait = 0, waiting = false;
   const report = await runSurvey(f.root, f.config, 'inventory', async args => {
@@ -137,4 +137,18 @@ test('review of 55e38d5: a failed scope reports the systemic failure, not the lo
     return answer(args);
   }, { sitesFile }).catch(e => e);
   assert.match(error.message, /authentication required/);
+});
+
+test('review (Sonnet): progress lists every running part and clears it when they finish', async t => {
+  const f = fixture(t, { concurrency: 3, sites: 1200 });
+  const seen = new Set();
+  const report = await runSurvey(f.root, f.config, 'inventory', async args => {
+    await sleep(20);
+    const progress = JSON.parse(fs.readFileSync(safePath(f.root, `migration/surveys/inventory/runs/${args.runId}.progress.json`), 'utf8'));
+    seen.add(String(Object.values(progress.parts)[0].activePart));
+    return answer(args);
+  }, { sitesFile });
+  assert.ok([...seen].some(v => v.includes(', ')), `several running parts are listed (${[...seen].join(' | ')})`);
+  const final = readJSON(safePath(f.root, `migration/surveys/inventory/runs/${report.runId}.progress.json`));
+  assert.equal(Object.values(final.parts)[0].activePart, undefined);
 });
