@@ -21,11 +21,15 @@ export function decide(event, role, cwd) {
     // repository or another worker's records and receipts.
     // view names one path; grep/rg and glob name `paths` (a string or an
     // array; CLI 1.0.105), and leaving it out searches the whole directory.
-    const named = args?.path ?? args?.file_path ?? args?.paths;
-    const targets = Array.isArray(named) ? named : [named];
-    if (!targets.length || targets.some(t => typeof t !== 'string' || !t.trim())) return 'Tool-assisted reviewers must name a listed file or directory';
-    // A glob pattern is relative to those paths: it must not climb out of them.
-    if (typeof args?.pattern === 'string' && /^glob$/i.test(name) && (path.isAbsolute(args.pattern) || /^[\\/]|(^|[\\/])\.\.([\\/]|$)/.test(args.pattern))) return `Tool-assisted reviewers may not search ${args.pattern}; use only the listed evidence files`;
+    // Every target key present is checked, so one key cannot hide another.
+    const present = ['path', 'file_path', 'paths'].filter(key => args?.[key] !== undefined);
+    const targets = present.flatMap(key => Array.isArray(args[key]) ? args[key] : [args[key]]);
+    // An empty list may mean the default, the whole directory.
+    if (!targets.length || present.some(key => Array.isArray(args[key]) && !args[key].length) || targets.some(t => typeof t !== 'string' || !t.trim())) return 'Tool-assisted reviewers must name a listed file or directory';
+    // A glob pattern is relative to those paths and must stay inside them: no
+    // "..", no absolute or drive-letter start, also inside {a,b} alternatives.
+    if (/^glob$/i.test(name) && args?.pattern !== undefined && (typeof args.pattern !== 'string' || args.pattern.includes('..') || /(^|[{,])\s*([\\/~]|[A-Za-z]:)/.test(args.pattern)))
+      return `Tool-assisted reviewers may not search ${String(args.pattern)}; use only the listed evidence files`;
     const base = path.resolve(event.cwd ?? cwd ?? process.cwd());
     // Resolve links (a listed path must not alias a record directory) and compare
     // case-insensitively: macOS and Windows treat Migration/Runs as migration/runs.
@@ -33,13 +37,14 @@ export function decide(event, role, cwd) {
     const real = p => {
       const rest = [];
       for (let dir = path.resolve(p); ; dir = path.dirname(dir)) {
-        try { return path.join(fs.realpathSync(dir), ...rest.reverse()); }
+        try { return path.join(fs.realpathSync.native(dir), ...rest.reverse()); }
         catch { if (path.dirname(dir) === dir) return path.resolve(p); rest.push(path.basename(dir)); }
       }
     };
     const records = /^migration\/(runs|state|results|gates|phases|pilots?)(\/|$)/i;
     for (const target of targets) {
-      const relative = path.relative(real(base), real(path.resolve(base, target))).split(path.sep).join('/');
+      // Windows ignores trailing dots and spaces in a name (migration/runs.).
+      const relative = path.relative(real(base), real(path.resolve(base, target))).split(path.sep).map(part => process.platform === 'win32' ? part.replace(/[. ]+$/, '') || part : part).join('/');
       if (!relative || /^migration$/i.test(relative) || relative.split('/')[0] === '..' || path.isAbsolute(relative) || records.test(relative)) return `Tool-assisted reviewers may not read ${target}; use only the listed evidence files`;
     }
   }

@@ -57,6 +57,11 @@ test('hook: agents cannot write guardrails.json; approvals and phase records ask
   assert.equal(write('apply_patch', `*** Begin Patch\n*** Add File: ${path.join(root, 'migration/guardrails.json')}\n+{}\n*** End Patch\n`).decision, 'deny');
   assert.equal(write('apply_patch', '*** Begin Patch\n*** Add File: migration/notes.md\n+mentions migration/guardrails.json only\n*** End Patch\n'), null, 'other files stay writable');
   assert.equal(write('bash', 'not json').decision, 'deny', 'a shell call with unreadable arguments is still denied');
+  assert.equal(write('bash', JSON.stringify('rm migration/guardrails.json')).decision, 'deny', 'a JSON-quoted shell string is not an object');
+  assert.equal(write('apply_patch', JSON.stringify('*** Begin Patch\n*** Add File: migration/guardrails.json\n+{}\n*** End Patch\n')).decision, 'deny', 'a JSON-quoted patch');
+  assert.equal(write('apply_patch', '*** Begin Patch\n*** Update File: README.md\n*** Move to: migration/guardrails.json\n@@\n-a\n+b\n*** End Patch\n').decision, 'deny', 'a move destination');
+  assert.equal(write('apply_patch', '*** Begin Patch\n  *** Add File: migration/guardrails.json\n+{}\n*** End Patch\n').decision, 'deny', 'an indented header');
+  if (['win32', 'darwin'].includes(process.platform)) assert.equal(write('apply_patch', '*** Begin Patch\n*** Add File: Migration/Guardrails.json\n+{}\n*** End Patch\n').decision, 'deny', 'another case on a case-insensitive file system');
   assert.equal(write('create', { path: 'migration/notes.md', file_text: 'mentions migration/guardrails.json only' }), null, 'text mentions are fine');
   assert.equal(humanGate('node x/run_migration.mjs approve smoke --note ok'), 'approve smoke');
   const ask = decisionOutput({ decision: 'ask', reason: 'confirm' });

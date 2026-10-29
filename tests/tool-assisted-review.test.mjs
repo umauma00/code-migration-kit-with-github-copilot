@@ -52,7 +52,12 @@ test('tool-assisted reviewers can search listed paths with grep, rg and glob, an
     assert.match(call(tool, { pattern: 'x', paths: [] }), /must name/, tool);
     assert.match(call(tool, { pattern: 'x' }), /must name/, tool);
   }
-  for (const pattern of ['../migration/runs/**', '/repo/migration/runs/*', 'a/../../x', '..\\runs\\*'])
-    assert.match(call('glob', { pattern, paths: 'src' }), /may not search/, pattern);
+  for (const pattern of ['../migration/runs/**', '/repo/migration/runs/*', 'a/../../x', '..\\runs\\*', '{..,.}/migration/runs/*', '{/repo,src}/migration/runs/*', 'C:..\\migration\\runs\\*', '~/x', ['../migration/runs/**']])
+    assert.match(call('glob', { pattern, paths: 'src' }), /may not search/, String(pattern));
+  // One key cannot hide another.
+  assert.match(call('grep', { pattern: 'x', path: 'src', paths: ['migration/runs'] }), /may not read migration\/runs/);
+  assert.match(call('grep', { pattern: 'x', file_path: 'src', paths: ['migration/runs'] }), /may not read migration\/runs/);
+  assert.match(call('grep', { pattern: 'x', path: 'src', paths: [] }), /may not read|must name/);
+  assert.equal(call('grep', { pattern: 'x', path: 'src', paths: ['lib'] }), null);
   assert.equal(call('glob', { pattern: '**/*.py', paths: 'src' }), null);
 });

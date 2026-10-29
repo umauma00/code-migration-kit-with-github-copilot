@@ -14,10 +14,16 @@ warning.
   from `apply_patch` too. CLI 1.0.105 sends its input as the bare patch text,
   not JSON; the hook skipped such a call, so a gpt-6-luna session could write
   the guardrails file directly (reproduced with the real CLI, now denied).
+  JSON-quoted strings, `*** Move to:` destinations, indented headers and
+  (on macOS) another letter case are checked too.
 - Tool-assisted reviewers can search again. On CLI 1.0.105, `grep`/`rg` and
   `glob` name their targets `paths` (a string or an array) for every model,
   so the hook found no path and denied every search. It now checks each of
-  `paths` like `view`'s path, and denies a glob pattern that climbs out of them.
+  `paths` like `view`'s path (every target key present, an empty list denied)
+  and denies a glob pattern with `..`, an absolute or drive-letter start (also
+  inside `{a,b}`) or a non-string value. Paths resolve with the native
+  realpath, and Windows trailing dots are ignored. Symlinks reached inside a
+  glob's own traversal are not resolved by the hook.
 
 The sandbox part: With
 sandboxing on (VS Code, Copilot CLI or the Copilot app), comparison B and the

@@ -1005,7 +1005,7 @@
     },
     {
       "path": "lib/guardrails.mjs",
-      "sha256": "156882ea3e71baec50bff72d144ec33f4760db926cf8482a371e9a0a8b44916b",
+      "sha256": "9e8ef50c5264dd57240e6af2bc6593f785bfdef416730bc8dd9cf8bf9c33fcda",
       "entries": [
         {
           "line": 46,
@@ -2666,7 +2666,7 @@
     },
     {
       "path": "lib/sandbox.mjs",
-      "sha256": "972aca7b4bddd90f99c86d14da17bce73d1a931c03394d8abccf3c472ddfca77",
+      "sha256": "647d90deebe419d691d318b8881206044071e0139427785affdc16ac636504c0",
       "entries": [
         {
           "line": 32,
@@ -2686,7 +2686,7 @@
         {
           "line": 61,
           "kind": "deadline-or-observation",
-          "code": "// A connect slower than the timeout is a loaded machine, not a refusal."
+          "code": "// No answer within the timeout counts too: a sandbox may drop the packets."
         },
         {
           "line": 62,
@@ -4301,10 +4301,10 @@
     },
     {
       "path": "scripts/migration_hook.mjs",
-      "sha256": "dd0385b24c9ca1aaef0bfdd9d8fc2d7d6123eeae5ccdb1c9881c399b2b64d697",
+      "sha256": "9ac52783121894dde5ae132c2ce039736e374336f79ff2e05057c763488f8ba4",
       "entries": [
         {
-          "line": 65,
+          "line": 70,
           "kind": "error-or-exit-candidate",
           "code": "} catch (e) { console.error(`Migration hook: ${e.message}`); process.exitCode = 2; }"
         }
