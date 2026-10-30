@@ -56,7 +56,10 @@ approval. Check rule adherence, read-only tools, JSON output, models and repair
 behavior. Do not mix disposable receipts with production receipts.
 
 Use the formal [pilot grant](../docs/PILOT.md): after current 00–02 and judge,
-`pilot prepare --target NEW_EXTERNAL_DIR --sources CSV --through STAGE --note TEXT`,
+run the read-only `pilot plan --sources CSV --through STAGE` and ask for permission
+once with its final file count (chosen files plus the files they use) and its
+`plain` sentence, then
+`pilot prepare --expect-total TOTAL --target NEW_EXTERNAL_DIR --sources CSV --through STAGE --note TEXT`,
 then `pilot run --root NEW_EXTERNAL_DIR` in a background terminal, never piped or
 redirected, checked with `status --root NEW_EXTERNAL_DIR --wait 600` like every
 long runner command. Obtain explicit authorization for that

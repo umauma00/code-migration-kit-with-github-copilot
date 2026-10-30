@@ -134,6 +134,32 @@ nothing, report the pending question, and ask the person to continue in an
 interactive session or to answer in chat. A nonblocking question stays pending;
 only independent work may continue while waiting for a required answer.
 
+### Write every question for someone who knows nothing about the kit
+
+Assume the person has never read the kit and does not know its commands, files,
+skills or terms. Every question (question tool or chat) follows this shape:
+
+1. **Situation:** one or two sentences in everyday words: what happened and why
+   a decision is needed now. No grant/target/manifest/receipt/gate/waiver/boundary
+   or similar kit words, no IDs, hashes, paths or command lines. Use the
+   [plain-words table](PLAIN-WORDS.md); when a term cannot be avoided, put the
+   everyday words first and the term in parentheses.
+2. **Choices:** each label says what will happen, as an action in everyday words
+   (「26 ファイルで試運転する」, never the kit's name for the step).
+3. **For each choice:** what happens, the good point, the bad point (time, AI
+   usage, whether it can be undone, what stays changed) in one or two lines.
+4. **Recommendation:** exactly one, first, labelled `（推奨）` / `(recommended)`,
+   with the reason in the person's terms. Pausing is always offered, last.
+5. **Reply example:** in everyday words too (「26 ファイルで進めて」).
+
+Phase numbers and the model-change answer format (`role=ID:EFFORT`) stay as they
+are. Commands are for you to run: never ask the person to run, read or choose
+between command lines. Only an act the person must do themselves in the host
+(for example typing `/sandbox off` in that session) names the exact text, says
+where to type it and what it changes. Before asking, check whether the question
+is needed at all: show final numbers before an approval (for example `pilot plan`
+before `pilot prepare`) so one question covers the whole act.
+
 ## Finish every phase with a report
 
 Before a question tool call, publish a concise report in chat containing:
@@ -278,8 +304,9 @@ actually observed, then report:
 4. **Choices:** at least two options plus pausing. Mark exactly one
    **recommended**, put it first, and give the reason for every option: why it
    fixes the cause, what it costs or changes (for example "changes config, so
-   approvals restart"), and when another option is better. Include the
-   command each option runs, if any.
+   approvals restart"), and when another option is better. Keep the command
+   each option runs for yourself (`guidance --format json` returns it as
+   `command`); do not show command lines to the person.
 5. **Question:** ask with the question tool, recommended option first and
    labelled `（推奨）` / `(recommended)`; `guidance --format json` returns these
    labels as `choices`. Without a question tool, show the same

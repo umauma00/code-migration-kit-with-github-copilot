@@ -1,3 +1,33 @@
+# 0.27.0 — 2026-10-30
+
+Questions are written for someone who knows nothing about the kit. In phase 03
+a pilot approved for 4 files grew to 26 when `pilot prepare` added the files
+they use, and the host asked a second question in kit terms ("translation-only
+pilot", "revoke the grant and clean up the target") that the person could not
+answer.
+
+- `pilot plan --sources CSV [--through STAGE]` shows a pilot's final scope
+  without writing anything: the chosen files, the files they use and the total
+  (`counts`), with a plain sentence for the approval question. Phase 03 runs it
+  first and asks once with the final count, so `pilot prepare` matches what the
+  person approved and needs no second question. Plan applies the same checks
+  as prepare, and `pilot prepare --expect-total N` refuses a scope that no
+  longer matches the approved count.
+- docs/PHASE-HANDOFF.md states how every question is written: the situation in
+  everyday words, each choice as what will happen with its good and bad points
+  (time, AI usage, whether it can be undone), one recommendation first with its
+  reason, pause last, and no kit terms, IDs, paths or command lines. The skill
+  and the orchestrator agents point to it. Phase numbers and the model-change
+  answer format stay as they are.
+- docs/PLAIN-WORDS.md lists everyday words for kit terms (pilot, grant, target,
+  judge, manifest, receipt, waive, guardrails and others).
+- The Japanese choice labels of the failure guidance (about 55) and the local
+  sandbox question no longer use kit terms or commands. The command each option
+  runs stays in its own field for the agent; the guidance text marks it as not
+  for the person. A new test (tests/plain-questions.test.mjs) checks the labels,
+  the sandbox question, the pilot plan sentence and the Japanese examples in
+  docs/PHASE-HANDOFF.md.
+
 # 0.26.0 — 2026-10-29
 
 A phase recorded earlier that goes out of date now says why. A pilot fix

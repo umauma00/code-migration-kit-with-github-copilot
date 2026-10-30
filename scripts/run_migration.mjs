@@ -9,7 +9,7 @@ import { strictPhases, phaseRecorded } from '../lib/phases.mjs';
 import { validateWorkerProfile, assistedReviewerRoles } from '../lib/review.mjs';
 import { runProcess } from '../lib/process.mjs';
 import { approve, runStage, translate, runPilot, runJudgePreparation } from '../lib/pipeline.mjs';
-import { preparePilot } from '../lib/pilot.mjs';
+import { preparePilot, planPilot } from '../lib/pilot.mjs';
 import { createCopilotAdapter, requiredCopilotFlags, copilotEnv, copilotArgs, probeWorkerAgents, probeReviewerHook, probeModelTools, stressBTools, stressBCommand, fileReadTools, fileLimits, fileLimitMinimum } from './copilot_adapter.mjs';
 import { runtimeLayout, pluginRoot } from '../lib/runtime.mjs';
 import { migrationStatus, statusMarkdown, statusTodo, statusChecklist } from '../lib/status.mjs';
@@ -77,7 +77,9 @@ export const usage = `Usage: node migration-kit/scripts/run_migration.mjs COMMAN
                               explicit AI call budget, agreed with the person (normal default: continuous)
   stress-b command --dir DIR [--model ID]
                               Phase 03 comparison B: the exact isolated copilot -p command, with the model's own file tools
-  pilot prepare --target NEW_DIR --sources src/a,src/b --note TEXT [--through translation|build|smoke|parity]
+  pilot plan --sources src/a,src/b [--through STAGE]
+                              Read-only: the files a pilot would cover (chosen + the files they use), to show before asking
+  pilot prepare --target NEW_DIR --sources src/a,src/b --note TEXT [--through translation|build|smoke|parity] [--expect-total N]
   pilot run --root PILOT_DIR  Run only the explicitly authorized, isolated pilot
   repair --target PATH --evidence migration/PATH | repair --queue migration/QUEUE.json [--max-calls N]
   diagnose [--stage build|smoke|parity]
@@ -407,7 +409,8 @@ export async function main(argv = process.argv.slice(2)) {
       if (args._[1] !== 'command') throw new Error('Use stress-b command --dir DIR [--model ID]');
       result = await stressB(root, config, { dir: args.dir, model: args.model, command: args.copilot, signal: controller.signal });
     }
-    else if (cmd === 'pilot' && args._[1] === 'prepare') result = preparePilot(root, config, { target: args.target, sources: args.sources?.split(','), through: args.through, note: args.note });
+    else if (cmd === 'pilot' && args._[1] === 'plan') result = planPilot(root, config, { sources: args.sources?.split(','), through: args.through });
+    else if (cmd === 'pilot' && args._[1] === 'prepare') result = preparePilot(root, config, { target: args.target, sources: args.sources?.split(','), through: args.through, note: args.note, expectTotal: args['expect-total'] });
     else if (cmd === 'pilot' && args._[1] === 'run') {
       result = await runPilot(root, config, createCopilotAdapter({ command: args.copilot }), { signal: controller.signal, onProgress: event => console.error(progressLine(event)) });
     }
