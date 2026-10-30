@@ -6,7 +6,7 @@
 
 Kit files (lib) change, so existing approvals and completion records expire once. Record them again as `phase next` shows in `stale`.
 
-1. A worker whose Copilot CLI ends with "Session host did not acknowledge 'assistant.reasoning' delivery within …" is retried instead of blocked (continuous mode: up to 5 times per call; bounded mode: `transientRetries`, default 2). No setting that lengthens the 120 s wait was found in CLI 1.0.105 or the kit.
+1. A worker whose Copilot CLI ends with "Session host did not acknowledge 'assistant.reasoning' delivery within …" is retried instead of blocked (continuous mode: up to 5 times per call; bounded mode: the lower of `transientRetries`, default 2, and 5). No setting that lengthens the 120 s wait was found in CLI 1.0.105 or the kit.
 2. A file that still does not pass stays unfinished: run the same command again, or try a lower `concurrency`. That change keeps approvals.
 3. In a copy install, replace all of `migration-kit/` with the temporary install's. The plugin needs only an update.
 
