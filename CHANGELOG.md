@@ -1,3 +1,26 @@
+# 0.29.0 — 2026-10-30
+
+In the same phase 03 pilot, one file's implementer stalled the Copilot CLI on
+every attempt (the 120 s "Session host did not acknowledge" wait, once at
+`tool.execution_start`). The implementer and fixer were told to read the
+rulebook, the inventory and the dependencies with their own tools, so they
+searched and opened large files themselves (a project's inventory can be over
+1.5 MB).
+
+- The runner now hands the implementer and the fixer the same evidence the
+  reviewers get: the rulebook, design inputs, this unit's inventory rows, the
+  source and the sources it depends on (decoded when legacy-encoded), and for
+  the fixer its candidate. When it fits `maxReviewInputBytes` they run without
+  file tools (`--deny-tool read,write,shell`).
+- Over the limit they get the hash-bound file list and the inventory rows, keep
+  read-only tools and are told to read only the listed files and never view
+  the whole inventory or any record.
+- Each call is smaller and the same for every attempt. The cause was not
+  confirmed from the stalled session's log (the person could not run scripts
+  on that computer); 0.28.0's retry stays as the safety net.
+- tests/implementer-evidence-2026-10-30.test.mjs covers the evidence for both
+  roles, both prompts and the CLI tool flags.
+
 # 0.28.0 — 2026-10-30
 
 A phase 03 pilot stayed at 0 of 26 files for over an hour: workers ended with

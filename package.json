@@ -1,6 +1,6 @@
 {
   "name": "code-migration-kit-with-copilot",
-  "version": "0.28.0",
+  "version": "0.29.0",
   "private": true,
   "type": "module",
   "description": "A Copilot CLI adaptation of Anthropic's code migration reference kit",

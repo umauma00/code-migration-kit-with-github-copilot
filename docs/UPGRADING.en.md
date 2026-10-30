@@ -1,6 +1,14 @@
-# Upgrading (0.28.0 and earlier releases)
+# Upgrading (0.29.0 and earlier releases)
 
 [日本語](UPGRADING.md) | English
+
+## 0.29.0 (the runner hands the implementer its evidence)
+
+Kit files (lib, scripts) change, so existing approvals and completion records expire once. Record them again as `phase next` shows in `stale`.
+
+1. The implementer and fixer receive the rulebook, this unit's inventory rows, the source and its dependencies from the runner. Within the limit they run without file tools; over it they read only the listed files. They no longer open the whole inventory.
+2. No setting changes. The limit is still `maxReviewInputBytes`.
+3. In a copy install, replace all of `migration-kit/` with the temporary install's. The plugin needs only an update.
 
 ## 0.28.0 (no stop on the CLI's internal wait)
 

@@ -91,9 +91,13 @@ test('RR3: a non-UTF-8 source is decoded for workers, names its encoding and doe
   assert.ok(inputs.length);
   const file = JSON.parse(inputs.find(a => a.reviewInput).reviewInput).files.find(x => x.path === unit.source);
   assert.equal(file.encoding, 'windows-1252');
-  const implementer = inputs.find(a => a.role === 'implementer').extra.legacyEncodedSources;
-  assert.deepEqual(implementer.map(x => [x.path, x.encoding]), [[unit.source, 'windows-1252']]);
-  assert.match(implementer[0].content, /café/);
+  // The implementer gets the same frozen evidence, already decoded (0.29.0).
+  const implementer = inputs.find(a => a.role === 'implementer');
+  assert.equal(implementer.workMode, 'frozen');
+  assert.equal(implementer.extra.legacyEncodedSources, undefined);
+  const decoded = JSON.parse(implementer.workInput).files.find(x => x.path === unit.source);
+  assert.equal(decoded.encoding, 'windows-1252');
+  assert.match(decoded.content, /café/);
   assert.match(file.content, /value = 'café'/);
   assert.equal(done(f.root, unit, contextHash(f.root, f.config)), true);
   assert.equal(fs.readFileSync(safePath(f.root, unit.source)).includes(0xe9), true, 'the original bytes are untouched');
