@@ -15,7 +15,7 @@ Phase numbers (00 to 06) and the model-change answer format stay as they are.
 | through build / smoke / parity | 変換後のビルド／簡単な動作確認／新旧の動作比較まで | up to build / a quick run / comparing old and new |
 | revoke the grant, clean the target | 許可記録とコピー先フォルダーを消す | delete the permission record and the copy folder |
 | dependency expansion | 選んだファイルが使っているファイルも自動で加わる | files the chosen ones use are added automatically |
-| judge | 新旧を比べるテストの判定 | the old-versus-new test check |
+| judge | テストの準備の判定（元のコードを動かす方式では新旧の比較、動かさない方式では計画の確認） | the test check (comparing old and new when the original runs, checking the plan when it does not) |
 | manifest | 変換するファイルの一覧 | the list of files to translate |
 | inventory | 要注意箇所の一覧 | the list of tricky spots |
 | RULEBOOK | 変換ルール | the translation rules |
@@ -25,9 +25,9 @@ Phase numbers (00 to 06) and the model-change answer format stay as they are.
 | waive | 見送って先へ進む（記録が残る） | skip and go on (recorded) |
 | guardrails | AI に実行させないコマンドの禁止リスト | the list of commands the AI must not run |
 | hook | キットの安全チェック | the kit's safety check |
-| source-as-spec | 元のコードだけを仕様として準備する方式（仕様書がない、または元のコードを動かせないとき） | prepare with the original code as the only specification (no specification, or the original cannot run) |
+| source-as-spec | 元のコードだけを仕様として準備する方式（仕様書がなく、元のコードも動かせないとき） | prepare with the original code as the only specification (no specification and the original cannot run) |
 | source-only | 元のコードを動かさない確認方式（新旧の動作比較はしない） | checking without running the original (no old-versus-new comparison) |
-| judge-plan.json | テストの計画ファイル（元のコードから読み取った期待する動き） | the test plan (behaviour expected from reading the original code) |
+| judge-plan.json | テストの計画ファイル（元のコードや仕様から読み取った期待する動き） | the test plan (behaviour expected from the original code or a specification) |
 | runtime mode | 元のコードを動かして新旧を比べる方式 | run the original and compare old and new |
 | concurrency | 同時に動かすAIの数 | how many AI workers run at once |
 | survey | 元のコードの調査 | the survey of the original code |

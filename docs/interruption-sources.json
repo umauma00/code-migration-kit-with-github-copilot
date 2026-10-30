@@ -1132,7 +1132,7 @@
     },
     {
       "path": "lib/guidance.mjs",
-      "sha256": "4b8ec612efc6b79d28bfcad7d49657041b4c1925110e4a8ea34d3cdbd26654d9",
+      "sha256": "f7bea77ecc113e6fee7b3705b9047983e91686f6703a5396a4eff2ffe70366d7",
       "entries": [
         {
           "line": 73,
@@ -1502,7 +1502,7 @@
     },
     {
       "path": "lib/pilot.mjs",
-      "sha256": "21a81714a4066d321a4e3592a22985ff0cbf27f517acb6da8a39fc7e4363f685",
+      "sha256": "f5a1c9f2f0bd3e25a93b37fac37e6d5655d58511d1e721ad5c63c1a6d28f343c",
       "entries": [
         {
           "line": 23,

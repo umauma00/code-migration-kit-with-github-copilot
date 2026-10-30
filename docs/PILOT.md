@@ -15,7 +15,7 @@ node migration-kit/scripts/run_migration.mjs pilot plan --root . \
 node migration-kit/scripts/run_migration.mjs pilot prepare --root . \
   --target /absolute/path/outside-project/new-pilot \
   --sources src/high-risk.py,src/boundary.py --through parity --expect-total 5 \
-  --note "User authorizes this disposable scope through parity; no production translation"
+  --note "User authorizes these 5 files (2 chosen + 3 they use) through parity; no production translation"
 node migration-kit/scripts/run_migration.mjs pilot run --root /absolute/path/outside-project/new-pilot
 ```
 
