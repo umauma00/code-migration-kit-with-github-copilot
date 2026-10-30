@@ -119,7 +119,7 @@ export async function modelToolChecks(root, config, layout, { command, signal, t
     if (typeof model !== 'string' || unsetModels(config).includes(base)) continue;
     const probe = await probeModelTools(command, copilotArgs(role, model, undefined, layout), { cwd: root, model, env: copilotEnv(role), signal, timeoutMs });
     // Unverified, never failed; a stalled probe means the next ones would stall too.
-    if (!probe.ok && stalled({ message: probe.detail })) { checks.push({ check: `model tools: ${role}`, ok: true, status: 'not-verified', stalled: true, model, detail: doctorStallDetail(`model tools: ${role}`, timeoutMs) }); return checks; }
+    if (!probe.ok && stalled({ message: probe.detail })) { checks.push({ check: `model tools: ${role}`, ok: true, status: 'not-verified', stalled: true, model, detail: doctorStallDetail(`model tools: ${role}`, timeoutMs), warning: doctorStallDetail(`model tools: ${role}`, timeoutMs) }); return checks; }
     if (!probe.ok) { checks.push({ check: `model tools: ${role}`, ok: true, status: 'not-verified', model, detail: probe.detail }); continue; }
     const missing = [['view'], ['grep', 'rg']].filter(any => !any.some(name => probe.tools.includes(name))).map(any => any.join('|'));
     checks.push({ check: `model tools: ${role}`, ok: missing.length === 0, model, tools: probe.tools.filter(name => fileReadTools.includes(name)), ...(missing.length ? { missing } : {}) });
@@ -128,7 +128,7 @@ export async function modelToolChecks(root, config, layout, { command, signal, t
   if (typeof model === 'string' && !unsetModels(config).includes('implementer')) {
     try {
       const found = await stressBTools(command, model, { signal, timeoutMs });
-      checks.push({ check: 'model tools: comparison B', ok: true, model, tools: found.tools, ...(found.verified ? {} : { status: 'not-verified', ...(stalled({ message: found.detail }) ? { stalled: true, detail: doctorStallDetail('model tools: comparison B', timeoutMs) } : { detail: found.detail }) }) });
+      checks.push({ check: 'model tools: comparison B', ok: true, model, tools: found.tools, ...(found.verified ? {} : { status: 'not-verified', ...(stalled({ message: found.detail }) ? { stalled: true, detail: doctorStallDetail('model tools: comparison B', timeoutMs), warning: doctorStallDetail('model tools: comparison B', timeoutMs) } : { detail: found.detail }) }) });
     } catch (e) { if (signal?.aborted) throw e; checks.push({ check: 'model tools: comparison B', ok: false, model, detail: e.message }); }
   }
   return checks;

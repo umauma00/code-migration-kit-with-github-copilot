@@ -66,8 +66,12 @@ test('a stalled loopback hook probe is reported with the doctor stall guidance a
 test('a stalled model-tools probe stays not-verified, is marked stalled and starts no other model-tools probe', async t => {
   const f = prepare(t, { executionMode: 'continuous' }), command = stallingCLI(f, 'model');
   const report = await doctor(f.root, f.config, { checkCLI: true, command, probeTimeoutMs: 5000 });
+  // The double cannot answer the hook probe's tool call, so that check fails without a stall and the model-tools probes still run.
+  const hook = report.checks.find(c => c.check === 'tool-assisted reviewer hook loads in prompt mode');
+  assert.equal(hook.ok, false); assert.equal(hook.stalled, undefined);
   const tools = report.checks.filter(c => c.check.startsWith('model tools: '));
   assert.equal(tools.length, 1);
+  assert.ok(report.warnings.some(w => /did not finish within 5 s/.test(w)), 'a stalled unverified check is still a warning');
   assert.equal(tools[0].ok, true); assert.equal(tools[0].status, 'not-verified'); assert.equal(tools[0].stalled, true);
   assert.match(tools[0].detail, /Doctor check "model tools: .*" did not finish within 5 s/);
   assert.equal(calls(f).filter(line => line.startsWith('model')).length, 1);
@@ -106,4 +110,5 @@ test('the doctor stall message gets its own guidance, not the bounded-deadline o
   const g = failureGuidance('Doctor check "Copilot CLI --help" did not finish within 180 s. The Copilot CLI got no answer.', { language: 'en' });
   assert.equal(g.id, 'doctor-stall'); assert.equal(g.recommended, 'check-network');
   assert.match(g.options[1].command, /doctor$/);
+  assert.equal(failureGuidance('Doctor check "x" did not finish within 1.5 s.').id, 'doctor-stall');
 });

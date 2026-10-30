@@ -1132,7 +1132,7 @@
     },
     {
       "path": "lib/guidance.mjs",
-      "sha256": "6a11def5d3ab55da16c22100fda7e3d92b51ec161df09a932bd447afb3707103",
+      "sha256": "cdc8c41362225f998ec0f74583f72e5bd21147515e98ea5f2c441dd192b24560",
       "entries": [
         {
           "line": 74,
@@ -4633,7 +4633,7 @@
     },
     {
       "path": "scripts/run_migration.mjs",
-      "sha256": "7715bcf4639590bd3132497e704214131690f548a4f199259b68c1f716d6316c",
+      "sha256": "7b49927204087868e0eac8a73fa08221956238899e806bf221398165a22de9f3",
       "entries": [
         {
           "line": 92,
@@ -4678,7 +4678,7 @@
         {
           "line": 122,
           "kind": "deadline-or-observation",
-          "code": "if (!probe.ok && stalled({ message: probe.detail })) { checks.push({ check: `model tools: ${role}`, ok: true, status: 'not-verified', stalled: true, model, detail: doctorStallDetail(`model tools: ${role}`, timeoutMs) }); return checks; }"
+          "code": "if (!probe.ok && stalled({ message: probe.detail })) { checks.push({ check: `model tools: ${role}`, ok: true, status: 'not-verified', stalled: true, model, detail: doctorStallDetail(`model tools: ${role}`, timeoutMs), warning: doctorStallDetail(`model tools: ${role}`, timeoutMs) }); return checks; }"
         },
         {
           "line": 130,
@@ -4688,7 +4688,7 @@
         {
           "line": 131,
           "kind": "deadline-or-observation",
-          "code": "checks.push({ check: 'model tools: comparison B', ok: true, model, tools: found.tools, ...(found.verified ? {} : { status: 'not-verified', ...(stalled({ message: found.detail }) ? { stalled: true, detail: doctorStallDetail('model tools: comparison B', timeoutMs) } : { detail: found.detail }) }) });"
+          "code": "checks.push({ check: 'model tools: comparison B', ok: true, model, tools: found.tools, ...(found.verified ? {} : { status: 'not-verified', ...(stalled({ message: found.detail }) ? { stalled: true, detail: doctorStallDetail('model tools: comparison B', timeoutMs), warning: doctorStallDetail('model tools: comparison B', timeoutMs) } : { detail: found.detail }) }) });"
         },
         {
           "line": 132,
