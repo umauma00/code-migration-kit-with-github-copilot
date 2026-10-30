@@ -13,7 +13,7 @@ import { prepare, result } from './helpers.mjs';
 import { approve, runStage, translate } from '../lib/pipeline.mjs';
 import { safePath, writeJSON, readJSON, atomicWrite } from '../lib/core.mjs';
 import { createCopilotAdapter } from '../scripts/copilot_adapter.mjs';
-import { isTransientFailure, isSystemicFailure, retryLimit, hostStallRetries } from '../lib/failures.mjs';
+import { isTransientFailure, isSystemicFailure, hostStallRetries } from '../lib/failures.mjs';
 import { failureGuidance } from '../lib/guidance.mjs';
 
 const stall = "Session host did not acknowledge 'assistant.reasoning' delivery within 120s";
@@ -36,16 +36,7 @@ test('the CLI host stall is a transient failure in the message, on stderr and as
   assert.equal(isTransientFailure(error('Copilot implementer failed (exit 1): client task cancellation delivery failed')), false);
 });
 
-test('stall retries are capped in every mode; other transient failures keep their limit', () => {
-  const stalled = error(`Copilot implementer failed (exit 1): ${stall}`), limited = error('Copilot implementer failed (exit 1): session.error rate_limit 429');
-  assert.equal(retryLimit(stalled, Infinity), hostStallRetries);
-  assert.equal(retryLimit(stalled, 2), 2);
-  assert.equal(retryLimit(limited, Infinity), Infinity);
-  // Surveys share the same limit.
-  assert.match(fs.readFileSync(new URL('../lib/survey.mjs', import.meta.url), 'utf8'), /retry >= retryLimit\(e, limits\.retries\)/);
-});
-
-async function stallFixture(t, failures, executionMode = 'bounded') {
+async function stallFixture(t, failures, executionMode = 'bounded', rateLimited = 0) {
   const f = prepare(t, { executionMode }); f.config.transientRetryDelayMs = 1;
   writeJSON(safePath(f.root, 'migration/config.json'), f.config);
   await runStage(f.root, f.config, 'judge');
@@ -57,7 +48,8 @@ if (process.argv.includes('--version')) { console.log('GitHub Copilot CLI 1.0.10
 for await (const _ of process.stdin);
 const role = process.env.MIGRATION_KIT_ROLE, n = fs.existsSync(${JSON.stringify(counter)}) ? Number(fs.readFileSync(${JSON.stringify(counter)}, 'utf8')) : 0;
 fs.writeFileSync(${JSON.stringify(counter)}, String(n + 1));
-if (n < ${failures}) { process.stderr.write(${JSON.stringify(`Error: ${stall}\n`)}); process.exit(1); }
+if (n < ${rateLimited}) { process.stderr.write('Error: 429 Rate limit exceeded\\n'); process.exit(1); }
+if (n < ${rateLimited} + ${failures}) { process.stderr.write(${JSON.stringify(`Error: ${stall}\n`)}); process.exit(1); }
 console.log(JSON.stringify({ type: 'assistant.message', data: { content: JSON.stringify(${JSON.stringify(responses)}[role]), toolRequests: [] } }));
 console.log(JSON.stringify({ type: 'result', exitCode: 0 }));
 `);
@@ -65,13 +57,19 @@ console.log(JSON.stringify({ type: 'result', exitCode: 0 }));
   catch (e) { e.root = f.root; throw e; }
 }
 
-test('a stall that never clears blocks the unit after the capped retries instead of looping', async t => {
-  // Continuous mode has no retry-count limit for other transient failures.
-  const failure = await stallFixture(t, Infinity, 'continuous').then(() => null, e => e);
+for (const rateLimited of [0, 5]) test(`a stall that never clears blocks the unit after ${hostStallRetries} stall retries (after ${rateLimited} rate-limit retries)`, async t => {
+  // Continuous mode has no retry-count limit for other transient failures;
+  // earlier rate-limit retries on the same call do not use up the stall cap.
+  const failure = await stallFixture(t, Infinity, 'continuous', rateLimited).then(() => null, e => e);
   assert.ok(failure, 'the run reports the blocked unit');
   assert.match(failure.message, /did not acknowledge 'assistant\.reasoning' delivery/);
-  assert.equal(Number(fs.readFileSync(safePath(failure.root, 'calls.txt'), 'utf8')), hostStallRetries + 1);
+  assert.equal(Number(fs.readFileSync(safePath(failure.root, 'calls.txt'), 'utf8')), rateLimited + hostStallRetries + 1);
   assert.equal(failureGuidance(failure, { language: 'ja' }).id, 'cli-host-stall');
+});
+
+test('surveys count stall retries apart from other transient retries too', () => {
+  const source = fs.readFileSync(new URL('../lib/survey.mjs', import.meta.url), 'utf8');
+  assert.match(source, /retry >= limits\.retries \|\| \(isHostStall\(e\) && stalls\+\+ >= hostStallRetries\)/);
 });
 
 test('a worker whose CLI stalls once is retried and the unit completes', async t => {
@@ -82,6 +80,7 @@ test('a worker whose CLI stalls once is retried and the unit completes', async t
   const implementer = fs.readdirSync(runDir).filter(n => n !== 'summary.json' && n.endsWith('.json')).map(n => readJSON(path.join(runDir, n))).find(a => a.role === 'implementer');
   assert.equal(implementer.retries.length, 1);
   assert.match(implementer.retries[0].error, /did not acknowledge 'assistant\.reasoning' delivery/);
+  assert.equal(implementer.retries[0].hostStall, true);
 });
 
 test('guidance explains the stall in plain words and offers rerun and fewer parallel workers', () => {
@@ -90,7 +89,7 @@ test('guidance explains the stall in plain words and offers rerun and fewer para
     assert.equal(g.id, 'cli-host-stall');
     assert.deepEqual(g.options.map(o => o.id), ['rerun', 'lower-concurrency', 'pause']);
   }
-  assert.match(failureGuidance(new Error(stall), { language: 'ja' }).cause, /キットからは延ばせません/);
+  assert.match(failureGuidance(new Error(stall), { language: 'ja' }).cause, /これを延ばす設定はありません/);
   // The kit's own deadline and a cancellation are final: not described as retried.
   assert.equal(failureGuidance(new Error(`Process timed out after 600000ms (explicit bounded deadline); ${stall}`)).id, 'timeout');
   assert.notEqual(failureGuidance(new Error(`Interrupted; ${stall}`)).id, 'cli-host-stall');

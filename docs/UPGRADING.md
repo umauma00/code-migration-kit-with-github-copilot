@@ -6,7 +6,7 @@
 
 キットのファイル（lib）が変わるため、既存の承認・完了記録は一度だけ失効します。`phase next` の `stale` が示すとおり記録し直してください。
 
-1. Copilot CLI が「Session host did not acknowledge 'assistant.reasoning' delivery within …」で終わったワーカーは、止めずに1回の呼び出しにつき最大5回まで自動でやり直します。この待ち時間は CLI の中で固定されていて、キットからは延ばせません。
+1. Copilot CLI が「Session host did not acknowledge 'assistant.reasoning' delivery within …」で終わったワーカーは、止めずに1回の呼び出しにつき最大5回まで自動でやり直します（やり直しの回数に上限を設定していれば、その回数まで）。この待ち時間（120秒）を延ばす設定は CLI 1.0.105 にもキットにもありません。
 2. 5回でも通らないファイルは未完了になります。同じ処理をもう一度動かすか、同時に動かす数（`concurrency`）を減らしてみてください。この変更では承認は消えません。
 3. コピー導入では `migration-kit/` 全体を一時導入先の内容に置き換えます。プラグインは更新だけで入ります。
 

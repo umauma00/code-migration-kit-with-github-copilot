@@ -8,10 +8,11 @@ was blocked on the first try, together with every file that depends on it.
   delivery within …", reported as 120 s, and its 60 s counterpart "the event
   poll loop may be wedged") is now a transient failure: the runner and surveys
   retry the same call with backoff, as for rate limits and network errors, but
-  at most 5 times per call in every mode (`hostStallRetries`), so a stall that
-  does not clear blocks that unit and its dependants instead of spending calls
-  forever. The wait is fixed inside the CLI (1.0.105 reads no setting for it),
-  so the kit cannot lengthen it. `status` names it when a call is retrying.
+  at most 5 stall retries per call (`hostStallRetries`, counted apart from
+  other transient retries; bounded mode's `transientRetries` still caps the
+  total), so a stall that does not clear blocks that unit and its dependants
+  instead of spending calls forever. The message reports a 120 s wait; neither
+  CLI 1.0.105 nor the kit has a setting that lengthens it. `status` names it when a call is retrying.
 - Failure guidance has a `cli-host-stall` entry that says so in plain words and
   offers a rerun (finished files are kept) or fewer parallel workers (approvals
   are kept). The kit's own deadline and a cancellation stay with the timeout

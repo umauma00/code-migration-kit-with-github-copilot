@@ -151,7 +151,7 @@ node migration-kit/scripts/run_migration.mjs doctor --check-cli
 | `maxRunInputBytes` | boundedモードだけで使う入力累計bytesの上限。通常実行は量だけで打ち切らず、`usageEstimate` とCLIの使用量を記録する |
 | `maxAiCreditsPerCall` | boundedモードだけで各workerへ渡す任意の `--max-ai-credits`（CLIの最小値30）。continuousでは渡さない。サービス側の残高・組織上限は外部制約 |
 | `timeoutSeconds` | boundedモードだけで使うCLI呼び出し時間上限。0は期限なし。通常実行は旧設定が600でも打ち切らない |
-| `transientRetries`, `transientRetryDelayMs` | レート制限・5xx・通信障害を待って再試行する。通常実行は回数で打ち切らない。boundedだけ既定2回。待機は既定5秒から倍増、最大60秒 |
+| `transientRetries`, `transientRetryDelayMs` | レート制限・5xx・通信障害を待って再試行する。通常実行は回数で打ち切らない（Copilot CLI 内部の受け渡し待ちの詰まりだけは5回まで）。boundedだけ既定2回。待機は既定5秒から倍増、最大60秒 |
 | `maxConsecutiveFailures` | boundedモードだけで使う連続失敗時の新規起動停止（既定3）。通常実行は独立した残りの単位を処理する。認証・残高など共通の実障害は原因を報告する |
 | `commandTimeoutSeconds` | boundedモードだけで使うビルド・比較の時間上限。0は期限なし。CPU使用率・無出力・600秒経過を理由に正常な処理を中断しない。`doctor --check-cli` と `stress-b command` のモデルのツール確認は、bounded で値を設定すればその時間、通常実行または 0 のときは2分で打ち切り、未確認として報告する |
 

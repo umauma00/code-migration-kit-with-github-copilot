@@ -1014,7 +1014,7 @@
     },
     {
       "path": "lib/failures.mjs",
-      "sha256": "632c5d36ff20c8aab23c32e10c12ea515bbdb0c5b4591e45660e1c30ae1c1117",
+      "sha256": "2ed068daa34fcd1435d55db1611e75d226b0f8aa09203bf18b1f7a779c1e9409",
       "entries": [
         {
           "line": 24,
@@ -1132,7 +1132,7 @@
     },
     {
       "path": "lib/guidance.mjs",
-      "sha256": "9a9fa05ce15a5c2a7779a7b9225efc3eec17d6f99c1c772c731ae7ddb592424f",
+      "sha256": "9390b0695af7b980b10481381c1650962b139522f60870352b43313c71842e1d",
       "entries": [
         {
           "line": 74,
@@ -1628,7 +1628,7 @@
     },
     {
       "path": "lib/pipeline.mjs",
-      "sha256": "8038eac1d4db4ba2a478a90306e97940dca22c0d3059c67785a94b3f870d917d",
+      "sha256": "4e7812eada03b8117054f06cafff4a91216547ddde7f151431384f97e82c5fbe",
       "entries": [
         {
           "line": 19,
@@ -1983,7 +1983,7 @@
         {
           "line": 418,
           "kind": "error-or-exit-candidate",
-          "code": "if (isSystemicFailure(e) || !isTransientFailure(e) || retry >= retryLimit(e, limits.retries) || signal?.aborted || dispatchError || reservations >= maxCalls) throw e;"
+          "code": "if (isSystemicFailure(e) || !isTransientFailure(e) || retry >= limits.retries || (isHostStall(e) && stalls++ >= hostStallRetries) || signal?.aborted || dispatchError || reservations >= maxCalls) throw e;"
         },
         {
           "line": 424,
@@ -2898,7 +2898,7 @@
     },
     {
       "path": "lib/status.mjs",
-      "sha256": "85c8cb4234d6c926ac17c489c5ba9151d24460c0bcd800ba05bf776da7db6255",
+      "sha256": "c89728abdc7f4adf7882acbdef7649d0011f6becd802e12ffc679ab0e76a0d7d",
       "entries": [
         {
           "line": 78,
@@ -2935,7 +2935,7 @@
     },
     {
       "path": "lib/survey.mjs",
-      "sha256": "8d8a4fd22b656310263aa16f50d0e9b8c2a8d1a7cd034103719d1feaf88e996f",
+      "sha256": "74b4bbfada19764d3661d494c205ca776ef678fae050b5d2c512ed88a829116d",
       "entries": [
         {
           "line": 23,
@@ -3120,7 +3120,7 @@
         {
           "line": 502,
           "kind": "error-or-exit-candidate",
-          "code": "if (!isTransientFailure(e) || retry >= retryLimit(e, limits.retries) || signal?.aborted) throw e;"
+          "code": "if (!isTransientFailure(e) || retry >= limits.retries || (isHostStall(e) && stalls++ >= hostStallRetries) || signal?.aborted) throw e;"
         },
         {
           "line": 508,
