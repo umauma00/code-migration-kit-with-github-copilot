@@ -1,6 +1,14 @@
-# Upgrading (0.27.0 and earlier releases)
+# Upgrading (0.28.0 and earlier releases)
 
 [日本語](UPGRADING.md) | English
+
+## 0.28.0 (no stop on the CLI's internal wait)
+
+Kit files (lib) change, so existing approvals and completion records expire once. Record them again as `phase next` shows in `stale`.
+
+1. A worker whose Copilot CLI ends with "Session host did not acknowledge 'assistant.reasoning' delivery within …" is retried instead of blocked. The wait is fixed inside the CLI; the kit cannot lengthen it.
+2. If the stall keeps coming back, lower `concurrency`. That change keeps approvals.
+3. In a copy install, replace all of `migration-kit/` with the temporary install's. The plugin needs only an update.
 
 ## 0.27.0 (questions anyone can answer)
 

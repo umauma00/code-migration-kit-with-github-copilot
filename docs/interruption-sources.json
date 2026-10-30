@@ -1014,7 +1014,7 @@
     },
     {
       "path": "lib/failures.mjs",
-      "sha256": "45b94728f950089ce4b77185d850cf857c390eb9b5982889a1298f4f22f2c96c",
+      "sha256": "a7853d32b291a96d6e4797f13c60691792227d0226fa0c9920ec530b1f59f517",
       "entries": [
         {
           "line": 12,
@@ -1022,7 +1022,7 @@
           "code": "// A timeout reported by the service or network is not: a retry finishes it."
         },
         {
-          "line": 16,
+          "line": 22,
           "kind": "deadline-or-observation",
           "code": "return /session\\.error rate_limit|\\b429\\b|rate[ -]?limit|too many requests|overloaded|temporar(?:il)?y unavailable|service unavailable|\\b50[234]\\b|session\\.error (?:\\S+ )?500\\b|\\b500 Internal Server Error|internal server error|bad gateway|gateway timeout|ECONNRESET|ETIMEDOUT|EAI_AGAIN|ECONNREFUSED|socket hang up|network (?:error|timeout)|fetch failed/i.test(value);"
         }
@@ -1132,7 +1132,7 @@
     },
     {
       "path": "lib/guidance.mjs",
-      "sha256": "f7bea77ecc113e6fee7b3705b9047983e91686f6703a5396a4eff2ffe70366d7",
+      "sha256": "9f06e3a7c0bfd6d6dccab5d8ec9e8c101410ff2d821cdba3033c67102f5c8e9b",
       "entries": [
         {
           "line": 73,
@@ -1175,22 +1175,22 @@
           "code": "{ id: 'check-billing', label: t('GitHub の課金・予算の設定で残量を確認し、追加・引き上げ後に再実行する', 'Check credits and budget in GitHub billing, add or raise them, then rerun'),"
         },
         {
-          "line": 583,
+          "line": 592,
           "kind": "deadline-or-observation",
           "code": "{ id: 'timeout', match: /timed out|\\btimeout\\b(?!Seconds)/i,"
         },
         {
-          "line": 588,
+          "line": 597,
           "kind": "deadline-or-observation",
           "code": "{ id: 'raise-timeout', label: t('選択済みの時間制限を見直す', 'Review an explicitly selected deadline'), reason: t('利用者が継続実行を望んだ場合はcontinuousへ戻すか0（期限なし）を選びます。', 'When the person wants continuous work, use continuous mode or an explicitly unlimited deadline of 0.') },"
         },
         {
-          "line": 659,
+          "line": 668,
           "kind": "loop-exit-candidate",
           "code": "for (const r of rules) { m = message.match(r.match); if (m) { rule = r; break; } }"
         },
         {
-          "line": 769,
+          "line": 778,
           "kind": "deadline-or-observation",
           "code": "[/^hook responds before its timeout$/, c => `Hook check failed: ${c.command ?? 'no hook command'} took ${c.durationMs ?? '?'} ms (timeout ${c.timeoutSec ?? '?'} s)`],"
         }
