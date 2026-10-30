@@ -1,6 +1,15 @@
-# Upgrading (0.29.0 and earlier releases)
+# Upgrading (0.31.0 and earlier releases)
 
 [日本語](UPGRADING.md) | English
+
+## 0.31.0 (a Japanese report language gives a Japanese rulebook)
+
+Kit files (lib, scripts, templates) change, so existing approvals and completion records expire once. Record them again as `phase next` shows in `stale`.
+
+1. With the report language ja, initialization starts `migration/RULEBOOK.md` from the Japanese template (`templates/RULEBOOK.ja.md`), and the orchestrator writes its prose in Japanese. Code, identifiers, paths, tags such as `construct: NAME` and markers such as `TODO(port):` keep their exact form.
+2. An existing rulebook is never rewritten. Translating one that already holds rules revokes every approval; to read it in Japanese during a run, ask the orchestrator for a summary.
+3. Only new projects start from the Japanese template. No setting changes.
+4. In a copy install, replace all of `migration-kit/` with the temporary install's. The plugin needs only an update.
 
 ## 0.29.0 (the runner hands the implementer its evidence)
 
