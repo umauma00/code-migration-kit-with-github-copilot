@@ -329,7 +329,7 @@
     },
     {
       "path": "lib/cli.mjs",
-      "sha256": "571e2c519158d8adaf997b6f826f479cd51f1d4514f6b93aa82205185f06eb35",
+      "sha256": "2b662e99931df4258d21716acc147357166be9b8f4981a40b0f46eddb3acc3f6",
       "entries": [
         {
           "line": 104,
@@ -1132,7 +1132,7 @@
     },
     {
       "path": "lib/guidance.mjs",
-      "sha256": "8e08f6b4f7f6b0400e1a24b6be0d7c9d93d4d53ff2ec165ca94f57677c86c7ff",
+      "sha256": "6ead6ccac22660b5dc898748b0dcf6cb4dfad184f14e61a8b6a4546430680c04",
       "entries": [
         {
           "line": 73,
@@ -1162,7 +1162,7 @@
         {
           "line": 513,
           "kind": "error-or-exit-candidate",
-          "code": "{ id: 'raise-budget', label: t('AI を呼ぶ回数の上限をあなたと決めて、変換をやり直す', 'Run translate --max-calls N with an agreed number (in bounded mode, raise maxAgentCalls)'), command: k => `node ${k}/scripts/run_migration.mjs translate --max-calls N`,"
+          "code": "{ id: 'raise-budget', label: t('AI を呼ぶ回数の上限をあなたと決めて、変換をやり直す（上限を設けるモードなら、その上限を増やす）', 'Run translate --max-calls N with an agreed number (in bounded mode, raise maxAgentCalls)'), command: k => `node ${k}/scripts/run_migration.mjs translate --max-calls N`,"
         },
         {
           "line": 539,
@@ -1502,7 +1502,7 @@
     },
     {
       "path": "lib/pilot.mjs",
-      "sha256": "4137253eca0621582ebddb3ad20c4bea27667df489a5aab98eb3bcfefda392b3",
+      "sha256": "21a81714a4066d321a4e3592a22985ff0cbf27f517acb6da8a39fc7e4363f685",
       "entries": [
         {
           "line": 23,
@@ -1540,87 +1540,82 @@
           "code": "if (!['translation', 'build', 'smoke', 'parity'].includes(grant.through)) throw new Error('Invalid pilot execution boundary');"
         },
         {
+          "line": 42,
+          "kind": "error-or-exit-candidate",
+          "code": "if (executionPurpose(config) !== 'production') throw new Error('A pilot cannot authorize another pilot');"
+        },
+        {
           "line": 43,
           "kind": "error-or-exit-candidate",
-          "code": "if (!Array.isArray(sources) || !sources.length || new Set(sources).size !== sources.length) throw new Error('Pilot plan needs explicit source selections (--sources)');"
+          "code": "if (config.mode !== 'preserve') throw new Error('The pilot file runner currently supports preserve mode only');"
         },
         {
           "line": 44,
+          "kind": "error-or-exit-candidate",
+          "code": "if (!Array.isArray(sources) || !sources.length || new Set(sources).size !== sources.length) throw new Error('Pilot needs explicit source selections (--sources)');"
+        },
+        {
+          "line": 45,
           "kind": "error-or-exit-candidate",
           "code": "if (!['translation', 'build', 'smoke', 'parity'].includes(through) || (through === 'parity' && config.verificationMode === 'source-only')) throw new Error('Invalid pilot boundary for this verification mode');"
         },
         {
           "line": 46,
           "kind": "error-or-exit-candidate",
-          "code": "for (const source of sources) if (!bySource.has(source)) throw new Error(`Pilot source is not in the manifest: ${source}`);"
-        },
-        {
-          "line": 57,
-          "kind": "error-or-exit-candidate",
-          "code": "if (executionPurpose(config) !== 'production') throw new Error('A pilot cannot authorize another pilot');"
-        },
-        {
-          "line": 58,
-          "kind": "error-or-exit-candidate",
-          "code": "if (config.mode !== 'preserve') throw new Error('The pilot file runner currently supports preserve mode only');"
-        },
-        {
-          "line": 59,
-          "kind": "error-or-exit-candidate",
-          "code": "if (!note?.trim() || !Array.isArray(sources) || !sources.length || new Set(sources).size !== sources.length) throw new Error('Pilot needs explicit source selections and an authorization --note');"
-        },
-        {
-          "line": 60,
-          "kind": "error-or-exit-candidate",
-          "code": "if (!['translation', 'build', 'smoke', 'parity'].includes(through) || (through === 'parity' && config.verificationMode === 'source-only')) throw new Error('Invalid pilot boundary for this verification mode');"
-        },
-        {
-          "line": 61,
-          "kind": "error-or-exit-candidate",
-          "code": "if (!target) throw new Error('Pilot requires a new --target directory outside the production project');"
-        },
-        {
-          "line": 66,
-          "kind": "error-or-exit-candidate",
-          "code": "if (within(destination, parent) || within(parent, destination)) throw new Error('Pilot target must be outside the production project');"
-        },
-        {
-          "line": 67,
-          "kind": "error-or-exit-candidate",
-          "code": "if (fs.existsSync(destination)) throw new Error('Pilot target must be a new directory; never overwrite existing work');"
-        },
-        {
-          "line": 71,
-          "kind": "error-or-exit-candidate",
           "code": "if (!currentPhase(parent, config, '02')) throw new Error('Review parent phases 00 through 02 before authorizing a pilot');"
         },
         {
-          "line": 73,
+          "line": 48,
           "kind": "error-or-exit-candidate",
           "code": "if (!preparedJudge(parent, config, context)) throw new Error('Run parent judge successfully with unchanged evidence before preparing a pilot');"
         },
         {
-          "line": 75,
+          "line": 50,
           "kind": "error-or-exit-candidate",
           "code": "for (const source of sources) if (!bySource.has(source)) throw new Error(`Pilot source is not in the manifest: ${source}`);"
         },
         {
-          "line": 79,
+          "line": 54,
           "kind": "error-or-exit-candidate",
           "code": "for (const stage of stages.filter(s => s !== 'translation')) if (!config.commands?.[stage]) throw new Error(`Configure commands.${stage} before authorizing that pilot boundary`);"
         },
         {
-          "line": 82,
+          "line": 57,
           "kind": "error-or-exit-candidate",
           "code": "if ((path.isAbsolute(value) && within(value, parent)) || (i > 0 && /^\\.\\.([/\\\\]|$)/.test(value))) throw new Error('Pilot commands must use project-relative inputs, not parent paths');"
         },
         {
-          "line": 109,
+          "line": 76,
+          "kind": "error-or-exit-candidate",
+          "code": "if (!note?.trim() || !Array.isArray(sources) || !sources.length || new Set(sources).size !== sources.length) throw new Error('Pilot needs explicit source selections and an authorization --note');"
+        },
+        {
+          "line": 77,
+          "kind": "error-or-exit-candidate",
+          "code": "if (!target) throw new Error('Pilot requires a new --target directory outside the production project');"
+        },
+        {
+          "line": 82,
+          "kind": "error-or-exit-candidate",
+          "code": "if (within(destination, parent) || within(parent, destination)) throw new Error('Pilot target must be outside the production project');"
+        },
+        {
+          "line": 83,
+          "kind": "error-or-exit-candidate",
+          "code": "if (fs.existsSync(destination)) throw new Error('Pilot target must be a new directory; never overwrite existing work');"
+        },
+        {
+          "line": 89,
+          "kind": "error-or-exit-candidate",
+          "code": "if (expectTotal !== undefined && Number(expectTotal) !== scope.length) throw new Error(`Pilot scope is ${scope.length} files, not the ${expectTotal} approved; run pilot plan again and ask with the new count`);"
+        },
+        {
+          "line": 115,
           "kind": "error-or-exit-candidate",
           "code": "if (contextHash(parent, config) !== context) throw new Error('Parent inputs changed while preparing the pilot');"
         },
         {
-          "line": 118,
+          "line": 124,
           "kind": "error-or-exit-candidate",
           "code": "throw e;"
         }
@@ -2758,7 +2753,7 @@
     },
     {
       "path": "lib/sandbox.mjs",
-      "sha256": "b8c39ce75fcffad581e5178b703ca118c094b58c8e22b3a0219919eccf4e5fa9",
+      "sha256": "eeb4153505e807942eda53ade6583fe615ea74304614ca8d28e7907b37a1cf43",
       "entries": [
         {
           "line": 32,
@@ -4633,7 +4628,7 @@
     },
     {
       "path": "scripts/run_migration.mjs",
-      "sha256": "1fae655c47fb74ffe9c86b50c4edbe33b53e915a962f1855b55fa67b0c64f524",
+      "sha256": "e6f90a160746001b39ae60f1014f1d6adc68f1408526e6e369a77c0ebe57116d",
       "entries": [
         {
           "line": 92,
@@ -5002,5 +4997,5 @@
       ]
     }
   ],
-  "candidateLines": 908
+  "candidateLines": 907
 }

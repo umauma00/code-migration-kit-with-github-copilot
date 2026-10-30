@@ -14,7 +14,7 @@ node migration-kit/scripts/run_migration.mjs pilot plan --root . \
   --sources src/high-risk.py,src/boundary.py --through translation
 node migration-kit/scripts/run_migration.mjs pilot prepare --root . \
   --target /absolute/path/outside-project/new-pilot \
-  --sources src/high-risk.py,src/boundary.py --through parity \
+  --sources src/high-risk.py,src/boundary.py --through parity --expect-total 5 \
   --note "User authorizes this disposable scope through parity; no production translation"
 node migration-kit/scripts/run_migration.mjs pilot run --root /absolute/path/outside-project/new-pilot
 ```
@@ -35,8 +35,11 @@ than the files chosen. `pilot plan` returns that final scope without writing
 anything: `counts` (requested, added, total), the added files and a `plain`
 sentence in the person's language. Ask for permission with the final count, for
 example "選んだ 4 ファイルと、それらが使っている 22 ファイル、合わせて 26 ファイル",
-and put the final count in `--note`. Then `pilot prepare` matches what the person
-approved and needs no second question. If the count is too large for them,
+and pass that count as `--expect-total N` (and name it in `--note`). Then
+`pilot prepare` authorizes exactly what the person approved, or refuses when the
+scope changed in between, and needs no second question. In auto mode pilot
+prepare runs unasked: still run `pilot plan` and give its count in the phase
+report. If the count is too large for them,
 offer choosing other files before preparing anything; nothing needs revoking yet.
 Inspect the returned requestedSources, sources, targets and boundary before running.
 If a whole-project build/parity command requires additional outputs, include

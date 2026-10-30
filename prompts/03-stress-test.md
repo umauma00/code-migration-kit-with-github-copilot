@@ -59,7 +59,7 @@ Use the formal [pilot grant](../docs/PILOT.md): after current 00–02 and judge,
 run the read-only `pilot plan --sources CSV --through STAGE` and ask for permission
 once with its final file count (chosen files plus the files they use) and its
 `plain` sentence, then
-`pilot prepare --target NEW_EXTERNAL_DIR --sources CSV --through STAGE --note TEXT`,
+`pilot prepare --expect-total TOTAL --target NEW_EXTERNAL_DIR --sources CSV --through STAGE --note TEXT`,
 then `pilot run --root NEW_EXTERNAL_DIR` in a background terminal, never piped or
 redirected, checked with `status --root NEW_EXTERNAL_DIR --wait 600` like every
 long runner command. Obtain explicit authorization for that

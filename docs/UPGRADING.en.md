@@ -1,6 +1,14 @@
-# Upgrading (0.26.0 and earlier releases)
+# Upgrading (0.27.0 and earlier releases)
 
 [日本語](UPGRADING.md) | English
+
+## 0.27.0 (questions anyone can answer)
+
+Kit files (lib, scripts, agent definitions) change, so existing approvals and completion records expire once. Record them again as `phase next` shows in `stale`.
+
+1. A phase-03 pilot first runs the read-only `pilot plan --sources …` for the final file count (chosen files plus the files they use) and asks once with that count. `pilot prepare --expect-total N` stops when the scope no longer matches it.
+2. A question-writing rule (docs/PHASE-HANDOFF.md) and a plain-words table (docs/PLAIN-WORDS.md) are added. The failure-guidance choices and the sandbox question no longer use kit terms or commands.
+3. In a copy install, replace all of `migration-kit/`, `.github/agents/migration-orchestrator.agent.md` and the SKILL.md in `.github/skills/` with the temporary install's. The plugin needs only an update.
 
 ## 0.26.0 (why a phase record is out of date, and what to do)
 

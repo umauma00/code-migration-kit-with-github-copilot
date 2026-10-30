@@ -10,7 +10,9 @@ answer.
   without writing anything: the chosen files, the files they use and the total
   (`counts`), with a plain sentence for the approval question. Phase 03 runs it
   first and asks once with the final count, so `pilot prepare` matches what the
-  person approved and needs no second question.
+  person approved and needs no second question. Plan applies the same checks
+  as prepare, and `pilot prepare --expect-total N` refuses a scope that no
+  longer matches the approved count.
 - docs/PHASE-HANDOFF.md states how every question is written: the situation in
   everyday words, each choice as what will happen with its good and bad points
   (time, AI usage, whether it can be undone), one recommendation first with its

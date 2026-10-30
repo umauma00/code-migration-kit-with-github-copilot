@@ -1,6 +1,14 @@
-# 更新手順（0.26.0 と以前の版）
+# 更新手順（0.27.0 と以前の版）
 
 日本語 | [English](UPGRADING.en.md)
+
+## 0.27.0（キットを知らない人にも分かる質問）
+
+キットのファイル（lib・scripts・エージェント定義）が変わるため、既存の承認・完了記録は一度だけ失効します。`phase next` の `stale` が示すとおり記録し直してください。
+
+1. 工程 03 の試運転は、先に `pilot plan --sources …`（書き込みなし）で最終のファイル数（選んだファイル＋それらが使っているファイル）を出し、その数で1回だけ許可を聞きます。`pilot prepare --expect-total N` は、範囲がその数と違えば止まります。
+2. 質問の書き方の決まり（docs/PHASE-HANDOFF.md）と言い換え表（docs/PLAIN-WORDS.md）が入りました。失敗時の選択肢とサンドボックスの質問は、キットの用語やコマンドを使わない文になりました。
+3. コピー導入では `migration-kit/` 全体と、`.github/agents/migration-orchestrator.agent.md`、`.github/skills/` の SKILL.md を一時導入先の内容に置き換えます。プラグインは更新だけで入ります。
 
 ## 0.26.0（古くなった工程記録の理由と次の一手）
 

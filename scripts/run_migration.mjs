@@ -79,7 +79,7 @@ export const usage = `Usage: node migration-kit/scripts/run_migration.mjs COMMAN
                               Phase 03 comparison B: the exact isolated copilot -p command, with the model's own file tools
   pilot plan --sources src/a,src/b [--through STAGE]
                               Read-only: the files a pilot would cover (chosen + the files they use), to show before asking
-  pilot prepare --target NEW_DIR --sources src/a,src/b --note TEXT [--through translation|build|smoke|parity]
+  pilot prepare --target NEW_DIR --sources src/a,src/b --note TEXT [--through translation|build|smoke|parity] [--expect-total N]
   pilot run --root PILOT_DIR  Run only the explicitly authorized, isolated pilot
   repair --target PATH --evidence migration/PATH | repair --queue migration/QUEUE.json [--max-calls N]
   diagnose [--stage build|smoke|parity]
@@ -410,7 +410,7 @@ export async function main(argv = process.argv.slice(2)) {
       result = await stressB(root, config, { dir: args.dir, model: args.model, command: args.copilot, signal: controller.signal });
     }
     else if (cmd === 'pilot' && args._[1] === 'plan') result = planPilot(root, config, { sources: args.sources?.split(','), through: args.through });
-    else if (cmd === 'pilot' && args._[1] === 'prepare') result = preparePilot(root, config, { target: args.target, sources: args.sources?.split(','), through: args.through, note: args.note });
+    else if (cmd === 'pilot' && args._[1] === 'prepare') result = preparePilot(root, config, { target: args.target, sources: args.sources?.split(','), through: args.through, note: args.note, expectTotal: args['expect-total'] });
     else if (cmd === 'pilot' && args._[1] === 'run') {
       result = await runPilot(root, config, createCopilotAdapter({ command: args.copilot }), { signal: controller.signal, onProgress: event => console.error(progressLine(event)) });
     }
