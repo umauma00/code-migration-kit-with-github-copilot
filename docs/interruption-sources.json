@@ -329,7 +329,7 @@
     },
     {
       "path": "lib/cli.mjs",
-      "sha256": "4cb9d278a45fcbece7967f0fa16173b36103efc8c788b474b8cd6df20bea54f1",
+      "sha256": "571e2c519158d8adaf997b6f826f479cd51f1d4514f6b93aa82205185f06eb35",
       "entries": [
         {
           "line": 104,
@@ -1132,7 +1132,7 @@
     },
     {
       "path": "lib/guidance.mjs",
-      "sha256": "1b6c0577aaf22b9194795b4acd504425402a46e61e116c6a3871c003b7ffe3d7",
+      "sha256": "8e08f6b4f7f6b0400e1a24b6be0d7c9d93d4d53ff2ec165ca94f57677c86c7ff",
       "entries": [
         {
           "line": 73,
@@ -1157,17 +1157,17 @@
         {
           "line": 401,
           "kind": "error-or-exit-candidate",
-          "code": "{ id: 'raise-breaker', label: t('失敗が互いに無関係と確認できたら maxConsecutiveFailures を増やして再実行する', 'If the failures are unrelated, raise maxConsecutiveFailures and rerun'),"
+          "code": "{ id: 'raise-breaker', label: t('失敗どうしが無関係と確認できたら、連続失敗で止まるまでの回数を増やしてやり直す', 'If the failures are unrelated, raise maxConsecutiveFailures and rerun'),"
         },
         {
           "line": 513,
           "kind": "error-or-exit-candidate",
-          "code": "{ id: 'raise-budget', label: t('合意した回数で translate --max-calls N を実行する（bounded モードなら maxAgentCalls を増やす）', 'Run translate --max-calls N with an agreed number (in bounded mode, raise maxAgentCalls)'), command: k => `node ${k}/scripts/run_migration.mjs translate --max-calls N`,"
+          "code": "{ id: 'raise-budget', label: t('AI を呼ぶ回数の上限をあなたと決めて、変換をやり直す', 'Run translate --max-calls N with an agreed number (in bounded mode, raise maxAgentCalls)'), command: k => `node ${k}/scripts/run_migration.mjs translate --max-calls N`,"
         },
         {
           "line": 539,
           "kind": "error-or-exit-candidate",
-          "code": "{ id: 'lower-concurrency', label: t('concurrency を下げるか transientRetryDelayMs を上げる', 'Lower concurrency or raise transientRetryDelayMs'),"
+          "code": "{ id: 'lower-concurrency', label: t('同時に動かすAIの数を減らすか、やり直すまでの待ち時間を延ばす', 'Lower concurrency or raise transientRetryDelayMs'),"
         },
         {
           "line": 546,
@@ -1502,7 +1502,7 @@
     },
     {
       "path": "lib/pilot.mjs",
-      "sha256": "bdcaa4a0b4de13d06c3103bf1b5681c82544c749e234c868ab40d3db3f18af01",
+      "sha256": "4137253eca0621582ebddb3ad20c4bea27667df489a5aab98eb3bcfefda392b3",
       "entries": [
         {
           "line": 23,
@@ -1540,72 +1540,87 @@
           "code": "if (!['translation', 'build', 'smoke', 'parity'].includes(grant.through)) throw new Error('Invalid pilot execution boundary');"
         },
         {
-          "line": 40,
-          "kind": "error-or-exit-candidate",
-          "code": "if (executionPurpose(config) !== 'production') throw new Error('A pilot cannot authorize another pilot');"
-        },
-        {
-          "line": 41,
-          "kind": "error-or-exit-candidate",
-          "code": "if (config.mode !== 'preserve') throw new Error('The pilot file runner currently supports preserve mode only');"
-        },
-        {
-          "line": 42,
-          "kind": "error-or-exit-candidate",
-          "code": "if (!note?.trim() || !Array.isArray(sources) || !sources.length || new Set(sources).size !== sources.length) throw new Error('Pilot needs explicit source selections and an authorization --note');"
-        },
-        {
           "line": 43,
           "kind": "error-or-exit-candidate",
-          "code": "if (!['translation', 'build', 'smoke', 'parity'].includes(through) || (through === 'parity' && config.verificationMode === 'source-only')) throw new Error('Invalid pilot boundary for this verification mode');"
+          "code": "if (!Array.isArray(sources) || !sources.length || new Set(sources).size !== sources.length) throw new Error('Pilot plan needs explicit source selections (--sources)');"
         },
         {
           "line": 44,
           "kind": "error-or-exit-candidate",
-          "code": "if (!target) throw new Error('Pilot requires a new --target directory outside the production project');"
+          "code": "if (!['translation', 'build', 'smoke', 'parity'].includes(through) || (through === 'parity' && config.verificationMode === 'source-only')) throw new Error('Invalid pilot boundary for this verification mode');"
         },
         {
-          "line": 49,
-          "kind": "error-or-exit-candidate",
-          "code": "if (within(destination, parent) || within(parent, destination)) throw new Error('Pilot target must be outside the production project');"
-        },
-        {
-          "line": 50,
-          "kind": "error-or-exit-candidate",
-          "code": "if (fs.existsSync(destination)) throw new Error('Pilot target must be a new directory; never overwrite existing work');"
-        },
-        {
-          "line": 54,
-          "kind": "error-or-exit-candidate",
-          "code": "if (!currentPhase(parent, config, '02')) throw new Error('Review parent phases 00 through 02 before authorizing a pilot');"
-        },
-        {
-          "line": 56,
-          "kind": "error-or-exit-candidate",
-          "code": "if (!preparedJudge(parent, config, context)) throw new Error('Run parent judge successfully with unchanged evidence before preparing a pilot');"
-        },
-        {
-          "line": 58,
+          "line": 46,
           "kind": "error-or-exit-candidate",
           "code": "for (const source of sources) if (!bySource.has(source)) throw new Error(`Pilot source is not in the manifest: ${source}`);"
         },
         {
-          "line": 62,
+          "line": 57,
+          "kind": "error-or-exit-candidate",
+          "code": "if (executionPurpose(config) !== 'production') throw new Error('A pilot cannot authorize another pilot');"
+        },
+        {
+          "line": 58,
+          "kind": "error-or-exit-candidate",
+          "code": "if (config.mode !== 'preserve') throw new Error('The pilot file runner currently supports preserve mode only');"
+        },
+        {
+          "line": 59,
+          "kind": "error-or-exit-candidate",
+          "code": "if (!note?.trim() || !Array.isArray(sources) || !sources.length || new Set(sources).size !== sources.length) throw new Error('Pilot needs explicit source selections and an authorization --note');"
+        },
+        {
+          "line": 60,
+          "kind": "error-or-exit-candidate",
+          "code": "if (!['translation', 'build', 'smoke', 'parity'].includes(through) || (through === 'parity' && config.verificationMode === 'source-only')) throw new Error('Invalid pilot boundary for this verification mode');"
+        },
+        {
+          "line": 61,
+          "kind": "error-or-exit-candidate",
+          "code": "if (!target) throw new Error('Pilot requires a new --target directory outside the production project');"
+        },
+        {
+          "line": 66,
+          "kind": "error-or-exit-candidate",
+          "code": "if (within(destination, parent) || within(parent, destination)) throw new Error('Pilot target must be outside the production project');"
+        },
+        {
+          "line": 67,
+          "kind": "error-or-exit-candidate",
+          "code": "if (fs.existsSync(destination)) throw new Error('Pilot target must be a new directory; never overwrite existing work');"
+        },
+        {
+          "line": 71,
+          "kind": "error-or-exit-candidate",
+          "code": "if (!currentPhase(parent, config, '02')) throw new Error('Review parent phases 00 through 02 before authorizing a pilot');"
+        },
+        {
+          "line": 73,
+          "kind": "error-or-exit-candidate",
+          "code": "if (!preparedJudge(parent, config, context)) throw new Error('Run parent judge successfully with unchanged evidence before preparing a pilot');"
+        },
+        {
+          "line": 75,
+          "kind": "error-or-exit-candidate",
+          "code": "for (const source of sources) if (!bySource.has(source)) throw new Error(`Pilot source is not in the manifest: ${source}`);"
+        },
+        {
+          "line": 79,
           "kind": "error-or-exit-candidate",
           "code": "for (const stage of stages.filter(s => s !== 'translation')) if (!config.commands?.[stage]) throw new Error(`Configure commands.${stage} before authorizing that pilot boundary`);"
         },
         {
-          "line": 65,
+          "line": 82,
           "kind": "error-or-exit-candidate",
           "code": "if ((path.isAbsolute(value) && within(value, parent)) || (i > 0 && /^\\.\\.([/\\\\]|$)/.test(value))) throw new Error('Pilot commands must use project-relative inputs, not parent paths');"
         },
         {
-          "line": 92,
+          "line": 109,
           "kind": "error-or-exit-candidate",
           "code": "if (contextHash(parent, config) !== context) throw new Error('Parent inputs changed while preparing the pilot');"
         },
         {
-          "line": 101,
+          "line": 118,
           "kind": "error-or-exit-candidate",
           "code": "throw e;"
         }
@@ -2743,7 +2758,7 @@
     },
     {
       "path": "lib/sandbox.mjs",
-      "sha256": "1b176dd34710cc0484d438ced9046a59d122cd1f43a970b7b2a6745d68fc439b",
+      "sha256": "b8c39ce75fcffad581e5178b703ca118c094b58c8e22b3a0219919eccf4e5fa9",
       "entries": [
         {
           "line": 32,
@@ -4618,295 +4633,295 @@
     },
     {
       "path": "scripts/run_migration.mjs",
-      "sha256": "9d2a835e3154c2ac6e4b7bcb06dc6d3950ee06f86075fb6a88b8464e1bdde54a",
+      "sha256": "1fae655c47fb74ffe9c86b50c4edbe33b53e915a962f1855b55fa67b0c64f524",
       "entries": [
         {
-          "line": 90,
+          "line": 92,
           "kind": "error-or-exit-candidate",
           "code": "limits apply only when explicitly chosen or executionMode is bounded"
         },
         {
-          "line": 98,
+          "line": 100,
           "kind": "error-or-exit-candidate",
           "code": "if (typeof dir !== 'string' || !path.isAbsolute(dir)) throw new Error('stress-b command needs --dir with an absolute path outside the repository');"
         },
         {
-          "line": 100,
+          "line": 102,
           "kind": "error-or-exit-candidate",
           "code": "if (!stat?.isDirectory()) throw new Error(`stress-b command: ${dir} is not a directory; create it and copy only the selected source files into it first`);"
         },
         {
-          "line": 102,
+          "line": 104,
           "kind": "error-or-exit-candidate",
           "code": "if (!inside || (inside !== '..' && !inside.startsWith(`..${path.sep}`) && !path.isAbsolute(inside))) throw new Error(`stress-b command: ${dir} is inside the repository; B must run in a directory outside it`);"
         },
         {
-          "line": 104,
+          "line": 106,
           "kind": "error-or-exit-candidate",
           "code": "if (typeof config.targetLanguage !== 'string' || !config.targetLanguage.trim()) throw new Error('stress-b command needs targetLanguage in migration/config.json');"
         },
         {
-          "line": 105,
+          "line": 107,
           "kind": "deadline-or-observation",
           "code": "const found = await stressBTools(command, model, { signal, timeoutMs: processTimeout(config, 'commandTimeoutSeconds') });"
         },
         {
-          "line": 113,
+          "line": 115,
           "kind": "deadline-or-observation",
           "code": "export async function modelToolChecks(root, config, layout, { command, signal, timeoutMs }) {"
         },
         {
-          "line": 118,
+          "line": 120,
           "kind": "deadline-or-observation",
           "code": "const probe = await probeModelTools(command, copilotArgs(role, model, undefined, layout), { cwd: root, model, env: copilotEnv(role), signal, timeoutMs });"
         },
         {
-          "line": 126,
+          "line": 128,
           "kind": "deadline-or-observation",
           "code": "const found = await stressBTools(command, model, { signal, timeoutMs });"
         },
         {
-          "line": 128,
+          "line": 130,
           "kind": "error-or-exit-candidate",
           "code": "} catch (e) { if (signal?.aborted) throw e; checks.push({ check: 'model tools: comparison B', ok: false, model, detail: e.message }); }"
         },
         {
-          "line": 133,
+          "line": 135,
           "kind": "error-or-exit-candidate",
           "code": "if (signal?.aborted) throw new Error('Interrupted');"
         },
         {
-          "line": 134,
+          "line": 136,
           "kind": "deadline-or-observation",
           "code": "const timeoutMs = processTimeout(config, 'commandTimeoutSeconds');"
         },
         {
-          "line": 137,
+          "line": 139,
           "kind": "error-or-exit-candidate",
           "code": "checks.push({ check: 'execution limits', ok: true, executionMode: config.executionMode ?? 'continuous', ...(ignored.length ? { ignored,"
         },
         {
-          "line": 138,
+          "line": 140,
           "kind": "error-or-exit-candidate",
           "code": "note: `Continuous mode does not enforce ${ignored.join(', ')}. Set \"executionMode\": \"bounded\" to enforce them, or delete them; per-command --max-calls / --max-rounds still apply.` } : {}) });"
         },
         {
-          "line": 166,
+          "line": 168,
           "kind": "deadline-or-observation",
           "code": "// Copilot hooks fail open on timeout: a slow start silently disables the"
         },
         {
-          "line": 175,
+          "line": 177,
           "kind": "deadline-or-observation",
           "code": "limit = entry?.timeoutSec ?? entry?.timeout ?? null;"
         },
         {
-          "line": 183,
+          "line": 185,
           "kind": "deadline-or-observation",
           "code": "signal, timeoutMs, env: { ...process.env, ...(role ? { MIGRATION_KIT_ROLE: role } : {}) } }).catch(e => {"
         },
         {
-          "line": 184,
+          "line": 186,
           "kind": "error-or-exit-candidate",
           "code": "if (signal?.aborted) throw new Error('Interrupted');"
         },
         {
-          "line": 193,
+          "line": 195,
           "kind": "deadline-or-observation",
           "code": "checks.push({ check: 'hook responds before its timeout', ok: Boolean(worker && parent) && worker.code === 0 && parent.code === 0 &&"
         },
         {
-          "line": 196,
+          "line": 198,
           "kind": "deadline-or-observation",
           "code": "command: line ?? null, durationMs: slowest, timeoutSec: limit,"
         },
         {
-          "line": 197,
+          "line": 199,
           "kind": "deadline-or-observation",
           "code": "note: 'Runs the configured hook command. Copilot CLI and VS Code let a tool call through when a hook times out; keep the measured time well under half the configured timeout.' });"
         },
         {
-          "line": 215,
+          "line": 217,
           "kind": "error-or-exit-candidate",
           "code": "if (signal?.aborted) throw new Error('Interrupted');"
         },
         {
-          "line": 221,
+          "line": 223,
           "kind": "deadline-or-observation",
           "code": "const version = await runProcess(command, ['--version'], { cwd: root, env, signal, timeoutMs });"
         },
         {
-          "line": 222,
+          "line": 224,
           "kind": "deadline-or-observation",
           "code": "const help = await runProcess(command, ['--help'], { cwd: root, env, signal, timeoutMs });"
         },
         {
-          "line": 228,
+          "line": 230,
           "kind": "deadline-or-observation",
           "code": "const agents = await probeWorkerAgents(command, [], { cwd: root, layout, signal, timeoutMs });"
         },
         {
-          "line": 231,
+          "line": 233,
           "kind": "deadline-or-observation",
           "code": "const hook = await probeReviewerHook(command, [], { cwd: root, layout, signal, timeoutMs });"
         },
         {
-          "line": 238,
+          "line": 240,
           "kind": "deadline-or-observation",
           "code": "if (agents.ok) checks.push(...await modelToolChecks(root, config, layout, { command, signal, timeoutMs }));"
         },
         {
-          "line": 239,
+          "line": 241,
           "kind": "deadline-or-observation",
           "code": "checks.push({ check: 'file descriptor limit', ...await fileLimits({ signal, timeoutMs }), minimum: fileLimitMinimum,"
         },
         {
-          "line": 242,
+          "line": 244,
           "kind": "error-or-exit-candidate",
           "code": "if (signal?.aborted) throw new Error('Interrupted');"
         },
         {
-          "line": 259,
+          "line": 261,
           "kind": "error-or-exit-candidate",
           "code": "if (!Number.isInteger(seconds) || seconds < 1 || seconds > 1800) throw new Error('--wait must be a number of seconds from 1 to 1800');"
         },
         {
-          "line": 267,
+          "line": 269,
           "kind": "loop-exit-candidate",
           "code": "if (progressKey(report) !== start) break;"
         },
         {
-          "line": 283,
+          "line": 285,
           "kind": "error-or-exit-candidate",
           "code": "throw new Error('Specify the exact lock owner PID');"
         },
         {
-          "line": 289,
+          "line": 291,
           "kind": "pid-probe",
           "code": "if (alive) try { process.kill(pid, 0); } catch (e) { if (e.code === 'ESRCH') alive = false; else throw e; }"
         },
         {
-          "line": 290,
+          "line": 292,
           "kind": "error-or-exit-candidate",
           "code": "if (alive) throw new Error('Lock owner is still running; refusing to unlock');"
         },
         {
-          "line": 322,
+          "line": 324,
           "kind": "error-or-exit-candidate",
           "code": "if (!['list', 'set'].includes(args._[1])) throw new Error('Use models list [--format json|markdown] | models set --assign ROLE=ID[:EFFORT][:long_context],... | models set --role ROLE --model ID [--effort LEVEL|default] [--context default|long_context]');"
         },
         {
-          "line": 323,
+          "line": 325,
           "kind": "error-or-exit-candidate",
           "code": "if (args.format !== undefined && !['json', 'markdown'].includes(args.format)) throw new Error('models list format must be json or markdown');"
         },
         {
-          "line": 326,
+          "line": 328,
           "kind": "error-or-exit-candidate",
           "code": "if (!readConfigIfPresent(root)) throw new Error('migration/config.json is missing: initialize the project (install.mjs) before recording model choices');"
         },
         {
-          "line": 344,
+          "line": 346,
           "kind": "error-or-exit-candidate",
           "code": "if (!readConfigIfPresent(root)) throw new Error('migration/config.json is missing: initialize the project (install.mjs) before run settings');"
         },
         {
-          "line": 352,
+          "line": 354,
           "kind": "error-or-exit-candidate",
           "code": "if (!fs.existsSync(file)) throw new Error(`${runSettingsFile} is missing: run settings init first`);"
         },
         {
-          "line": 354,
+          "line": 356,
           "kind": "error-or-exit-candidate",
           "code": "try { settings = JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\\uFEFF/, '')); } catch (e) { throw new Error(`${runSettingsFile} is not valid JSON: ${e.message}`); }"
         },
         {
-          "line": 356,
+          "line": 358,
           "kind": "error-or-exit-candidate",
           "code": "if (errors.length) process.exitCode = 1;"
         },
         {
-          "line": 360,
+          "line": 362,
           "kind": "error-or-exit-candidate",
           "code": "if (action !== 'apply') throw new Error('Use settings init | check | apply');"
         },
         {
-          "line": 364,
+          "line": 366,
           "kind": "error-or-exit-candidate",
           "code": "if (!result.applied) process.exitCode = 1;"
         },
         {
-          "line": 377,
+          "line": 379,
           "kind": "error-or-exit-candidate",
           "code": "if (args.format && !['json', 'markdown', 'todo', 'checklist'].includes(args.format)) throw new Error('status format must be json, markdown, todo or checklist');"
         },
         {
-          "line": 379,
+          "line": 381,
           "kind": "error-or-exit-candidate",
           "code": "if (!report.ok) process.exitCode = 1;"
         },
         {
-          "line": 390,
+          "line": 392,
           "kind": "error-or-exit-candidate",
           "code": "if (args.format && !['json', 'markdown'].includes(args.format)) throw new Error('usage format must be json or markdown');"
         },
         {
-          "line": 396,
+          "line": 398,
           "kind": "error-or-exit-candidate",
           "code": "if (typeof args.message !== 'string' || !args.message.trim()) throw new Error('guidance requires --message TEXT (the error to explain)');"
         },
         {
-          "line": 402,
+          "line": 404,
           "kind": "cancellation",
           "code": "const abort = () => controller.abort();"
         },
         {
-          "line": 407,
+          "line": 409,
           "kind": "error-or-exit-candidate",
           "code": "if (args._[1] !== 'command') throw new Error('Use stress-b command --dir DIR [--model ID]');"
         },
         {
-          "line": 446,
+          "line": 449,
           "kind": "error-or-exit-candidate",
           "code": "else if (cmd === 'source-spec') throw new Error('Use source-spec init [--apply] | check');"
         },
         {
-          "line": 460,
+          "line": 463,
           "kind": "error-or-exit-candidate",
           "code": "} else throw new Error('Use survey plan|run|status|merge --kind facts|contracts|inventory [--max-files N] [--sites migration/PATH.tsv]');"
         },
         {
-          "line": 474,
+          "line": 477,
           "kind": "error-or-exit-candidate",
           "code": "else throw new Error('Use sessions status | prune [--run RUN_ID]');"
         },
         {
-          "line": 482,
+          "line": 485,
           "kind": "error-or-exit-candidate",
           "code": "} else throw new Error('Use guardrails show | install [--add CSV] [--remove CSV] [--deny CSV] [--waiver NOTE] [--replace]');"
         },
         {
-          "line": 487,
+          "line": 490,
           "kind": "error-or-exit-candidate",
           "code": "process.exitCode = 1;"
         },
         {
-          "line": 498,
+          "line": 501,
           "kind": "error-or-exit-candidate",
           "code": "if (args._[1] !== 'translation' || args['complete-phase'] !== '03') throw new Error('--complete-phase applies only as approve translation --complete-phase 03');"
         },
         {
-          "line": 505,
+          "line": 508,
           "kind": "error-or-exit-candidate",
           "code": "if (cmd === 'repair' && !args.target && !args.queue) throw new Error('repair requires --target or --queue');"
         },
         {
-          "line": 510,
+          "line": 513,
           "kind": "error-or-exit-candidate",
           "code": "} else throw new Error(`Unknown command ${cmd}\\n${usage}`);"
         },
         {
-          "line": 531,
+          "line": 534,
           "kind": "error-or-exit-candidate",
           "code": "process.exitCode = 1;"
         }
@@ -4987,5 +5002,5 @@
       ]
     }
   ],
-  "candidateLines": 905
+  "candidateLines": 908
 }

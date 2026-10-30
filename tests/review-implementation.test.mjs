@@ -6,7 +6,7 @@ import { prepare, ready, fake, result, mini, finding } from './helpers.mjs';
 import { kitRoot } from '../scripts/install.mjs';
 import { safePath, atomicWrite, writeJSON, readJSON, fileHash, loadConfig, contextHash, done, unitState } from '../lib/core.mjs';
 import { approve, runStage, translate, runPilot, runJudgePreparation, currentRecord } from '../lib/pipeline.mjs';
-import { preparePilot, requirePilot } from '../lib/pilot.mjs';
+import { preparePilot, requirePilot, planPilot } from '../lib/pilot.mjs';
 import { currentPhase } from '../lib/phases.mjs';
 import { phaseCommand } from '../scripts/phase_cli.mjs';
 import { doctor } from '../scripts/run_migration.mjs';
@@ -55,6 +55,25 @@ test('a running pilot shows its own current phase as in progress in TODO and cha
   assert.deepEqual([item.status, item.title], ['in-progress', '04 Translation and review [running]']);
   assert.deepEqual([during.todo.current.phase, during.todo.current.state], ['04', 'running']);
   assert.match(during.checklist, /▶ 04 Translation and review \[running\] {2}← you are here/);
+});
+
+test('pilot plan shows the final scope without writing, and prepare then matches it', async t => {
+  const f = await reviewedPreparation(t, { count: 3 }), child = childPath(t, f);
+  const before = fs.readdirSync(safePath(f.root, 'migration')).sort();
+  const plan = planPilot(f.root, f.config, { sources: ['src/main.py'] });
+  assert.deepEqual(plan.counts, { requested: 1, added: 2, total: 3 });
+  assert.deepEqual(plan.added, plan.sources.filter(s => s !== 'src/main.py'));
+  assert.match(plan.plain.ja, /選んだ 1 ファイルと、それらが使っている 2 ファイル、合わせて 3 ファイル/);
+  assert.match(plan.plain.ja, /ビルドや動作確認はしません/);
+  assert.doesNotMatch(plan.plain.ja, /grant|target|translation|pilot/i);
+  // Read-only: no grant, lock or other file appears in production.
+  assert.deepEqual(fs.readdirSync(safePath(f.root, 'migration')).sort(), before);
+  assert.equal(fs.existsSync(child), false);
+  assert.match(planPilot(f.root, f.config, { sources: ['src/main.py'], through: 'build' }).plain.ja, /ビルドや動作確認も行います/);
+  assert.throws(() => planPilot(f.root, f.config, { sources: [] }), /explicit source/);
+  assert.throws(() => planPilot(f.root, f.config, { sources: ['src/none.py'] }), /not in the manifest/);
+  const grant = preparePilot(f.root, f.config, { target: child, sources: ['src/main.py'], note: 'Plan of 3 files approved' });
+  assert.deepEqual(grant.sources, plan.sources);
 });
 
 test('strict phase-03 pilot uses the shared pipeline before production approval and cannot become production done', async t => {

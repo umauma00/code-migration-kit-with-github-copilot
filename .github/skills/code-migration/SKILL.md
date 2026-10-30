@@ -143,6 +143,12 @@ beside it (rewritten by every `settings init`, never read back). `FILL_IN` marks
 what is still open; every role already holds the model just chosen, and the
 person edits a role only to give it another model, effort or context.
 
+**Questions are for someone who knows nothing about the kit.** Before every
+question, follow [how to write a question](../../../docs/PHASE-HANDOFF.md#write-every-question-for-someone-who-knows-nothing-about-the-kit):
+the situation in everyday words, each choice as what will happen with its good
+and bad points, one recommendation first with its reason, pause last, and no kit
+terms, IDs, paths or command lines ([plain words](../../../docs/PLAIN-WORDS.md)).
+
 **First choices are questions, never file edits.** Every entry a question
 fills (models, languages, phase mode, whether the original runs) is asked with
 the question tool and recorded by a command; the file then shows the answer. The

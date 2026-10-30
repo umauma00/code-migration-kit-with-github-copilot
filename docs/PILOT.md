@@ -6,9 +6,12 @@ and limits as production. It never supplies production done or approval evidence
 The file runner supports preserve mode; redesign trials remain separately designed.
 
 After actual review of production 00/00b/01/02 and successful formal `judge`,
-select risk-weighted sources and obtain permission for the concrete experiment:
+select risk-weighted sources, run the read-only `pilot plan` first, and obtain
+permission for the concrete experiment in one question:
 
 ```bash
+node migration-kit/scripts/run_migration.mjs pilot plan --root . \
+  --sources src/high-risk.py,src/boundary.py --through translation
 node migration-kit/scripts/run_migration.mjs pilot prepare --root . \
   --target /absolute/path/outside-project/new-pilot \
   --sources src/high-risk.py,src/boundary.py --through parity \
@@ -26,8 +29,16 @@ For plugins, use the loaded plugin's absolute script path. `--through` defaults
 to translation; build, smoke and parity require their configured commands.
 Source-only cannot authorize parity. The destination must be new and outside
 production, including when a parent directory is a symlink alias. Existing work
-is never overwritten. Dependencies that have manifest units expand the selection;
-inspect the returned requestedSources, sources, targets and boundary before running.
+is never overwritten. Dependencies that have manifest units expand the selection
+(the declared review dependencies, transitively), so the scope is usually larger
+than the files chosen. `pilot plan` returns that final scope without writing
+anything: `counts` (requested, added, total), the added files and a `plain`
+sentence in the person's language. Ask for permission with the final count, for
+example "選んだ 4 ファイルと、それらが使っている 22 ファイル、合わせて 26 ファイル",
+and put the final count in `--note`. Then `pilot prepare` matches what the person
+approved and needs no second question. If the count is too large for them,
+offer choosing other files before preparing anything; nothing needs revoking yet.
+Inspect the returned requestedSources, sources, targets and boundary before running.
 If a whole-project build/parity command requires additional outputs, include
 those sources explicitly or choose translation-only scope. The kit cannot make
 an arbitrary whole-project command validate a partial migration automatically.
