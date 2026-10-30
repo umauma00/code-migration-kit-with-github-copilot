@@ -14,8 +14,11 @@ request to the proxy and waited too.
   and the usual causes, with its own guidance (`doctor-stall`: check the proxy
   and sign-in, or run `doctor` without `--check-cli`). No later CLI probe
   starts after a stalled one, and a stalled hook probe skips the model-tool
-  probes that use the same loopback provider. Migration work keeps no
-  implicit deadline.
+  probes that use the same loopback provider. A stalled model-tools probe stays
+  "not-verified" (as before) but is marked `stalled` and skips the rest. Under
+  doctor the model-tools probes now wait 180 s instead of 120 s. A probe that
+  hangs after it already got its answer keeps that answer. Migration work
+  keeps no implicit deadline.
 - The loopback probes (reviewer hook, model tools, comparison B tools) add
   `127.0.0.1,localhost` to `NO_PROXY` for their own CLI child, keeping the
   person's entries. With a non-answering proxy the hook probe passed in under

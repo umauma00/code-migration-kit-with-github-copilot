@@ -141,7 +141,11 @@ export async function probeReviewerHook(command = 'copilot', prefixArgs = [], { 
     return { ok: false, requests, detail: requests < 2
       ? `The CLI did not complete the loopback probe (exit ${result.code}): ${(result.stderr || result.stdout).slice(-400)}`
       : 'The worker hook did not deny a tool-assisted reviewer\'s read of migration/runs: this CLI no longer loads repository/plugin hooks in prompt mode through GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS. Oversized reviews are not isolated from other workers\' records; keep maxReviewInputBytes high enough that reviews stay frozen, or pin a CLI version that passes this check.' };
-  } catch (e) { if (signal?.aborted) throw new Error('Interrupted'); return { ok: false, detail: e.message }; }
+  } catch (e) {
+    if (signal?.aborted) throw new Error('Interrupted');
+    // A CLI that hung after the denial still proved the hook.
+    return denied ? { ok: true } : { ok: false, detail: e.message };
+  }
   finally { server.closeAllConnections?.(); server.close(); fs.rmSync(home, { recursive: true, force: true }); }
 }
 // The tools a model gets from this CLI, read from the first request the CLI
@@ -171,7 +175,11 @@ export async function probeModelTools(command = 'copilot', args = [], { cwd, mod
     const result = await runProcess(command, args, { cwd, signal, timeoutMs: timeoutMs || 120000, input: 'Tool probe. Reply {}.', env: loopbackNoProxy({ ...process.env, ...env, ...loopbackEnv(home, server.address().port, model) }) });
     if (tools) return { ok: true, tools };
     return { ok: false, detail: `The CLI made no model request (exit ${result.code}): ${(result.stderr || result.stdout).slice(-400)}` };
-  } catch (e) { if (signal?.aborted) throw new Error('Interrupted'); return { ok: false, detail: e.message }; }
+  } catch (e) {
+    if (signal?.aborted) throw new Error('Interrupted');
+    // A CLI that hung after its first request already listed the tools.
+    return tools ? { ok: true, tools } : { ok: false, detail: e.message };
+  }
   finally { server.closeAllConnections?.(); server.close(); fs.rmSync(home, { recursive: true, force: true }); }
 }
 // A corporate HTTPS_PROXY without 127.0.0.1 in NO_PROXY sends the probe's

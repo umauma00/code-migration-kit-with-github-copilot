@@ -118,6 +118,8 @@ export async function modelToolChecks(root, config, layout, { command, signal, t
     const base = role.replace(/-read$/, ''), model = config.models?.[base];
     if (typeof model !== 'string' || unsetModels(config).includes(base)) continue;
     const probe = await probeModelTools(command, copilotArgs(role, model, undefined, layout), { cwd: root, model, env: copilotEnv(role), signal, timeoutMs });
+    // Unverified, never failed; a stalled probe means the next ones would stall too.
+    if (!probe.ok && stalled({ message: probe.detail })) { checks.push({ check: `model tools: ${role}`, ok: true, status: 'not-verified', stalled: true, model, detail: doctorStallDetail(`model tools: ${role}`, timeoutMs) }); return checks; }
     if (!probe.ok) { checks.push({ check: `model tools: ${role}`, ok: true, status: 'not-verified', model, detail: probe.detail }); continue; }
     const missing = [['view'], ['grep', 'rg']].filter(any => !any.some(name => probe.tools.includes(name))).map(any => any.join('|'));
     checks.push({ check: `model tools: ${role}`, ok: missing.length === 0, model, tools: probe.tools.filter(name => fileReadTools.includes(name)), ...(missing.length ? { missing } : {}) });
@@ -126,7 +128,7 @@ export async function modelToolChecks(root, config, layout, { command, signal, t
   if (typeof model === 'string' && !unsetModels(config).includes('implementer')) {
     try {
       const found = await stressBTools(command, model, { signal, timeoutMs });
-      checks.push({ check: 'model tools: comparison B', ok: true, model, tools: found.tools, ...(found.verified ? {} : { status: 'not-verified', detail: found.detail }) });
+      checks.push({ check: 'model tools: comparison B', ok: true, model, tools: found.tools, ...(found.verified ? {} : { status: 'not-verified', ...(stalled({ message: found.detail }) ? { stalled: true, detail: doctorStallDetail('model tools: comparison B', timeoutMs) } : { detail: found.detail }) }) });
     } catch (e) { if (signal?.aborted) throw e; checks.push({ check: 'model tools: comparison B', ok: false, model, detail: e.message }); }
   }
   return checks;
@@ -138,7 +140,7 @@ export async function modelToolChecks(root, config, layout, { command, signal, t
 // and doctor finishes. An explicit bounded commandTimeoutSeconds replaces it.
 export const doctorProbeSeconds = 180;
 const stalled = e => /^Process timed out after /.test(e?.message ?? '');
-export const doctorStallDetail = (stage, ms) => `Doctor check "${stage}" did not finish within ${Math.round(ms / 1000)} s. The Copilot CLI got no answer: a proxy that does not respond (HTTPS_PROXY / HTTP_PROXY), a sign-in waiting for input, or a blocked network can hold it. Nothing was changed.`;
+export const doctorStallDetail = (stage, ms) => `Doctor check "${stage}" did not finish within ${Number((ms / 1000).toFixed(1))} s. The Copilot CLI got no answer: a proxy that does not respond (HTTPS_PROXY / HTTP_PROXY), a sign-in waiting for input, or a blocked network can hold it. Nothing was changed.`;
 export async function doctor(root, config, { checkCLI = false, command = 'copilot', signal, sandboxProbe = localSandboxProbe, probeTimeoutMs } = {}) {
   if (signal?.aborted) throw new Error('Interrupted');
   const timeoutMs = probeTimeoutMs ?? (processTimeout(config, 'commandTimeoutSeconds') || doctorProbeSeconds * 1000);
