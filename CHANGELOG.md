@@ -15,11 +15,19 @@ searched and opened large files themselves (a project's inventory can be over
 - Over the limit they get the hash-bound file list and the inventory rows, keep
   read-only tools and are told to read only the listed files and never view
   the whole inventory or any record.
-- Each call is smaller and the same for every attempt. The cause was not
-  confirmed from the stalled session's log (the person could not run scripts
-  on that computer); 0.28.0's retry stays as the safety net.
+- Every attempt now sees the same input, and the CLI no longer records the
+  worker's own searches. The prompt itself is larger (the evidence, up to
+  `maxReviewInputBytes`), so in bounded runs `maxRunInputBytes` is reached
+  sooner, and the implementer and fixer models must hold that much input, as
+  the reviewer models already do. Over the limit a listed file is still read
+  whole. The cause was not confirmed from the stalled session's log (the
+  person could not run scripts on that computer); 0.28.0's retry stays as the
+  safety net.
+- The implementer and fixer profiles point people, not workers, at the manual.
+- The fold benchmark (lib/bench.mjs) still runs its implementer and fixer the
+  old way, with their own tools; its results describe that setup.
 - tests/implementer-evidence-2026-10-30.test.mjs covers the evidence for both
-  roles, both prompts and the CLI tool flags.
+  roles, the implementer and fixer prompts and the CLI tool flags.
 
 # 0.28.0 — 2026-10-30
 

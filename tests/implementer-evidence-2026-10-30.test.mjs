@@ -49,7 +49,7 @@ test('a frozen implementer prompt asks for no reads; an oversized one names the 
   const f = prepare(t), unit = f.units[0];
   const frozen = reviewEvidence(f.root, f.config, unit, null, { candidate: false });
   const prompt = agentPrompt({ role: 'implementer', unit, extra: { designInputs: [] }, workInput: frozen.text, workMode: 'frozen' });
-  assert.match(prompt, /Use ONLY the frozen task input below/);
+  assert.match(prompt, /Use ONLY the frozen task input and extra task data below/);
   assert.match(prompt, /No tools are available/);
   assert.doesNotMatch(prompt, /Read migration\/RULEBOOK\.md, relevant migration\/inventory\.tsv rows/);
   assert.ok(prompt.includes(frozen.text));
@@ -59,6 +59,17 @@ test('a frozen implementer prompt asks for no reads; an oversized one names the 
   assert.match(big, /never view it whole/);
   assert.match(big, /Read nothing else/);
   assert.ok(big.includes(assisted.text));
+  assert.match(prompt, /frozen task input and extra task data/);
+  assert.match(prompt, /The target entry is empty: it is the file you write/);
+  // The fixer is pointed at its candidate and its findings in extra task data.
+  atomicWrite(safePath(f.root, unit.target), 'export const divide = () => {};\n');
+  const fix = reviewEvidence(f.root, f.config, unit);
+  const fixer = agentPrompt({ role: 'fixer', unit, extra: { designInputs: [], confirmedFindings: [finding] }, workInput: fix.text, workMode: 'frozen' });
+  assert.match(fixer, /frozen task input and extra task data/);
+  assert.match(fixer, /change it only for extra\.confirmedFindings/);
+  assert.match(fixer, /Extra task data: .*Wrong division rounding/);
+  // Profiles send people, not workers, to the manual.
+  for (const role of ['implementer', 'fixer']) assert.doesNotMatch(fs.readFileSync(new URL(`../.github/agents/migration-${role}.agent.md`, import.meta.url), 'utf8'), /^Read \[the operating manual\]/m);
   // Without runner evidence (the fold benchmark), the old instructions stay.
   assert.match(agentPrompt({ role: 'implementer', unit, extra: { designInputs: [] } }), /Read migration\/RULEBOOK\.md/);
 });

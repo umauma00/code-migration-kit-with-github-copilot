@@ -3395,7 +3395,7 @@
     },
     {
       "path": "scripts/copilot_adapter.mjs",
-      "sha256": "a503e3808b72282c97f9849f73269eea8819cad113451828a39501c83b2ba33b",
+      "sha256": "3808f29f2fe446a9cd3eb1088824afcb5bcaeb734c63764ee43c60cfa18b0526",
       "entries": [
         {
           "line": 9,
