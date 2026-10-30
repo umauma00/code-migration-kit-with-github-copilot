@@ -1132,7 +1132,7 @@
     },
     {
       "path": "lib/guidance.mjs",
-      "sha256": "cdc8c41362225f998ec0f74583f72e5bd21147515e98ea5f2c441dd192b24560",
+      "sha256": "d0f1769d62265c29cece6c307de0c1aa00f6bf088ce5601219fa34ba8dbc0a52",
       "entries": [
         {
           "line": 74,
@@ -4633,7 +4633,7 @@
     },
     {
       "path": "scripts/run_migration.mjs",
-      "sha256": "7b49927204087868e0eac8a73fa08221956238899e806bf221398165a22de9f3",
+      "sha256": "f389248b009ee4225086632ec59b43262083c0cca60525968efd8abdc1d04443",
       "entries": [
         {
           "line": 92,
@@ -4696,99 +4696,94 @@
           "code": "} catch (e) { if (signal?.aborted) throw e; checks.push({ check: 'model tools: comparison B', ok: false, model, detail: e.message }); }"
         },
         {
-          "line": 145,
+          "line": 147,
           "kind": "error-or-exit-candidate",
           "code": "if (signal?.aborted) throw new Error('Interrupted');"
         },
         {
-          "line": 146,
+          "line": 148,
           "kind": "deadline-or-observation",
-          "code": "const timeoutMs = probeTimeoutMs ?? (processTimeout(config, 'commandTimeoutSeconds') || doctorProbeSeconds * 1000);"
+          "code": "const timeoutMs = probeTimeoutMs ?? doctorTimeout(config);"
         },
         {
-          "line": 149,
+          "line": 151,
           "kind": "error-or-exit-candidate",
           "code": "checks.push({ check: 'execution limits', ok: true, executionMode: config.executionMode ?? 'continuous', ...(ignored.length ? { ignored,"
         },
         {
-          "line": 150,
+          "line": 152,
           "kind": "error-or-exit-candidate",
           "code": "note: `Continuous mode does not enforce ${ignored.join(', ')}. Set \"executionMode\": \"bounded\" to enforce them, or delete them; per-command --max-calls / --max-rounds still apply.` } : {}) });"
         },
         {
-          "line": 178,
+          "line": 180,
           "kind": "deadline-or-observation",
           "code": "// Copilot hooks fail open on timeout: a slow start silently disables the"
         },
         {
-          "line": 187,
+          "line": 189,
           "kind": "deadline-or-observation",
           "code": "limit = entry?.timeoutSec ?? entry?.timeout ?? null;"
         },
         {
-          "line": 195,
+          "line": 197,
           "kind": "deadline-or-observation",
           "code": "signal, timeoutMs, env: { ...process.env, ...(role ? { MIGRATION_KIT_ROLE: role } : {}) } }).catch(e => {"
         },
         {
-          "line": 196,
+          "line": 198,
           "kind": "error-or-exit-candidate",
           "code": "if (signal?.aborted) throw new Error('Interrupted');"
         },
         {
-          "line": 205,
+          "line": 207,
           "kind": "deadline-or-observation",
           "code": "checks.push({ check: 'hook responds before its timeout', ok: Boolean(worker && parent) && worker.code === 0 && parent.code === 0 &&"
         },
         {
-          "line": 208,
+          "line": 210,
           "kind": "deadline-or-observation",
           "code": "command: line ?? null, durationMs: slowest, timeoutSec: limit,"
         },
         {
-          "line": 209,
+          "line": 211,
           "kind": "deadline-or-observation",
           "code": "note: 'Runs the configured hook command. Copilot CLI and VS Code let a tool call through when a hook times out; keep the measured time well under half the configured timeout.' });"
         },
         {
-          "line": 227,
+          "line": 229,
           "kind": "error-or-exit-candidate",
           "code": "if (signal?.aborted) throw new Error('Interrupted');"
         },
         {
-          "line": 234,
+          "line": 236,
           "kind": "deadline-or-observation",
           "code": "const version = await runProcess(command, ['--version'], { cwd: root, env, signal, timeoutMs });"
         },
         {
-          "line": 236,
+          "line": 239,
           "kind": "deadline-or-observation",
           "code": "const help = await runProcess(command, ['--help'], { cwd: root, env, signal, timeoutMs });"
         },
         {
-          "line": 243,
+          "line": 245,
           "kind": "deadline-or-observation",
           "code": "const agents = await probeWorkerAgents(command, [], { cwd: root, layout, signal, timeoutMs });"
         },
         {
-          "line": 248,
+          "line": 250,
           "kind": "deadline-or-observation",
           "code": "const hook = await probeReviewerHook(command, [], { cwd: root, layout, signal, timeoutMs });"
         },
         {
-          "line": 250,
+          "line": 252,
           "kind": "deadline-or-observation",
           "code": "if (hookStalled) Object.assign(hook, { stalled: true, detail: doctorStallDetail(stage, timeoutMs) });"
         },
         {
-          "line": 258,
+          "line": 260,
           "kind": "deadline-or-observation",
           "code": "if (agents.ok && !hookStalled) checks.push(...await modelToolChecks(root, config, layout, { command, signal, timeoutMs }));"
-        },
-        {
-          "line": 259,
-          "kind": "deadline-or-observation",
-          "code": "checks.push({ check: 'file descriptor limit', ...await fileLimits({ signal, timeoutMs }), minimum: fileLimitMinimum,"
         },
         {
           "line": 262,
@@ -4801,147 +4796,152 @@
           "code": "checks.push(stalled(e) ? { check: 'Copilot CLI answers', ok: false, stalled: true, stage, detail: doctorStallDetail(stage, timeoutMs) }"
         },
         {
-          "line": 281,
+          "line": 268,
+          "kind": "deadline-or-observation",
+          "code": "checks.push({ check: 'file descriptor limit', ...await fileLimits({ signal, timeoutMs }), minimum: fileLimitMinimum,"
+        },
+        {
+          "line": 284,
           "kind": "error-or-exit-candidate",
           "code": "if (!Number.isInteger(seconds) || seconds < 1 || seconds > 1800) throw new Error('--wait must be a number of seconds from 1 to 1800');"
         },
         {
-          "line": 289,
+          "line": 292,
           "kind": "loop-exit-candidate",
           "code": "if (progressKey(report) !== start) break;"
         },
         {
-          "line": 305,
+          "line": 308,
           "kind": "error-or-exit-candidate",
           "code": "throw new Error('Specify the exact lock owner PID');"
         },
         {
-          "line": 311,
+          "line": 314,
           "kind": "pid-probe",
           "code": "if (alive) try { process.kill(pid, 0); } catch (e) { if (e.code === 'ESRCH') alive = false; else throw e; }"
         },
         {
-          "line": 312,
+          "line": 315,
           "kind": "error-or-exit-candidate",
           "code": "if (alive) throw new Error('Lock owner is still running; refusing to unlock');"
         },
         {
-          "line": 344,
+          "line": 347,
           "kind": "error-or-exit-candidate",
           "code": "if (!['list', 'set'].includes(args._[1])) throw new Error('Use models list [--format json|markdown] | models set --assign ROLE=ID[:EFFORT][:long_context],... | models set --role ROLE --model ID [--effort LEVEL|default] [--context default|long_context]');"
         },
         {
-          "line": 345,
+          "line": 348,
           "kind": "error-or-exit-candidate",
           "code": "if (args.format !== undefined && !['json', 'markdown'].includes(args.format)) throw new Error('models list format must be json or markdown');"
         },
         {
-          "line": 348,
+          "line": 351,
           "kind": "error-or-exit-candidate",
           "code": "if (!readConfigIfPresent(root)) throw new Error('migration/config.json is missing: initialize the project (install.mjs) before recording model choices');"
         },
         {
-          "line": 366,
+          "line": 369,
           "kind": "error-or-exit-candidate",
           "code": "if (!readConfigIfPresent(root)) throw new Error('migration/config.json is missing: initialize the project (install.mjs) before run settings');"
         },
         {
-          "line": 374,
+          "line": 377,
           "kind": "error-or-exit-candidate",
           "code": "if (!fs.existsSync(file)) throw new Error(`${runSettingsFile} is missing: run settings init first`);"
         },
         {
-          "line": 376,
+          "line": 379,
           "kind": "error-or-exit-candidate",
           "code": "try { settings = JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\\uFEFF/, '')); } catch (e) { throw new Error(`${runSettingsFile} is not valid JSON: ${e.message}`); }"
         },
         {
-          "line": 378,
+          "line": 381,
           "kind": "error-or-exit-candidate",
           "code": "if (errors.length) process.exitCode = 1;"
         },
         {
-          "line": 382,
+          "line": 385,
           "kind": "error-or-exit-candidate",
           "code": "if (action !== 'apply') throw new Error('Use settings init | check | apply');"
         },
         {
-          "line": 386,
+          "line": 389,
           "kind": "error-or-exit-candidate",
           "code": "if (!result.applied) process.exitCode = 1;"
         },
         {
-          "line": 399,
+          "line": 402,
           "kind": "error-or-exit-candidate",
           "code": "if (args.format && !['json', 'markdown', 'todo', 'checklist'].includes(args.format)) throw new Error('status format must be json, markdown, todo or checklist');"
         },
         {
-          "line": 401,
+          "line": 404,
           "kind": "error-or-exit-candidate",
           "code": "if (!report.ok) process.exitCode = 1;"
         },
         {
-          "line": 412,
+          "line": 415,
           "kind": "error-or-exit-candidate",
           "code": "if (args.format && !['json', 'markdown'].includes(args.format)) throw new Error('usage format must be json or markdown');"
         },
         {
-          "line": 418,
+          "line": 421,
           "kind": "error-or-exit-candidate",
           "code": "if (typeof args.message !== 'string' || !args.message.trim()) throw new Error('guidance requires --message TEXT (the error to explain)');"
         },
         {
-          "line": 424,
+          "line": 427,
           "kind": "cancellation",
           "code": "const abort = () => controller.abort();"
         },
         {
-          "line": 429,
+          "line": 432,
           "kind": "error-or-exit-candidate",
           "code": "if (args._[1] !== 'command') throw new Error('Use stress-b command --dir DIR [--model ID]');"
         },
         {
-          "line": 469,
+          "line": 472,
           "kind": "error-or-exit-candidate",
           "code": "else if (cmd === 'source-spec') throw new Error('Use source-spec init [--apply] | check');"
         },
         {
-          "line": 483,
+          "line": 486,
           "kind": "error-or-exit-candidate",
           "code": "} else throw new Error('Use survey plan|run|status|merge --kind facts|contracts|inventory [--max-files N] [--sites migration/PATH.tsv]');"
         },
         {
-          "line": 497,
+          "line": 500,
           "kind": "error-or-exit-candidate",
           "code": "else throw new Error('Use sessions status | prune [--run RUN_ID]');"
         },
         {
-          "line": 505,
+          "line": 508,
           "kind": "error-or-exit-candidate",
           "code": "} else throw new Error('Use guardrails show | install [--add CSV] [--remove CSV] [--deny CSV] [--waiver NOTE] [--replace]');"
         },
         {
-          "line": 510,
+          "line": 513,
           "kind": "error-or-exit-candidate",
           "code": "process.exitCode = 1;"
         },
         {
-          "line": 521,
+          "line": 524,
           "kind": "error-or-exit-candidate",
           "code": "if (args._[1] !== 'translation' || args['complete-phase'] !== '03') throw new Error('--complete-phase applies only as approve translation --complete-phase 03');"
         },
         {
-          "line": 528,
+          "line": 531,
           "kind": "error-or-exit-candidate",
           "code": "if (cmd === 'repair' && !args.target && !args.queue) throw new Error('repair requires --target or --queue');"
         },
         {
-          "line": 533,
+          "line": 536,
           "kind": "error-or-exit-candidate",
           "code": "} else throw new Error(`Unknown command ${cmd}\\n${usage}`);"
         },
         {
-          "line": 554,
+          "line": 557,
           "kind": "error-or-exit-candidate",
           "code": "process.exitCode = 1;"
         }

@@ -18,7 +18,7 @@ CPU使用率、無出力、経過時間、呼び出し数、修正回数、入�
 | CPU 100%が継続、CPUが低い、無出力 | 終了・再起動しない。CPUによる自動終了コードはなく、親の指示にも中断禁止を明記 | 全ハーネスのskill・orchestrator・工程引継ぎ |
 | 1ワーカー600秒、ビルド・比較600秒 | 自動終了しない。既存の正数設定も通常モードでは無効。低水準APIの `timeoutMs: 0` はタイマーを作らない | `execution-policy.mjs`, `process.mjs`, `copilot_adapter.mjs`, `pipeline.mjs` |
 | モデル一覧・バージョン確認の20/30/60秒 | 暗黙の時間切れを撤廃。応答を待つ | `models.mjs`, CLIとadapterの診断 |
-| doctorの各プローブ | 移行作業ではない短い確認なので、continuousでも1つ180秒（boundedで `commandTimeoutSeconds` を明示すればその値）で打ち切り、終わらなかった確認とよくある原因（応答しないプロキシ・サインイン待ち・ネットワーク遮断）を出して終わる。応答しないプロキシで1時間以上「still running」が続いた（2026-10-30）。後続のCLIプローブは開始しない。利用者の明示キャンセルも各プローブへ伝える。127.0.0.1 の偽プロバイダを使うプローブは、その子プロセスにだけ `NO_PROXY` へ 127.0.0.1・localhost を足す | `run_migration.mjs` の `doctor`, `copilot_adapter.mjs` |
+| doctorの各プローブ | 移行作業ではない短い確認なので、continuousでも起動するプロセス1つにつき180秒（boundedで `commandTimeoutSeconds` をそれより短く明示すればその値）で打ち切り、終わらなかった確認とよくある原因（応答しないプロキシ・サインイン待ち・ネットワーク遮断）を出して終わる。応答しないプロキシで1時間以上「still running」が続いた（2026-10-30）。後続のCLIプローブは開始しない。利用者の明示キャンセルも各プローブへ伝える。127.0.0.1 の偽プロバイダを使うプローブは、その子プロセスにだけ `NO_PROXY` へ 127.0.0.1・localhost を足す | `run_migration.mjs` の `doctor`, `copilot_adapter.mjs` |
 | 子プロセスstdout+stderrが16MiB超 | 終了せず全出力をログファイルへ退避。メモリには末尾だけ保持。モデルJSONLと診断パーサーは全ログを順に読む | `process.mjs`, `copilot_adapter.mjs`, `diagnostics.mjs`, `diagnostic_queue.mjs` |
 | surveyのファイル集合・censusが入力上限超 | ファイル・箇所の集合を分割。scope IDと既存結果を維持 | `survey-parts.mjs` |
 | surveyの単一ファイル本文が入力上限超 | facts・contractsは行範囲に分割（1行自体が巨大でも文字位置で分割し、Unicodeのペアを切らない。入力は実際のJSON化後bytesで検査）。inventoryは、RULEBOOKと1箇所と一緒に1回の入力に収まらないファイルについて、モデルを呼ばずに全箇所をUNKNOWN / TODO(port)で記録し、`unsurveyedOversizedFiles` に残す（2万行・1,000箇所の1ファイルで148回の呼び出しが同じUNKNOWNに結合されていた） | `survey-parts.mjs`, `survey.mjs` |

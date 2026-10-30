@@ -8,7 +8,8 @@ probe waited on api.github.com, and the reviewer-hook probe sent its loopback
 request to the proxy and waited too.
 
 - Each doctor probe now has a 180 s deadline (`doctorProbeSeconds`), also in
-  continuous mode; an explicit bounded `commandTimeoutSeconds` replaces it.
+  continuous mode; an explicit bounded `commandTimeoutSeconds` can only shorten
+  it. The deadline is per process, and also covers the hook response check.
   A probe past it ends as a failed check that names the stage
   (`Copilot CLI answers`, or the reviewer-hook check with `stalled: true`)
   and the usual causes, with its own guidance (`doctor-stall`: check the proxy
