@@ -129,7 +129,7 @@ node migration-kit/scripts/run_migration.mjs doctor --check-cli
 | `verificationRoots` | 比較器・テスト・テストデータ。例：`["tests"]` |
 | `verificationInputs` | 追加で変更を追跡するビルド設定・依存設定等のファイル。例：`["build/config.json", "packages/api/tsconfig.json"]` |
 | `buildArtifactRoots` | コマンドが生成するバイナリ・オブジェクト・レポートのディレクトリ。例：`["artifacts", "dist"]`。既定は空配列 |
-| `maxReviewInputBytes` | 固定レビュー入力のJSONサイズ上限。新規導入は1048576 bytes（1 MiB、目安で約26万〜36万トークン）。レビュアーのモデルの `models list` の「コンテキスト（入力上限）」がこれより小さいときは、その上限に収まる値まで下げる（例：272K なら 655360 以下）。既存の設定は値を保ち、項目がなければ65536。超過した単位は、自動でツール付きレビュー（下記）に切り替わる |
+| `maxReviewInputBytes` | 固定レビュー入力のJSONサイズ上限。新規導入は1048576 bytes（1 MiB、目安で約26万〜36万トークン）。実装・修正担当も同じ入力を受け取る（0.29.0）。レビュアー・実装・修正担当のモデルの `models list` の「コンテキスト（入力上限）」がこれより小さいときは、その上限に収まる値まで下げる（例：272K なら 655360 以下）。既存の設定は値を保ち、項目がなければ65536。超過した単位は、自動でツール付きレビュー（下記）に切り替わる |
 | `reviewDependencyMap` | 監査した依存宣言JSON。既定 `migration/review-dependencies.json`。phase 01で作成する必須成果物 |
 | `sourceLanguage`, `targetLanguage` | 対象言語。テンプレートのPython/JavaScriptを変更可能 |
 | `verificationMode` | `runtime`（省略時）：元環境と新旧比較を実行。`source-only`：ソース由来の準備と変換後build/smokeを検証し、動作同等性未検証として引き継ぐ。既存設定は自動変更しない |
@@ -151,7 +151,7 @@ node migration-kit/scripts/run_migration.mjs doctor --check-cli
 | `maxRunInputBytes` | boundedモードだけで使う入力累計bytesの上限。通常実行は量だけで打ち切らず、`usageEstimate` とCLIの使用量を記録する |
 | `maxAiCreditsPerCall` | boundedモードだけで各workerへ渡す任意の `--max-ai-credits`（CLIの最小値30）。continuousでは渡さない。サービス側の残高・組織上限は外部制約 |
 | `timeoutSeconds` | boundedモードだけで使うCLI呼び出し時間上限。0は期限なし。通常実行は旧設定が600でも打ち切らない |
-| `transientRetries`, `transientRetryDelayMs` | レート制限・5xx・通信障害を待って再試行する。通常実行は回数で打ち切らない。boundedだけ既定2回。待機は既定5秒から倍増、最大60秒 |
+| `transientRetries`, `transientRetryDelayMs` | レート制限・5xx・通信障害を待って再試行する。通常実行は回数で打ち切らない（Copilot CLI 内部の受け渡し待ちの詰まりだけは5回まで）。boundedだけ既定2回。待機は既定5秒から倍増、最大60秒 |
 | `maxConsecutiveFailures` | boundedモードだけで使う連続失敗時の新規起動停止（既定3）。通常実行は独立した残りの単位を処理する。認証・残高など共通の実障害は原因を報告する |
 | `commandTimeoutSeconds` | boundedモードだけで使うビルド・比較の時間上限。0は期限なし。CPU使用率・無出力・600秒経過を理由に正常な処理を中断しない。`doctor --check-cli` と `stress-b command` のモデルのツール確認は、bounded で値を設定すればその時間、通常実行または 0 のときは2分で打ち切り、未確認として報告する |
 
@@ -163,7 +163,7 @@ manifestに明示した元ファイルと変換先は走査除外ディレクト
 
 生成物のディレクトリは元ソース・変換後ソース・検証ルート・明示入力・キットの管理領域と重ねられません。実際に読み込む設定やスクリプトは生成物のディレクトリ外に置き、必要に応じて `verificationInputs` へ登録します。`doctor` に入力一覧と生成物のディレクトリを別々に表示します。生成物の内容は承認ハッシュで追跡しないため、build・smoke・parityの各コマンドでその正しさを検証してください。Node/Python/POSIX shellの認識したインラインコードはファイル扱いしませんが、`cc -c FILE` と `node -c FILE` のFILEは追跡します。
 
-レビュー入力は対象の元ファイルと宣言した依存の推移的な閉包、当該候補ファイル、RULEBOOK全文、その範囲に一致するinventory行と全体注記、指定した診断です。同じ内容を両担当へ渡し、ツールを無効化します。inventoryは `file` を先頭列とし、リポジトリ相対パスの完全一致で選びます。ファイル先頭のUTF-8 BOMはコメント・空行・ヘッダーの判定前に一度だけ除去します。不正な行や未知の先頭列は停止します。Shift_JIS・EUC-JP・Latin-1・UTF-16 の入力は読み替えて渡し、`encoding` を明記します（元ファイルは変更しません）。NULを含むバイナリは名前を示して停止します。静的な元資料は実装・修正担当の呼び出し前にも検査します。他の変換後ファイルとの統合はbuild/smoke/parityで確認します。上限を超えた単位は止めずに、**ツール付きレビュー**へ自動で切り替えます。両担当には本文の代わりに「対象ファイルの一覧とSHA-256」を同じ内容で渡し、読み取り専用の `reviewer-*-read` プロファイルが各ファイルを読みます。他の担当の記録（`migration/runs` 等）はhookで読めません。固定入力より独立性の保証が弱いため、実行記録の `reviewInputMode`、runの `toolAssistedReviews` と `warnings` に残り、工程報告にも表示されます。変更追跡のための全ソース走査は維持します。
+レビュー入力は対象の元ファイルと宣言した依存の推移的な閉包、当該候補ファイル、RULEBOOK全文、その範囲に一致するinventory行と全体注記、指定した診断です。同じ内容を両担当へ渡し、ツールを無効化します。inventoryは `file` を先頭列とし、リポジトリ相対パスの完全一致で選びます。ファイル先頭のUTF-8 BOMはコメント・空行・ヘッダーの判定前に一度だけ除去します。不正な行や未知の先頭列は停止します。Shift_JIS・EUC-JP・Latin-1・UTF-16 の入力は読み替えて渡し、`encoding` を明記します（元ファイルは変更しません）。NULを含むバイナリは名前を示して停止します。実装・修正担当にも同じ入力（実装担当には候補ファイルの中身を除いたもの）をキットが渡し、収まればツールなしで呼びます。上限を超えるときは同じ「一覧とSHA-256」と該当inventory行を渡し、一覧のファイルだけを読ませます（inventory全体は開かせません）。他の変換後ファイルとの統合はbuild/smoke/parityで確認します。上限を超えた単位は止めずに、**ツール付きレビュー**へ自動で切り替えます。両担当には本文の代わりに「対象ファイルの一覧とSHA-256」を同じ内容で渡し、読み取り専用の `reviewer-*-read` プロファイルが各ファイルを読みます。他の担当の記録（`migration/runs` 等）はhookで読めません。固定入力より独立性の保証が弱いため、実行記録の `reviewInputMode`、runの `toolAssistedReviews` と `warnings` に残り、工程報告にも表示されます。変更追跡のための全ソース走査は維持します。
 
 CLIの全5ワーカーは `--no-custom-instructions` を付けて新しいプロセスを起動します。`AGENTS.md`、リポジトリ・個人のCopilot指示などの自動注入を止め、指定した役割プロファイルとランナーの契約を使います。案件固有の移植方針は、承認対象の `migration/RULEBOOK.md` とinventoryへ取り込んでください。暗黙の指示ファイルを変更してもワーカーの方針は変わりません。通常の対話セッションでは引き続きCopilot指示を使えます。
 

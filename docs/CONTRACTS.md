@@ -16,6 +16,9 @@ messages, and requires a successful terminal result. Malformed JSONL, session
 errors, aborts, unfinished tool requests and events after result fail closed.
 Informational/unknown event types may be ignored; they never supply a reply.
 Implementer, fixer and arbiter profiles use the concrete CLI tools view,grep,glob.
+When the implementer or fixer gets a frozen task input, its call also denies
+read (`--deny-tool read,write,shell`); the profile keeps the tools for inputs
+over the limit.
 The read/search aliases are not accepted for these workers because the reference
 CLI loses search tools with those aliases.
 
@@ -64,9 +67,11 @@ recorded with each review. No reviewer outcome is supplied to the other reviewer
 Oversized input and binary files block the unit instead of silently omitting
 evidence. A source in a legacy encoding (Shift_JIS, EUC-JP, Latin-1, UTF-16) is
 decoded by the bundled mappers' rules and its entry names the `encoding`; the
-implementer and fixer get such sources decoded in `extra.legacyEncodedSources`
-(the unit's source first, then dependencies, within `maxReviewInputBytes`; a
-file over the budget is named with its encoding only).
+implementer and fixer get such sources decoded inside their frozen task input;
+when that input is over the limit (and for the arbiter) they come in
+`extra.legacyEncodedSources` (the unit's source first, then dependencies,
+within `maxReviewInputBytes`; a file over the budget is named with its encoding
+only).
 Kanji-only Shift_JIS or EUC-JP cannot be told from Latin-1 reliably; set
 `sourceEncoding` (for example `"shift_jis"`) in `migration/config.json` to
 name the encoding of non-UTF-8 sources (`cp932` is accepted). It is tried

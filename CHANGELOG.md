@@ -1,3 +1,60 @@
+# 0.29.0 — 2026-10-30
+
+In the same phase 03 pilot, one file's implementer stalled the Copilot CLI on
+every attempt (the 120 s "Session host did not acknowledge" wait, once at
+`tool.execution_start`). The implementer and fixer were told to read the
+rulebook, the inventory and the dependencies with their own tools, so they
+searched and opened large files themselves (a project's inventory can be over
+1.5 MB).
+
+- The runner now hands the implementer and the fixer the same evidence the
+  reviewers get: the rulebook, design inputs, this unit's inventory rows, the
+  source and the sources it depends on (decoded when legacy-encoded), and for
+  the fixer its candidate. When it fits `maxReviewInputBytes` they run without
+  file tools (`--deny-tool read,write,shell`).
+- Over the limit they get the hash-bound file list and the inventory rows, keep
+  read-only tools and are told to read only the listed files and never view
+  the whole inventory or any record.
+- Every attempt now sees the same input, and the CLI no longer records the
+  worker's own searches. The prompt itself is larger (the evidence, up to
+  `maxReviewInputBytes`), so in bounded runs `maxRunInputBytes` is reached
+  sooner, and the implementer and fixer models must hold that much input, as
+  the reviewer models already do. Over the limit a listed file is still read
+  whole. The cause was not confirmed from the stalled session's log (the
+  person could not run scripts on that computer); 0.28.0's retry stays as the
+  safety net.
+- The implementer and fixer profiles point people, not workers, at the manual.
+- The fold benchmark (lib/bench.mjs) still runs its implementer and fixer with
+  their own tools and no runner evidence (now under the reworded profiles), so
+  its results are not directly comparable with earlier runs or with
+  translation.
+- The fixer's diagnostic travels once, inside the evidence.
+- tests/implementer-evidence-2026-10-30.test.mjs covers the evidence for both
+  roles, the implementer and fixer prompts and the CLI tool flags.
+
+# 0.28.0 — 2026-10-30
+
+A phase 03 pilot stayed at 0 of 26 files for over an hour: workers ended with
+the Copilot CLI's own "assistant.reasoning event delivery" timeout, and each one
+was blocked on the first try, together with every file that depends on it.
+
+- The CLI's internal event wait ("Session host did not acknowledge '<event>'
+  delivery within …", reported as 120 s, and its 60 s counterpart "the event
+  poll loop may be wedged") is now a transient failure: the runner and surveys
+  retry the same call with backoff, as for rate limits and network errors, but
+  at most 5 stall retries per call (per part for surveys; `hostStallRetries`,
+  counted apart from other transient retries; bounded mode's
+  `transientRetries` still caps the total), so a stall that does not clear blocks that unit and its dependants
+  instead of spending calls forever. The message reports a 120 s wait; no setting
+  that lengthens it was found in CLI 1.0.105 or the kit. `status` names it when a call is retrying.
+- Failure guidance has a `cli-host-stall` entry that says so in plain words and
+  offers a rerun (finished files are kept) or fewer parallel workers (approvals
+  are kept). The kit's own deadline and a cancellation stay with the timeout
+  rule.
+- tests/cli-host-stall-2026-10-30.test.mjs covers the classification, a worker
+  retried after one stall, the retry cap (also after rate-limit retries) and
+  the guidance; surveys use the same check.
+
 # 0.27.0 — 2026-10-30
 
 Questions are written for someone who knows nothing about the kit. In phase 03

@@ -8,6 +8,8 @@ disable-model-invocation: true
 
 Return the implementation contract. Change only the assigned target and only for confirmed findings. Preserve unrelated behavior. Never modify the rulebook, tests or source.
 
-Read [the operating manual](../../docs/OPERATING-MANUAL.md) and
+Work from the task input the coordinator supplies; read files only when it lists them for you to read.
+
+For human setup: [operating manual](../../docs/OPERATING-MANUAL.md) and
 [JSON contracts](../../docs/CONTRACTS.md). Model selection belongs to
 `migration/config.json`; do not add a `model` frontmatter override.

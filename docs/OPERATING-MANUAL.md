@@ -42,8 +42,9 @@ does not apply to automated workers, which keep their JSON-only contracts.
 4. 00 reads and samples the source directly, as upstream does. 00b (source-as-spec)
    and 02 must cover every file: delegate that reading by scope with `survey` (fresh
    tool-free surveyors, results as files under `migration/surveys/`); see [surveys](SURVEYS.md).
-   Translate through the runner. Implementers, fixers and arbiters use read/search
-   tools. Reviewers have no tools and receive the same frozen input; when it exceeds
+   Translate through the runner. Implementers and fixers receive the same evidence as
+   reviewers from the runner and run without tools when it fits (over the limit they
+   read only the listed files); arbiters use read/search tools. Reviewers have no tools and receive the same frozen input; when it exceeds
    maxReviewInputBytes both receive the same hash-bound file list and
    run on read-only `reviewer-*-read` profiles, recorded as tool-assisted. All return
    JSON. The coordinator validates and writes only the manifest target.
