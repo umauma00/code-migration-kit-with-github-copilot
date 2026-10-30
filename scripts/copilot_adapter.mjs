@@ -135,7 +135,7 @@ export async function probeReviewerHook(command = 'copilot', prefixArgs = [], { 
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'migration-kit-hook-probe-'));
   try {
     await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
-    const env = { ...copilotEnv(role), ...loopbackEnv(home, server.address().port, 'gpt-4.1') };
+    const env = loopbackNoProxy({ ...copilotEnv(role), ...loopbackEnv(home, server.address().port, 'gpt-4.1') });
     const result = await runProcess(command, [...prefixArgs, ...copilotArgs(role, 'gpt-4.1', undefined, layout)], { cwd, env, signal, timeoutMs, input: 'Hook probe. Follow the tool call.' });
     if (denied) return { ok: true };
     return { ok: false, requests, detail: requests < 2
@@ -168,11 +168,24 @@ export async function probeModelTools(command = 'copilot', args = [], { cwd, mod
   try {
     await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
     // Bounded even when commands are not: a CLI that keeps retrying is unverified.
-    const result = await runProcess(command, args, { cwd, signal, timeoutMs: timeoutMs || 120000, input: 'Tool probe. Reply {}.', env: { ...process.env, ...env, ...loopbackEnv(home, server.address().port, model) } });
+    const result = await runProcess(command, args, { cwd, signal, timeoutMs: timeoutMs || 120000, input: 'Tool probe. Reply {}.', env: loopbackNoProxy({ ...process.env, ...env, ...loopbackEnv(home, server.address().port, model) }) });
     if (tools) return { ok: true, tools };
     return { ok: false, detail: `The CLI made no model request (exit ${result.code}): ${(result.stderr || result.stdout).slice(-400)}` };
   } catch (e) { if (signal?.aborted) throw new Error('Interrupted'); return { ok: false, detail: e.message }; }
   finally { server.closeAllConnections?.(); server.close(); fs.rmSync(home, { recursive: true, force: true }); }
+}
+// A corporate HTTPS_PROXY without 127.0.0.1 in NO_PROXY sends the probe's
+// loopback request to the proxy (CLI 1.0.105: "Could not connect to local
+// model provider", or no answer at all). The probe adds loopback to NO_PROXY
+// for its own child only, keeping the person's entries; Windows matches
+// variable names without case, so only one spelling is passed there.
+export function loopbackNoProxy(env) {
+  const out = { ...env }, keys = Object.keys(out).filter(key => key.toLowerCase() === 'no_proxy');
+  const entries = keys.flatMap(key => String(out[key] ?? '').split(',')).map(entry => entry.trim()).filter(Boolean);
+  for (const key of keys) delete out[key];
+  out.NO_PROXY = [...new Set([...entries, '127.0.0.1', 'localhost'])].join(',');
+  if (process.platform !== 'win32') out.no_proxy = out.NO_PROXY;
+  return out;
 }
 const loopbackEnv = (home, port, model) => ({ COPILOT_HOME: home, COPILOT_OFFLINE: 'true', COPILOT_PROVIDER_BASE_URL: `http://127.0.0.1:${port}/v1`,
   COPILOT_PROVIDER_TYPE: 'openai', COPILOT_PROVIDER_API_KEY: 'loopback-probe', COPILOT_PROVIDER_BEARER_TOKEN: '', COPILOT_PROVIDER_WIRE_API: 'completions',

@@ -131,9 +131,17 @@ export async function modelToolChecks(root, config, layout, { command, signal, t
   }
   return checks;
 }
-export async function doctor(root, config, { checkCLI = false, command = 'copilot', signal, sandboxProbe = localSandboxProbe } = {}) {
+// Doctor is a short readiness check, not migration work, so each process it
+// starts has a deadline even in continuous mode: a CLI held by a proxy that
+// never answers kept doctor --check-cli "still running" for over an hour
+// (2026-10-30). A probe past it is reported with its stage and likely causes,
+// and doctor finishes. An explicit bounded commandTimeoutSeconds replaces it.
+export const doctorProbeSeconds = 180;
+const stalled = e => /^Process timed out after /.test(e?.message ?? '');
+export const doctorStallDetail = (stage, ms) => `Doctor check "${stage}" did not finish within ${Math.round(ms / 1000)} s. The Copilot CLI got no answer: a proxy that does not respond (HTTPS_PROXY / HTTP_PROXY), a sign-in waiting for input, or a blocked network can hold it. Nothing was changed.`;
+export async function doctor(root, config, { checkCLI = false, command = 'copilot', signal, sandboxProbe = localSandboxProbe, probeTimeoutMs } = {}) {
   if (signal?.aborted) throw new Error('Interrupted');
-  const timeoutMs = processTimeout(config, 'commandTimeoutSeconds');
+  const timeoutMs = probeTimeoutMs ?? (processTimeout(config, 'commandTimeoutSeconds') || doctorProbeSeconds * 1000);
   const checks = [{ check: 'configuration', ok: true }];
   const ignored = ignoredLimits(config);
   checks.push({ check: 'execution limits', ok: true, executionMode: config.executionMode ?? 'continuous', ...(ignored.length ? { ignored,
@@ -217,32 +225,42 @@ export async function doctor(root, config, { checkCLI = false, command = 'copilo
   if (signal?.aborted) throw new Error('Interrupted');
   checks.push(sandboxCheck(sandbox));
   if (checkCLI) {
+    let stage = 'Copilot CLI --version';
     try {
       // Same environment as workers: a launcher may pick a different build otherwise.
       const env = copilotEnv('reviewer-rules');
       const version = await runProcess(command, ['--version'], { cwd: root, env, signal, timeoutMs });
+      stage = 'Copilot CLI --help';
       const help = await runProcess(command, ['--help'], { cwd: root, env, signal, timeoutMs });
       const text = help.stdout + help.stderr;
       checks.push({ check: 'Copilot executable', ok: version.code === 0, detail: version.stdout.trim() });
       const advertised = new Set(text.match(/(?<![\w-])--?[A-Za-z][A-Za-z0-9-]*/g) ?? []);
       const missing = requiredCopilotFlags(layout, config).filter(flag => !advertised.has(flag));
       checks.push({ check: 'required flags', ok: help.code === 0 && missing.length === 0, missing });
+      stage = 'worker agents resolve';
       const agents = await probeWorkerAgents(command, [], { cwd: root, layout, signal, timeoutMs });
       checks.push({ check: 'worker agents resolve', ...agents });
+      let hookStalled = false;
       if (agents.ok) {
+        stage = 'tool-assisted reviewer hook loads in prompt mode';
         const hook = await probeReviewerHook(command, [], { cwd: root, layout, signal, timeoutMs });
+        hookStalled = !hook.ok && stalled({ message: hook.detail });
+        if (hookStalled) Object.assign(hook, { stalled: true, detail: doctorStallDetail(stage, timeoutMs) });
         // Refused loopback fails this check for the sandbox's reason, not the CLI's.
         const loopback = !hook.ok && sandbox.blocked.some(b => b.access === 'loopback');
         checks.push({ check: 'tool-assisted reviewer hook loads in prompt mode', ...hook,
           ...(loopback ? { cause: 'local-sandbox', detail: `Loopback is blocked in this session (see "${sandboxCheck(sandbox).check}"), so this check cannot run; it says nothing about the CLI. ${hook.detail ?? ''}`.trim() } : {}),
           note: 'Live check with a loopback model provider: no account, network or AI usage. It proves the hook keeps tool-assisted reviewers out of migration/runs.' });
       }
-      if (agents.ok) checks.push(...await modelToolChecks(root, config, layout, { command, signal, timeoutMs }));
+      // The model-tool probes use the same loopback provider: a stalled hook probe means they would stall too.
+      if (agents.ok && !hookStalled) checks.push(...await modelToolChecks(root, config, layout, { command, signal, timeoutMs }));
       checks.push({ check: 'file descriptor limit', ...await fileLimits({ signal, timeoutMs }), minimum: fileLimitMinimum,
         note: 'Each CLI process raises its soft open-file limit to the hard limit by itself. A hard limit below the minimum is a warning: workers may hit EMFILE "Too many open files", which stops the run with guidance.' });
     } catch (e) {
       if (signal?.aborted) throw new Error('Interrupted');
-      checks.push({ check: 'Copilot executable', ok: false, detail: e.message });
+      // A stalled CLI would stall the later probes too: report the stage and stop here.
+      checks.push(stalled(e) ? { check: 'Copilot CLI answers', ok: false, stalled: true, stage, detail: doctorStallDetail(stage, timeoutMs) }
+        : { check: 'Copilot executable', ok: false, detail: e.message });
     }
   }
   const staticValid = checks.every(x => x.ok !== false);
