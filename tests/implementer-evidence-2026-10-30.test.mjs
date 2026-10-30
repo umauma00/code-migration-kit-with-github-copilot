@@ -37,7 +37,8 @@ test('the runner hands the implementer and the fixer frozen evidence when it fit
     for (const name of ['migration/RULEBOOK.md', 'migration/inventory.tsv', unit.source]) assert.ok(paths.includes(name), `${role}: ${name}`);
     // Only this unit's inventory rows, never the whole inventory.
     const rows = input.files.find(x => x.path === 'migration/inventory.tsv').content.split('\n').filter(l => l && !l.startsWith('#')).slice(1);
-    assert.ok(rows.every(r => input.sources.includes(r.split('\t')[0])), role);
+    assert.ok(rows.length && rows.every(r => input.sources.includes(r.split('\t')[0])), role);
+    if (role === 'fixer') assert.equal(Object.hasOwn(call.extra, 'diagnostic'), false, 'the diagnostic travels once, in the evidence');
     // The fixer sees its own candidate; the implementer gets none.
     assert.equal(input.files.find(x => x.path === unit.target).content === '', role === 'implementer', role);
   }
@@ -69,7 +70,7 @@ test('a frozen implementer prompt asks for no reads; an oversized one names the 
   assert.match(fixer, /change it only for extra\.confirmedFindings/);
   assert.match(fixer, /Extra task data: .*Wrong division rounding/);
   // Profiles send people, not workers, to the manual.
-  for (const role of ['implementer', 'fixer']) assert.doesNotMatch(fs.readFileSync(new URL(`../.github/agents/migration-${role}.agent.md`, import.meta.url), 'utf8'), /^Read \[the operating manual\]/m);
+  for (const role of ['implementer', 'fixer']) assert.doesNotMatch(fs.readFileSync(new URL(`../.github/agents/migration-${role}.agent.md`, import.meta.url), 'utf8'), /^Read\b/m);
   // Without runner evidence (the fold benchmark), the old instructions stay.
   assert.match(agentPrompt({ role: 'implementer', unit, extra: { designInputs: [] } }), /Read migration\/RULEBOOK\.md/);
 });

@@ -47,7 +47,8 @@ the arbiter as a pair, since they can still ask for different changes; the
 arbiter defaults to not confirmed) → confirmed fixes → re-review (skipped with `fixPolicy: single-pass`) →
 hash-bound completion. Workers use
 explicit models from config and structured results. Reviewers have no tools and
-receive identical frozen inputs; other CLI workers have read/search-only tools.
+receive identical frozen inputs; the implementer and fixer get the same evidence
+from the runner (no tools when it fits); the arbiter has read/search-only tools.
 If a unit's evidence exceeds maxReviewInputBytes, the CLI runner automatically
 gives both reviewers the same SHA-256-bound file list on read-only `-read`
 profiles. Report every `toolAssistedReviews` target and warning to the human.

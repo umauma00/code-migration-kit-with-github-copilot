@@ -16,6 +16,9 @@ messages, and requires a successful terminal result. Malformed JSONL, session
 errors, aborts, unfinished tool requests and events after result fail closed.
 Informational/unknown event types may be ignored; they never supply a reply.
 Implementer, fixer and arbiter profiles use the concrete CLI tools view,grep,glob.
+When the implementer or fixer gets a frozen task input, its call also denies
+read (`--deny-tool read,write,shell`); the profile keeps the tools for inputs
+over the limit.
 The read/search aliases are not accepted for these workers because the reference
 CLI loses search tools with those aliases.
 

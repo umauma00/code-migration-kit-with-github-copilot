@@ -24,8 +24,11 @@ searched and opened large files themselves (a project's inventory can be over
   person could not run scripts on that computer); 0.28.0's retry stays as the
   safety net.
 - The implementer and fixer profiles point people, not workers, at the manual.
-- The fold benchmark (lib/bench.mjs) still runs its implementer and fixer the
-  old way, with their own tools; its results describe that setup.
+- The fold benchmark (lib/bench.mjs) still runs its implementer and fixer with
+  their own tools and no runner evidence (now under the reworded profiles), so
+  its results are not directly comparable with earlier runs or with
+  translation.
+- The fixer's diagnostic travels once, inside the evidence.
 - tests/implementer-evidence-2026-10-30.test.mjs covers the evidence for both
   roles, the implementer and fixer prompts and the CLI tool flags.
 
