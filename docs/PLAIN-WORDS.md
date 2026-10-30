@@ -25,9 +25,9 @@ Phase numbers (00 to 06) and the model-change answer format stay as they are.
 | waive | 見送って先へ進む（記録が残る） | skip and go on (recorded) |
 | guardrails | AI に実行させないコマンドの禁止リスト | the list of commands the AI must not run |
 | hook | キットの安全チェック | the kit's safety check |
-| source-as-spec | 元のコードだけを仕様として準備する方式（仕様書も動く元のコードもないとき） | prepare with the original code as the only specification |
+| source-as-spec | 元のコードだけを仕様として準備する方式（仕様書がない、または元のコードを動かせないとき） | prepare with the original code as the only specification (no specification, or the original cannot run) |
 | source-only | 元のコードを動かさない確認方式（新旧の動作比較はしない） | checking without running the original (no old-versus-new comparison) |
-| judge-plan.json | 新旧を比べるテストの計画ファイル | the plan file for the old-versus-new tests |
+| judge-plan.json | テストの計画ファイル（元のコードから読み取った期待する動き） | the test plan (behaviour expected from reading the original code) |
 | runtime mode | 元のコードを動かして新旧を比べる方式 | run the original and compare old and new |
 | concurrency | 同時に動かすAIの数 | how many AI workers run at once |
 | survey | 元のコードの調査 | the survey of the original code |

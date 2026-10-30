@@ -17,7 +17,7 @@ const japanese = /[぀-ヿ一-鿿]/;
 const kitKatakana = /ゲート|マニフェスト|グラント|ターゲット|ランナー|レシート|インベントリ|ジャッジ/g;
 // Inside parentheses a term may follow its everyday words, but never a command
 // line, an option or a setting key.
-const commandLike = /--?[a-z][\w-]*|\b[a-z]+[A-Z]\w*|\b\w+\.\w+\b|\b[a-z]+_[a-z_]+\b|\b(?:node|run_migration|phase|approve|translate|pilot|survey|guardrails|doctor|status)\s+[a-z-]+/g;
+const commandLike = /--?[a-z][\w-]*|\b(?:launchctl|ulimit|grep|sed|npm|git)\b|\b[a-z]+[A-Z]\w*|\b\w+\.\w+\b|\b[a-z]+_[a-z_]+\b|\b(?:node|run_migration|phase|approve|translate|pilot|survey|guardrails|doctor|status)\s+[a-z-]+/g;
 export function jargon(text) {
   const bare = text.replace(/\$\{[^}]*\}/g, '').replaceAll('/sandbox off', '').replace(/macOS/g, '');
   const inside = [...bare.matchAll(/（([^（）]*)）|\(([^()]*)\)/g)].map(m => m[1] ?? m[2]).join(' ');
@@ -52,8 +52,12 @@ test('the sandbox setup question is plain in Japanese apart from the blocked pat
 test('the pilot plan sentences for the approval question are plain in both languages', () => {
   const source = read('lib/pilot.mjs');
   const ja = source.match(/ja: `([^`]*)`/)[1], en = source.match(/en: `([^`]*)`/)[1];
-  assert.deepEqual(jargon(ja), []);
-  assert.doesNotMatch(en.replace(/\$\{[^}]*\}/g, ''), /grant|target|translation-only|manifest|judge|boundary|scope/i);
+  // The sentence branches sit inside \${...} as quoted strings; check them too.
+  // A single word in quotes is a compared value ('translation'), not a sentence.
+  const branches = text => [...text.matchAll(/'((?:\\.|[^'])*)'/g)].map(m => m[1]).filter(b => !/^[\w-]+$/.test(b));
+  assert.ok(branches(ja).length >= 3 && branches(en).length >= 3, 'every branch is found');
+  for (const part of [ja, ...branches(ja)]) assert.deepEqual(jargon(part), [], part);
+  for (const part of [en, ...branches(en)]) assert.doesNotMatch(part.replace(/\$\{[^}]*\}/g, ''), /grant|target|translation-only|manifest|judge|boundary|scope/i, part);
 });
 
 test('Japanese question and reply examples in the handoff contract are plain', () => {
