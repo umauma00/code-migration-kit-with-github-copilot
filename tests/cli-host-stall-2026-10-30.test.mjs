@@ -67,6 +67,12 @@ for (const rateLimited of [0, 5]) test(`a stall that never clears blocks the uni
   assert.equal(failureGuidance(failure, { language: 'ja' }).id, 'cli-host-stall');
 });
 
+test('bounded mode keeps its own retry limit for stalls (default 2)', async t => {
+  const failure = await stallFixture(t, Infinity, 'bounded').then(() => null, e => e);
+  assert.ok(failure);
+  assert.equal(Number(fs.readFileSync(safePath(failure.root, 'calls.txt'), 'utf8')), 3);
+});
+
 test('surveys count stall retries apart from other transient retries too', () => {
   const source = fs.readFileSync(new URL('../lib/survey.mjs', import.meta.url), 'utf8');
   assert.match(source, /retry >= limits\.retries \|\| \(isHostStall\(e\) && stalls\+\+ >= hostStallRetries\)/);
@@ -89,7 +95,7 @@ test('guidance explains the stall in plain words and offers rerun and fewer para
     assert.equal(g.id, 'cli-host-stall');
     assert.deepEqual(g.options.map(o => o.id), ['rerun', 'lower-concurrency', 'pause']);
   }
-  assert.match(failureGuidance(new Error(stall), { language: 'ja' }).cause, /これを延ばす設定はありません/);
+  assert.match(failureGuidance(new Error(stall), { language: 'ja' }).cause, /これを延ばす設定は見当たりません/);
   // The kit's own deadline and a cancellation are final: not described as retried.
   assert.equal(failureGuidance(new Error(`Process timed out after 600000ms (explicit bounded deadline); ${stall}`)).id, 'timeout');
   assert.notEqual(failureGuidance(new Error(`Interrupted; ${stall}`)).id, 'cli-host-stall');
