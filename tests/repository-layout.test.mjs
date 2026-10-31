@@ -33,3 +33,15 @@ test('each skill has one copy per install layout and no stray skill folder', () 
   const names = dir => fs.readdirSync(path.join(kitRoot, dir)).sort();
   assert.deepEqual(names('skills'), names('.github/skills'));
 });
+
+// 0.36.0: the Claude Code settings file was never read by the kit or Copilot; it is gone
+// from the kit and from what a copy install writes.
+test('no Claude Code settings reference is kept or installed', t => {
+  assert.equal(fs.existsSync(path.join(kitRoot, 'templates/claude-settings.reference.json')), false);
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'layout-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const { changes } = install(root);
+  assert.deepEqual(changes.filter(rel => /claude-settings/.test(rel)), []);
+  const readme = fs.readFileSync(path.join(kitRoot, 'templates/settings.README.md'), 'utf8');
+  assert.doesNotMatch(readme, /claude-settings\.reference\.json/);
+});
