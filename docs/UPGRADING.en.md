@@ -10,6 +10,15 @@ Kit files (lib, templates) change, so existing approvals and completion records 
 2. When the Copilot CLI keeps stalling on its 120 s wait on a busy computer, set `concurrency` to 1 in `migration/run-settings.json` and run `settings apply` (run `settings init` first if that file does not exist). It is a run limit, so reviewed work and approvals are kept.
 3. When runs pass at 1, raise it step by step (2, then 4) for speed.
 
+## 0.31.0 (a Japanese report language gives a Japanese rulebook)
+
+Kit files (lib, scripts, templates) change, so existing approvals and completion records expire once. Record them again as `phase next` shows in `stale`.
+
+1. With the report language ja, initialization starts `migration/RULEBOOK.md` from the Japanese template (`templates/RULEBOOK.ja.md`), and the orchestrator writes its prose in Japanese. Code, identifiers, paths, tags such as `construct: NAME` and markers such as `TODO(port):` keep their exact form.
+2. An existing rulebook is never rewritten. Translating one that already holds rules revokes every approval; to read it in Japanese during a run, ask the orchestrator for a summary.
+3. Only new projects start from the Japanese template. No setting changes.
+4. In a copy install, replace all of `migration-kit/` with the temporary install's. The plugin needs only an update.
+
 ## 0.30.0 (doctor always finishes)
 
 Kit files (lib, scripts) change, so existing approvals and completion records expire once. Record them again as `phase next` shows in `stale`.

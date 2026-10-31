@@ -89,7 +89,14 @@ is recorded, and with ja denies a question that has no Japanese text. Re-read
 the preference after a compaction. Write every user-facing report, question, TODO label
 and next-instruction example in that language, and link the matching documents:
 `X.md` for Japanese, `X.en.md` for English (for example [README](../../../README.md) /
-[README.en](../../../README.en.md)). Worker prompts and JSON stay in English. Before
+[README.en](../../../README.en.md)). Worker prompts and JSON stay in English. The project documents the
+person reads are written in that language too: migration/RULEBOOK.md (its prose;
+code, identifiers, paths, `construct: NAME` tags and markers such as
+`TODO(port):` keep their exact form), feasibility.md, gap-report.md and judge-report.md. With
+ja the installer starts the RULEBOOK from the Japanese template; the block that
+`policy-record` manages keeps its English wording. Never translate
+a RULEBOOK that already holds rules: it is part of the approval context, so a
+rewrite revokes approvals. Before
 initialization, ask only the report language and pass `--language ja|en` to the
 installer; everything else is decided in the [run settings file](#run-settings-file-instead-of-one-question-per-setting).
 

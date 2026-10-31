@@ -13,6 +13,31 @@ once add to the load that makes it run out.
 - Existing configurations keep their value; the README, the run settings help
   and the skill say how to choose it.
 
+# 0.31.0 — 2026-10-30
+
+A person who chose 日本語 got an English RULEBOOK while reports and the judge
+were in Japanese. The report language covered user-facing text only, the
+rulebook was not named, and its template was English, so it was drafted in
+English. Autopilot played no part.
+
+- `templates/RULEBOOK.ja.md` is the same template in Japanese: the same
+  sections, and every marker, tag and placeholder the runner and workers rely
+  on (`TODO(port):`, `PORT STATUS`, `DEV-001`, `[source language]`...) kept
+  as is.
+- The installer uses it when the report language is ja (a recorded choice
+  wins, as the installer keeps it); an existing RULEBOOK is never replaced.
+- The Japanese template keeps the `[source language]` / `[target language]`
+  placeholders, so phase 02 and the source-as-spec readiness check still treat
+  it untouched as a template, with no code change.
+- The skill and the orchestrator agents say the RULEBOOK's prose (and
+  feasibility.md, gap-report.md, judge-report.md) is written in the report
+  language, and that a RULEBOOK which already holds rules is never translated,
+  because a rewrite revokes approvals. Worker prompts and JSON stay English,
+  and so does the policy block `policy-record` writes (it is matched by its
+  exact heading).
+- tests/rulebook-language-2026-10-30.test.mjs covers both layouts, the
+  template's markers, phase 02 and the instructions.
+
 # 0.30.0 — 2026-10-30
 
 On a Windows PC behind a corporate proxy, `doctor --check-cli` printed
