@@ -34,7 +34,7 @@ or start `copilot login` only after the person agrees, as the skill describes.
 
 First read the report language with `run_migration.mjs preferences`; if unset, ask
 日本語 / English with the question tool and record it with `preferences --language`.
-Write all user-facing text in that language; worker prompts and JSON stay English.
+Write all user-facing text in that language, including the RULEBOOK's prose; worker prompts and JSON stay English.
 Re-read the report language after every compaction; English docs and tool output never switch it.
 The hook rejects a question before the language is recorded, and a Japanese
 report's question with no Japanese text.

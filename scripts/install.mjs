@@ -59,6 +59,10 @@ function parseRoleModels(value) {
   }
   return out;
 }
+const templateFor = (rel, language) => rel === 'RULEBOOK.md' && language === 'ja' ? 'templates/RULEBOOK.ja.md' : `templates/${rel}`;
+function recordedLanguage(target) {
+  try { return readJSON(safePath(fs.realpathSync(target), 'migration/preferences.json')).userLanguage ?? null; } catch { return null; }
+}
 function setModels(config, model, roleModels) {
   for (const role of Object.keys(config.models)) if (model) config.models[role] = model;
   Object.assign(config.models, roleModels);
@@ -71,6 +75,10 @@ export function install(target, { apply = false, model, harness = 'copilot', wit
   // Report language lives outside config.json so changing it never revokes approvals.
   const preferences = language && !fs.existsSync(safePath(fs.realpathSync(path.resolve(target)), 'migration/preferences.json'))
     ? `${JSON.stringify({ schemaVersion: 1, userLanguage: language }, null, 2)}\n` : null;
+  // The rulebook is read by the person too: with Japanese recorded (or chosen
+  // now), its template is the Japanese one, so the rules are drafted in it. A
+  // recorded choice wins, as the existing preferences file is kept.
+  const rulebookLanguage = recordedLanguage(path.resolve(target)) ?? language;
   if (verificationMode !== undefined && !['runtime', 'source-only'].includes(verificationMode)) throw new Error('verificationMode must be runtime or source-only');
   if (preparationProfile !== undefined && !['standard', 'source-as-spec'].includes(preparationProfile)) throw new Error('preparationProfile must be standard or source-as-spec');
   // Source as the only specification implies source-only verification.
@@ -112,7 +120,7 @@ export function install(target, { apply = false, model, harness = 'copilot', wit
       const name = `migration/${rel}`, file = safePath(root, name);
       if (fs.existsSync(file)) {
         if (!fs.statSync(file).isFile()) throw new Error(`Destination is not a regular file: ${name}`);
-      } else files.set(name, fs.readFileSync(path.join(kitRoot, `templates/${rel}`), 'utf8'));
+      } else files.set(name, fs.readFileSync(path.join(kitRoot, templateFor(rel, rulebookLanguage)), 'utf8'));
     }
     if (preferences) files.set('migration/preferences.json', preferences);
     if (apply) for (const [name, content] of files) atomicWrite(safePath(root, name), content);
@@ -146,7 +154,7 @@ export function install(target, { apply = false, model, harness = 'copilot', wit
   configureBackend(config);
   setModels(config, model, roleModels);
   if (!fs.existsSync(safePath(root, 'migration/config.json'))) files.set('migration/config.json', `${JSON.stringify(config, null, 2)}\n`);
-  for (const rel of ['RULEBOOK.md', 'inventory.tsv']) if (!fs.existsSync(safePath(root, `migration/${rel}`))) files.set(`migration/${rel}`, fs.readFileSync(path.join(kitRoot, `templates/${rel}`), 'utf8'));
+  for (const rel of ['RULEBOOK.md', 'inventory.tsv']) if (!fs.existsSync(safePath(root, `migration/${rel}`))) files.set(`migration/${rel}`, fs.readFileSync(path.join(kitRoot, templateFor(rel, rulebookLanguage)), 'utf8'));
   if (preferences) files.set('migration/preferences.json', preferences);
   const changes = [];
   for (const [rel, content] of files) {
