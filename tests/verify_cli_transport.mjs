@@ -15,7 +15,7 @@ import { approve, runStage, translate } from '../lib/pipeline.mjs';
 import { runProcess } from '../lib/process.mjs';
 import { doctor } from '../scripts/run_migration.mjs';
 import { sessionsStatus, pruneSessions, workerSessions } from '../lib/sessions.mjs';
-import { sessionStateDirs } from '../lib/worker-home.mjs';
+import { sessionStateDirs, workerHomePath } from '../lib/worker-home.mjs';
 
 const command = process.argv[2];
 if (!command || !path.isAbsolute(command)) throw new Error('Supply an absolute Copilot executable path');
@@ -132,6 +132,8 @@ try {
     translation: { done: translation.done, total: translation.total, agentCalls: translation.agentCalls },
     stages, resumedAgentCalls: resumed.agentCalls, sessions, records, outputHashes: f.units.map(u => ({ target: u.target, hash: fileHash(safePath(f.root, u.target)) })) }, null, 2));
 } finally {
+  // The CLI home here is inside the project, so the worker home is in the user profile.
+  fs.rmSync(workerHomePath(f.root), { recursive: true, force: true });
   for (const key of Object.keys(process.env)) if (!(key in savedEnv)) delete process.env[key];
   Object.assign(process.env, savedEnv);
   server.closeAllConnections(); await new Promise(resolve => server.close(resolve));

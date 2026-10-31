@@ -17,21 +17,29 @@ adds a session to that one shared home, so a migration grows it by thousands.
   its own index in the worker home).
 - The worker home carries the person's settings, not their records: the
   top-level settings files (`config.json`, which names the signed-in account,
-  `settings.json`, MCP and permission settings) are copied once per process,
-  and the folders the CLI reads plugins, agents and settings from are linked
-  (a junction on Windows). The person's session-state, index, logs, command
-  history and downloaded builds are left out. The workers' own index starts
-  over once it passes 64 MiB.
-- If the CLI reports itself signed out in the worker home (a sign-in failure
-  without a network error), the call is repeated in the person's home and
-  the rest of that run stays there, with a warning in the run report instead
-  of a stop.
+  `settings.json`, MCP and permission settings) are copied when they changed
+  (through a temporary file, so a CLI starting in parallel never reads half a
+  file), and the folders the CLI reads plugins, agents and settings from are
+  linked (a junction on Windows; settings kept as symbolic links are
+  followed). The person's session-state, index, logs, command history and
+  downloaded builds are left out. With a relative `COPILOT_HOME` inside the
+  project, the worker home goes to the user profile instead. The workers' own
+  index starts over once it passes 64 MiB and no CLI wrote to it for 15
+  minutes. Worker transcripts stay until `sessions prune`.
+- If the CLI says it is not signed in in the worker home (its sign-in help or
+  "not signed in", without a network error; a single 401 or forbidden model
+  does not count), the call is repeated in the person's home. Once that
+  works, the rest of that command stays there, with a warning in the run
+  report instead of a stop. Signed out in both homes still stops the run as a
+  sign-in problem.
 - `workerCopilotHome: "shared"` in `migration/config.json` keeps every worker
   in the person's home, as before. It is a run setting: changing it keeps
   reviewed work and approvals.
 - `sessions status` and `sessions prune` look in both homes, so sessions from
   older runs are still found.
-- `doctor --check-cli` checks the CLI in the worker home, as workers run it.
+- `doctor --check-cli` shows the worker home (`worker Copilot CLI home`) and
+  checks the CLI there, as workers run it. docs/LIVE-SMOKE notes that a local
+  sandbox must allow writes there too.
 - tests/worker-home-2026-10-31.test.mjs covers what the worker home carries,
   the per-process copy, the index reset, the sign-in fallback (and that a
   network error with sign-in help does not trigger it), the setting, and

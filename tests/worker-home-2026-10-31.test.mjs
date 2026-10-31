@@ -12,9 +12,9 @@ import path from 'node:path';
 import { prepare, result } from './helpers.mjs';
 import { safePath, atomicWrite, loadConfig } from '../lib/core.mjs';
 import { createCopilotAdapter, copilotEnv } from '../scripts/copilot_adapter.mjs';
-import { prepareWorkerHome, workerCopilotHome, userCopilotHome, resetPreparedWorkerHomes, sessionStateDirs, workerIndexLimitBytes } from '../lib/worker-home.mjs';
+import { prepareWorkerHome, workerCopilotHome, userCopilotHome, resetPreparedWorkerHomes, sessionStateDirs, workerIndexLimitBytes, workerIndexIdleMs } from '../lib/worker-home.mjs';
 import { sessionsStatus, pruneSessions, recordSession } from '../lib/sessions.mjs';
-import { isSignInFailure, isSystemicFailure } from '../lib/failures.mjs';
+import { isSignedOut, isSystemicFailure } from '../lib/failures.mjs';
 
 // A person's CLI home in a temporary folder, restored after the test.
 function personHome(t) {
@@ -25,9 +25,15 @@ function personHome(t) {
   t.after(() => { if (previous === undefined) delete process.env.COPILOT_HOME; else process.env.COPILOT_HOME = previous; resetPreparedWorkerHomes(); fs.rmSync(dir, { recursive: true, force: true }); });
   return home;
 }
+// A project folder outside the person's home.
+function project(t) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kit-project-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  return dir;
+}
 
 test('the worker home carries the person\'s settings and plugins but none of their session records', t => {
-  const home = personHome(t), root = os.tmpdir();
+  const home = personHome(t), root = project(t);
   fs.writeFileSync(path.join(home, 'config.json'), '{"loggedInUsers":[{"login":"someone"}],"trustedFolders":["/work"]}');
   fs.writeFileSync(path.join(home, 'settings.json'), '{"model":"x"}');
   fs.writeFileSync(path.join(home, 'mcp-config.json'), '{"mcpServers":{}}');
@@ -49,7 +55,7 @@ test('the worker home carries the person\'s settings and plugins but none of the
 });
 
 test('settings are copied once per process, and a worker index past the limit starts over', t => {
-  const home = personHome(t), root = os.tmpdir();
+  const home = personHome(t), root = project(t);
   fs.writeFileSync(path.join(home, 'config.json'), '{"a":1}');
   const worker = prepareWorkerHome(root, {});
   fs.writeFileSync(path.join(home, 'config.json'), '{"a":2}');
@@ -63,6 +69,11 @@ test('settings are copied once per process, and a worker index past the limit st
   resetPreparedWorkerHomes();
   fs.truncateSync(path.join(worker, 'session-store.db'), workerIndexLimitBytes + 1);
   fs.writeFileSync(path.join(worker, 'session-store.db-wal'), 'x');
+  prepareWorkerHome(root, {});
+  assert.ok(fs.existsSync(path.join(worker, 'session-store.db')), 'an index written to just now may be in use by another kit process');
+  resetPreparedWorkerHomes();
+  const idle = (Date.now() - workerIndexIdleMs - 60000) / 1000;
+  for (const name of ['session-store.db', 'session-store.db-wal']) fs.utimesSync(path.join(worker, name), idle, idle);
   prepareWorkerHome(root, {});
   assert.ok(!fs.existsSync(path.join(worker, 'session-store.db')) && !fs.existsSync(path.join(worker, 'session-store.db-wal')));
 });
@@ -116,9 +127,10 @@ test('a CLI signed out only in the worker home is retried in the person\'s home,
 test('a network error with sign-in help is not a reason to leave the worker home', async t => {
   const home = personHome(t), f = prepare(t);
   const help = 'Error: Failed to fetch models: connect ETIMEDOUT 140.82.112.21:443\nTo authenticate, you can use any of the following methods';
-  assert.equal(isSignInFailure(help), false);
-  assert.equal(isSignInFailure('To authenticate, you can use any of the following methods'), true);
-  assert.equal(isSignInFailure('session.error authentication: token expired'), true);
+  assert.equal(isSignedOut(help), false);
+  assert.equal(isSignedOut('To authenticate, you can use any of the following methods'), true);
+  assert.equal(isSignedOut('Error: No authentication information found.'), true);
+  for (const one of ['401 Unauthorized', 'Bad credentials', 'session.error forbidden: model not enabled', 'session.error authentication: token expired']) assert.equal(isSignedOut(one), false, one);
   const cli = cliDouble(f, `process.stderr.write(${JSON.stringify(`${help}\n`)}); process.exit(1);`);
   const error = await cli.call().catch(e => e);
   assert.match(error.message, /ETIMEDOUT/);
@@ -145,4 +157,55 @@ test('sessions status and prune find worker sessions in the worker home and in t
   assert.ok(!fs.existsSync(path.join(workerState, inWorker)) && !fs.existsSync(path.join(personState, inPerson)));
   assert.ok(fs.existsSync(own), 'the person\'s own sessions are never touched');
   assert.ok(!fs.existsSync(path.join(personState, gone)));
+});
+
+test('settings kept as symbolic links are followed, and a folder the CLI made is replaced only while empty', t => {
+  const home = personHome(t), root = project(t), elsewhere = fs.mkdtempSync(path.join(os.tmpdir(), 'kit-dotfiles-'));
+  t.after(() => fs.rmSync(elsewhere, { recursive: true, force: true }));
+  fs.writeFileSync(path.join(elsewhere, 'config.json'), '{"linked":true}');
+  fs.mkdirSync(path.join(elsewhere, 'agents/x'), { recursive: true });
+  fs.symlinkSync(path.join(elsewhere, 'config.json'), path.join(home, 'config.json'));
+  fs.symlinkSync(path.join(elsewhere, 'agents'), path.join(home, 'agents'), process.platform === 'win32' ? 'junction' : 'dir');
+  for (const dir of ['skills/s', 'hooks/h']) fs.mkdirSync(path.join(home, dir), { recursive: true });
+  const worker = workerCopilotHome(root, {});
+  fs.mkdirSync(path.join(worker, 'skills'), { recursive: true });
+  fs.mkdirSync(path.join(worker, 'hooks/kept'), { recursive: true });
+  prepareWorkerHome(root, {});
+  assert.equal(fs.readFileSync(path.join(worker, 'config.json'), 'utf8'), '{"linked":true}');
+  assert.ok(!fs.lstatSync(path.join(worker, 'config.json')).isSymbolicLink(), 'a copy, never a link to the person\'s file');
+  assert.ok(fs.existsSync(path.join(worker, 'agents/x')));
+  assert.ok(fs.lstatSync(path.join(worker, 'skills')).isSymbolicLink(), 'an empty folder is replaced by the link');
+  assert.ok(fs.existsSync(path.join(worker, 'hooks/kept')) && !fs.lstatSync(path.join(worker, 'hooks')).isSymbolicLink(), 'a folder with content is left alone');
+  // A link that went stale is pointed at the person's folder again.
+  resetPreparedWorkerHomes();
+  fs.rmSync(path.join(worker, 'skills'));
+  fs.symlinkSync(elsewhere, path.join(worker, 'skills'), process.platform === 'win32' ? 'junction' : 'dir');
+  prepareWorkerHome(root, {});
+  assert.equal(fs.realpathSync(path.join(worker, 'skills')), fs.realpathSync(path.join(home, 'skills')));
+});
+
+test('a relative COPILOT_HOME inside the project puts the worker home in the user profile, not the project', t => {
+  const f = prepare(t);
+  const previous = process.env.COPILOT_HOME; process.env.COPILOT_HOME = '.copilot-test-home';
+  t.after(() => { if (previous === undefined) delete process.env.COPILOT_HOME; else process.env.COPILOT_HOME = previous; });
+  const worker = workerCopilotHome(f.root, {});
+  assert.ok(path.relative(f.root, worker).startsWith('..'), worker);
+  assert.equal(path.dirname(worker), os.homedir());
+  assert.equal(sessionStateDirs(f.root)[0], path.join(worker, 'session-state'));
+});
+
+test('a refused request or a call that also fails in the person\'s home does not move later workers', async t => {
+  const home = personHome(t), f = prepare(t);
+  const counter = safePath(f.root, 'count.txt');
+  // One 401 in the worker home: an error of that call, not a reason to leave.
+  const refused = cliDouble(f, `const n = fs.existsSync(${JSON.stringify(counter)}) ? 1 : 0; if (!n) { fs.writeFileSync(${JSON.stringify(counter)}, '1'); process.stderr.write('Error: 401 Unauthorized\\n'); process.exit(1); }`);
+  await refused.call().catch(() => {});
+  await refused.call();
+  assert.deepEqual(refused.homes().map(h => h.home), [workerCopilotHome(f.root, {}), workerCopilotHome(f.root, {})]);
+  // Signed out in both homes: stops as before, and the next call tries the worker home again.
+  fs.rmSync(safePath(f.root, 'homes.jsonl'));
+  const both = cliDouble(f, `process.stderr.write('To authenticate, you can use any of the following methods\\n'); process.exit(1);`);
+  assert.equal(isSystemicFailure(await both.call().catch(e => e)), true);
+  await both.call().catch(() => {});
+  assert.deepEqual(both.homes().map(h => h.home), [workerCopilotHome(f.root, {}), home, workerCopilotHome(f.root, {}), home]);
 });

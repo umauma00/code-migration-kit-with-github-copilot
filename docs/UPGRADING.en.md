@@ -8,7 +8,7 @@ The kit's files (lib, scripts) change, so existing approvals and completion reco
 
 1. The Copilot CLI workers the kit starts use `~/.copilot-migration-kit-workers`, next to the person's `~/.copilot`. They no longer write into the person's session index (session-store.db), which on the reporting PC held thousands of sessions, so the 120 s stall should become rarer.
 2. Sign-in, settings and plugins stay the person's (settings files are copied, plugin and agent folders are linked). The person's sessions, index and logs are not brought in.
-3. If the CLI says it is not signed in there, the call is repeated in the person's `~/.copilot` and the rest of the run stays there: no stop, a warning in the run report.
+3. If the CLI says it is not signed in there, the call is repeated in the person's `~/.copilot`; once that works, the rest of that command stays there: no stop, a warning in the run report.
 4. To keep the old behavior (everything in `~/.copilot`), set `"workerCopilotHome": "shared"` in `migration/config.json`. It is a run setting, so reviewed work and approvals are kept.
 5. `sessions status` and `sessions prune` look in both homes.
 6. For copy installs, replace all of `migration-kit/` with the staged copy. Plugins only need the update.

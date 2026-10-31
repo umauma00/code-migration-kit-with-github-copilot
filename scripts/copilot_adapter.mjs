@@ -12,8 +12,8 @@ import { isReviewer, isToolFree, toolAssistedRole, assistedReviewerRoles, valida
 import { runtimeLayout } from '../lib/runtime.mjs';
 import { sessionIdPattern } from '../lib/sessions.mjs';
 import { recordCallUsage } from '../lib/usage.mjs';
-import { prepareWorkerHome } from '../lib/worker-home.mjs';
-import { isSignInFailure } from '../lib/failures.mjs';
+import { prepareWorkerHome, workerCopilotHome as workerHomeOf } from '../lib/worker-home.mjs';
+import { isSignedOut } from '../lib/failures.mjs';
 
 // Worker sessions hold source code and prompts. They carry a runner-chosen
 // ID and name, so receipts point at their transcript and
@@ -363,8 +363,9 @@ export function createCopilotAdapter({ command = 'copilot', prefixArgs = [], ver
     return check.result;
   };
   // Workers run in the kit's own CLI home (lib/worker-home.mjs). If the CLI is
-  // not signed in there, the call is repeated in the person's home and every
-  // later call of this process stays there; the run continues and says so.
+  // not signed in there, the call is repeated in the person's home and, once
+  // that works, every later call of this command stays there; the run
+  // continues and says so.
   let sharedHome = false, homeWarning;
   const workerHome = (root, config) => {
     if (sharedHome) return null;
@@ -419,16 +420,22 @@ export function createCopilotAdapter({ command = 'copilot', prefixArgs = [], ver
     } catch (e) { fs.rmSync(usageDir, { recursive: true, force: true }); throw e; }
     try {
       result = await runProcess(command, argv, options);
-      if (home && result.code !== 0 && isSignInFailure(`${copilotStreamError(processOutputLines(result)) ?? ''}\n${result.stderr}`)) {
-        // Signed out only in the worker home: no model request was made.
-        if (!sharedHome) {
-          sharedHome = true;
-          homeWarning = `Workers use the person's Copilot CLI home: the CLI was not signed in in the kit's worker home ${home}`;
-          console.error(`WARNING: ${homeWarning}`);
-        }
-        home = null; versionFields.cliHomeWarning = homeWarning;
+      if (home && result.code !== 0 && isSignedOut(`${copilotStreamError(processOutputLines(result)) ?? ''}\n${result.stderr}`)) {
+        // Not signed in in the worker home: no model request was made. The
+        // call is repeated in the person's home; once that works, the rest of
+        // this command stays there. A CLI signed out in both homes stops the
+        // run as a sign-in problem, as before.
         fs.rmSync(usageFile, { force: true });
         result = await runProcess(command, argv, { ...options, env: copilotEnv(worker) });
+        home = null;
+        if (result.code === 0) {
+          if (!sharedHome) {
+            sharedHome = true;
+            homeWarning = `Workers use the person's Copilot CLI home for the rest of this command: the CLI was not signed in in the kit's worker home ${workerHomeOf(root, config)}`;
+            console.error(`WARNING: ${homeWarning}`);
+          }
+          versionFields.cliHomeWarning = homeWarning;
+        }
       }
       usage = readUsageFile(usageFile);
     } catch (e) {
