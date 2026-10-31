@@ -116,7 +116,7 @@ node scripts/install.mjs --target /path/to/your-project --language ja --apply
 
 Copilot の課金は、使ったトークン量に応じた **GitHub AI Credits** です。キットの各ワーカー呼び出しは Copilot CLI の呼び出し1回として、利用者のアカウントの AI Credits を使います。チャットで話しているオーケストレーター自身の使用量も別にかかります。
 
-キットが動かしたワーカーの使用量（トークン数など）は、`usage` コマンドで合計・担当・モデルごとに見られます。CLI は AI Credits への換算値を返さないため、金額は表示しません（[使用量の記録](docs/COST-LOG.md)）。上の工程表のとおり、04 の変換とレビューが最も多く AI を呼びます。
+キットが動かしたワーカーの使用量（トークン数と AI unit）は、`usage` コマンドで合計・担当・モデルごとに見られます。CLI は AI Credits への換算値を返さないため、金額は表示しません（[使用量の記録](docs/COST-LOG.md)）。上の工程表のとおり、04 の変換とレビューが最も多く AI を呼びます。
 
 ## 検証状況
 

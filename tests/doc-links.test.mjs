@@ -22,7 +22,7 @@ const anchorCache = new Map();
 function anchors(file) {
   if (anchorCache.has(file)) return anchorCache.get(file);
   const text = fs.readFileSync(file, 'utf8');
-  const ids = new Set([...text.matchAll(/\bid="([^"]+)"/g)].map(m => m[1]));
+  const ids = new Set([...text.matchAll(/(?<![\w-])id="([^"]+)"/g)].map(m => m[1]));
   if (file.endsWith('.md')) {
     const seen = new Map();
     let fenced = false;
