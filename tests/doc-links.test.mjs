@@ -16,7 +16,32 @@ function documents(dir = '.') {
   });
 }
 
-test('relative links in documents and guides resolve to files in the kit', () => {
+// Anchors a link may name: GitHub's heading slugs for Markdown, plus any id="..."
+// (explicit <a id> in Markdown, element ids in HTML).
+const anchorCache = new Map();
+function anchors(file) {
+  if (anchorCache.has(file)) return anchorCache.get(file);
+  const text = fs.readFileSync(file, 'utf8');
+  const ids = new Set([...text.matchAll(/\bid="([^"]+)"/g)].map(m => m[1]));
+  if (file.endsWith('.md')) {
+    const seen = new Map();
+    let fenced = false;
+    for (const line of text.split(/\r?\n/)) {
+      if (/^\s*```/.test(line)) fenced = !fenced;
+      const heading = !fenced && line.match(/^#{1,6}\s+(.*?)\s*#*\s*$/);
+      if (!heading) continue;
+      const base = heading[1].replace(/<[^>]+>/g, '').replace(/\[([^\]]*)\]\([^)]*\)/g, '$1').toLowerCase()
+        .replace(/[^\p{L}\p{N}\p{M}\s_-]/gu, '').replace(/ /g, '-');
+      const count = seen.get(base) ?? 0;
+      seen.set(base, count + 1);
+      ids.add(count ? `${base}-${count}` : base);
+    }
+  }
+  anchorCache.set(file, ids);
+  return ids;
+}
+
+test('relative links in documents and guides resolve to files and anchors in the kit', () => {
   const broken = [];
   const files = documents();
   assert.ok(files.includes(path.join('docs', 'REFERENCE.md')));
@@ -25,8 +50,11 @@ test('relative links in documents and guides resolve to files in the kit', () =>
     const links = file.endsWith('.md') ? text.matchAll(/\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g) : text.matchAll(/(?:href|src)="([^"]+)"/g);
     for (const [, link] of links) {
       if (/^(?:[a-z][a-z0-9+.-]*:|#|\$\{|migration\/)/i.test(link)) continue;
-      const target = decodeURI(link.split('#')[0]);
-      if (target && !fs.existsSync(path.join(kitRoot, path.dirname(file), target))) broken.push(`${file} -> ${link}`);
+      const [rawTarget, fragment] = link.split('#');
+      const target = decodeURI(rawTarget);
+      const resolved = path.join(kitRoot, path.dirname(file), target);
+      if (target && !fs.existsSync(resolved)) broken.push(`${file} -> ${link}`);
+      else if (target && fragment && /\.(md|html)$/.test(target) && !anchors(resolved).has(decodeURIComponent(fragment))) broken.push(`${file} -> ${link} (no such anchor)`);
     }
   }
   assert.deepEqual(broken, []);

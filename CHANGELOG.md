@@ -16,12 +16,14 @@ Documents only; no kit code changed.
 - PLUGIN, LIVE-SMOKE, WINDOWS, REVIEW-BENCHMARK, CONTRIBUTING, guides/README
   and the file map are brought up to date (VS Code 1.144, the Copilot app,
   the Windows run up to phase 03).
+- The orchestrator skill and OPERATING-MANUAL send configuration questions to
+  REFERENCE instead of README.
 - Removed development records that only described past work: `history/` and
   docs/TESTING. Links to them in CHANGELOG and UPGRADING point at commit
   0bea302 on GitHub.
 - tests/doc-links.test.mjs checks that every relative link in the documents
-  resolves and that every English document has a Japanese twin linked both
-  ways.
+  resolves (anchors included) and that every English document in docs/ has
+  a Japanese twin linked both ways.
 
 # 0.35.0 — 2026-10-31
 

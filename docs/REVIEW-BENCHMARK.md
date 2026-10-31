@@ -25,7 +25,7 @@ Anthropic の記事「[Building agents: When to fold subagents into your main ag
 
 ## 手順
 
-モデル呼び出しには利用枠・料金が発生します。題材は `fixtures/mini` の3ファイルです。
+モデルの呼び出しはアカウントの GitHub AI Credits を使います。題材は `fixtures/mini` の3ファイルです。
 
 1. キットのルートで、まだ存在しないディレクトリを指定して検証用のルートを作ります。
 

@@ -100,7 +100,7 @@ does not apply to automated workers, which keep their JSON-only contracts.
 10. Separate redesign from structural translation. In redesign mode, replace the
     rulebook bakeoff with adversarial design review and disposable module trials.
 
-Read [usage](../README.md), [contracts](CONTRACTS.md) and
+Read [detailed usage](REFERENCE.md), [contracts](CONTRACTS.md) and
 [permissions](../templates/settings.README.md) before a production run.
 Workers always run as Copilot CLI processes, also from VS Code: the parent runs the
 runner in a terminal and the runner starts the workers (the VS Code subagent

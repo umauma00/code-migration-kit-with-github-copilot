@@ -116,7 +116,7 @@ Before 03, guardrails (`migration/guardrails.json`) are installed with your conf
 
 Copilot bills by tokens used, in **GitHub AI Credits**. Each worker call is one Copilot CLI call and uses your account's AI Credits. The orchestrator you chat with uses its own share as well.
 
-The `usage` command shows the tokens the kit's workers used, by phase, role and model. The CLI reports no conversion to AI Credits, so no amount is shown ([usage records](docs/COST-LOG.en.md)). As the phase table suggests, translation and review in 04 call the AI the most.
+The `usage` command shows the tokens and AI units the kit's workers used, in total, by role and by model. The CLI reports no conversion to AI Credits, so no amount is shown ([usage records](docs/COST-LOG.en.md)). As the phase table suggests, translation and review in 04 call the AI the most.
 
 ## Verification status
 

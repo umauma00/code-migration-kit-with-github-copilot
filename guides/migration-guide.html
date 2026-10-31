@@ -214,13 +214,13 @@ footer { padding-top: 40px; color: var(--muted); font-size: 13px; display: grid;
     <a href="#p-setup"><b>設定</b><span>初期設定</span><i class="bar zero" style="width:4%"></i></a>
     <a href="#p-00"><b>00</b><span>適否と範囲</span><i class="bar zero" style="width:4%"></i></a>
     <a href="#p-00b"><b>00b</b><span>比較器</span><i class="bar zero" style="width:4%"></i></a>
-    <a href="#p-01"><b>01</b><span>依存関係</span><i class="bar" style="width:6%"></i></a>
-    <a href="#p-02"><b>02</b><span>意味の差</span><i class="bar" style="width:12%"></i></a>
-    <a href="#p-03"><b>03</b><span>事前試行</span><i class="bar" style="width:24%"></i></a>
+    <a href="#p-01"><b>01</b><span>依存関係</span><i class="bar" style="width:1%"></i></a>
+    <a href="#p-02"><b>02</b><span>意味の差</span><i class="bar" style="width:6%"></i></a>
+    <a href="#p-03"><b>03</b><span>事前試行</span><i class="bar" style="width:14%"></i></a>
     <a href="#p-04"><b>04</b><span>変換</span><i class="bar" style="width:100%"></i></a>
-    <a href="#p-05"><b>05</b><span>ビルド</span><i class="bar" style="width:12%"></i></a>
-    <a href="#p-05b"><b>05b</b><span>起動確認</span><i class="bar" style="width:5%"></i></a>
-    <a href="#p-05c"><b>05c</b><span>新旧比較</span><i class="bar" style="width:6%"></i></a>
+    <a href="#p-05"><b>05</b><span>ビルド</span><i class="bar" style="width:10%"></i></a>
+    <a href="#p-05b"><b>05b</b><span>起動確認</span><i class="bar" style="width:3%"></i></a>
+    <a href="#p-05c"><b>05c</b><span>新旧比較</span><i class="bar" style="width:4%"></i></a>
     <a href="#p-06"><b>06</b><span>引き継ぎ</span><i class="bar" style="width:4%"></i></a>
   </div>
 
@@ -354,7 +354,7 @@ footer { padding-top: 40px; color: var(--muted); font-size: 13px; display: grid;
       <div class="case"><span class="num">5</span><b>指摘を認めて直す</b><div class="dots" aria-hidden="true"><i class="dot"></i><i class="dot r"></i><i class="dot r"></i><i class="dot a"></i><i class="dot f"></i></div><small class="note">＋修正1</small></div>
     </div>
     <ul class="plain note">
-      <li>修正後にもう一度レビューする設定（<code>fixPolicy: rereview</code>）では、直すたびにレビュー2＋裁定1＋修正1が足されます。</li>
+      <li>修正後にもう一度レビューする設定（<code>fixPolicy: rereview</code>）では、直すたびにレビュー2が足され、その再レビューで指摘が出れば裁定1、認められれば修正1がさらに足されます。</li>
       <li>レート制限や通信エラーは、待ってから同じ呼び出しをやり直します。やり直しも1回の呼び出しとして使用量に入ります。</li>
       <li>入力が上限（新規導入で 1 MiB）を超えるファイルだけ、ファイル一覧とハッシュを渡して読み取り専用で読ませ、その旨を記録します。</li>
     </ul>
@@ -372,9 +372,9 @@ footer { padding-top: 40px; color: var(--muted); font-size: 13px; display: grid;
       <label for="fixed">指摘を認めて直す割合 <output id="fixed-out" for="fixed">35%</output><input id="fixed" type="range" min="0" max="100" step="5" value="35"></label>
     </div>
     <div class="bars" id="bars" aria-live="polite"></div>
-    <div class="total"><span>ワーカー呼び出しの合計</span><b id="total">約 480</b><span class="note">1回ごとに Copilot CLI の呼び出し1回として、アカウントの GitHub AI Credits を使います。金額はモデルとトークン量で決まります。</span></div>
+    <div class="total"><span>ワーカー呼び出しの合計</span><b id="total">約 532</b><span class="note">1回ごとに Copilot CLI の呼び出し1回として、アカウントの GitHub AI Credits を使います。金額はモデルとトークン量で決まります。</span></div>
   </div>
-  <p class="note">前提：00b の監査なし（既存のテストを使う）、01 は同梱の解析器、02 は監査のまとまり3〜5、03 の試運転は10〜20ファイル、05〜05c の修正はビルドエラーの出たファイルの約1割。どれも案件によって大きく変わります。</p>
+  <p class="note">前提：00b の監査なし（既存のテストを使う）、01 は同梱の解析器、02 は監査のまとまり3〜5、03 の試運転は10〜20ファイル、05 はファイルの約1割にビルドエラーが出て直す想定（1件あたり約4回）、05b・05c の修正はそれぞれ 05 の約4分の1・約4割。どれも案件によって大きく変わります。</p>
 </section>
 
 <section id="gates" aria-labelledby="gates-h">

@@ -8,7 +8,7 @@ No kit code changed.
 
 1. README, the guides and docs are rewritten for the current version. The detail README used to carry moved to [detailed usage](REFERENCE.en.md).
 2. With a plugin install the version number changes, so existing approvals and completion records go stale once. Record them again as `phase next`'s `stale` shows.
-3. With a copy install only the documents in `migration-kit/` change, so approvals and completion records stay valid. Replace the whole `migration-kit/` with the contents of a temporary install.
+3. With a copy install only documents and a link in the skill change, so approvals and completion records stay valid. Replace the whole `migration-kit/` and the `.github/skills/` SKILL.md files with the contents of a temporary install (configuration questions now point at detailed usage instead of README).
 4. Development records (`history/` and TESTING) are no longer kept in the repository. Read them at commit 0bea302 on GitHub if needed.
 
 ## 0.35.0 (the autopilot handoff is right in every app)

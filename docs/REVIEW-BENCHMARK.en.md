@@ -33,7 +33,7 @@ comparison measures how much the second reviewer adds to quality.
 
 ## Steps
 
-Model calls use quota and may cost money. The cases use the three files of `fixtures/mini`.
+Model calls use your account's GitHub AI Credits. The cases use the three files of `fixtures/mini`.
 
 1. From the kit root, create a benchmark root in a directory that does not exist yet:
 
