@@ -58,7 +58,8 @@ initialization check `copilot --version`; afterwards `run_migration.mjs doctor
 question tool and, after a yes, run `npm install -g @github/copilot` (Node 22+; on a
 permission error, show the cause and choices from `run_migration.mjs guidance`).
 If it is not signed in (doctor or a worker reports "To authenticate" or
-`session.error authentication`), ask, then run `copilot login` in a background
+`session.error authentication` without a network error such as ETIMEDOUT; with
+one, the CLI only could not reach GitHub, and guidance says `cli-network`), ask, then run `copilot login` in a background
 terminal, show the URL and any one-time code it prints in chat, wait for it to
 finish and run doctor again. Signing in to VS Code does not sign in the CLI.
 

@@ -1014,17 +1014,22 @@
     },
     {
       "path": "lib/failures.mjs",
-      "sha256": "e9bd6506d214c083d6bbd35c574d9fed196b354b3243a0f8c23d864224b3330a",
+      "sha256": "e6ab1bcef780fa2f202de7da9cf4be70cce0c1ae4944fa9b0c370774228ad600",
       "entries": [
         {
-          "line": 24,
+          "line": 27,
           "kind": "deadline-or-observation",
           "code": "// A timeout reported by the service or network is not: a retry finishes it."
         },
         {
-          "line": 29,
+          "line": 32,
           "kind": "deadline-or-observation",
           "code": "return /session\\.error rate_limit|\\b429\\b|rate[ -]?limit|too many requests|overloaded|temporar(?:il)?y unavailable|service unavailable|\\b50[234]\\b|session\\.error (?:\\S+ )?500\\b|\\b500 Internal Server Error|internal server error|bad gateway|gateway timeout|ECONNRESET|ETIMEDOUT|EAI_AGAIN|ECONNREFUSED|socket hang up|network (?:error|timeout)|fetch failed/i.test(value);"
+        },
+        {
+          "line": 40,
+          "kind": "deadline-or-observation",
+          "code": "export const networkFailurePattern = /\\b(?:ETIMEDOUT|ECONNRESET|ECONNREFUSED|EAI_AGAIN)\\b|socket hang up|fetch failed|network (?:error|timeout)|\\b(?:connection|connect) timed out\\b/i;"
         }
       ]
     },
@@ -1132,7 +1137,7 @@
     },
     {
       "path": "lib/guidance.mjs",
-      "sha256": "d0f1769d62265c29cece6c307de0c1aa00f6bf088ce5601219fa34ba8dbc0a52",
+      "sha256": "2aa29be6426910ff961058047a93e82a22dfd662402624ad9c43305ff532146f",
       "entries": [
         {
           "line": 74,
@@ -1160,42 +1165,42 @@
           "code": "{ id: 'raise-breaker', label: t('失敗どうしが無関係と確認できたら、連続失敗で止まるまでの回数を増やしてやり直す', 'If the failures are unrelated, raise maxConsecutiveFailures and rerun'),"
         },
         {
-          "line": 526,
+          "line": 537,
           "kind": "error-or-exit-candidate",
           "code": "{ id: 'raise-budget', label: t('AI を呼ぶ回数の上限をあなたと決めて、変換をやり直す（上限を設けるモードなら、その上限を増やす）', 'Run translate --max-calls N with an agreed number (in bounded mode, raise maxAgentCalls)'), command: k => `node ${k}/scripts/run_migration.mjs translate --max-calls N`,"
         },
         {
-          "line": 552,
+          "line": 563,
           "kind": "error-or-exit-candidate",
           "code": "{ id: 'lower-concurrency', label: t('同時に動かすAIの数を減らすか、やり直すまでの待ち時間を延ばす', 'Lower concurrency or raise transientRetryDelayMs'),"
         },
         {
-          "line": 559,
+          "line": 570,
           "kind": "error-or-exit-candidate",
           "code": "{ id: 'check-billing', label: t('GitHub の課金・予算の設定で残量を確認し、追加・引き上げ後に再実行する', 'Check credits and budget in GitHub billing, add or raise them, then rerun'),"
         },
         {
-          "line": 598,
+          "line": 609,
           "kind": "deadline-or-observation",
           "code": "// and a cancellation are final and stay with the timeout rule."
         },
         {
-          "line": 606,
+          "line": 617,
           "kind": "deadline-or-observation",
           "code": "{ id: 'timeout', match: /timed out|\\btimeout\\b(?!Seconds)/i,"
         },
         {
-          "line": 611,
+          "line": 622,
           "kind": "deadline-or-observation",
           "code": "{ id: 'raise-timeout', label: t('選択済みの時間制限を見直す', 'Review an explicitly selected deadline'), reason: t('利用者が継続実行を望んだ場合はcontinuousへ戻すか0（期限なし）を選びます。', 'When the person wants continuous work, use continuous mode or an explicitly unlimited deadline of 0.') },"
         },
         {
-          "line": 682,
+          "line": 693,
           "kind": "loop-exit-candidate",
           "code": "for (const r of rules) { m = message.match(r.match); if (m) { rule = r; break; } }"
         },
         {
-          "line": 793,
+          "line": 804,
           "kind": "deadline-or-observation",
           "code": "[/^hook responds before its timeout$/, c => `Hook check failed: ${c.command ?? 'no hook command'} took ${c.durationMs ?? '?'} ms (timeout ${c.timeoutSec ?? '?'} s)`],"
         }
@@ -5022,5 +5027,5 @@
       ]
     }
   ],
-  "candidateLines": 912
+  "candidateLines": 913
 }

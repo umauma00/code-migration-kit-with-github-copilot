@@ -1,6 +1,15 @@
-# Upgrading (0.32.0 and earlier releases)
+# Upgrading (0.33.0 and earlier releases)
 
 [日本語](UPGRADING.md) | English
+
+## 0.33.0 (the 120 s stall and network errors recognized correctly)
+
+Kit files (lib) change, so existing approvals and completion records expire once. Record them again as `phase next` shows in `stale`.
+
+1. The Copilot CLI's "session host did not complete the ... event within 120s" (the wording recorded on Windows) is recognized as a stall, and the same call is retried up to 5 times. Before, the kit did not recognize it and left the file unfinished on the first stall.
+2. A network error (ETIMEDOUT and similar) followed by the CLI's sign-in help no longer stops the whole run as a sign-in problem; the call is retried, and the guidance is a rerun and a proxy check instead of `copilot login`.
+3. No settings change is needed. Restart a stopped pilot from its preparation after the update.
+4. A repository copy replaces the whole `migration-kit/` with the staged copy. The plugin installs with the update alone.
 
 ## 0.32.0 (one AI call at a time for new installs)
 

@@ -1,3 +1,30 @@
+# 0.33.0 — 2026-10-31
+
+The same Windows pilot recorded what actually stopped it. Workers failed with
+"session event delivery failed: session host did not complete the
+assistant.reasoning event within 120s" (also `system.message`,
+`user.message`, `model.call_final_result`). The kit knew only the CLI's other
+wording ("Session host did not acknowledge ..."), so the 0.28.0 retry never
+ran and each file was blocked on its first stall. A reviewer's connection
+timeout (`ETIMEDOUT` while fetching models) followed by the CLI's sign-in help
+stopped the whole run as a sign-in problem and offered `copilot login`,
+although the CLI was signed in and other workers were running.
+
+- The CLI stall is recognized in both wordings ("did not complete / did not
+  acknowledge the ... event within", "session event delivery failed") and
+  retried as before: up to 5 stall retries per call.
+- A network error (`ETIMEDOUT`, `ECONNRESET`, `ECONNREFUSED`, `EAI_AGAIN`,
+  socket hang up, fetch failed) is a transient failure even when the CLI's
+  sign-in help follows it, so the call is retried instead of the run
+  stopping. An explicit rejection (401, Bad credentials,
+  `session.error authentication`) is still a sign-in problem.
+- New failure guidance `cli-network`: the connection dropped or timed out,
+  not a failed sign-in; rerun, and if it keeps happening check the proxy
+  settings with the AI. It no longer offers `copilot login` for these.
+- tests/cli-stall-network-2026-10-31.test.mjs covers the recorded wordings,
+  a worker that stalls once with the new wording, and a run whose reviewer
+  first fails with `ETIMEDOUT` plus sign-in help.
+
 # 0.32.0 — 2026-10-31
 
 On a busy company computer the phase 03 pilot ran for more than ten hours and
