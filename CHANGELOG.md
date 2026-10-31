@@ -1,3 +1,29 @@
+# 0.35.0 — 2026-10-31
+
+The auto-mode handoff at the end of setup said "switch to autopilot with
+Shift+Tab". Shift+Tab is a Copilot CLI key; the GitHub Copilot app and VS Code
+switch with a picker, so the line was wrong for two of the three apps the kit
+supports. The kit cannot tell which app runs it, so the handoff now names all
+three (checked on 2026-10-31 against the GitHub Docs pages on Copilot CLI
+autopilot and Copilot app session modes, and the VS Code docs on approvals and
+agent harnesses):
+
+- Copilot CLI: Shift+Tab until the status line shows Autopilot, or
+  `/autopilot continue`.
+- GitHub Copilot app: the mode picker below the prompt box, or
+  `/autopilot continue`.
+- VS Code, including the Agents window: the mode picker in the chat input; in
+  a Local harness session Autopilot is in the permissions picker instead, so
+  the line says to look there when the mode picker has no Autopilot.
+
+The three are a Markdown list after a blank line, so a chat that renders
+Markdown shows them as separate lines.
+
+Only the wording changed: when the handoff is shown, that it is shown once,
+and that the run stops before phase 00 are as before. The ORDERED-WORKFLOW
+pages say the same. tests/setup-flow.test.mjs checks that each app has its own
+item and that Shift+Tab appears only in the Copilot CLI item.
+
 # 0.31.0 — 2026-10-30
 
 A person who chose 日本語 got an English RULEBOOK while reports and the judge

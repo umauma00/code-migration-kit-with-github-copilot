@@ -11,7 +11,7 @@ import { modelCatalogCli } from './helpers.mjs';
 import { install, kitRoot } from '../scripts/install.mjs';
 import { readJSON, writeJSON, safePath } from '../lib/core.mjs';
 import { normalizeModels, setRoleModels } from '../lib/models.mjs';
-import { initRunSettings, applyRunSettings, syncRunSettings, runSettingsFile } from '../lib/run-settings.mjs';
+import { initRunSettings, applyRunSettings, syncRunSettings, runSettingsFile, autoHandoff } from '../lib/run-settings.mjs';
 import { setPreferences, readPreferences, autoModeFile } from '../lib/preferences.mjs';
 import { autoModeOn } from '../lib/auto-mode.mjs';
 import { interactiveDecision } from '../lib/guardrails.mjs';
@@ -98,13 +98,13 @@ test('auto mode: every setup step says it is still manual, and setup ends with t
   assert.ok(applied.setupNotice, 'the source-as-spec confirmation is still manual');
   assert.equal(applied.autoHandoff, undefined, 'no handoff before the switch');
   const switched = JSON.parse(cli(root, 'source-spec', 'init', '--apply').stdout);
-  assert.match(switched.autoHandoff, /初期設定が完了しました。ここから autopilot が使えます。Shift\+Tab/);
+  assert.match(switched.autoHandoff, /^初期設定が完了しました。ここから autopilot（自動で進めるモード）が使えます。/);
   assert.match(switched.next, /end the turn now: do not start phase 00/);
   // With a runnable original, apply itself hands over.
   const other = fresh(t, 'en');
   upToMode(other, 'auto'); runtime(other, 'available');
   const done = applyRunSettings(other, models);
-  assert.match(done.autoHandoff, /Setup is done, and autopilot can be used from here/);
+  assert.match(done.autoHandoff, /^Setup is done, and autopilot can be used from here/);
   // Once phase 00 has started, apply never hands over again.
   writeJSON(safePath(other, 'migration/phases/starts/00.json'), { schemaVersion: 1 });
   assert.equal(applyRunSettings(other, models).autoHandoff, undefined);
@@ -263,4 +263,29 @@ test('source-spec init --apply before settings apply does not end setup', t => {
   assert.equal(result.autoHandoff, undefined);
   assert.match(result.next, /setup, which is not finished: run settings init/);
   assert.match(applyRunSettings(root, models).autoHandoff, /初期設定が完了しました/);
+});
+
+// Shift+Tab is a Copilot CLI key. The GitHub Copilot app and VS Code switch to
+// autopilot with a picker, and the kit cannot tell which app runs it, so the
+// handoff gives each app its own list item and keeps Shift+Tab in the CLI item.
+test('the autopilot handoff gives each supported app its own way to switch', () => {
+  for (const language of ['ja', 'en']) {
+    const text = autoHandoff(language);
+    // A blank line and "- " items, so a Markdown chat renders a list.
+    const [intro, blank, ...items] = text.split('\n');
+    assert.equal(blank, '', `${language}: a blank line before the list`);
+    assert.ok(items.every(line => line.startsWith('- ')), `${language}: every app is a list item`);
+    assert.doesNotMatch(intro, /Shift\+Tab|\/autopilot/, `${language}: the shared part names no app-specific control`);
+    assert.match(intro, language === 'ja' ? /切り替えずに送っても、1回ずつ手動で進みます/ : /sent without switching, the run still advances one turn at a time/);
+    const item = app => { const found = items.filter(line => line.includes(app)); assert.equal(found.length, 1, `${language}: one item for ${app}`); return found[0]; };
+    const cliLine = item('Copilot CLI'), appLine = item('GitHub Copilot app'), codeLine = item('VS Code');
+    assert.equal(items.length, 3, `${language}: three apps`);
+    assert.match(cliLine, /Shift\+Tab/);
+    assert.match(cliLine, /\/autopilot/);
+    for (const other of [appLine, codeLine]) assert.doesNotMatch(other, /Shift\+Tab/, `${language}: Shift+Tab is for the CLI only`);
+    assert.match(appLine, /\/autopilot/);
+    assert.match(codeLine, /Agents/, `${language}: the VS Code item covers the Agents window`);
+    // VS Code documents no /autopilot command.
+    assert.doesNotMatch(codeLine, /\/autopilot/);
+  }
 });
