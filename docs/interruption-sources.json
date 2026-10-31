@@ -1014,7 +1014,7 @@
     },
     {
       "path": "lib/failures.mjs",
-      "sha256": "e6ab1bcef780fa2f202de7da9cf4be70cce0c1ae4944fa9b0c370774228ad600",
+      "sha256": "395aa2c8304f4c6075a83ab3529d6229f49de070f917c21a4320bba5e96ee2fb",
       "entries": [
         {
           "line": 27,
@@ -1137,7 +1137,7 @@
     },
     {
       "path": "lib/guidance.mjs",
-      "sha256": "2aa29be6426910ff961058047a93e82a22dfd662402624ad9c43305ff532146f",
+      "sha256": "a365d730ed707043c97731009d008e81642e023372af58ebd1d987a0b4283381",
       "entries": [
         {
           "line": 74,
@@ -1165,42 +1165,42 @@
           "code": "{ id: 'raise-breaker', label: t('失敗どうしが無関係と確認できたら、連続失敗で止まるまでの回数を増やしてやり直す', 'If the failures are unrelated, raise maxConsecutiveFailures and rerun'),"
         },
         {
-          "line": 537,
+          "line": 538,
           "kind": "error-or-exit-candidate",
           "code": "{ id: 'raise-budget', label: t('AI を呼ぶ回数の上限をあなたと決めて、変換をやり直す（上限を設けるモードなら、その上限を増やす）', 'Run translate --max-calls N with an agreed number (in bounded mode, raise maxAgentCalls)'), command: k => `node ${k}/scripts/run_migration.mjs translate --max-calls N`,"
         },
         {
-          "line": 563,
+          "line": 564,
           "kind": "error-or-exit-candidate",
           "code": "{ id: 'lower-concurrency', label: t('同時に動かすAIの数を減らすか、やり直すまでの待ち時間を延ばす', 'Lower concurrency or raise transientRetryDelayMs'),"
         },
         {
-          "line": 570,
+          "line": 571,
           "kind": "error-or-exit-candidate",
           "code": "{ id: 'check-billing', label: t('GitHub の課金・予算の設定で残量を確認し、追加・引き上げ後に再実行する', 'Check credits and budget in GitHub billing, add or raise them, then rerun'),"
         },
         {
-          "line": 609,
+          "line": 610,
           "kind": "deadline-or-observation",
           "code": "// and a cancellation are final and stay with the timeout rule."
         },
         {
-          "line": 617,
+          "line": 618,
           "kind": "deadline-or-observation",
           "code": "{ id: 'timeout', match: /timed out|\\btimeout\\b(?!Seconds)/i,"
         },
         {
-          "line": 622,
+          "line": 623,
           "kind": "deadline-or-observation",
           "code": "{ id: 'raise-timeout', label: t('選択済みの時間制限を見直す', 'Review an explicitly selected deadline'), reason: t('利用者が継続実行を望んだ場合はcontinuousへ戻すか0（期限なし）を選びます。', 'When the person wants continuous work, use continuous mode or an explicitly unlimited deadline of 0.') },"
         },
         {
-          "line": 693,
+          "line": 694,
           "kind": "loop-exit-candidate",
           "code": "for (const r of rules) { m = message.match(r.match); if (m) { rule = r; break; } }"
         },
         {
-          "line": 804,
+          "line": 805,
           "kind": "deadline-or-observation",
           "code": "[/^hook responds before its timeout$/, c => `Hook check failed: ${c.command ?? 'no hook command'} took ${c.durationMs ?? '?'} ms (timeout ${c.timeoutSec ?? '?'} s)`],"
         }
@@ -1633,7 +1633,7 @@
     },
     {
       "path": "lib/pipeline.mjs",
-      "sha256": "360a7a5d37204ee9d69ce9a9a9e3ab4bf63fb9a80b8762a8e07934c5d776878e",
+      "sha256": "c0f8e6f506b87c6f3b62d5d138d52a8111960ca6ec6b146abeaf69cd2a548e6f",
       "entries": [
         {
           "line": 19,
@@ -1988,7 +1988,7 @@
         {
           "line": 424,
           "kind": "error-or-exit-candidate",
-          "code": "if (isSystemicFailure(e) || !isTransientFailure(e) || retry >= limits.retries || (isHostStall(e) && stalls++ >= hostStallRetries) || signal?.aborted || dispatchError || reservations >= maxCalls) throw e;"
+          "code": "if (isSystemicFailure(e) || !isTransientFailure(e) || retry >= limits.retries || (isLimitedRetry(e) && stalls++ >= hostStallRetries) || signal?.aborted || dispatchError || reservations >= maxCalls) throw e;"
         },
         {
           "line": 430,
@@ -2940,7 +2940,7 @@
     },
     {
       "path": "lib/survey.mjs",
-      "sha256": "74b4bbfada19764d3661d494c205ca776ef678fae050b5d2c512ed88a829116d",
+      "sha256": "7c0ff33dd5996bea10e6d41b2430be5101105307ec47092160f22bd12c8e5d5f",
       "entries": [
         {
           "line": 23,
@@ -3125,7 +3125,7 @@
         {
           "line": 502,
           "kind": "error-or-exit-candidate",
-          "code": "if (!isTransientFailure(e) || retry >= limits.retries || (isHostStall(e) && stalls++ >= hostStallRetries) || signal?.aborted) throw e;"
+          "code": "if (!isTransientFailure(e) || retry >= limits.retries || (isLimitedRetry(e) && stalls++ >= hostStallRetries) || signal?.aborted) throw e;"
         },
         {
           "line": 508,

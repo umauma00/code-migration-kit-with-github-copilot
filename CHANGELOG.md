@@ -14,13 +14,18 @@ although the CLI was signed in and other workers were running.
   acknowledge the ... event within", "session event delivery failed") and
   retried as before: up to 5 stall retries per call.
 - A network error (`ETIMEDOUT`, `ECONNRESET`, `ECONNREFUSED`, `EAI_AGAIN`,
-  socket hang up, fetch failed) is a transient failure even when the CLI's
-  sign-in help follows it, so the call is retried instead of the run
-  stopping. An explicit rejection (401, Bad credentials,
-  `session.error authentication`) is still a sign-in problem.
+  socket hang up, fetch failed) followed by the CLI's generic sign-in help is
+  retried instead of stopping the run. Since the CLI may still be signed out,
+  these retries are capped like the stall (5 per call, counted together),
+  also in continuous mode. An explicit statement ("not signed in",
+  "authentication required", 401, Bad credentials,
+  `session.error authentication`) is still a sign-in problem, and the other
+  run-stopping causes (missing agents, credits, the open-file limit...) still
+  stop the run next to a network error.
 - New failure guidance `cli-network`: the connection dropped or timed out,
   not a failed sign-in; rerun, and if it keeps happening check the proxy
-  settings with the AI. It no longer offers `copilot login` for these.
+  settings and the sign-in with doctor. It no longer offers `copilot login`
+  for these.
 - tests/cli-stall-network-2026-10-31.test.mjs covers the recorded wordings,
   a worker that stalls once with the new wording, and a run whose reviewer
   first fails with `ETIMEDOUT` plus sign-in help.
