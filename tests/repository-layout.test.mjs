@@ -15,13 +15,11 @@ test('a copy install leaves out the kit development records', t => {
   assert.deepEqual(changes.filter(rel => /(?:^|\/)(?:history|skill)\/|docs\/(?:reviews|validation|plans)\/|REVIEW-FIXES/.test(rel)), []);
 });
 
-test('copied documents link to the records in the kit repository', t => {
+test('copied documents never link to development records by a relative path', t => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'layout-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   install(root, { apply: true, model: 'test-double' });
-  const testing = fs.readFileSync(path.join(root, 'migration-kit/docs/TESTING.md'), 'utf8');
-  assert.match(testing, /\]\(https:\/\/github\.com\/[^)]+\/blob\/HEAD\/history\/validation\/automated-tests\.tap\)/);
-  for (const rel of ['migration-kit/README.md', 'migration-kit/README.en.md', 'migration-kit/CHANGELOG.md', 'migration-kit/docs/TESTING.md', 'migration-kit/docs/TESTING.en.md', 'migration-kit/docs/UPGRADING.md', 'migration-kit/docs/UPGRADING.en.md']) {
+  for (const rel of ['migration-kit/README.md', 'migration-kit/README.en.md', 'migration-kit/CHANGELOG.md', 'migration-kit/docs/UPGRADING.md', 'migration-kit/docs/UPGRADING.en.md', 'migration-kit/docs/REFERENCE.md', 'migration-kit/docs/REFERENCE.en.md']) {
     const text = fs.readFileSync(path.join(root, rel), 'utf8');
     assert.doesNotMatch(text, /\]\((?!https?:)[^)]*history\//, rel);
   }

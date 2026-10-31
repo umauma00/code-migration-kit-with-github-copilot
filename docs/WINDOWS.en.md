@@ -2,7 +2,7 @@
 
 [日本語](WINDOWS.md) | English
 
-Windows is a primary platform for this kit. GitHub Actions runs `npm test` and `npm run demo` on `windows-latest` (Windows Server, PowerShell 7, Node 22, Python 3.12) for every change. A live run with the Copilot CLI and VS Code is still pending (see [LIVE-SMOKE](LIVE-SMOKE.en.md)).
+Windows is a primary platform for this kit. GitHub Actions runs `npm test` and `npm run demo` on `windows-latest` (Windows Server, PowerShell 7, Node 22, Python 3.12) for every change. On the maintainer's Windows PC a signed-in real model has run up to the phase-03 trial (as of 2026-10-31). A run through the last phase and an exhaustive check from the VS Code and Copilot app screens are still pending (see the [small check with a real account](LIVE-SMOKE.en.md)).
 
 ## Requirements
 

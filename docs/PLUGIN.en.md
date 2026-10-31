@@ -2,7 +2,7 @@
 
 [日本語](PLUGIN.md) | English
 
-Requires Node.js 22 or later and GitHub Copilot CLI, VS Code or the GitHub Copilot app with Agent Plugins 1.0 support. Workers always run on the Copilot CLI, so it is required in VS Code and the app too (if it is missing, the AI installs it and starts sign-in after you agree). Verified CLI versions: 1.0.93, 1.0.95 and 1.0.98. You also need the languages and tests of the project being migrated.
+Requires Node.js 22 or later and GitHub Copilot CLI, VS Code or the GitHub Copilot app with Agent Plugins 1.0 support. Workers always run on the Copilot CLI, so it is required in VS Code and the app too (if it is missing, the AI installs it and starts sign-in after you agree). Transport with the real CLI and a stand-in model was checked on 1.0.93 to 1.0.98. On 1.0.105, the latest as of 2026-10-31, every option the kit passes to the CLI is still valid (checked with `copilot --help`). You also need the languages and tests of the project being migrated.
 
 ## Installation
 
@@ -45,6 +45,14 @@ Enable the `chat.plugins.enabled` setting, then use one of these:
 
 The `/plugin` commands in Copilot harness chats keep a separate inventory from the Customizations editor. Manage the plugin where you installed it.
 
+When you start a session in VS Code (checked against VS Code 1.144 and its documentation as of 2026-10-31):
+
+- Use the **Copilot** harness, the default for new sessions in 1.144. The plugin is read in this harness. **Local** is hidden by default in 1.144 and not available in the Agents window; to use Local, install a repository copy with `--harness vscode-local` ([detailed usage](REFERENCE.en.md#what-a-copy-install-puts-in-the-repository)).
+- In the chat view and the **Agents window** alike, select `code-migration-plugin-orchestrator` in the agent picker.
+- In the Agents window choose **Folder** isolation. **New Worktree** sessions always run "Allow all" and show no confirmation dialog, while the kit's approvals expect a person to allow them there, so do not use it. A new worktree also starts from committed files, so an uncommitted `migration/` does not carry over.
+- Use **Manual permissions** (the default) or **Assisted permissions**. **Allow all** shows no confirmation.
+- To run through automatically, choose auto mode at setup and, when setup is done, switch to autopilot mode and send "continue".
+
 ### GitHub Copilot app
 
 1. Open **Customize** in the sidebar and, from the marketplace settings next to the marketplace dropdown, add the source above as a GitHub repository. Opening `ghapp://plugins/marketplace/add?source=umauma00%2Fcode-migration-kit-with-github-copilot` shows the form filled in (it is added after you confirm).
@@ -54,7 +62,7 @@ When you start a session in the app:
 
 - Set **Environment** to **This computer**. The kit runs workers with your local Copilot CLI and writes the migration record to local files (Cloud is unverified).
 - Set **Workspace** to **Current checkout**. **New worktree** creates a separate working copy per session, and the uncommitted `migration/` does not carry over. If another worktree already holds a migration when you initialize, the initialization preview returns where (`existingMigrations`) and the orchestrator asks whether to resume there.
-- Select `code-migration-plugin-orchestrator` in the agent picker (or with `/agent`). The **Autopilot** session mode matches the kit's auto mode (`phaseMode: auto`).
+- Select `code-migration-plugin-orchestrator` in the agent picker (or with `/agent`). To run through automatically, choose auto mode at setup and, when setup is done, switch to autopilot mode and send "continue".
 - Set tool permissions to **Ask every time** or **Assisted**. Gate commands rely on a confirmation; whether **Approve all** shows it is unverified.
 - If a worker cannot reach the network or its sign-in in a session with local sandboxing on, turn it off in that session with `/sandbox off`. Commands in that session then run without the sandbox's limits, so do this only for repositories you trust.
 
@@ -79,25 +87,25 @@ Add the following to the migration target's `.github/copilot/settings.json` to e
 }
 ```
 
-### Primary sources checked (2026-10-29)
+### Primary sources checked (2026-10-29; VS Code session settings re-checked 2026-10-31)
 
 - GitHub Docs: [Customizing the GitHub Copilot app](https://docs.github.com/en/copilot/how-tos/github-copilot-app/customize-github-copilot-app), [Opening the app with deep links](https://docs.github.com/en/copilot/how-tos/github-copilot-app/open-with-deep-links), [Agent sessions](https://docs.github.com/en/copilot/how-tos/github-copilot-app/agent-sessions)
 - GitHub Docs: [Finding and installing plugins for Copilot CLI](https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/plugins-finding-installing), [CLI plugin reference](https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-plugin-reference), [Plugins](https://docs.github.com/en/copilot/concepts/customizations/plugins)
-- VS Code: [Agent plugins](https://code.visualstudio.com/docs/agent-customization/agent-plugins), [Agent plugin reference](https://code.visualstudio.com/docs/agents/reference/agent-plugin-reference)
+- VS Code: [Agent plugins](https://code.visualstudio.com/docs/agent-customization/agent-plugins), [Agent plugin reference](https://code.visualstudio.com/docs/agents/reference/agent-plugin-reference), [Agent harnesses](https://code.visualstudio.com/docs/agents/run/agent-harnesses), [Agents window](https://code.visualstudio.com/docs/agents/run/agents-window), [Approvals](https://code.visualstudio.com/docs/agents/run/approvals), [1.144 release notes](https://code.visualstudio.com/updates/v1_144)
 
 ## Starting a new migration
 
-Open the target repository in VS Code, select `code-migration-plugin-orchestrator` in Copilot Chat's agent picker (`/agent` in the Copilot CLI), and ask something like "start migrating from Python to JavaScript", naming a model ID available to you. The orchestrator asks which language to report in (Japanese or English), checks initialization and configuration, and proceeds one phase at a time from feasibility.
+Open the target repository, select `code-migration-plugin-orchestrator` in the agent picker (`/agent` also works in the Copilot CLI and the app), and ask something like "start migrating from Python to JavaScript". The orchestrator asks which language to report in, initializes the project, asks the models and the other setup questions one at a time, and proceeds one phase at a time from feasibility.
 
-To initialize manually, run the following with the target repository as the working directory. Replace `MODEL_ID` with a model ID available to your account.
+To initialize manually, run the following with the target repository as the working directory (models are chosen by a question after installation).
 
 At the end of each phase, Copilot reports links to the artifacts, review points, the next phase and a sample reply. When a decision is needed, it asks "continue / revise / stop" with the available question tool, or shows the same choices in chat and waits where no tool exists. Instructions you already gave are not asked again. Production translation, build, smoke and parity need explicit approval of the current artifacts. See [phase reports and user decisions](PHASE-HANDOFF.md) for details and examples.
 
 At start or resumption, the parent orchestrator creates the ten-phase list in Copilot's TODO and shows the current phase, approval waits, revisions and stops. Phase reports include the number of completed phases and the next phase. On resumption the list is reconciled with the saved artifacts and validation records; a TODO check alone never means approved or complete. Where no TODO tool exists, a chat list is used. See [phase TODO tracking](PHASE-HANDOFF.md#track-the-ten-phases-in-the-host-todo-list).
 
 ```bash
-node /path/to/code-migration-kit/scripts/install.mjs --target . --layout plugin --model MODEL_ID --language en
-node /path/to/code-migration-kit/scripts/install.mjs --target . --layout plugin --model MODEL_ID --language en --apply
+node /path/to/code-migration-kit/scripts/install.mjs --target . --layout plugin --language en
+node /path/to/code-migration-kit/scripts/install.mjs --target . --layout plugin --language en --apply
 ```
 
 Whether you start from VS Code, the Copilot CLI or the GitHub Copilot app, the parent agent runs the runner in a terminal and the runner starts Copilot CLI workers. The AI runs these commands from chat too.
@@ -127,4 +135,4 @@ Automated tests check translation of three files, independent review and build/s
 
 `node tests/verify_plugin_resolution.mjs /absolute/path/to/runtime.node` compares worker collisions and post-hook invalidation with CLI 1.0.93's actual discovery, selection and hook APIs. Only this verification script depends on those internal APIs.
 
-On macOS, the real CLI (1.0.95 and 1.0.98) with a loopback test provider was used to check plugin-layout translation, independent review (including tool-assisted review) and denial by the guardrail hook. An old CLI (1.0.40) cannot load the plugin's agents, and `doctor` reports the missing worker IDs. Behavior in the VS Code UI and the GitHub Copilot app, and translation quality with an authenticated real model, are not verified. Before a real project, run the small check in [LIVE-SMOKE.en.md](LIVE-SMOKE.en.md), reading its `migration-kit/` as the plugin's absolute path.
+On macOS, the real CLI (1.0.95 and 1.0.98) with a stand-in (loopback) model was used to check plugin-layout translation, independent review (including tool-assisted review) and denial by the guardrail hook. An old CLI (1.0.40) cannot load the plugin's agents, and `doctor` reports the missing worker IDs. Exhaustive checks from the VS Code and GitHub Copilot app screens, and translation quality with a real model through the last phase, are not verified yet. Before a real project, run the small check in [LIVE-SMOKE.en.md](LIVE-SMOKE.en.md), reading its `migration-kit/` as the plugin's absolute path.

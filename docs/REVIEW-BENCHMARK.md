@@ -33,7 +33,7 @@ Anthropic の記事「[Building agents: When to fold subagents into your main ag
    node scripts/review_benchmark.mjs setup --target /tmp/review-bench --model MODEL_ID
    ```
 
-   ワーカーはルートのファイルを読めます。そのため setup は、ルートからこのベンチマークの文書・コード、比較器の mutant などを除きます（過去のレビュー・検証記録は `history/` にあり、導入先には写りません）。正しいコードの行が残っていれば setup は失敗します。ただし CHANGELOG などには、ベンチマークがあること自体は書かれています。全担当に同じモデルが入ります。担当ごとに変える場合は `/tmp/review-bench/migration/config.json` の `models` と `reasoningEfforts` を編集します。レビューの観点は `reviewFocus: "shared"` に設定されます（1人のレビューでも両方の観点を見るため）。
+   ワーカーはルートのファイルを読めます。そのため setup は、ルートからこのベンチマークの文書・コード、比較器の mutant などを除きます。正しいコードの行が残っていれば setup は失敗します。ただし CHANGELOG などには、ベンチマークがあること自体は書かれています。全担当に同じモデルが入ります。担当ごとに変える場合は `/tmp/review-bench/migration/config.json` の `models` と `reasoningEfforts` を編集します。レビューの観点は `reviewFocus: "shared"` に設定されます（1人のレビューでも両方の観点を見るため）。
 
 2. まず1回ずつ、検証用ルートとワーカーが動くことを確認します。呼び出し回数の上限を表示します。
 

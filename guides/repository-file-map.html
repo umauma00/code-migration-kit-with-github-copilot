@@ -27,7 +27,7 @@
 </figure>
 <section><h2>ファイルを選ぶと、役割が分かる</h2>
 <noscript>JavaScriptを有効にすると、ファイルごとの説明を選択できます。全体の役割は上の構成図と下の配置図から確認できます。</noscript>
-<figure><div class="explorer"><nav class="tree" aria-label="主要ディレクトリとファイル"><div class="root">code-migration-kit-with-copilot/</div><div class="kicker">一覧はスクロールできます</div><div id="tree"></div></nav><div id="inspector" class="inspector" aria-live="polite"></div></div><figcaption><span class="mono">Fig. B</span>主要なファイルを役割ごとに表示しています。フォルダ名の下にある項目を選んでください。</figcaption></figure>
+<figure><div class="explorer"><nav class="tree" aria-label="主要ディレクトリとファイル"><div class="root">code-migration-kit-with-github-copilot/</div><div class="kicker">一覧はスクロールできます</div><div id="tree"></div></nav><div id="inspector" class="inspector" aria-live="polite"></div></div><figcaption><span class="mono">Fig. B</span>主要なファイルを役割ごとに表示しています。フォルダ名の下にある項目を選んでください。</figcaption></figure>
 </section>
 <section><h2>導入すると、対象プロジェクトに配置される</h2>
 <figure><div class="duo">
@@ -41,13 +41,14 @@ guides/      視覚的な説明資料
 tests/       キットの自動テスト
 fixtures/    テスト用の小さな題材
 examples/    過去の移植記録
-history/     開発時のレビュー・検証記録
 skills/      プラグイン用のスキル</pre></div>
 <div class="install"><div class="kicker">install.mjs の導入先</div><h3>案件の実行用</h3><pre>対象プロジェクト/
 ├─ .github/       Copilotの入口・役割
 ├─ migration-kit/ キットの実行コード・文書
 ├─ migration/
+│  ├─ run-settings.json 最初に選んだ設定
 │  ├─ config.json 設定
+│  ├─ guardrails.json 禁止するコマンド
 │  ├─ RULEBOOK.md 移植ルール
 │  ├─ inventory.tsv 意味の差の一覧
 │  ├─ manifest.tsv 元→先の対応
@@ -84,6 +85,9 @@ const groups=[
 ['depmap_python.py','Pythonの依存解析','importなどから依存関係と処理順序・循環を調べる解析器です。',[]],
 ['depmap_ts.mjs','TypeScriptの依存解析','import、export-from、requireから依存関係を調べる解析器です。',[]],
 ['depmap_c.py','C/C++の依存解析','includeから依存関係を調べる解析器です。',[]],
+['depmap_csharp.py','C#の依存解析','usingと名前空間から依存関係を調べます。Java・VB.NET・PHP・COBOLもdepmap_java.pyなど言語ごとの解析器があります。規則はdocs/DEPENDENCY-MAPPERS.mdにあります。',[]],
+['phase_cli.mjs','工程の記録','phase init、next、start、completeで工程の順番と完了を記録します。',[]],
+['audit_inputs.mjs','準備監査の入力','00b・01・02の成果物を、ツールを持たない監査役に渡す固定入力にまとめます。',[]],
 ['make_manifest.py','移植対象の対応表を作る','ファイル一覧や順序から、元ソースと変換先を対応付けるmanifest.tsvを生成します。',[]],
 ['make_review_dependencies.mjs','レビュー用の依存宣言','依存解析のedges.tsvから、レビューに渡す元ソースと依存ファイルを宣言するJSONの草案を作ります。',[]],
 ['build_daemon.sh','ビルド監視','ソースの変更を検知してビルドを実行し、各ラウンドの診断をファイルに保存する補助ツールです。',[]],
@@ -91,6 +95,10 @@ const groups=[
 ['demo.mjs','オフラインデモ','fixtures/miniの題材と固定のAI応答を使って一連の工程を再現します。PythonとNodeの比較コマンドは実際に動かします。',[]]
 ]},
 {name:'lib/',role:'共通の実行エンジン',desc:'CLIや任意のDynamic Workflowsアダプターから再利用する、移植処理の本体です。',items:[
+['phases.mjs','工程の順番','10工程の前提と完了記録を確かめ、normal・relaxed・autoの進め方に従って次の工程を決めます。',[]],
+['survey.mjs','準備の読み込み（survey）','元ソースを1フォルダ・最大20ファイルの単位に分け、ワーカーに並列で読ませてまとめます。',[]],
+['guardrails.mjs','禁止するコマンド','guardrails.jsonを読み、履歴の書き換えや直接のビルド・テストのコマンドを止めます。',[]],
+['usage.mjs','AI使用量の集計','ワーカーが使ったトークンを工程・担当・モデルごとに集計します（usageコマンド）。',[]],
 ['pipeline.mjs','工程管理の中心','承認を確認し、変換・独立レビュー・裁定・修正を進め、judge/build/smoke/parityの検証結果を保存します。',['元ファイル→候補→2種類の独立レビュー','指摘を裁定し、必要な修正後に再レビュー','上流の再実行で下流の承認・結果を失効させる','完了は出力の存在ではなく、レビューとハッシュを結んだ記録で判定']],
 ['core.mjs','設定・パス・記録の基盤','設定とmanifest、依存宣言を読み込み、安全なパス、入力ハッシュ、完了記録、排他ロックを扱います。',[]],
 ['review.mjs','レビューに渡す固定入力','担当プロファイルを検査し、元ソースと依存、候補、RULEBOOK、対象inventory、診断を両レビュー担当に同じ内容で渡します。',[]],
@@ -101,7 +109,7 @@ const groups=[
 ]},
 {name:'.github/',role:'Copilot向けの入口と定義',desc:'通常のCopilot対話に適用する指示、入口のオーケストレーターとワーカーの役割、スキル、hooksを置きます。',items:[
 ['copilot-instructions.md','共通の対話指示','運用マニュアルと工程プロンプトへの入口です。元実装の維持、工程ごとの停止、ランナー経由の変換を指示します。',[]],
-['agents/','役割別のプロファイル','migration-orchestrator、implementer、reviewer-semantics、reviewer-rules、arbiter、fixerを定義します。',['orchestrator：唯一の入口。工程を案内する','implementer：候補を作る','reviewer-semantics / reviewer-rules：振る舞いとルールを独立に調べる','arbiter：指摘を裁定する / fixer：確認済みの指摘を修正する']],
+['agents/','役割別のプロファイル','migration-orchestrator、implementer、reviewer-semantics・reviewer-rules（読み取りツール付きの -read 版も）、arbiter、fixer、surveyor、preparation-auditorを定義します。',['orchestrator：唯一の入口。工程を案内する','implementer：候補を作る','reviewer-semantics / reviewer-rules：振る舞いとルールを独立に調べる','arbiter：指摘を裁定する / fixer：確認済みの指摘を修正する','surveyor：準備の読み込み / preparation-auditor：準備工程の監査']],
 ['skills/code-migration/SKILL.md','オーケストレーターの手順','オーケストレーターが最初に読む手順です。/メニューには出しません。現在の成果物と承認状態に応じて、次に読む工程プロンプトを案内します。',[]],
 ['hooks/code-migration.json','ツール操作への制約','移植ワーカーの書き込みやコマンド実行などを制限するhooks設定です。scripts/migration_hook.mjsと連携します。',[]],
 ['extensions/code-migration/extension.mjs','実験的なWorkflowの入口','Copilot SDKのDynamic Workflowsに共通エンジンを接続します。導入時は--with-workflowを指定した場合に配置されます。',[]]
@@ -124,12 +132,13 @@ const groups=[
 ['inventory.tsv','意味の差の一覧','各ファイルの意味上の問題、参照するルール、根拠などを整理する表です。',[]],
 ['hooks.copilot.json','Copilot CLI用hooks','標準の導入で使うhooks設定です。',[]],
 ['hooks.vscode-local.json','VS Code Local用hooks','--harness vscode-localで選ぶhooks設定です。',[]],
-['settings.README.md','権限・hooksの説明','設定の役割と制約を説明します。claude-settings.reference.jsonは原版の参照資料です。',[]]
+['settings.README.md','権限・hooksの説明','設定の役割と制約を説明します。',[]]
 ]},
 {name:'tests/',role:'キットそのものの自動テスト',desc:'工程管理、承認の失効、完了記録、独立レビュー、Copilot互換性、再レビューで見つかった不具合を検証します。',items:[
 ['migration.test.mjs','移植エンジンのテスト','設定・導入・工程管理などの基本動作を確認します。',[]],
 ['copilot-compatibility.test.mjs','CLI互換性の回帰テスト','Copilotとの接続や関連する互換性修正を検証します。',[]],
 ['helpers.mjs','テストの準備と疑似応答','一時的な対象プロジェクトや固定のAI応答を用意します。demo.mjsからも使います。',[]],
+['doc-links.test.mjs','文書のリンク検査','相対リンクの切れと、日本語・英語の対の欠けを検出します。',[]],
 ['verify_cli_transport.mjs','実CLIの通信確認','実CLIと疑似プロバイダーを使い、応答・権限などの通信経路を確認する補助スクリプトです。',[]]
 ]},
 {name:'fixtures/',role:'テスト・デモ用の題材',desc:'小さな元コードと期待結果をまとめます。c/、python/、ts/は依存解析、mini/はPython→JavaScriptの工程デモに使います。',items:[
@@ -141,13 +150,14 @@ const groups=[
 ['OPERATING-MANUAL.md','実行時のルール','元実装を残すこと、工程ごとの承認、独立レビュー、完了記録、修正上限などを定めます。',[]],
 ['CONTRACTS.md','JSONと記録の形式','ワーカーの応答やランナーが扱うデータ契約を説明します。',[]],
 ['LIVE-SMOKE.md','実環境での小規模確認','Copilot認証や実際のモデルを使う前に行う確認手順です。',[]],
-['TESTING.md','検証範囲の説明','どの環境と動作を検証し、どの範囲が未確認かを記録します。',[]],
+['REFERENCE.md','詳しい使い方','設定ファイル、コマンド、コピー導入で置かれるもの、制限事項などの詳細です。',[]],
+['PLUGIN.md','プラグインとして使う','Copilot CLI、VS Code、Copilotアプリでの導入・更新・セッションの設定です。',[]],
 ['UPGRADING.md','既存導入からの更新','導入済みのキットを更新する際の手順です。',[]],
 ['DYNAMIC-WORKFLOWS.md','実験的アダプターの説明','任意のDynamic Workflows連携について説明します。',[]]
 ]},
 {name:'guides/',role:'視覚的な説明資料',desc:'技術ガイドとファイル構成図をまとめるディレクトリです。README.mdから目的に合った説明を選べます。',items:[
 ['README.md','ガイドの目次','各HTMLの内容と開き方をまとめます。',[]],
-['migration-guide.html','仕組みと仕様の技術ガイド','AI Agent・ランナー・人間の役割、移行フロー、データ、API、例外、設計判断を図で説明します。参照ソースはHTMLに埋め込まれています。',[]],
+['migration-guide.html','仕組みと仕様の技術ガイド','工程ごとに何をして、誰がどこから何回AIを呼ぶか、確認の出方、元のClaude Code版キットとの違いを図で説明します。',[]],
 ['repository-file-map.html','ファイル構成図','ディレクトリと主要ファイルの役割を選んで確認できる、このHTMLです。ソースへのリンクはリポジトリ内の相対配置から解決します。',[]]
 ]},
 {name:'examples/',role:'過去の移植で残した成果物',desc:'run1-toml/は、TOML処理の移植で使ったルール、差分、監査、比較用コードを保存した記録です。実行可能なデモはscripts/demo.mjsを読みます。',items:[
@@ -156,12 +166,6 @@ const groups=[
 {name:'skills/',role:'プラグイン用のスキル',desc:'プラグイン導入で読み込まれるスキルです。コピー導入用は.github/skills/にあります。手順は同じで、リンクの深さ、キット本体の探し方、プラグインだけにある初期化の段落が違います。',items:[
 ['code-migration/SKILL.md','オーケストレーターの手順','プラグインのオーケストレーターが最初に読む手順です。/メニューには出しません。',[]],
 ['depmap-adapter/SKILL.md','依存解析器の追加手順','対応していない言語の依存解析器を作るときの手順です。',[]]
-]},
-{name:'history/',role:'開発時のレビュー・検証記録',desc:'キットを作る過程のレビュー、修正対応表、計画、検証ログです。導入先には写しません。',items:[
-['reviews/','レビューと修正の記録','互換性レビュー、再レビュー、修正のMarkdown・JSON記録を保存しています。',[]],
-['validation/','検証の証跡','自動テスト、オフラインデモ、CLI通信のログやJSON結果を保存しています。',[]],
-['plans/','過去の作業計画','レビュー対応などの計画文書です。',[]],
-['REVIEW-FIXES.md','初期版の修正対応表','0.1.x のレビュー指摘と修正・回帰テストの対応表です。',[]]
 ]},
 {name:'ルートのファイル',prefix:'',role:'概要・由来・開発情報',desc:'リポジトリ全体の入口と配布情報です。',items:[
 ['README.md','最初に読む文書','目的、導入、設定、工程、検証範囲をまとめています。',[]],

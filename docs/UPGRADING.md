@@ -1,6 +1,15 @@
-# 更新手順（0.35.0 と以前の版）
+# 更新手順（0.37.0 と以前の版）
 
 日本語 | [English](UPGRADING.en.md)
+
+## 0.37.0（文書の書き直し）
+
+キットのコードは変わっていません。
+
+1. README・ガイド・docs を今の版に合わせて書き直しました。README にあった細かい説明は [詳しい使い方](REFERENCE.md) に移しました。
+2. プラグイン導入では、版番号が変わるため既存の承認・完了記録が一度だけ失効します。`phase next` の `stale` が示すとおり記録し直してください。
+3. コピー導入では `migration-kit/` の文書が置き換わるだけで、承認と完了記録は失効しません。`migration-kit/` 全体を一時導入先の内容に置き換えてください。
+4. 開発時の記録（`history/`・TESTING）はリポジトリから外しました。必要なら GitHub のコミット 0bea302 で読めます。
 
 ## 0.35.0（autopilot への切り替え案内をどのアプリでも正しく）
 
@@ -337,7 +346,7 @@ inventory-merge.jsonは生成receiptとして予約し、保護入力への登�
 衝突する既存の入力は別のパスへ移して設定を更新してください。自動上書きはしません。
 repair queueは全jobのjournalとレビューbindingを保持します。中断後はtranslateで再開し、
 未着手jobを含む全診断のレビュー完了までbuild承認は通りません。
-詳細は[今回の対応表](../history/plans/2026-10-15-review-implementation.md)を参照してください。
+詳細は[今回の対応表](https://github.com/umauma00/code-migration-kit-with-github-copilot/blob/0bea302/history/plans/2026-10-15-review-implementation.md)を参照してください。
 
 新規導入はREADMEの手順を使います。既存の導入先に0.1.5のinstallerを実行すると、内容が違うファイルは上書きせず停止します。これは意図した動作です。
 

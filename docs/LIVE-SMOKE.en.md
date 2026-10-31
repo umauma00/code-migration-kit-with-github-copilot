@@ -2,7 +2,7 @@
 
 [日本語](LIVE-SMOKE.md) | English
 
-The automated tests never authenticate with Copilot or call AI. This procedure checks the normal CLI path in your own environment. Model calls consume your quota and may cost money.
+The automated tests never authenticate with Copilot or call AI. This procedure checks the normal CLI path in your own environment. Model calls use your account's GitHub AI Credits.
 
 From VS Code the workers are the same Copilot CLI processes. Also confirm that the fixture can be completed from chat alone (see the checklist below).
 
@@ -29,10 +29,11 @@ From VS Code the workers are the same Copilot CLI processes. Also confirm that t
 
 Check permissions in a disposable directory. Confirm that reviewers cannot use tools including read/search, that other workers cannot edit or use the shell, and that normal sessions work without the role environment variable. The hook's JSON conversion verified by tests and the real CLI/IDE actually running that hook are separate checks.
 
-When using VS Code, separately check the entry points and that hooks really run for the chosen session type.
+In VS Code and the GitHub Copilot app, separately check the entry points and that hooks really run.
 
-- **Copilot (Agent Host):** confirm that only the orchestrator is visible in the agent picker and can start the requested phase, that the `code-migration` and `depmap-adapter` skills are not in the `/` menu, and that no worker is in the picker.
-- **Local:** install with `--harness vscode-local` and switch the VS Code chat's session type to Local too. Besides the same entry-point checks as Copilot (Agent Host), confirm that the Local hooks are actually called. The `--harness` option alone does not change the chat's session type.
+- **VS Code (Copilot harness, the default):** confirm that only the orchestrator is visible in the agent picker and can start the requested phase, that the `code-migration` and `depmap-adapter` skills are not in the `/` menu, and that no worker is in the picker. In the Agents window check the same with **Folder** isolation (do not use **New Worktree**: it always runs Allow all and shows no confirmation).
+- **VS Code (Local harness):** in 1.144 Local is hidden by default and not available in the Agents window. To use it, install a repository copy with `--harness vscode-local` and switch the chat's harness to Local too. Besides the entry-point checks, confirm that the Local hooks are actually called. The `--harness` option alone does not change the chat's harness.
+- **GitHub Copilot app:** with Environment **This computer**, Workspace **Current checkout** and tool permissions **Ask every time** or **Assisted**, confirm that the orchestrator can be selected from the agent picker or with `/agent`, and that the person's own decisions show a confirmation.
 
 Before trying Dynamic Workflows, add its [specific checks](DYNAMIC-WORKFLOWS.md).
 
@@ -40,37 +41,25 @@ Example of what to record: CLI version, OS, Node version, model ID, phase, unit 
 
 ## Human gates and worker sessions (live checks, not run yet)
 
-Automated tests and the loopback checks cover prompt-mode workers only. Check the following on a real setup and record the results under `liveChecks` in `history/validation/copilot-cli-1.0.98-review-2026-10-18.json` of the kit repository (`null` means not run).
+Automated tests and the loopback checks cover prompt-mode workers only. Check the following on a real setup and record the results in an issue or pull request of the kit repository, labelled with the name of each item below (for example `liveCLIInteractiveAsk`). Write "not run" for items you did not run.
 
 - **Interactive CLI (trusted folder):** have the AI run `node migration-kit/scripts/run_migration.mjs approve translation --note test`. Record that the question appears, that "No" stops the command, and whether the CLI shows its own permission prompt again after "Yes" ([copilot-cli#3042](https://github.com/github/copilot-cli/issues/3042)) (`liveCLIInteractiveAsk`).
 - **Autopilot:** confirm the same command is denied without a question (CLI 1.0.97 and later, `liveCLIAutopilot`). Also record whether `--allow-all` / `--yolo` shows the question (not documented, `liveCLIAllowAll`).
 - **Questions in autopilot:** in autopilot, create a situation that needs a choice (for example a failure report). Record whether the agent chooses nothing, states the pending decision and stops when `ask_user` returns an automatic reply (that the user is not available and the agent should work autonomously), and keep the reply text (the CLI 1.0.98 changelog says autopilot auto-handles `ask_user`; `liveCLIAutopilotAskUser`).
-- **VS Code:** check the same in the Local and Copilot session types (`liveVSCodeAsk`), and record whether the Copilot session type loads `.github/hooks` (`liveVSCodeCopilotHarnessRepoHooks`). Also record whether the confirmation appears, the command is denied, or it runs unconfirmed under the Allow all permission level, Autopilot and `/yolo` (`liveVSCodeAllowAll`). If it runs unconfirmed, tell people to switch back to Manual permissions while gate commands run.
+- **VS Code:** check the same in the Copilot harness (and Local if you use it) (`liveVSCodeAsk`), and record whether the Copilot session type loads `.github/hooks` (`liveVSCodeCopilotHarnessRepoHooks`). Also record whether the confirmation appears, the command is denied, or it runs unconfirmed under the Allow all permission level, Autopilot, `/yolo` and Agents window New Worktree sessions (`liveVSCodeAllowAll`). If it runs unconfirmed, tell people to switch back to Manual permissions while gate commands run.
 - **Hooks in an untrusted folder:** re-run `node tests/verify_cli_transport.mjs` on an untrusted repository copy and record that the hook still applies to tool-assisted reviewers (they cannot read `migration/runs`) and that the other roles run (`liveRepoHooksAssistedReviewersOnly`). The same check against a loopback model runs every time as `doctor --check-cli`'s `tool-assisted reviewer hook loads in prompt mode`.
 - **Sandbox:** with VS Code's or the Copilot CLI's local sandboxing on (generally available since 2026-10-07, off by default), run `doctor --check-cli` and a one-unit `translate`, and record whether worker CLIs started from the terminal can write `~/.copilot` and the worker home `~/.copilot-migration-kit-workers` (shown by `doctor --check-cli` as `worker Copilot CLI home`) and reach the Copilot API (`liveSandboxWorkers`). If they cannot, review the sandbox allowances or ask the person to approve running the runner outside the sandbox; the AI never changes sandbox settings on its own.
 
-## VS Code orchestration checklist (pending live verification)
+## Running to the end from chat alone (live checks, not run yet)
 
-These checks require actual VS Code; offline fixtures do not establish UI behavior.
+Screen behaviour cannot be checked by automated tests, so check it in a real VS Code or Copilot app.
 
-- Start via plugin skill, repository skill and Local prompt: user-facing parent
-  shows all ten phases before long work; planning children return advice.
-- Confirm actual exposed TODO tool/schema, response and rendered list separately.
-  Preserve unrelated tasks, avoid duplicates; verify chat fallback on unavailable,
-  failed or reported invisible TODO. Local children never use TODO/question tools.
-- Drive the whole fixture from chat only: the agent checks/installs the Copilot CLI,
-  starts `copilot login` and relays its code, proposes and runs `guardrails install`,
-  and the host asks before every human-gate command (not for `models set` and `settings apply`, which record the person's choice). Nothing is typed by the person.
-- During translate, confirm the background terminal and a responsive parent, slot
-  refill, the reviewer cap and the CLI-reported models in the run summary.
-- Invoke actual built-in Rubber Duck if exposed; record unavailable otherwise.
-  Save adoption/rejection and actual fix/reverification references.
-- Press VS Code Stop during implementation and between the two reviews. Inspect
-  runner process, terminal and worker processes. If still active, Ctrl+C the runner;
-  verify the lock release and that late results are rejected.
-- Rerun translate: completed units reuse valid receipts, only missing reviews rerun,
-  blocked/stopped status matches evidence. Confirm changed inputs require fresh approval.
-- Walk source-only through judge, approval, reviewed implementation, actual build/smoke
-  and handoff: no original invocation, no passed parity, final equivalence unverified.
+- Take a small verification repository to the end from chat alone. Confirm that the AI checks for and installs the Copilot CLI, starts `copilot login` and relays its code, proposes a deny list and runs `guardrails install`, and that a confirmation appears before every command for the person's own decisions (not for `models set` and `settings apply`, which record the person's choice). Confirm the person never has to type a command.
+- Confirm that the setup questions (models, target language, how phases advance, whether the original can run, whether a specification exists) come through `ask_user` and that the answers go into `migration/run-settings.json`.
+- Confirm that the ten phases and their progress are visible before long work, and that progress keeps showing and the chat stays responsive during long commands such as translate.
+- During translate, confirm that freed slots are refilled, the cap on concurrent reviewers, and the CLI-reported models in the run summary.
+- Press the chat's stop button during an implementation and between the two reviews, and check whether the runner and worker processes remain. If they do, stop the runner and confirm that the lock is released and that late results are rejected.
+- Re-run translate: completed units reuse valid records and only missing reviews run again; changed inputs require fresh approval.
+- In source-only mode, walk through the comparator, approval, reviewed implementation, a real build/smoke and handoff without ever starting the original; parity is never treated as passed and final equivalence is written as unverified.
 
-Current repository automation does not claim these live checks have passed.
+The repository's automated tests do not claim these live checks have passed.

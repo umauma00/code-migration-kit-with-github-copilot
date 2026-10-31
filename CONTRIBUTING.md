@@ -16,3 +16,16 @@ user-level Copilot settings, actual migration inputs or usage/session logs.
 
 Keep Apache-2.0 attribution and mark modified upstream files. Original experiment
 results in RUN-NOTES.md are historical; add Copilot validation results separately.
+
+## Documents
+
+- User documents come in Japanese and English pairs (`X.md` and `X.en.md`) that link
+  to each other. Change both in the same pull request.
+- Every pull request bumps the plugin version in `plugin.json`, `package.json` and
+  `.github/plugin/marketplace.json`, adds a `CHANGELOG.md` entry and an entry in
+  `docs/UPGRADING.md` / `docs/UPGRADING.en.md` that says whether approvals go stale.
+- `tests/doc-links.test.mjs` fails on a relative link that does not resolve and on a
+  missing language twin. Link to past records by a pinned GitHub URL; they are no longer
+  kept in the repository.
+- Write Copilot usage as GitHub AI Credits. Date facts about Copilot CLI, VS Code and the
+  Copilot app that were checked against their documentation.
