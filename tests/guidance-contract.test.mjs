@@ -42,6 +42,7 @@ const samples = {
   'models-unset': 'Set an available model ID for models.implementer',
   'cli-options': 'Copilot CLI is missing required options: --session-id',
   'hook-check': 'Hook check failed: node hook.mjs took 9000 ms (timeout 5 s)',
+  'doctor-stall': 'Doctor check "worker agents resolve" did not finish within 180 s. The Copilot CLI got no answer.',
   'profile-modified': "Worker profile is not the kit's: migration-implementer",
   'waiting-dependency': 'Waiting on unfinished dependencies (ported/a.mjs); review blocked upstream receipts',
   'circuit-breaker': 'Stopped dispatching after 3 consecutive unit failures',

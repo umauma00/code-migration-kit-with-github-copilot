@@ -23,6 +23,33 @@ English. Autopilot played no part.
 - tests/rulebook-language-2026-10-30.test.mjs covers both layouts, the
   template's markers, phase 02 and the instructions.
 
+# 0.30.0 — 2026-10-30
+
+On a Windows PC behind a corporate proxy, `doctor --check-cli` printed
+"still running" for over an hour. Continuous mode gave doctor's probes no
+deadline, and a Copilot CLI that gets no answer waits forever. Reproduced with
+CLI 1.0.105 and a proxy that accepts connections but never answers: the agent
+probe waited on api.github.com, and the reviewer-hook probe sent its loopback
+request to the proxy and waited too.
+
+- Each doctor probe now has a 180 s deadline (`doctorProbeSeconds`), also in
+  continuous mode; an explicit bounded `commandTimeoutSeconds` can only shorten
+  it. The deadline is per process, and also covers the hook response check.
+  A probe past it ends as a failed check that names the stage
+  (`Copilot CLI answers`, or the reviewer-hook check with `stalled: true`)
+  and the usual causes, with its own guidance (`doctor-stall`: check the proxy
+  and sign-in, or run `doctor` without `--check-cli`). No later CLI probe
+  starts after a stalled one, and a stalled hook probe skips the model-tool
+  probes that use the same loopback provider. A stalled model-tools probe stays
+  "not-verified" (as before) but is marked `stalled` and skips the rest. Under
+  doctor the model-tools probes now wait 180 s instead of 120 s. A probe that
+  hangs after it already got its answer keeps that answer. Migration work
+  keeps no implicit deadline.
+- The loopback probes (reviewer hook, model tools, comparison B tools) add
+  `127.0.0.1,localhost` to `NO_PROXY` for their own CLI child, keeping the
+  person's entries. With a non-answering proxy the hook probe passed in under
+  a second instead of hanging.
+
 # 0.29.0 — 2026-10-30
 
 In the same phase 03 pilot, one file's implementer stalled the Copilot CLI on
