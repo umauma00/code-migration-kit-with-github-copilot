@@ -90,7 +90,7 @@ test('plugin hook uses PowerShell environment syntax for the plugin root', () =>
 
 test('new installs fan out without dependency waits unless a unit typecheck needs translated dependencies', async t => {
   const template = readJSON(path.join(kitRoot, 'templates/migration-config.json'));
-  assert.equal(template.dependencyOrder, 'auto'); assert.equal(template.concurrency, 1, 'one worker at a time until the computer is known to keep up'); assert.equal(template.fixPolicy, 'single-pass');
+  assert.equal(template.dependencyOrder, 'auto'); assert.equal(template.concurrency, 4); assert.equal(template.fixPolicy, 'single-pass');
   assert.equal(waitsForDependencies({ dependencyOrder: 'auto', commands: { typecheck: null } }), false);
   assert.equal(waitsForDependencies({ dependencyOrder: 'auto', commands: { typecheck: ['tsc'] } }), true);
   assert.equal(waitsForDependencies({ commands: { typecheck: null } }), true, 'unset keeps the earlier behavior');

@@ -21,7 +21,7 @@
     "arbiter": "SELECT_MODEL_ID",
     "fixer": "SELECT_MODEL_ID"
   },
-  "concurrency": 1,
+  "concurrency": 4,
   "dependencyOrder": "auto",
   "fixPolicy": "single-pass",
   "reviewFocus": "shared",

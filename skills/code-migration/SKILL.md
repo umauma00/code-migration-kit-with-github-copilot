@@ -531,10 +531,8 @@ or `rereview` (a fixed output is reviewed again until no confirmed finding
 remains; also what an older configuration without the key gets).
 `dependencyOrder: auto` (new installs) lets the approved scope fan out like
 upstream and holds dependents for reviewed dependencies only when a per-unit
-typecheck needs them. `concurrency` (up to 64, both reviewers included; 1 for new
-installs) should stay within what the computer and the account's rate limits
-keep up with; raise it only after runs at the current value pass without CLI
-stalls. `reviewFocus`: `shared` (new installs; both
+typecheck needs them. `concurrency` (up to 64, both reviewers included) should
+stay within the account's rate limits. `reviewFocus`: `shared` (new installs; both
 reviewers check semantics and rules, each from its own lens first) or
 `specialized` (one check each, upstream's split). Changing `fixPolicy`,
 `dependencyOrder` or `reviewFocus` revokes approvals. Run limits (`concurrency`,
@@ -556,8 +554,8 @@ not one per poll. After each check, tell the person in chat the finished count,
 the active units and any retry or blocked unit. Never block the parent on the
 run or kill it for being slow. When status shows a worker retrying after a transient failure
 (rate limit, service error), tell the user at once: the runner waits and retries
-by itself; if it persists, offer a lower `concurrency` (down to 1) after the
-run (it keeps reviewed work). A run that stops at its AI call budget is a budget stop: rerun
+by itself; if it persists, offer a lower `concurrency` after the run (it keeps
+reviewed work). A run that stops at its AI call budget is a budget stop: rerun
 `translate`, or propose `translate --max-calls N` with the number the person agrees.
 
 After a failed build, propose `build-loop --note TEXT [--through build|smoke|parity]

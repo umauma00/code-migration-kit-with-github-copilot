@@ -55,7 +55,7 @@ test('settings init writes the values in one file, and the explanations and the 
   assert.equal(s.sourceLanguage, 'FILL_IN', 'template example languages are not presented as a choice');
   assert.equal(s.models.implementer.model, 'FILL_IN');
   assert.deepEqual(s.models.surveyor, { model: 'same-as-implementer', effort: 'default', context: 'default' });
-  assert.equal(s.concurrency, 1, 'new installs run one worker at a time');
+  assert.equal(s.concurrency, 4, 'new installs run four workers at once');
   // The settings file holds only values: no explanations or choices in it.
   assert.deepEqual(Object.keys(s).filter(k => k.startsWith('_')), ['_about']);
   assert.match(s._about, /記入した/);
@@ -75,15 +75,15 @@ test('settings init writes the values in one file, and the explanations and the 
 test('an existing configuration keeps its concurrency through reinstall, settings init and apply', t => {
   const root = fresh(t);
   const file = safePath(root, 'migration/config.json');
-  writeJSON(file, { ...readJSON(file), concurrency: 4 });
+  writeJSON(file, { ...readJSON(file), concurrency: 2 });
   install(root, { apply: true, layout: 'repository', language: 'ja' });
-  assert.equal(readJSON(file).concurrency, 4, 'reinstalling never resets it to the new default');
+  assert.equal(readJSON(file).concurrency, 2, 'reinstalling never resets it to the template value');
   initRunSettings(root, models);
-  assert.equal(settingsOf(root).concurrency, 4);
+  assert.equal(settingsOf(root).concurrency, 2);
   writeSettings(root, filled(root));
   const result = applyRunSettings(root, models);
   assert.equal(result.applied, true, JSON.stringify(result.errors));
-  assert.equal(loadConfig(root).concurrency, 4);
+  assert.equal(loadConfig(root).concurrency, 2);
 });
 
 test('settings init keeps the person\'s values and refreshes only explanations and choices', t => {

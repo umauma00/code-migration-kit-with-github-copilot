@@ -22,13 +22,11 @@ Kit files (lib) change, so existing approvals and completion records expire once
 3. No settings change is needed. Restart a stopped pilot from its preparation after the update.
 4. A repository copy replaces the whole `migration-kit/` with the staged copy. The plugin installs with the update alone.
 
-## 0.32.0 (one AI call at a time for new installs)
+## 0.32.0 (no change)
 
-Kit files (lib, templates) change, so existing approvals and completion records expire once. Record them again as `phase next` shows in `stale`.
+Nothing changes in this version. Lowering `concurrency` for new installs from 4 to 1 was withdrawn before release; new installs keep 4.
 
-1. New installs get `concurrency` 1 instead of 4. Existing configurations keep their value.
-2. When the Copilot CLI keeps stalling on its 120 s wait on a busy computer, set `concurrency` to 1 in `migration/run-settings.json` and run `settings apply` (run `settings init` first if that file does not exist). It is a run limit, so reviewed work and approvals are kept.
-3. When runs pass at 1, raise it step by step (2, then 4) for speed.
+If the Copilot CLI still keeps stalling on its 120 s wait on a busy computer, lower `concurrency` in `migration/run-settings.json` and run `settings apply` (run `settings init` first if that file does not exist). It is a run limit, so reviewed work and approvals are kept.
 
 ## 0.31.0 (a Japanese report language gives a Japanese rulebook)
 

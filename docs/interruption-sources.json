@@ -2616,7 +2616,7 @@
     },
     {
       "path": "lib/run-settings.mjs",
-      "sha256": "679053debca17ac07a0cd681e6db198e3dbdf0768d17f998e8bae0690704b763",
+      "sha256": "213cc4d8f2630ca159b0333d29218c2c084fd34b0b8050f27541ee5a663da635",
       "entries": [
         {
           "line": 26,
@@ -2636,12 +2636,12 @@
         {
           "line": 55,
           "kind": "error-or-exit-candidate",
-          "code": "executionMode: 'continuous は終わるまで続ける、bounded は config.json の上限で止める。', concurrency: '同時に動かすワーカーの数（1〜64）。新規導入の初期値は1。Copilot CLI が止まったりレート制限が出たりしなければ、増やすと速くなる。',"
+          "code": "executionMode: 'continuous は終わるまで続ける、bounded は config.json の上限で止める。', concurrency: '同時に動かすワーカーの数（1〜64）。',"
         },
         {
           "line": 68,
           "kind": "error-or-exit-candidate",
-          "code": "executionMode: 'continuous runs until done; bounded stops at the limits in config.json.', concurrency: 'Workers running at once (1-64). New installs use 1; raise it for speed when the computer keeps up and no Copilot CLI stall or rate limit appears.',"
+          "code": "executionMode: 'continuous runs until done; bounded stops at the limits in config.json.', concurrency: 'Workers running at once (1-64).',"
         },
         {
           "line": 91,
@@ -5027,7 +5027,7 @@
     },
     {
       "path": "templates/migration-config.json",
-      "sha256": "a5276add5d01161959ae8f3d6c11d9bebcf5ec72178a0f97ca47d9c87124fee0",
+      "sha256": "ebec4d3c287731fbe7b83b1397eef3a6c090cd04255db666c19294546dec432c",
       "entries": [
         {
           "line": 28,
