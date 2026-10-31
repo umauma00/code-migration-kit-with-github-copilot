@@ -1,6 +1,32 @@
-# Upgrading (0.31.0 and earlier releases)
+# Upgrading (0.34.0 and earlier releases)
 
 [日本語](UPGRADING.md) | English
+
+## 0.34.0 (workers run in a Copilot CLI home of their own)
+
+The kit's files (lib, scripts) change, so existing approvals and completion records are revoked once. Record them again as `phase next` lists under `stale`.
+
+1. The Copilot CLI workers the kit starts use `~/.copilot-migration-kit-workers`, next to the person's `~/.copilot`. They no longer write into the person's session index (session-store.db), which on the reporting PC held thousands of sessions, so the 120 s stall should become rarer.
+2. Sign-in, settings and plugins stay the person's (settings files are copied, plugin and agent folders are linked). The person's sessions, index and logs are not brought in.
+3. If the CLI says it is not signed in there, the call is repeated in the person's `~/.copilot`; once that works, the rest of that command stays there: no stop, a warning in the run report.
+4. To keep the old behavior (everything in `~/.copilot`), set `"workerCopilotHome": "shared"` in `migration/config.json`. It is a run setting, so reviewed work and approvals are kept.
+5. `sessions status` and `sessions prune` look in both homes.
+6. For copy installs, replace all of `migration-kit/` with the staged copy. Plugins only need the update.
+
+## 0.33.0 (the 120 s stall and network errors recognized correctly)
+
+Kit files (lib) change, so existing approvals and completion records expire once. Record them again as `phase next` shows in `stale`.
+
+1. The Copilot CLI's "session host did not complete the ... event within 120s" (the wording recorded on Windows) is recognized as a stall, and the same call is retried up to 5 times. Before, the kit did not recognize it and left the file unfinished on the first stall.
+2. A network error (ETIMEDOUT and similar) followed by the CLI's sign-in help no longer stops the whole run as a sign-in problem; the call is retried (up to 5 times per call), and the guidance is a rerun and a proxy and sign-in check instead of `copilot login`.
+3. No settings change is needed. Restart a stopped pilot from its preparation after the update.
+4. A repository copy replaces the whole `migration-kit/` with the staged copy. The plugin installs with the update alone.
+
+## 0.32.0 (no change)
+
+Nothing changes in this version. Lowering `concurrency` for new installs from 4 to 1 was withdrawn before release; new installs keep 4.
+
+If the Copilot CLI still keeps stalling on its 120 s wait on a busy computer, lower `concurrency` in `migration/run-settings.json` and run `settings apply` (run `settings init` first if that file does not exist). It is a run limit, so reviewed work and approvals are kept.
 
 ## 0.31.0 (a Japanese report language gives a Japanese rulebook)
 
