@@ -1,6 +1,14 @@
-# Upgrading (0.34.0 and earlier releases)
+# Upgrading (0.35.0 and earlier releases)
 
 [日本語](UPGRADING.md) | English
+
+## 0.35.0 (the autopilot handoff is right in every app)
+
+Kit files (lib) change, so existing approvals and completion records go stale once. Re-record them as `phase next` reports under `stale`.
+
+1. In auto mode, the message at the end of setup no longer names the Copilot CLI-only Shift+Tab. It now only says to switch to autopilot mode and send "continue" (without switching, the run still goes on by itself to some extent). Switch the way your app (Copilot CLI, the GitHub Copilot app or VS Code) does.
+2. When the message is shown, and the stop before phase 00, are unchanged. No settings change is needed.
+3. In a copy install, replace all of `migration-kit/` with the temporary install's. The plugin needs only an update.
 
 ## 0.34.0 (workers run in a Copilot CLI home of their own)
 

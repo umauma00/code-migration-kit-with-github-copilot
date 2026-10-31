@@ -1,3 +1,19 @@
+# 0.35.0 — 2026-10-31
+
+The auto-mode handoff at the end of setup said "switch to autopilot with
+Shift+Tab". Shift+Tab is a Copilot CLI key; the GitHub Copilot app and VS Code
+switch with a picker, so the line was wrong for two of the three apps the kit
+supports, and the kit cannot tell which app runs it. The handoff now just says
+to switch to autopilot mode and send "continue", without naming a key or a
+control, and that without switching the run still goes on by itself to some
+extent.
+
+Only the wording changed: when the handoff is shown, that it is shown once,
+and that the run stops before phase 00 are as before. The ORDERED-WORKFLOW
+pages say the same, and their auto-mode headings no longer say Copilot CLI
+only. tests/setup-flow.test.mjs checks that the handoff names no app's key,
+picker or command.
+
 # 0.34.0 — 2026-10-31
 
 The same Windows PC showed where the 120 s stall most likely comes from. Its
