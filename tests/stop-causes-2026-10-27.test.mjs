@@ -18,9 +18,9 @@ const alive = pid => { try { process.kill(pid, 0); return true; } catch (e) { re
 // A PID no process can hold, so it stays gone for the whole test. A reaped
 // child's PID did not: Windows reuses PIDs quickly, and on CI one came back as
 // another test's process between the check and the lock (PR #43). Every OS the
-// kit supports keeps real PIDs far below 2^31 (Linux at most 2^22, Windows
-// multiples of 4 in practice much lower), and process.kill(pid, 0) on one
-// reports ESRCH there.
+// kit supports keeps real PIDs far below 2^31 in practice (Linux at most
+// 2^22, macOS 99999), and process.kill(pid, 0) on one reports ESRCH there;
+// the assertion below fails loudly if a platform ever differs.
 let nextDeadPid = 0x7ffffffc;
 const deadPid = () => {
   const pid = nextDeadPid;
