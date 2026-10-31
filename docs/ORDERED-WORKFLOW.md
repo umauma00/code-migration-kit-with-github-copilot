@@ -83,7 +83,7 @@ node migration-kit/scripts/run_migration.mjs phase waive 03 --note "全体の形
 - モードは設定の指紋（contextHash）に含めません。切り替えても承認やレビュー済みの記録は失効しません。
 
 <a id="auto-mode"></a>
-### 自動モード（`auto`、Copilot CLI の autopilot 向け）
+### 自動モード（`auto`、autopilot 向け）
 
 autopilot は確認（フックの ask）を自動で拒否するため、`normal` と `relaxed` では関門で止まります。`auto` はその関門だけを人に聞かずに通します。
 

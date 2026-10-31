@@ -66,7 +66,7 @@ node migration-kit/scripts/run_migration.mjs phase waive 03 --note "See the over
 - The mode is not part of the configuration fingerprint (contextHash), so switching revokes no approval or reviewed record.
 
 <a id="auto-mode"></a>
-### Auto mode (`auto`, for Copilot CLI autopilot)
+### Auto mode (`auto`, for autopilot)
 
 Autopilot refuses every confirmation (a hook ask), so `normal` and `relaxed` stop at the gates. `auto` lets those gates through without asking the person.
 

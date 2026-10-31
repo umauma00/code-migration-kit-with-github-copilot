@@ -13,12 +13,16 @@ agent harnesses):
 - GitHub Copilot app: the mode picker below the prompt box, or
   `/autopilot continue`.
 - VS Code, including the Agents window: the mode picker in the chat input; in
-  a Local harness session Autopilot is in the permissions picker instead.
+  a Local harness session Autopilot is in the permissions picker instead, so
+  the line says to look there when the mode picker has no Autopilot.
+
+The three are a Markdown list after a blank line, so a chat that renders
+Markdown shows them as separate lines.
 
 Only the wording changed: when the handoff is shown, that it is shown once,
 and that the run stops before phase 00 are as before. The ORDERED-WORKFLOW
 pages say the same. tests/setup-flow.test.mjs checks that each app has its own
-line and that Shift+Tab appears only on the Copilot CLI line.
+item and that Shift+Tab appears only in the Copilot CLI item.
 
 # 0.31.0 — 2026-10-30
 

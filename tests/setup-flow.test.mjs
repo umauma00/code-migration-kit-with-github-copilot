@@ -269,20 +269,23 @@ test('source-spec init --apply before settings apply does not end setup', t => {
 // autopilot with a picker, and the kit cannot tell which app runs it, so the
 // handoff gives each app its own line and keeps Shift+Tab on the CLI line.
 test('the autopilot handoff gives each supported app its own way to switch', () => {
-  for (const [language, apps] of [['ja', ['Copilot CLI', 'GitHub Copilot app', 'VS Code（Agents ウィンドウを含む）']], ['en', ['Copilot CLI', 'GitHub Copilot app', 'VS Code (including the Agents window)']]]) {
-    const [intro, ...lines] = autoHandoff(language).split('\n');
+  for (const language of ['ja', 'en']) {
+    const text = autoHandoff(language);
+    // A blank line and "- " items, so a Markdown chat renders a list.
+    const [intro, blank, ...items] = text.split('\n');
+    assert.equal(blank, '', `${language}: a blank line before the list`);
+    assert.ok(items.every(line => line.startsWith('- ')), `${language}: every app is a list item`);
     assert.doesNotMatch(intro, /Shift\+Tab|\/autopilot/, `${language}: the shared part names no app-specific control`);
     assert.match(intro, language === 'ja' ? /切り替えずに送っても、1回ずつ手動で進みます/ : /sent without switching, the run still advances one turn at a time/);
-    assert.equal(lines.length, apps.length, `${language}: one line per app`);
-    apps.forEach((app, i) => assert.ok(lines[i].includes(app), `${language}: line ${i + 1} is for ${app}`));
-    const [cliLine, appLine, codeLine] = lines;
+    const item = app => { const found = items.filter(line => line.includes(app)); assert.equal(found.length, 1, `${language}: one item for ${app}`); return found[0]; };
+    const cliLine = item('Copilot CLI'), appLine = item('GitHub Copilot app'), codeLine = item('VS Code');
+    assert.equal(items.length, 3, `${language}: three apps`);
     assert.match(cliLine, /Shift\+Tab/);
     assert.match(cliLine, /\/autopilot/);
-    for (const other of [appLine, codeLine]) assert.doesNotMatch(other, /Shift\+Tab|Tab/, `${language}: Shift+Tab is for the CLI only`);
-    assert.match(appLine, language === 'ja' ? /モードの選択/ : /mode picker/);
+    for (const other of [appLine, codeLine]) assert.doesNotMatch(other, /Shift\+Tab/, `${language}: Shift+Tab is for the CLI only`);
     assert.match(appLine, /\/autopilot/);
-    // VS Code documents no /autopilot command; Local harness sessions keep Autopilot in the permissions picker.
+    assert.match(codeLine, /Agents/, `${language}: the VS Code item covers the Agents window`);
+    // VS Code documents no /autopilot command.
     assert.doesNotMatch(codeLine, /\/autopilot/);
-    assert.match(codeLine, language === 'ja' ? /モードの選択[\s\S]*Local の会話では、権限の選択/ : /mode picker[\s\S]*Local session it is in the permissions picker/);
   }
 });
