@@ -522,7 +522,7 @@ reviewers check semantics and rules, each from its own lens first) or
 `specialized` (one check each, upstream's split). Changing `fixPolicy`,
 `dependencyOrder` or `reviewFocus` revokes approvals. Run limits (`concurrency`,
 `maxAgentCalls`, `maxFixRounds`, timeouts, retry settings, `maxRunInputBytes`,
-`maxAiCreditsPerCall`) can change between runs and keep reviewed work and approvals.
+`maxAiCreditsPerCall`, `workerCopilotHome`) can change between runs and keep reviewed work and approvals.
 
 Long runner commands (`translate`, `repair`, `repair-round`, `build-loop`,
 `pilot run`, `survey run`) all run the same way. Start the command alone in a

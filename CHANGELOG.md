@@ -1,3 +1,43 @@
+# 0.34.0 — 2026-10-31
+
+The same Windows PC showed where the 120 s stall most likely comes from. Its
+Copilot CLI home held 2,959 sessions and a 192 MB session index
+(`~/.copilot/session-store.db`), and the CLI log said "Session store tracking
+backlog limit reached; live indexing paused" while workers failed with
+"session host did not complete the ... event within 120s". Every worker call
+adds a session to that one shared home, so a migration grows it by thousands.
+(The person's six company MCP servers were ruled out: a `copilot -p` call took
+11.6 s with them and 12.2 s with all six disabled.)
+
+- Workers run in a Copilot CLI home of their own, next to the person's
+  (`~/.copilot` -> `~/.copilot-migration-kit-workers`), so their sessions and
+  index no longer share the person's large records. The CLI finds its
+  session-state, index and logs only through `COPILOT_HOME` (checked on
+  1.0.105, where a full worker run with the real CLI kept every session and
+  its own index in the worker home).
+- The worker home carries the person's settings, not their records: the
+  top-level settings files (`config.json`, which names the signed-in account,
+  `settings.json`, MCP and permission settings) are copied once per process,
+  and the folders the CLI reads plugins, agents and settings from are linked
+  (a junction on Windows). The person's session-state, index, logs, command
+  history and downloaded builds are left out. The workers' own index starts
+  over once it passes 64 MiB.
+- If the CLI reports itself signed out in the worker home (a sign-in failure
+  without a network error), the call is repeated in the person's home and
+  the rest of that run stays there, with a warning in the run report instead
+  of a stop.
+- `workerCopilotHome: "shared"` in `migration/config.json` keeps every worker
+  in the person's home, as before. It is a run setting: changing it keeps
+  reviewed work and approvals.
+- `sessions status` and `sessions prune` look in both homes, so sessions from
+  older runs are still found.
+- `doctor --check-cli` checks the CLI in the worker home, as workers run it.
+- tests/worker-home-2026-10-31.test.mjs covers what the worker home carries,
+  the per-process copy, the index reset, the sign-in fallback (and that a
+  network error with sign-in help does not trigger it), the setting, and
+  status/prune across both homes; tests/verify_cli_transport.mjs now checks
+  that real CLI workers write only to the worker home.
+
 # 0.33.0 — 2026-10-31
 
 The same Windows pilot recorded what actually stopped it. Workers failed with

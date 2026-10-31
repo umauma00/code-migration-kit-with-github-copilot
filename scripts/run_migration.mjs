@@ -22,6 +22,7 @@ import { phaseCommand } from './phase_cli.mjs';
 import { parseCommandLine, specs } from '../lib/cli.mjs';
 import { diagnoseBuild } from './diagnostic_queue.mjs';
 import { sessionsStatus, pruneSessions } from '../lib/sessions.mjs';
+import { prepareWorkerHome } from '../lib/worker-home.mjs';
 import { usageReport, usageMarkdown } from '../lib/usage.mjs';
 import { buildLoop } from '../lib/build-loop.mjs';
 import { readPreferences, setPreferences, preferencesReport } from '../lib/preferences.mjs';
@@ -232,7 +233,9 @@ export async function doctor(root, config, { checkCLI = false, command = 'copilo
     let stage = 'Copilot CLI --version';
     try {
       // Same environment as workers: a launcher may pick a different build otherwise.
-      const env = copilotEnv('reviewer-rules');
+      let home = null;
+      try { home = prepareWorkerHome(root, config); } catch {}
+      const env = copilotEnv('reviewer-rules', home);
       const version = await runProcess(command, ['--version'], { cwd: root, env, signal, timeoutMs });
       checks.push({ check: 'Copilot executable', ok: version.code === 0, detail: version.stdout.trim() });
       stage = 'Copilot CLI --help';
@@ -242,7 +245,7 @@ export async function doctor(root, config, { checkCLI = false, command = 'copilo
       const missing = requiredCopilotFlags(layout, config).filter(flag => !advertised.has(flag));
       checks.push({ check: 'required flags', ok: help.code === 0 && missing.length === 0, missing });
       stage = 'worker agents resolve';
-      const agents = await probeWorkerAgents(command, [], { cwd: root, layout, signal, timeoutMs });
+      const agents = await probeWorkerAgents(command, [], { cwd: root, layout, signal, timeoutMs, home });
       checks.push({ check: 'worker agents resolve', ...agents });
       let hookStalled = false;
       if (agents.ok) {

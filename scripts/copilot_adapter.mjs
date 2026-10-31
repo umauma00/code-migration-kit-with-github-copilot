@@ -12,6 +12,8 @@ import { isReviewer, isToolFree, toolAssistedRole, assistedReviewerRoles, valida
 import { runtimeLayout } from '../lib/runtime.mjs';
 import { sessionIdPattern } from '../lib/sessions.mjs';
 import { recordCallUsage } from '../lib/usage.mjs';
+import { prepareWorkerHome } from '../lib/worker-home.mjs';
+import { isSignInFailure } from '../lib/failures.mjs';
 
 // Worker sessions hold source code and prompts. They carry a runner-chosen
 // ID and name, so receipts point at their transcript and
@@ -64,13 +66,14 @@ export function readUsageFile(file) {
 // of other workers' records); every other role is limited by its CLI flags. So
 // only they admit the repository hooks, which bypasses folder trust for every
 // .github/hooks file in the project; the others follow folder trust.
-export function copilotEnv(role) {
-  const env = { ...process.env, COPILOT_ALLOW_ALL: 'false', MIGRATION_KIT_ROLE: role };
+// home: the worker CLI home (lib/worker-home.mjs); omitted, the person's.
+export function copilotEnv(role, home) {
+  const env = { ...process.env, COPILOT_ALLOW_ALL: 'false', MIGRATION_KIT_ROLE: role, ...(home ? { COPILOT_HOME: home } : {}) };
   if (assistedReviewerRoles.includes(role)) env.GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS = 'true';
   return env;
 }
-export async function copilotVersion(command = 'copilot', prefixArgs = [], { cwd, signal, timeoutMs = 0 } = {}) {
-  const result = await runProcess(command, [...prefixArgs, '--version'], { cwd, signal, timeoutMs, env: copilotEnv('reviewer-rules') });
+export async function copilotVersion(command = 'copilot', prefixArgs = [], { cwd, signal, timeoutMs = 0, home } = {}) {
+  const result = await runProcess(command, [...prefixArgs, '--version'], { cwd, signal, timeoutMs, env: copilotEnv('reviewer-rules', home) });
   const version = result.stdout.match(/\d+\.\d+\.\d+(?:[-+][\w.]*\w)?/)?.[0];
   if (result.code !== 0 || !version) throw new Error(`Cannot read the Copilot CLI version (exit ${result.code}): ${(result.stderr || result.stdout).slice(-500)}`);
   return version;
@@ -95,11 +98,11 @@ export async function fileLimits({ signal, timeoutMs = 0 } = {}) {
 export const probeAgentName = '__migration_kit_probe_missing_agent__';
 // An unknown --agent fails before any session or model request and lists the
 // agents this exact invocation discovers. Help text alone cannot show that.
-export async function probeWorkerAgents(command = 'copilot', prefixArgs = [], { cwd, layout, signal, timeoutMs = 0 } = {}) {
+export async function probeWorkerAgents(command = 'copilot', prefixArgs = [], { cwd, layout, signal, timeoutMs = 0, home } = {}) {
   const args = copilotArgs('reviewer-rules', 'diagnostic-model', undefined, layout);
   args[args.indexOf('--agent') + 1] = probeAgentName;
   const result = await runProcess(command, [...prefixArgs, ...args], { cwd, signal, timeoutMs,
-    input: 'Agent resolution probe. No model request is expected.', env: copilotEnv('reviewer-rules') });
+    input: 'Agent resolution probe. No model request is expected.', env: copilotEnv('reviewer-rules', home) });
   const listed = `${result.stdout}\n${result.stderr}`.match(new RegExp(`No such agent: ${probeAgentName}, available:([^\\r\\n]*)`));
   const required = [...roles, ...assistedReviewerRoles, 'surveyor', 'preparation-auditor'].map(role => layout?.agentId(role) ?? `migration-${role}`);
   if (!listed) return { ok: false, required, missing: required,
@@ -353,11 +356,20 @@ export function createCopilotAdapter({ command = 'copilot', prefixArgs = [], ver
   // and it repeats only after versionRecheckMs; a change warns once and the run continues.
   let baseline, check;
   const warned = new Set();
-  const currentVersion = (root, signal, timeoutMs) => {
-    if (!check || check.timeoutMs !== timeoutMs || Date.now() - check.at >= versionRecheckMs) {
-      check = { at: Date.now(), timeoutMs, result: copilotVersion(command, prefixArgs, { cwd: root, signal, timeoutMs }).then(version => ({ version }), error => ({ error })) };
+  const currentVersion = (root, signal, timeoutMs, home) => {
+    if (!check || check.timeoutMs !== timeoutMs || check.home !== home || Date.now() - check.at >= versionRecheckMs) {
+      check = { at: Date.now(), timeoutMs, home, result: copilotVersion(command, prefixArgs, { cwd: root, signal, timeoutMs, home }).then(version => ({ version }), error => ({ error })) };
     }
     return check.result;
+  };
+  // Workers run in the kit's own CLI home (lib/worker-home.mjs). If the CLI is
+  // not signed in there, the call is repeated in the person's home and every
+  // later call of this process stays there; the run continues and says so.
+  let sharedHome = false, homeWarning;
+  const workerHome = (root, config) => {
+    if (sharedHome) return null;
+    try { return prepareWorkerHome(root, config); }
+    catch (e) { sharedHome = true; homeWarning = `Workers use the person's Copilot CLI home: the kit's worker home could not be prepared (${e.message.slice(0, 200)})`; console.error(`WARNING: ${homeWarning}`); return null; }
   };
   return async ({ root, config, role, unit, extra, signal, reviewInput, reviewMode = 'frozen', workInput, workMode, runId, sessionId, model: modelOverride }) => {
     // Oversized reviews run on the read-only twin profile of the same reviewer.
@@ -368,7 +380,8 @@ export function createCopilotAdapter({ command = 'copilot', prefixArgs = [], ver
     // An override (a preparation audit's host-chosen model) keeps that model's own default effort and context.
     const effort = modelOverride ? undefined : workerEffort(config, role), context = modelOverride ? undefined : workerContext(config, role);
     let cliVersion = null, cliVersionWarning;
-    const checked = await currentVersion(root, signal, processTimeout(config, 'commandTimeoutSeconds'));
+    let home = workerHome(root, config);
+    const checked = await currentVersion(root, signal, processTimeout(config, 'commandTimeoutSeconds'), home);
     if (signal?.aborted) throw new Error('Interrupted');
     if (checked.error) cliVersionWarning = `Copilot CLI version unknown before this call: ${checked.error.message.slice(0, 300)}`;
     else cliVersion = checked.version;
@@ -382,7 +395,7 @@ export function createCopilotAdapter({ command = 'copilot', prefixArgs = [], ver
     // The runner journals sessionId before this call; direct callers get a fresh one.
     const id = sessionIdPattern.test(sessionId ?? '') ? sessionId : crypto.randomUUID();
     const session = { id };
-    const versionFields = { cliVersion, ...(cliVersionWarning ? { cliVersionWarning } : {}), cliSessionId: session.id };
+    const versionFields = { cliVersion, ...(cliVersionWarning ? { cliVersionWarning } : {}), cliSessionId: session.id, ...(homeWarning ? { cliHomeWarning: homeWarning } : {}) };
     let result;
     // Surveyors get their scope as a frozen input, like tool-free reviewers.
     const frozenRole = role === 'surveyor' || role === 'preparation-auditor';
@@ -402,10 +415,21 @@ export function createCopilotAdapter({ command = 'copilot', prefixArgs = [], ver
     let argv, options;
     try {
       argv = [...prefixArgs, ...copilotArgs(worker, model, undefined, layout, session, { usageFile, maxAiCredits: executionLimits(config).aiCredits, effort, context, toolFree: isToolFree(worker) || (usesWorkInput(role, workMode) && workMode === 'frozen' && typeof workInput === 'string') })];
-      options = { cwd: root, signal, input: prompt, timeoutMs: processTimeout(config, 'timeoutSeconds'), outputDir: safePath(root, 'migration/runs/process-output'), env: copilotEnv(worker) };
+      options = { cwd: root, signal, input: prompt, timeoutMs: processTimeout(config, 'timeoutSeconds'), outputDir: safePath(root, 'migration/runs/process-output'), env: copilotEnv(worker, home) };
     } catch (e) { fs.rmSync(usageDir, { recursive: true, force: true }); throw e; }
     try {
       result = await runProcess(command, argv, options);
+      if (home && result.code !== 0 && isSignInFailure(`${copilotStreamError(processOutputLines(result)) ?? ''}\n${result.stderr}`)) {
+        // Signed out only in the worker home: no model request was made.
+        if (!sharedHome) {
+          sharedHome = true;
+          homeWarning = `Workers use the person's Copilot CLI home: the CLI was not signed in in the kit's worker home ${home}`;
+          console.error(`WARNING: ${homeWarning}`);
+        }
+        home = null; versionFields.cliHomeWarning = homeWarning;
+        fs.rmSync(usageFile, { force: true });
+        result = await runProcess(command, argv, { ...options, env: copilotEnv(worker) });
+      }
       usage = readUsageFile(usageFile);
     } catch (e) {
       // A killed or timed-out CLI may still have written its usage.
