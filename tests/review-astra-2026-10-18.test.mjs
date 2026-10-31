@@ -21,7 +21,9 @@ async function approvedWith(t, options, change = () => {}) {
 }
 const failingBuild = [process.execPath, '-e', 'console.error("ported/math_ops.mjs:1:1: error: still broken"); process.exit(1)'];
 const live = t => { const p = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 30000)'], { stdio: 'ignore' }); t.after(() => p.kill()); return p; };
-const dead = async () => { const p = spawn(process.execPath, ['-e', ''], { stdio: 'ignore' }); await new Promise(resolve => p.once('exit', resolve)); return p.pid; };
+// A PID no process can hold: a reaped child's PID can be reused at once on Windows
+// (see deadPid in stop-causes-2026-10-27.test.mjs).
+const dead = async () => 0x7ffffff0;
 
 test('a quoted substitution behind a read-only command still reaches the human gate and the guardrails file check', t => {
   for (const [command, gate] of [

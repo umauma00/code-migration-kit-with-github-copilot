@@ -1,6 +1,15 @@
-# Upgrading (0.29.0 and earlier releases)
+# Upgrading (0.30.0 and earlier releases)
 
 [日本語](UPGRADING.md) | English
+
+## 0.30.0 (doctor always finishes)
+
+Kit files (lib, scripts) change, so existing approvals and completion records expire once. Record them again as `phase next` shows in `stale`.
+
+1. Each process `doctor` starts for a check (including the hook response check) now ends after 180 s. When the Copilot CLI got no answer (for example from a proxy that does not respond), continuous mode used to wait for hours. Doctor now names the check that did not finish, the time, and the usual causes (proxy, a sign-in waiting for input, a blocked network), and ends. Deadlines for migration work (translation, builds) are unchanged.
+2. The checks that point the CLI at a loopback model provider add `127.0.0.1,localhost` to `NO_PROXY` for that CLI only. Behind a corporate proxy, no manual `NO_PROXY` change is needed; the person's environment is not changed.
+3. No setting changes. In bounded mode an explicit `commandTimeoutSeconds` below 180 s is used instead; it never lengthens the deadline. The model-tools probes now wait 180 s instead of 120 s.
+4. In a copy install, replace all of `migration-kit/` with the temporary install's. The plugin needs only an update.
 
 ## 0.29.0 (the runner hands the implementer its evidence)
 
