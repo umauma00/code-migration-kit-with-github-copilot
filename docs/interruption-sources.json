@@ -1019,7 +1019,7 @@
     },
     {
       "path": "lib/failures.mjs",
-      "sha256": "c0e3ce9c1cf4a3249070a44acdae6586817f07918f1d329e8a0988119d2c09fb",
+      "sha256": "dd0071c1cb00455874149e29482a756d4a40a16cb7336cd9171576cc22e3b4c0",
       "entries": [
         {
           "line": 27,
@@ -3232,7 +3232,7 @@
     },
     {
       "path": "lib/worker-home.mjs",
-      "sha256": "aef78e048f46083a8530e4fac35cbcbe08c45c1e26f77a0ef03bfb049714901f",
+      "sha256": "f24bd80e1682910d84aa302726777e7e6154dba77907afea508e6e308e4d3c6c",
       "entries": []
     },
     {

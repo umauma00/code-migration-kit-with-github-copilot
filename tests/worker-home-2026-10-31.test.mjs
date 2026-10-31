@@ -130,6 +130,7 @@ test('a network error with sign-in help is not a reason to leave the worker home
   assert.equal(isSignedOut(help), false);
   assert.equal(isSignedOut('To authenticate, you can use any of the following methods'), true);
   assert.equal(isSignedOut('Error: No authentication information found.'), true);
+  assert.equal(isSignedOut('session.error authentication: Not authenticated. Please authenticate first.'), true);
   for (const one of ['401 Unauthorized', 'Bad credentials', 'session.error forbidden: model not enabled', 'session.error authentication: token expired']) assert.equal(isSignedOut(one), false, one);
   const cli = cliDouble(f, `process.stderr.write(${JSON.stringify(`${help}\n`)}); process.exit(1);`);
   const error = await cli.call().catch(e => e);
@@ -182,6 +183,18 @@ test('settings kept as symbolic links are followed, and a folder the CLI made is
   fs.symlinkSync(elsewhere, path.join(worker, 'skills'), process.platform === 'win32' ? 'junction' : 'dir');
   prepareWorkerHome(root, {});
   assert.equal(fs.realpathSync(path.join(worker, 'skills')), fs.realpathSync(path.join(home, 'skills')));
+  // A folder the person removed is unlinked; a file the CLI keeps there stays.
+  resetPreparedWorkerHomes();
+  fs.rmSync(path.join(home, 'skills'), { recursive: true });
+  fs.writeFileSync(path.join(worker, 'cli-own.json'), '{}');
+  prepareWorkerHome(root, {});
+  assert.ok(!fs.existsSync(path.join(worker, 'skills')) && fs.existsSync(path.join(worker, 'cli-own.json')));
+  if (process.platform !== 'win32') {
+    resetPreparedWorkerHomes();
+    fs.writeFileSync(path.join(home, 'statusline.sh'), '#!/bin/sh\n', { mode: 0o755 });
+    prepareWorkerHome(root, {});
+    assert.equal(fs.statSync(path.join(worker, 'statusline.sh')).mode & 0o777, 0o700, 'executable for the person only');
+  }
 });
 
 test('a relative COPILOT_HOME inside the project puts the worker home in the user profile, not the project', t => {
