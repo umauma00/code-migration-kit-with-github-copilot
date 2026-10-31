@@ -149,6 +149,7 @@ node migration-kit/scripts/run_migration.mjs doctor --check-cli
 | `executionMode` | 既定・未指定は `continuous`。旧設定の時間・呼び出し数・修正回数・累計入力・リトライ回数で打ち切らず、終了まで継続する。利用者が明示的に `bounded` を選んだ場合だけ以下の上限を適用する。continuous で効かない値が書かれていれば `doctor` が表示する。[停止条件一覧](docs/INTERRUPTION-POLICY.md) |
 | `maxFixRounds`, `maxAgentCalls` | boundedモードだけで使う1単位の修正回数・1実行のAI呼び出し数上限。continuousでは適用しない。`translate --max-calls N` を利用者が明示した場合は、その実行の有限上限として扱う |
 | `maxRunInputBytes` | boundedモードだけで使う入力累計bytesの上限。通常実行は量だけで打ち切らず、`usageEstimate` とCLIの使用量を記録する |
+| `workerCopilotHome` | 既定・未指定は `separate`。キットが動かす作業用 Copilot CLI は `~/.copilot` の隣の `~/.copilot-migration-kit-workers` で動き、利用者の会話記録・記録 DB を共有しない（サインイン・設定・プラグインは利用者のもの）。そこでサインインできなければ自動で `~/.copilot` に戻る。`shared` で常に `~/.copilot` |
 | `maxAiCreditsPerCall` | boundedモードだけで各workerへ渡す任意の `--max-ai-credits`（CLIの最小値30）。continuousでは渡さない。サービス側の残高・組織上限は外部制約 |
 | `timeoutSeconds` | boundedモードだけで使うCLI呼び出し時間上限。0は期限なし。通常実行は旧設定が600でも打ち切らない |
 | `transientRetries`, `transientRetryDelayMs` | レート制限・5xx・通信障害を待って再試行する。通常実行は回数で打ち切らない（Copilot CLI 内部の受け渡し待ちの詰まりだけは5回まで）。boundedだけ既定2回。待機は既定5秒から倍増、最大60秒 |
@@ -330,7 +331,7 @@ npm run demo
 - CLI応答は1つのJSONです。ワーカー応答の取り込み上限は16 MiB。モデル自体の出力上限にも制約されます。
 - ログには要求モデルと時間を保存します。CLI方式では、CLIがJSONLで報告する実行モデル（`model.call_final_result`）と `premiumRequests` などの使用量も記録し、要求と違うモデルはrunの警告にします。さらに各呼び出しで `--usage-output-file` を使い、CLI自身が報告する入力・出力・キャッシュのトークン数とAI unit（nano AIU）を `cliUsage` に、runの合計を `measuredUsage` に記録します。キット全体（翻訳・修正・survey・準備監査）の合計は `usage --format markdown` で見られます（[COST-LOG](docs/COST-LOG.md#キット全体の使用量)）。AI Creditsへの換算はCLIが報告しないため `null` のままです。呼び出し上限は料金上限ではありません。
 - CLIは `--output-format json` のとき、レート制限・5xx・認証エラーをstdoutの `session.error` だけに出します（stderrは空）。runnerはこれを読み、429/5xxは再試行、認証・クレジット切れは全体停止として扱い、エラーメッセージに原因を残します。
-- CLIワーカーは呼び出しごとに1つのセッション（GitHubアカウントへの同期は利用者のCopilot CLIの設定に従う。キットは同期用のフラグを渡さない）として `~/.copilot/session-state` に残り、IDはrunnerが呼び出し前に実行記録（`cli-sessions.jsonl`、再試行・中断した呼び出しも含む）へ残します。ソースコードを含むため、移行後にAIが `sessions status` で件数と容量を報告し、同意があれば `sessions prune` でキットのワーカー分だけを削除します（ホストが確認を求めます）。
+- CLIワーカーは呼び出しごとに1つのセッション（GitHubアカウントへの同期は利用者のCopilot CLIの設定に従う。キットは同期用のフラグを渡さない）として作業用ホーム `~/.copilot-migration-kit-workers/session-state`（`workerCopilotHome: "shared"` や以前の版では `~/.copilot/session-state`）に残り、IDはrunnerが呼び出し前に実行記録（`cli-sessions.jsonl`、再試行・中断した呼び出しも含む）へ残します。ソースコードを含むため、移行後にAIが `sessions status` で件数と容量を報告し、同意があれば `sessions prune` でキットのワーカー分だけを削除します（ホストが確認を求めます）。
 - 並列ワーカーは多くのファイルを開きます。Copilot CLI（Node）は起動時に自分で開けるファイル数（soft limit）をhard limitまで引き上げるため（1.0.98で256→hard limitを確認）、キット側の引き上げは不要です。上げられないのはhard limitだけなので、`doctor --check-cli` がhard limitを確認し、4096未満なら引き上げ方を案内します。
 - レート制限（429）やサービス障害は自動で再試行します。再試行中は `status` に表示され、AIがその旨を伝えます。
 - 権限制限とhooksは作業上の制御であり、OSの隔離境界ではありません。SDK拡張と設定コマンドはローカルコードとして動作します。

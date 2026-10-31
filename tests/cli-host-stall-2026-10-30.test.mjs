@@ -75,7 +75,7 @@ test('bounded mode keeps its own retry limit for stalls (default 2)', async t =>
 
 test('surveys count stall retries apart from other transient retries too', () => {
   const source = fs.readFileSync(new URL('../lib/survey.mjs', import.meta.url), 'utf8');
-  assert.match(source, /retry >= limits\.retries \|\| \(isHostStall\(e\) && stalls\+\+ >= hostStallRetries\)/);
+  assert.match(source, /retry >= limits\.retries \|\| \(isLimitedRetry\(e\) && stalls\+\+ >= hostStallRetries\)/);
 });
 
 test('a worker whose CLI stalls once is retried and the unit completes', async t => {

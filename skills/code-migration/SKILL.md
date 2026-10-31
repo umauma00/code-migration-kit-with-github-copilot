@@ -57,8 +57,10 @@ initialization check `copilot --version`; afterwards `run_migration.mjs doctor
 --check-cli`. If the CLI is missing, explain why it is required, ask with the
 question tool and, after a yes, run `npm install -g @github/copilot` (Node 22+; on a
 permission error, show the cause and choices from `run_migration.mjs guidance`).
-If it is not signed in (doctor or a worker reports "To authenticate" or
-`session.error authentication`), ask, then run `copilot login` in a background
+If it is not signed in (doctor or a worker reports `session.error
+authentication`, or "To authenticate" without a network error such as
+ETIMEDOUT; with one, the CLI may only have failed to reach GitHub, and guidance
+says `cli-network`), ask, then run `copilot login` in a background
 terminal, show the URL and any one-time code it prints in chat, wait for it to
 finish and run doctor again. Signing in to VS Code does not sign in the CLI.
 
@@ -535,7 +537,7 @@ reviewers check semantics and rules, each from its own lens first) or
 `specialized` (one check each, upstream's split). Changing `fixPolicy`,
 `dependencyOrder` or `reviewFocus` revokes approvals. Run limits (`concurrency`,
 `maxAgentCalls`, `maxFixRounds`, timeouts, retry settings, `maxRunInputBytes`,
-`maxAiCreditsPerCall`) can change between runs and keep reviewed work and approvals.
+`maxAiCreditsPerCall`, `workerCopilotHome`) can change between runs and keep reviewed work and approvals.
 
 Long runner commands (`translate`, `repair`, `repair-round`, `build-loop`,
 `pilot run`, `survey run`) all run the same way. Start the command alone in a

@@ -14,6 +14,96 @@ pages say the same, and their auto-mode headings no longer say Copilot CLI
 only. tests/setup-flow.test.mjs checks that the handoff names no app's key,
 picker or command.
 
+# 0.34.0 — 2026-10-31
+
+The same Windows PC showed where the 120 s stall most likely comes from. Its
+Copilot CLI home held 2,959 sessions and a 192 MB session index
+(`~/.copilot/session-store.db`), and the CLI log said "Session store tracking
+backlog limit reached; live indexing paused" while workers failed with
+"session host did not complete the ... event within 120s". Every worker call
+adds a session to that one shared home, so a migration grows it by thousands.
+(The person's six company MCP servers were ruled out: a `copilot -p` call took
+11.6 s with them and 12.2 s with all six disabled.)
+
+- Workers run in a Copilot CLI home of their own, next to the person's
+  (`~/.copilot` -> `~/.copilot-migration-kit-workers`), so their sessions and
+  index no longer share the person's large records. The CLI finds its
+  session-state, index and logs only through `COPILOT_HOME` (checked on
+  1.0.105, where a full worker run with the real CLI kept every session and
+  its own index in the worker home).
+- The worker home carries the person's settings, not their records: the
+  top-level settings files (`config.json`, which names the signed-in account,
+  `settings.json`, MCP and permission settings) are copied when they changed
+  (through a temporary file, so a CLI starting in parallel never reads half a
+  file), and the folders the CLI reads plugins, agents and settings from are
+  linked (a junction on Windows; settings kept as symbolic links are
+  followed). The person's session-state, index, logs, command history and
+  downloaded builds are left out. With a relative `COPILOT_HOME` inside the
+  project, the worker home goes to the user profile instead. The workers' own
+  index starts over once it passes 64 MiB and no CLI wrote to it for 15
+  minutes. Worker transcripts stay until `sessions prune`.
+- If the CLI says it is not signed in in the worker home (its sign-in help or
+  "not signed in", without a network error; a single 401 or forbidden model
+  does not count), the call is repeated in the person's home. Once that
+  works, the rest of that command stays there, with a warning in the run
+  report instead of a stop. Signed out in both homes still stops the run as a
+  sign-in problem.
+- `workerCopilotHome: "shared"` in `migration/config.json` keeps every worker
+  in the person's home, as before. It is a run setting: changing it keeps
+  reviewed work and approvals.
+- `sessions status` and `sessions prune` look in both homes, so sessions from
+  older runs are still found.
+- `doctor --check-cli` shows the worker home (`worker Copilot CLI home`) and
+  checks the CLI there, as workers run it. docs/LIVE-SMOKE notes that a local
+  sandbox must allow writes there too.
+- tests/worker-home-2026-10-31.test.mjs covers what the worker home carries,
+  the per-process copy, the index reset, the sign-in fallback (and that a
+  network error with sign-in help does not trigger it), the setting, and
+  status/prune across both homes; tests/verify_cli_transport.mjs now checks
+  that real CLI workers write only to the worker home.
+
+# 0.33.0 — 2026-10-31
+
+The same Windows pilot recorded what actually stopped it. Workers failed with
+"session event delivery failed: session host did not complete the
+assistant.reasoning event within 120s" (also `system.message`,
+`user.message`, `model.call_final_result`). The kit knew only the CLI's other
+wording ("Session host did not acknowledge ..."), so the 0.28.0 retry never
+ran and each file was blocked on its first stall. A reviewer's connection
+timeout (`ETIMEDOUT` while fetching models) followed by the CLI's sign-in help
+stopped the whole run as a sign-in problem and offered `copilot login`,
+although the CLI was signed in and other workers were running.
+
+- The CLI stall is recognized in both wordings ("did not complete / did not
+  acknowledge the ... event within", "session event delivery failed") and
+  retried as before: up to 5 stall retries per call.
+- A network error (`ETIMEDOUT`, `ECONNRESET`, `ECONNREFUSED`, `EAI_AGAIN`,
+  socket hang up, fetch failed) followed by the CLI's generic sign-in help is
+  retried instead of stopping the run. Since the CLI may still be signed out,
+  these retries are capped like the stall (5 per call, counted together),
+  also in continuous mode. An explicit statement ("not signed in",
+  "authentication required", 401, Bad credentials,
+  `session.error authentication`) is still a sign-in problem, and the other
+  run-stopping causes (missing agents, credits, the open-file limit...) still
+  stop the run next to a network error.
+- New failure guidance `cli-network`: the connection dropped or timed out,
+  not a failed sign-in; rerun, and if it keeps happening check the proxy
+  settings and the sign-in with doctor. It no longer offers `copilot login`
+  for these.
+- tests/cli-stall-network-2026-10-31.test.mjs covers the recorded wordings,
+  a worker that stalls once with the new wording, and a run whose reviewer
+  first fails with `ETIMEDOUT` plus sign-in help.
+
+# 0.32.0 — 2026-10-31
+
+No change ships under this number. It first lowered `concurrency` for new
+installs from 4 to 1 because a busy company computer stalled on the Copilot
+CLI's 120 s internal wait; that was withdrawn before release, once 0.33.0 and
+0.34.0 addressed the stall itself. New installs keep 4, and existing
+configurations keep their value (now covered by a test). A computer that still
+stalls can lower `concurrency` in `migration/run-settings.json`; it is a run
+limit, so reviewed work and approvals are kept.
+
 # 0.31.0 — 2026-10-30
 
 A person who chose 日本語 got an English RULEBOOK while reports and the judge
