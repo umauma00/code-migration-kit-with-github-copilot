@@ -267,7 +267,7 @@ test('source-spec init --apply before settings apply does not end setup', t => {
 
 // Shift+Tab is a Copilot CLI key. The GitHub Copilot app and VS Code switch to
 // autopilot with a picker, and the kit cannot tell which app runs it, so the
-// handoff gives each app its own line and keeps Shift+Tab on the CLI line.
+// handoff gives each app its own list item and keeps Shift+Tab in the CLI item.
 test('the autopilot handoff gives each supported app its own way to switch', () => {
   for (const language of ['ja', 'en']) {
     const text = autoHandoff(language);
