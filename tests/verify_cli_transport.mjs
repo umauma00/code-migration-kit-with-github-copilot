@@ -14,7 +14,8 @@ import { createWorkflowDefinition } from '../lib/workflow.mjs';
 import { approve, runStage, translate } from '../lib/pipeline.mjs';
 import { runProcess } from '../lib/process.mjs';
 import { doctor } from '../scripts/run_migration.mjs';
-import { sessionsStatus, pruneSessions, sessionStateDir } from '../lib/sessions.mjs';
+import { sessionsStatus, pruneSessions, workerSessions } from '../lib/sessions.mjs';
+import { sessionStateDirs, workerHomePath } from '../lib/worker-home.mjs';
 
 const command = process.argv[2];
 if (!command || !path.isAbsolute(command)) throw new Error('Supply an absolute Copilot executable path');
@@ -108,15 +109,20 @@ try {
   atomicWrite(safePath(f.root, 'AGENTS.md'), canaries.root + '_EDITED\n');
   const resumed = await runTranslation(); assert.equal(resumed.agentCalls, 0);
   if (providerError) throw providerError;
-  // Workers ran as runner-named sessions: each recorded ID exists in this CLI
-  // home, and prune removes exactly those (the control run's session stays).
-  const stateDir = sessionStateDir(f.root), before = fs.readdirSync(stateDir);
+  // Workers ran as runner-named sessions in the kit's worker home (0.34.0):
+  // each recorded ID exists there, none in the person's home, and prune
+  // removes exactly those (the control run's session in the person's home stays).
+  const [workerState, personState] = sessionStateDirs(f.root);
+  const list = dir => fs.existsSync(dir) ? fs.readdirSync(dir).filter(n => !n.startsWith('.')) : [];
+  const before = list(workerState), personBefore = list(personState);
   const recorded = sessionsStatus(f.root);
   assert.ok(recorded.recorded >= 9); assert.equal(recorded.present, recorded.recorded);
-  const pruned = pruneSessions(f.root), after = fs.readdirSync(stateDir);
+  assert.ok([...workerSessions(f.root).keys()].every(id => before.includes(id) && !personBefore.includes(id)), 'workers used the worker home');
+  assert.ok(fs.existsSync(path.join(path.dirname(workerState), 'session-store.db')), 'the worker home has its own session index');
+  const pruned = pruneSessions(f.root), after = list(workerState);
   assert.equal(pruned.removed, recorded.present); assert.equal(before.length - after.length, pruned.removed);
-  assert.ok(after.length >= 1, 'the unrecorded control session is left alone');
-  const sessions = { recorded: recorded.recorded, present: recorded.present, removed: pruned.removed, untouched: after.length };
+  assert.ok(personBefore.length >= 1 && list(personState).length === personBefore.length, 'the unrecorded control session is left alone');
+  const sessions = { recorded: recorded.recorded, present: recorded.present, removed: pruned.removed, untouched: list(personState).length };
   const version = await runProcess(command, ['--version'], { cwd: f.root });
   console.log(JSON.stringify({ schemaVersion: 1, date: new Date().toISOString(), cli: version.stdout.trim(),
     platform: `${process.platform}/${process.arch}`, node: process.version, localProviderIsTestDouble: true,
@@ -126,6 +132,8 @@ try {
     translation: { done: translation.done, total: translation.total, agentCalls: translation.agentCalls },
     stages, resumedAgentCalls: resumed.agentCalls, sessions, records, outputHashes: f.units.map(u => ({ target: u.target, hash: fileHash(safePath(f.root, u.target)) })) }, null, 2));
 } finally {
+  // The CLI home here is inside the project, so the worker home is in the user profile.
+  fs.rmSync(workerHomePath(f.root), { recursive: true, force: true });
   for (const key of Object.keys(process.env)) if (!(key in savedEnv)) delete process.env[key];
   Object.assign(process.env, savedEnv);
   server.closeAllConnections(); await new Promise(resolve => server.close(resolve));

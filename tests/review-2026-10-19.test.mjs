@@ -21,7 +21,7 @@ test('run limits, timeouts, documents and Copilot instructions do not revoke rev
   await translate(f.root, f.config, fake);
   const context = contextHash(f.root, f.config);
   const changed = { ...f.config, executionMode: 'continuous', concurrency: 1, maxAgentCalls: 500, maxFixRounds: 3, timeoutSeconds: 900, commandTimeoutSeconds: 900,
-    transientRetries: 4, transientRetryDelayMs: 100, maxConsecutiveFailures: 5, maxRunInputBytes: 4096, maxAiCreditsPerCall: 30 };
+    transientRetries: 4, transientRetryDelayMs: 100, maxConsecutiveFailures: 5, maxRunInputBytes: 4096, maxAiCreditsPerCall: 30, workerCopilotHome: 'shared' };
   assert.deepEqual(Object.keys(changed).filter(k => changed[k] !== f.config[k]).sort(), [...operationalConfigKeys].sort());
   writeJSON(safePath(f.root, 'migration/config.json'), changed);
   fs.appendFileSync(safePath(f.root, '.github/copilot-instructions.md'), '\nTeam note.\n');
