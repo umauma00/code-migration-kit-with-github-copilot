@@ -72,6 +72,20 @@ test('settings init writes the values in one file, and the explanations and the 
   assert.deepEqual(runSettingsState(root, readJSON(safePath(root, 'migration/config.json'))).state, 'unfilled');
 });
 
+test('an existing configuration keeps its concurrency through reinstall, settings init and apply', t => {
+  const root = fresh(t);
+  const file = safePath(root, 'migration/config.json');
+  writeJSON(file, { ...readJSON(file), concurrency: 4 });
+  install(root, { apply: true, layout: 'repository', language: 'ja' });
+  assert.equal(readJSON(file).concurrency, 4, 'reinstalling never resets it to the new default');
+  initRunSettings(root, models);
+  assert.equal(settingsOf(root).concurrency, 4);
+  writeSettings(root, filled(root));
+  const result = applyRunSettings(root, models);
+  assert.equal(result.applied, true, JSON.stringify(result.errors));
+  assert.equal(loadConfig(root).concurrency, 4);
+});
+
 test('settings init keeps the person\'s values and refreshes only explanations and choices', t => {
   const root = fresh(t, 'en');
   initRunSettings(root, models);

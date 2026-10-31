@@ -2606,7 +2606,7 @@
     },
     {
       "path": "lib/run-settings.mjs",
-      "sha256": "0c9ff49efe800e25bb341d9e5d5575e778d3ebd8e47295280df99c78338d4d25",
+      "sha256": "679053debca17ac07a0cd681e6db198e3dbdf0768d17f998e8bae0690704b763",
       "entries": [
         {
           "line": 26,
@@ -2626,7 +2626,7 @@
         {
           "line": 55,
           "kind": "error-or-exit-candidate",
-          "code": "executionMode: 'continuous は終わるまで続ける、bounded は config.json の上限で止める。', concurrency: '同時に動かすワーカーの数（1〜64）。新規導入は1。パソコンに余裕があり、Copilot CLI の詰まりやレート制限が出なければ増やすと速くなる。',"
+          "code": "executionMode: 'continuous は終わるまで続ける、bounded は config.json の上限で止める。', concurrency: '同時に動かすワーカーの数（1〜64）。新規導入の初期値は1。Copilot CLI が止まったりレート制限が出たりしなければ、増やすと速くなる。',"
         },
         {
           "line": 68,

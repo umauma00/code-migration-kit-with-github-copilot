@@ -4,7 +4,7 @@
 
 ## 0.32.0 (one AI call at a time for new installs)
 
-Kit files (templates) change, so existing approvals and completion records expire once. Record them again as `phase next` shows in `stale`.
+Kit files (lib, templates) change, so existing approvals and completion records expire once. Record them again as `phase next` shows in `stale`.
 
 1. New installs get `concurrency` 1 instead of 4. Existing configurations keep their value.
 2. When the Copilot CLI keeps stalling on its 120 s wait on a busy computer, set `concurrency` to 1 in `migration/run-settings.json` and run `settings apply`. It is a run limit, so reviewed work and approvals are kept.
