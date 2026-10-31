@@ -55,6 +55,7 @@ test('settings init writes the values in one file, and the explanations and the 
   assert.equal(s.sourceLanguage, 'FILL_IN', 'template example languages are not presented as a choice');
   assert.equal(s.models.implementer.model, 'FILL_IN');
   assert.deepEqual(s.models.surveyor, { model: 'same-as-implementer', effort: 'default', context: 'default' });
+  assert.equal(s.concurrency, 1, 'new installs run one worker at a time');
   // The settings file holds only values: no explanations or choices in it.
   assert.deepEqual(Object.keys(s).filter(k => k.startsWith('_')), ['_about']);
   assert.match(s._about, /記入した/);

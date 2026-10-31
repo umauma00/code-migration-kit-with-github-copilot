@@ -142,7 +142,7 @@ node migration-kit/scripts/run_migration.mjs doctor --check-cli
 | `packageMap` | 任意のsource→target package宣言JSON。指定時は01で別のpackage cycle監査を記録 |
 | `markerPolicy` | 新規は`todo-lines-v1`：TODO(port)のある行数と末尾todosを照合。未指定の既存案件は従来契約を維持 |
 | `workerBackend` | `copilot-cli` のみ（省略可）。0.3.0でnative方式を削除 |
-| `concurrency` | 同時AI呼び出し数。新規導入の初期値4、上限64。2つのレビューも含めてこの数以下。CLI方式では各呼び出しが別プロセスなので、Copilotのsubagent同時実行数ではなく、アカウントのレート制限が実質の上限 |
+| `concurrency` | 同時AI呼び出し数。新規導入の初期値1（0.32.0。以前は4）、上限64。2つのレビューも含めてこの数以下。CLI方式では各呼び出しが別プロセスなので、Copilotのsubagent同時実行数ではなく、パソコンの負荷とアカウントのレート制限が実質の上限。負荷の高いパソコンで同時に多く動かすと Copilot CLI が内部の120秒待ちで詰まることがあるため、1で始め、詰まりやレート制限が出なければ増やす。既存の設定は値を保つ |
 | `dependencyOrder` | `auto`（新規導入）: 単位型チェックがあるときだけ、依存先のレビュー完了まで依存元を待たせる。型チェックがなければ上流と同じく承認範囲を一斉に展開する。`reviewed`（省略時・既存設定）: 常に待つ。`none`: 待たない（型チェックとは併用不可） |
 | `fixPolicy` | `single-pass`（新規導入の既定）: 上流Step 3と同じく、確定指摘の修正は1回で完了とし、build/smoke/parityが判定する。呼び出し数と停止する単位が減る。`rereview`（キーのない既存設定）: 修正後に再レビューし、確定した指摘がなくなるまで繰り返す |
 | `reviewFocus` | `shared`（新規導入）: 2人のレビュアーがそれぞれ自分の観点を先に、両方の観点（元の動作・ルール順守）を確認し、見つけた欠陥をすべて報告する。互いの結果は見ない。`specialized`（省略時・既存設定）: 上流と同じく1人1観点 |

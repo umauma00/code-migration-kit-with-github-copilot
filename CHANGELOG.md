@@ -1,3 +1,18 @@
+# 0.32.0 — 2026-10-31
+
+On a busy company computer the phase 03 pilot ran for more than ten hours and
+finished 1 of 30 files: about 24 workers failed on the Copilot CLI's fixed
+120 s internal wait ("Session host did not acknowledge ..."), small constant
+classes included. That wait cannot be lengthened, and several CLI workers at
+once add to the load that makes it run out.
+
+- New installs start with `concurrency` 1 (was 4): one AI call at a time. Raise
+  it in `migration/run-settings.json` (or `config.json`) when runs at the
+  current value pass without CLI stalls or rate limits; it is a run limit, so
+  changing it keeps reviewed work and approvals.
+- Existing configurations keep their value; the README, the run settings help
+  and the skill say how to choose it.
+
 # 0.29.0 — 2026-10-30
 
 In the same phase 03 pilot, one file's implementer stalled the Copilot CLI on

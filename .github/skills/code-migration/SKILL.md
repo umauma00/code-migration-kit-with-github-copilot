@@ -505,8 +505,9 @@ or `rereview` (a fixed output is reviewed again until no confirmed finding
 remains; also what an older configuration without the key gets).
 `dependencyOrder: auto` (new installs) lets the approved scope fan out like
 upstream and holds dependents for reviewed dependencies only when a per-unit
-typecheck needs them. `concurrency` (up to 64, both reviewers included) should
-stay within the account's rate limits. `reviewFocus`: `shared` (new installs; both
+typecheck needs them. `concurrency` (up to 64, both reviewers included; 1 for new installs) should
+stay within what the computer and the account's rate limits keep up with;
+raise it only after runs at the current value pass without CLI stalls. `reviewFocus`: `shared` (new installs; both
 reviewers check semantics and rules, each from its own lens first) or
 `specialized` (one check each, upstream's split). Changing `fixPolicy`,
 `dependencyOrder` or `reviewFocus` revokes approvals. Run limits (`concurrency`,
