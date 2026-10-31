@@ -5,7 +5,6 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
-import { spawnSync } from 'node:child_process';
 import { prepare } from './helpers.mjs';
 import { safePath, writeJSON, readJSON, lockRun, readManifest, atomicWrite } from '../lib/core.mjs';
 import { isTransientFailure } from '../lib/failures.mjs';
@@ -16,14 +15,18 @@ import { main } from '../scripts/run_migration.mjs';
 import { preparationCommand } from '../scripts/preparation_cli.mjs';
 
 const alive = pid => { try { process.kill(pid, 0); return true; } catch (e) { return e.code === 'EPERM'; } };
+// A PID no process can hold, so it stays gone for the whole test. A reaped
+// child's PID did not: Windows reuses PIDs quickly, and on CI one came back as
+// another test's process between the check and the lock (PR #43). Every OS the
+// kit supports keeps real PIDs far below 2^31 in practice (Linux at most
+// 2^22, macOS 99999), and process.kill(pid, 0) on one reports ESRCH there;
+// the assertion below fails loudly if a platform ever differs.
+let nextDeadPid = 0x7ffffffc;
 const deadPid = () => {
-  // A child that has exited and been reaped: its PID no longer exists. Windows
-  // reuses PIDs quickly, so confirm it is still free (CI saw one reused).
-  for (let i = 0; i < 20; i++) {
-    const pid = Number(spawnSync(process.execPath, ['-e', 'console.log(process.pid)'], { encoding: 'utf8' }).stdout.trim());
-    if (!alive(pid)) return pid;
-  }
-  throw new Error('No free PID found for the test');
+  const pid = nextDeadPid;
+  nextDeadPid -= 4;
+  assert.equal(alive(pid), false, `PID ${pid} must not exist`);
+  return pid;
 };
 
 test('a run.lock whose owner process is gone is taken over by the next command instead of stopping', t => {

@@ -10,6 +10,15 @@ Kit files (lib, templates) change, so existing approvals and completion records 
 2. When the Copilot CLI keeps stalling on its 120 s wait on a busy computer, set `concurrency` to 1 in `migration/run-settings.json` and run `settings apply` (run `settings init` first if that file does not exist). It is a run limit, so reviewed work and approvals are kept.
 3. When runs pass at 1, raise it step by step (2, then 4) for speed.
 
+## 0.30.0 (doctor always finishes)
+
+Kit files (lib, scripts) change, so existing approvals and completion records expire once. Record them again as `phase next` shows in `stale`.
+
+1. Each process `doctor` starts for a check (including the hook response check) now ends after 180 s. When the Copilot CLI got no answer (for example from a proxy that does not respond), continuous mode used to wait for hours. Doctor now names the check that did not finish, the time, and the usual causes (proxy, a sign-in waiting for input, a blocked network), and ends. Deadlines for migration work (translation, builds) are unchanged.
+2. The checks that point the CLI at a loopback model provider add `127.0.0.1,localhost` to `NO_PROXY` for that CLI only. Behind a corporate proxy, no manual `NO_PROXY` change is needed; the person's environment is not changed.
+3. No setting changes. In bounded mode an explicit `commandTimeoutSeconds` below 180 s is used instead; it never lengthens the deadline. The model-tools probes now wait 180 s instead of 120 s.
+4. In a copy install, replace all of `migration-kit/` with the temporary install's. The plugin needs only an update.
+
 ## 0.29.0 (the runner hands the implementer its evidence)
 
 Kit files (lib, scripts) change, so existing approvals and completion records expire once. Record them again as `phase next` shows in `stale`.
