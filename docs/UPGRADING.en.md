@@ -12,6 +12,13 @@ From 0.34.0 the worker home (`~/.copilot-migration-kit-workers`) copied every to
 4. `"workerCopilotHome": "shared"` in `migration/config.json`, if you set it as a workaround, keeps working; removing it goes back to the worker home (both are run settings, so approvals and completion records are kept).
 5. Updating from 0.40.0 or 0.40.1 keeps approvals and completion records. What updating from 0.40.0 does to phases 00b to 03 is described under 0.40.1. In a copy install, replace all of `migration-kit/` with the temporary install's copy; the plugin updates by itself.
 
+## 0.40.1 (a kit update no longer makes phases 00b to 03 stale)
+
+In 0.40.0 the judge input record of phase 00b still included the kit's own files, so a kit update made 00b to 03 stale in a chain and translation could not go on until they were recorded again (`rulebook accept` was also refused because phase 02 stayed out of date). This release takes them out.
+
+1. Updating from 0.40.0 makes the 00b record stale once, because its fingerprint changes, and with it 01 to 03 in order. `phase next` says to check and record again, not to redo the phase (auto mode does it without asking); no phase work is redone. Finished files and approvals are kept. If judge is run again, its preparation (the original and mutation commands) runs again once too. A migration that already recorded 05c or 06 records them again as well (in runtime mode, the parity and post-parity run and approval).
+2. Updating from a release before 0.40.0 has the one-time effect described under 0.40.0 below (every finished file reviewed again).
+
 ## 0.40.0 (finished work survives a RULEBOOK change and a kit update)
 
 **Do not update to this release in the middle of a migration.** How approvals and completion records are fingerprinted changes, so this one update makes existing approvals and completion records go stale once and every finished file is reviewed again. Update after the migration ends, or before the next one.

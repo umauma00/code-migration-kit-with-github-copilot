@@ -1228,10 +1228,10 @@
     },
     {
       "path": "lib/judge.mjs",
-      "sha256": "cf384d396da6c986fcda4e839b034b82ac243142ea08ea7b0bc1209326a01c22",
+      "sha256": "419b4006d01614937ea9ba8e87d8bfa13c5f0727fbd8211a39450bdd3193f60e",
       "entries": [
         {
-          "line": 8,
+          "line": 7,
           "kind": "error-or-exit-candidate",
           "code": "for (const p of requiredInputRoots(config)) if (!fs.existsSync(safePath(root, p))) throw new Error(missingRootMessage(config, p, 'Judge input root missing'));"
         },
@@ -1431,7 +1431,7 @@
     },
     {
       "path": "lib/phases.mjs",
-      "sha256": "69b95c03ad452b2f19fa5a394c2633c4aaf838027cf2e3fcf8ef7b2450e5b529",
+      "sha256": "729e32ea993879afb5198e8dd234030b8e2fc8e12571c70daebf5da8c23c6fd5",
       "entries": [
         {
           "line": 60,
