@@ -3303,7 +3303,7 @@
     },
     {
       "path": "lib/worker-home.mjs",
-      "sha256": "3afa1e518ea5f5e1f2b9f8d3de220b6e3e9494df636b3e617257e8eb8151d502",
+      "sha256": "22765269b2e91a930cc222b00ff05aa6603a6981e321c1140449de672483807f",
       "entries": [
         {
           "line": 120,
@@ -3316,9 +3316,19 @@
           "code": "if (userReal && sameName(fs.realpathSync(home), userReal)) throw new Error('The kit\\'s worker home must not be the person\\'s Copilot CLI home');"
         },
         {
-          "line": 182,
+          "line": 128,
+          "kind": "error-or-exit-candidate",
+          "code": "if (pending) throw new Error(pending);"
+        },
+        {
+          "line": 171,
+          "kind": "pid-probe",
+          "code": "const alive = pid => { try { process.kill(pid, 0); return true; } catch (e) { return e.code === 'EPERM'; } };"
+        },
+        {
+          "line": 194,
           "kind": "loop-exit-candidate",
-          "code": "try { fs.mkdirSync(lock); fs.writeFileSync(path.join(lock, 'owner'), token); break; } catch {}"
+          "code": "try { fs.writeFileSync(ownerFile, JSON.stringify({ pid: process.pid, token })); break; }"
         }
       ]
     },
@@ -5134,5 +5144,5 @@
       ]
     }
   ],
-  "candidateLines": 933
+  "candidateLines": 935
 }

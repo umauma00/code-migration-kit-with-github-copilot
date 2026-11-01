@@ -17,11 +17,13 @@ file bound to the person's home, and copied them again on every command.
 - A worker home made by 0.34.0 to 0.40.1 (no `.migration-kit-worker-home.json`
   marker) is emptied once, keeping `session-state`, `session-store.db`, `logs`
   and `pkg` (locks go too, so no lock outlives its binding). Links are removed
-  as links, never followed. One kit process empties it at a time (another
-  waits up to 30 seconds, then uses the person's home for that call); a stale
-  lock is taken over after 10 minutes. The marker is written once nothing tied
-  to the person's home is left; anything else Windows kept open is warned
-  about. A worker home that is a link,
+  as links, never followed. One kit process empties it at a time; another
+  waits up to 30 seconds, then runs the rest of that command in the person's
+  home with a warning. A lock whose process has ended is taken over at once,
+  any other after 10 minutes untouched. The marker is written once nothing
+  tied to the person's home is left (until then each command uses the
+  person's home, with a warning); anything else Windows kept open is only
+  warned about. A worker home that is a link,
   or resolves to the person's home, is refused (workers use the person's home
   for that command, with a warning).
 - A worker that cannot start its MCP servers or its storage in the worker home

@@ -140,9 +140,9 @@ test('an older worker home is emptied by one kit process at a time, and a broken
   fs.mkdirSync(lock, { recursive: true });
   fs.writeFileSync(path.join(worker, 'mcp-installations.json'), 'old');
   fs.writeFileSync(path.join(worker, workerHomeMarker), 'not json');
-  fs.writeFileSync(path.join(lock, 'owner'), 'another process');
-  // Another process is emptying it: this one waits, then uses the person's home for now and tries again next time.
-  assert.equal(prepareWorkerHome(root, {}, { upgradeWaitMs: 300 }), null);
+  fs.writeFileSync(path.join(lock, 'owner.json'), JSON.stringify({ pid: process.pid, token: 'another' }));
+  // Another process is emptying it: this one waits, then says so (the adapter then uses the person's home for that command).
+  assert.throws(() => prepareWorkerHome(root, {}, { upgradeWaitMs: 300 }), /another kit process is still clearing/);
   assert.ok(fs.existsSync(path.join(worker, 'mcp-installations.json')));
   assert.ok(fs.existsSync(lock), 'another process\'s lock is left alone');
   assert.equal(fs.readFileSync(path.join(worker, workerHomeMarker), 'utf8'), 'not json');
@@ -153,6 +153,14 @@ test('an older worker home is emptied by one kit process at a time, and a broken
   assert.equal(prepareWorkerHome(root, {}), worker);
   assert.ok(!fs.existsSync(path.join(worker, 'mcp-installations.json')) && !fs.existsSync(lock));
   assert.deepEqual(fs.readdirSync(worker).filter(name => name.startsWith('.migration-kit-upgrading')), [], 'the stale lock was taken over and removed');
+  // A lock whose owner process has ended is taken over at once.
+  resetPreparedWorkerHomes();
+  fs.rmSync(path.join(worker, workerHomeMarker));
+  fs.writeFileSync(path.join(worker, 'mcp-activations.json'), 'old');
+  fs.mkdirSync(lock);
+  fs.writeFileSync(path.join(lock, 'owner.json'), JSON.stringify({ pid: 2 ** 31 - 2, token: 'ended' }));
+  assert.equal(prepareWorkerHome(root, {}, { upgradeWaitMs: 300 }), worker);
+  assert.ok(!fs.existsSync(path.join(worker, 'mcp-activations.json')) && !fs.existsSync(lock));
   assert.deepEqual(JSON.parse(fs.readFileSync(path.join(worker, workerHomeMarker), 'utf8')), { layout: workerHomeLayout });
 });
 
@@ -189,4 +197,24 @@ process.stderr.write('No such agent: ${probeAgentName}, available: ${required.jo
   const probe = await probeWorkerAgents(process.execPath, [script], { cwd: f.root, layout, home: worker });
   assert.match(probe.warning, /could not start its MCP servers or its storage in the kit's worker home/);
   assert.ok(!probe.missing.includes(required[0]), 'the agent list came from the person\'s home');
+});
+
+test('a worker home still being cleared moves that command to the person\'s home with a warning, once', async t => {
+  const home = personHome(t), f = prepare(t);
+  const worker = workerCopilotHome(f.root, {}), lock = path.join(worker, '.migration-kit-upgrading');
+  fs.mkdirSync(lock, { recursive: true });
+  fs.writeFileSync(path.join(lock, 'owner.json'), JSON.stringify({ pid: process.pid, token: 'another' }));
+  const cli = cliDouble(f, '');
+  // Waits for the other process only once in this command.
+  const { workerHomeUpgrade } = await import('../lib/worker-home.mjs');
+  assert.equal(workerHomeUpgrade.waitMs, 30000);
+  workerHomeUpgrade.waitMs = 400;
+  t.after(() => { workerHomeUpgrade.waitMs = 30000; });
+  const started = Date.now();
+  const first = await cli.call(), second = await cli.call();
+  assert.match(first.cliHomeWarning, /could not be prepared.*another kit process is still clearing/);
+  assert.equal(second.cliHomeWarning, first.cliHomeWarning);
+  assert.deepEqual(cli.homes(), [home, home]);
+  assert.ok(Date.now() - started < 5000, 'the second call does not wait again');
+  assert.ok(fs.existsSync(lock), 'the other process\'s lock is left alone');
 });
