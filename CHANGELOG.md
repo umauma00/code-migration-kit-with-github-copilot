@@ -16,8 +16,10 @@ until they were recorded again, and `rulebook accept` was refused because phase
   to check and record again, not to redo the phase; new 00b records carry
   `judgeInputSchema: 2`. Finished units and approvals are not affected. If
   judge is run again, its preparation (the original and mutation commands)
-  runs again once too. Updating from an earlier release has the one-time
-  effect described for 0.40.0.
+  runs again once too. A migration that already recorded 05c or 06 records
+  them again as well (in runtime mode: the parity and post-parity run and
+  approval). Updating from an earlier release has the one-time effect
+  described for 0.40.0.
 - Test: `tests/kit-update-keeps-phases-2026-11-01.test.mjs` (plugin and copy
   install updates keep 00b to 02 current; a real judge input still makes 00b
   stale; a 0.40.0 record is recorded again without losing anything).
