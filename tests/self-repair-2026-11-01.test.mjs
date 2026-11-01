@@ -13,7 +13,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { prepare, fake, result, finding, mini } from './helpers.mjs';
 import { safePath, writeJSON, readJSON, unitState, contextHash, done, fileHash, statePath } from '../lib/core.mjs';
-import { translate, approve, runStage, contractSlip, unitSlip, codeOf } from '../lib/pipeline.mjs';
+import { translate, approve, runStage, contractSlip, unitSlip, withoutFlags } from '../lib/pipeline.mjs';
 import { markerEvidence, markerError } from '../lib/markers.mjs';
 import { failureGuidance } from '../lib/guidance.mjs';
 import { agentPrompt } from '../scripts/copilot_adapter.mjs';
@@ -428,22 +428,29 @@ test('a single-pass fix that only adds an unnamed TODO(port) line is asked to fi
   assert.equal(report.done, 1);
   const fixers = calls.filter(c => c.role === 'fixer');
   assert.equal(fixers.length, 2);
-  assert.match(fixers[1].extra.correction, /^Your change fixes no code \(it changes only comments, TODO\(port\) lines or the trailer\), so reviewer-rules:F1 is neither fixed nor named\. Fix each finding in extra\.confirmedFindings in the code; only when this file cannot fix one, name its reference in its TODO\(port\) line .* and count it in the PORT STATUS trailer\. Return the complete file again with this corrected\.$/);
+  assert.match(fixers[1].extra.correction, /^Your change fixes no code \(it changes only TODO\(port\) lines or the PORT STATUS trailer\), so reviewer-rules:F1 is neither fixed nor named\. Fix each finding in extra\.confirmedFindings in the code; only when this file cannot fix one, name its reference in its TODO\(port\) line .* and count it in the PORT STATUS trailer\. Return the complete file again with this corrected\.$/);
   const state = unitState(f.root, f.units[0]);
   assert.deepEqual(state.singlePass.flagged, ['reviewer-rules:F1']);
   assert.equal(done(f.root, f.units[0], contextHash(f.root, f.config)), true);
   const recorded = summary(f, report);
   assert.deepEqual(recorded.selfRepairs.flagged, [{ target: f.units[0].target, references: ['reviewer-rules:F1'] }]);
-  assert.ok(recorded.warnings.some(w => w === `${f.units[0].target}: its single-pass fix left reviewer-rules:F1 unfixed (flagged with TODO(port), or no code changed for it); no review follows a single-pass fix`), recorded.warnings);
+  assert.ok(recorded.warnings.some(w => w === `${f.units[0].target}: its single-pass fix left reviewer-rules:F1 unfixed (flagged with TODO(port), or the fix changed only flags); no review follows a single-pass fix`), recorded.warnings);
 });
 
 test('what a single-pass fix leaves open: named flags next to a code change; nothing for a code fix or a trailer fix', async t => {
   const second = { ...finding, id: 'F2', message: 'Null input is not handled', evidence: 'src/math_ops.py:2 has no null check' };
+  const lines = body().split('\n'), i = lines.findIndex(l => l.includes('Math.floor'));
+  const commented = [...lines.slice(0, i), `${lines[i]} // checked`, ...lines.slice(i + 1)].join('\n');
   const cases = [
     { name: 'code change and one flag', findings: [finding, second], fixed: `${changed()}\n// TODO(port): reviewer-rules:F2: the inventory needs a null decision\n// PORT STATUS: confidence=medium todos=1\n`, flagged: ['reviewer-rules:F2'] },
     { name: 'code change only', findings: [finding], fixed: fixedGood(), flagged: undefined },
     { name: 'trailer only', findings: [{ ...finding, message: 'The PORT STATUS confidence should be medium: the rounding is unverified', evidence: 'last line' }], fixed: `${body()}\n// PORT STATUS: confidence=medium todos=0\n`, flagged: undefined },
-    { name: 'a doc comment fix', findings: [{ ...finding, message: 'The doc comment of divide misstates the rounding' }], fixed: `${body().replace('export function divide', '// Floor division, as in the source.\nexport function divide')}\n// PORT STATUS: confidence=high todos=0\n`, flagged: undefined }];
+    { name: 'a trailer finding that does not say PORT STATUS', findings: [{ ...finding, message: 'The trailer claims more certainty than the rounding has' }], fixed: `${body()}\n// PORT STATUS: confidence=medium todos=0\n`, flagged: undefined },
+    { name: 'a comment fix: an edit besides flags is a change', findings: [{ ...finding, message: 'The doc comment of divide misstates the rounding' }], fixed: `${body().replace('export function divide', '// Floor division, as in the source.\nexport function divide')}\n// PORT STATUS: confidence=high todos=0\n`, flagged: undefined },
+    { name: 'a flag naming F1 at the end of a sentence', findings: [finding], fixed: `${body()}\n// TODO(port): the inventory decides this, see reviewer-rules:F1.\n// PORT STATUS: confidence=medium todos=1\n`, flagged: ['reviewer-rules:F1'] },
+    // Not caught, by design: so that a real change never reads as none, any
+    // edit besides flags is a change, and no review follows a single-pass fix.
+    { name: 'a comment on a code line next to an unnamed flag', findings: [finding], fixed: `${commented}\n// TODO(port): later\n// PORT STATUS: confidence=medium todos=1\n`, flagged: undefined }];
   for (const c of cases) {
     const f = await setup(t);
     const { calls, adapter } = firstReview(c.findings, () => c.fixed);
@@ -473,32 +480,51 @@ test('an answer that ended without a final message is asked again', async t => {
   assert.equal(failureGuidance('Copilot JSONL is incomplete: successful result and final assistant message required').id, 'worker-output');
 });
 
-test('what counts as code when a fix is compared: comments, flags, the trailer and spacing do not', () => {
-  for (const [line, code] of [['foo(); // x', 'foo();'], ['url = "http://a"; // c', 'url = "http://a";'], ['s = "a // b";', 's = "a // b";'],
-    ['/* TODO(port): F1 */ doThing()', 'doThing()'], ['} // PORT STATUS: confidence=high todos=0', '}'], ['  // TODO(port): reviewer-rules:F1: x', ''],
-    ['x = 1  # TODO(port): F1', 'x = 1'], ['# comment', ''], ['#region Setup', '#region Setup'], [' * doc line', ''], ['*p = 1;', '*p = 1;'],
-    ["  'use strict';", "'use strict';"], ['<!-- TODO(port): x -->', ''], ['    return [q, r];', 'return [q, r];']]) assert.equal(codeOf(line), code, line);
-  assert.equal(codeOf('a();\n\n  // note\nb();\n'), 'a();\nb();');
+test('a fix is compared without the kit\'s flags only: every other edit is a change, comments and spacing included', () => {
+  // Candidate and fix that differ in flags alone: a TODO(port) or PORT STATUS
+  // comment after its opener, on its own line or at the end of a code line.
+  for (const [before, after] of [
+    ['a();\nb();\n', 'a();\n  // TODO(port): reviewer-rules:F1: x\nb();\n'], ['a();\n', 'a(); // TODO(port): x\n'],
+    ['x = 1\n', 'x = 1  # TODO(port): x\n'], ['select 1;\n', 'select 1; -- TODO(port): x\n'], ['Dim a\n', "Dim a\n' TODO(port): x\nREM TODO(port): y\n"],
+    ['/**\n * doc\n */\n', '/**\n * doc\n * TODO(port): x\n */\n'], ['    doThing();\n', '    /* TODO(port): x */ doThing();\n'],
+    ['<div/>\n', '<!-- TODO(port): x --> <div/>\n'], ['}\n// PORT STATUS: confidence=high todos=0\n', '} // PORT STATUS: confidence=medium todos=0\n'],
+    ['a\n// PORT STATUS: confidence=high todos=0\n}\n', 'a\n}\n// PORT STATUS: confidence=high todos=0\n'], ['a();\r\nb();\r\n', 'a(); // TODO(port): x\r\nb();\r\n']]) {
+    assert.equal(withoutFlags(before), withoutFlags(after), JSON.stringify(after));
+  }
+  // Real changes, several of which a guess at each language's comments read as none.
+  for (const [before, after] of [
+    ['for x in y:\n    return 2\n', 'for x in y:\n    pass\nreturn 2\n'], ['def f():\n        return 2\n', 'def f():\n    return 2\n'],
+    ['q = a // b\n', 'q = a // abs(b)\n'], ['total = a\n  * b;\n', 'total = a\n  * c;\n'], ['# define MAX 10\n', '# define MAX 20\n'],
+    ['print("Port status: %s" % s)\n', 'print("Port status: %s" % t)\n'], ['Log("TODO(port): x"); x = 1;\n', 'Log("TODO(port): x"); x = 2;\n'],
+    ['a();\n', 'a(); // checked\n'], ['/// <summary>A</summary>\n', '/// <summary>B</summary>\n'], ['a();\nb();\n', 'a();\n\nb();\n'],
+    ['a();\r\n', 'a();\n'], ['a();  \n', 'a();\n'], ["f(1, 'TODO(port)', x)\n", "f(1, 'TODO(port)', y)\n"]]) {
+    assert.notEqual(withoutFlags(before), withoutFlags(after), JSON.stringify(after));
+  }
+  // Linear on lines no real file has (an earlier scan took seconds on them).
+  const started = Date.now();
+  for (const line of ['#'.repeat(200000), `${' '.repeat(200000)}x`, '/* '.repeat(70000), 'x("TODO(port)");'.repeat(15000), '/* TODO(port) */ '.repeat(12000)]) withoutFlags(line);
+  assert.ok(Date.now() - started < 3000, `${Date.now() - started} ms`);
 });
 
-// The fixer leaves reviewer-rules:F1 unfixed in several ways; each is asked to fix or name it.
-test('a single-pass fix that changes only comments or names another finding is asked to fix or name the rest', async t => {
-  const tenth = { ...finding, id: 'F10', message: 'Remainder sign is wrong for negative divisors' };
-  const lines = body().split('\n'), i = lines.findIndex(l => l.includes('Math.floor'));
-  const commented = [...lines.slice(0, i), `${lines[i]} // checked`, ...lines.slice(i + 1)].join('\n');
+// The fixer changes only flags and leaves reviewer-rules:F1 unnamed in several ways.
+test('a single-pass fix that changes only flags, or names another finding, is asked to fix or name the rest', async t => {
+  const other = (id, message) => ({ ...finding, id, message });
   const cases = [
-    { name: 'a comment on a code line and an unnamed flag', findings: [finding], first: `${commented}\n// TODO(port): later\n// PORT STATUS: confidence=medium todos=1\n`, unnamed: 'reviewer-rules:F1 is' },
-    { name: 'a flag that names F10 only', findings: [finding, tenth], first: `${body()}\n// TODO(port): reviewer-rules:F10: needs a decision\n// PORT STATUS: confidence=medium todos=1\n`, unnamed: 'reviewer-rules:F1 is' },
-    { name: 'a "trailer record" finding is about code, not the PORT STATUS trailer', findings: [{ ...finding, message: 'The trailer record count is never written' }], first: `${body()}\n// TODO(port): later\n// PORT STATUS: confidence=medium todos=1\n`, unnamed: 'reviewer-rules:F1 is' }];
+    { name: 'a flag that names F10 only', findings: [finding, other('F10', 'Remainder sign is wrong for negative divisors')], flag: 'reviewer-rules:F10: needs a decision' },
+    { name: 'a flag that names F1-b only', findings: [finding, other('F1-b', 'The quotient type differs')], flag: 'reviewer-rules:F1-b: needs a decision' },
+    { name: 'a flag that names F1.2 only', findings: [finding, other('F1.2', 'The remainder type differs')], flag: 'reviewer-rules:F1.2: needs a decision' },
+    { name: 'evidence quoting the trailer does not make a finding about it', findings: [{ ...finding, evidence: 'math_ops.mjs:9 // PORT STATUS: confidence=high todos=0 follows a divide that truncates' }], flag: 'later' },
+    { name: 'a message that mentions a comment is about code', findings: [{ ...finding, message: 'The comment says floor, but the code truncates' }], flag: 'later' }];
   for (const c of cases) {
     const f = await setup(t);
+    const first = `${body()}\n// TODO(port): ${c.flag}\n// PORT STATUS: confidence=medium todos=1\n`;
     const named = `${body()}\n${c.findings.map(x => `// TODO(port): reviewer-rules:${x.id}: needs a decision`).join('\n')}\n// PORT STATUS: confidence=medium todos=${c.findings.length}\n`;
-    const { calls, adapter } = firstReview(c.findings, (call, n) => n === 1 ? c.first : named);
+    const { calls, adapter } = firstReview(c.findings, (call, n) => n === 1 ? first : named);
     const report = await translate(f.root, f.config, adapter);
     assert.equal(report.done, 1, c.name);
     const fixers = calls.filter(x => x.role === 'fixer');
     assert.equal(fixers.length, 2, c.name);
-    assert.match(fixers[1].extra.correction, new RegExp(`so ${c.unnamed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} neither fixed nor named`), c.name);
+    assert.match(fixers[1].extra.correction, /so reviewer-rules:F1 is neither fixed nor named/, c.name);
     assert.deepEqual(unitState(f.root, f.units[0]).singlePass.flagged, c.findings.map(x => `reviewer-rules:${x.id}`).sort(), c.name);
   }
   // A code change next to a flag in a block comment is a code change: no correction.
@@ -508,6 +534,19 @@ test('a single-pass fix that changes only comments or names another finding is a
   assert.equal((await translate(f.root, f.config, adapter)).done, 1);
   assert.equal(calls.filter(x => x.role === 'fixer').length, 1);
   assert.deepEqual(unitState(f.root, f.units[0]).singlePass.flagged, ['reviewer-rules:F1']);
+});
+
+// A real fix on a line that only looks like a comment must not be told it fixed nothing.
+test('a single-pass fix of a line that only looks like a comment is taken as a fix', async t => {
+  const f = await setup(t);
+  const candidate = `${body().replace('const quotient = Math.floor(a / b);', 'const quotient = Math.floor(a\n    * 1 / b); const label = "Port status: " + a;')}\n// PORT STATUS: confidence=high todos=0\n`;
+  const fixed = candidate.replace('    * 1 / b);', '    * 1 / b) + 0;');
+  const { calls, adapter } = firstReview([finding], () => fixed, () => candidate);
+  const report = await translate(f.root, f.config, adapter);
+  assert.equal(report.done, 1);
+  assert.equal(calls.filter(x => x.role === 'fixer').length, 1);
+  assert.equal(unitState(f.root, f.units[0]).singlePass.flagged, undefined);
+  assert.equal(summary(f, report).selfRepairs, undefined);
 });
 
 test('a forged trailer-fix receipt cannot finish without two fresh reviews', async t => {
@@ -584,4 +623,45 @@ test('in continuous mode trailer fixes stop at two per run even when each later 
   // Three reviews: the implementer's file and each trailer-fixed file.
   assert.equal(calls.filter(c => c.role.startsWith('reviewer-')).length, 6);
   assert.equal(calls.filter(c => c.role === 'fixer' && c.extra.confirmedFindings[0].reference === 'marker:M1').length, 2);
+});
+
+test('the last pass shares the run\'s two trailer fixes: a unit that used one before it slipped gets one more', async t => {
+  const f = await setup(t, { executionMode: 'continuous' });
+  const calls = [];
+  const error = await translate(f.root, f.config, async call => {
+    calls.push(call);
+    if (call.role === 'implementer') return content(call, inside());
+    // The first trailer fix slips twice; every later fix keeps the trailer above the brace.
+    if (call.role === 'fixer') { if (calls.filter(c => c.role === 'fixer').length <= 2) throw slip(); return content(call, inside()); }
+    return fake(call);
+  }).catch(e => e);
+  assert.match(error.message, /PORT STATUS count mismatch or invalid trailer/);
+  assert.deepEqual(roles(calls), ['implementer', 'implementer', 'fixer', 'fixer', 'fixer', 'fixer', 'fixer', 'fixer']);
+  assert.equal(unitState(f.root, f.units[0]).markerRepair.count, 2);
+  assert.deepEqual(error.report.selfRepairs, { corrections: 4, markerFixes: 2, repass: { units: 1, done: 0 } });
+});
+
+test('a unit resumed with one review done, or repaired, on a file with a wrong trailer goes to the fixer first', async t => {
+  const f = await setup(t);
+  await translate(f.root, f.config, async call => call.role === 'implementer' ? content(call, good()) : fake(call));
+  const out = safePath(f.root, f.units[0].target);
+  // As an older kit could leave it: one reviewer done on a file whose trailer is wrong.
+  fs.writeFileSync(out, inside());
+  const state = unitState(f.root, f.units[0]);
+  Object.assign(state, { stage: 'review', status: 'review', outputHash: fileHash(out), reviewMap: { 'reviewer-semantics': state.reviewMap['reviewer-semantics'] }, reviews: [], reviewEvidence: [] });
+  delete state.arbitration;
+  writeJSON(statePath(f.root, f.units[0]), state);
+  const calls = [];
+  const report = await translate(f.root, f.config, async call => { calls.push(call); return call.role === 'fixer' ? content(call, good()) : fake(call); });
+  assert.equal(report.done, 1);
+  assert.deepEqual(roles(calls), ['fixer', 'reviewer', 'reviewer']);
+  // A repair run fixes the trailer before it reviews the file with the diagnostic.
+  fs.writeFileSync(out, inside());
+  fs.writeFileSync(safePath(f.root, 'migration/diagnostic.txt'), 'Check the division rounding again.\n');
+  const repairs = [];
+  const repaired = await translate(f.root, f.config, async call => { repairs.push(call); return call.role === 'fixer' ? content(call, good()) : fake(call); }, { onlyTarget: f.units[0].target, evidence: 'migration/diagnostic.txt' });
+  assert.equal(repaired.done, 1);
+  assert.deepEqual(roles(repairs), ['fixer', 'reviewer', 'reviewer']);
+  assert.equal(fs.readFileSync(out, 'utf8'), good());
+  assert.equal(done(f.root, f.units[0], contextHash(f.root, f.config)), true);
 });

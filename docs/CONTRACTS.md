@@ -110,14 +110,15 @@ target, every unrejected finding is in `confirmed`, and the records keep their
 hashes. A fixer that returns the reviewed candidate unchanged is asked once more
 to change the file or record what this file cannot fix as a
 `TODO(port): <reference>: <what is needed>` line; unchanged again, it fails the
-unit without using up a fix round. A fix that changes no code (only comments,
-such as TODO(port) lines and the trailer, or spacing; a heuristic comparison,
-not a parser) is asked once to fix or name each finding it leaves open, except
-findings about comments (the PORT STATUS trailer, a TODO(port) line, a doc
-comment, a license header); a reference counts as named only whole.
+unit without using up a fix round. A fix that changes nothing but the kit's
+flags (TODO(port) comments and the PORT STATUS trailer; any other edit,
+comments and spacing included, is a change) is asked once to fix or name each
+finding it leaves open, except findings whose message is about the trailer or a
+TODO(port) line; a reference counts as named only whole.
 `singlePass.flagged` lists the findings the fix left unfixed (named in a
-TODO(port) line it added, or all but those comment findings when it changed no
-code); the run summary repeats them in `selfRepairs.flagged` and `warnings`. No review checks that a flagged
+TODO(port) line it added, or all but those trailer and flag findings when it
+changed nothing but flags); the run summary repeats them in
+`selfRepairs.flagged` and `warnings`. No review checks that a flagged
 finding could not be fixed: that is single-pass's trade-off, as upstream.
 A fix of a typecheck-only finding has no reviews of its own, so it is reviewed as usual;
 with a unit typecheck configured, `verify-fix` runs it once and a failure returns
@@ -141,8 +142,8 @@ ended without a final message ("Copilot JSONL is incomplete"), and an
 arbitration with miswritten references, is asked once more with a `correction`
 saying what was wrong. Units still blocked by such a slip, or by an unchanged
 single-pass fix, get one more pass before a translate run ends (not a repair
-run, and not after a tripped circuit breaker, a used-up call budget or an
-interruption), resuming where they stopped; the circuit breaker counts that pass
+run, and not after a tripped circuit breaker, a used-up call budget, a
+systemic failure or an interruption), resuming where they stopped; the circuit breaker counts that pass
 afresh, and a unit the pass never restarts keeps its error. The run summary
 counts these in `selfRepairs` (`corrections`, the arbiter's reference re-ask
 included, `markerFixes`, `repass`, `flagged`).
