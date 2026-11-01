@@ -1228,10 +1228,10 @@
     },
     {
       "path": "lib/judge.mjs",
-      "sha256": "cf384d396da6c986fcda4e839b034b82ac243142ea08ea7b0bc1209326a01c22",
+      "sha256": "419b4006d01614937ea9ba8e87d8bfa13c5f0727fbd8211a39450bdd3193f60e",
       "entries": [
         {
-          "line": 8,
+          "line": 7,
           "kind": "error-or-exit-candidate",
           "code": "for (const p of requiredInputRoots(config)) if (!fs.existsSync(safePath(root, p))) throw new Error(missingRootMessage(config, p, 'Judge input root missing'));"
         },

@@ -24,7 +24,7 @@ copilot plugin install code-migration-kit@code-migration-kit-marketplace
 copilot plugin list
 ```
 
-To update, run `copilot plugin marketplace update code-migration-kit-marketplace`, then `copilot plugin update code-migration-kit`. To use a local checkout, register it with `copilot plugin marketplace add /path/to/code-migration-kit`. A plugin from a local marketplace reads the checkout directly; changes take effect in a new session (or after `/restart`). Do not update to 0.40.0 in the middle of a migration (that one update revokes approvals once and sends every finished file back to review). From 0.40.0 on, an update keeps approvals and completion records ([UPGRADING.en.md](UPGRADING.en.md)).
+To update, run `copilot plugin marketplace update code-migration-kit-marketplace`, then `copilot plugin update code-migration-kit`. To use a local checkout, register it with `copilot plugin marketplace add /path/to/code-migration-kit`. A plugin from a local marketplace reads the checkout directly; changes take effect in a new session (or after `/restart`). Do not update from a release before 0.40.0 in the middle of a migration (that one update revokes approvals once and sends every finished file back to review; from 0.40.0 only phase 00b is recorded again). From 0.40.1 on, an update keeps phase records, approvals and completion records ([UPGRADING.en.md](UPGRADING.en.md)).
 
 ### VS Code
 

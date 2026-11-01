@@ -48,7 +48,7 @@ copilot plugin install code-migration-kit@code-migration-kit-marketplace
 
 VS Code と GitHub Copilot app でも、同じ登録元（`umauma00/code-migration-kit-with-github-copilot`）をマーケットプレイスとして追加し、`code-migration-kit` を入れます。VS Code は CLI で入れたプラグインも自動で見つけます。画面ごとの手順・更新・社内 Git サーバーからの導入は [PLUGIN.md](docs/PLUGIN.md) を参照してください。
 
-**0.40.0 への更新は、移行の途中では行わないでください。** この版に上げるときだけ承認が一度失効し、完了済みのファイルがすべて再レビューになります。0.40.0 からは、プラグインの更新で承認と完了記録は失効しません（版ごとの影響は [UPGRADING.md](docs/UPGRADING.md)）。
+**0.40.0 より前の版から 0.40.1 への更新は、移行の途中では行わないでください。** この更新のときだけ承認が一度失効し、完了済みのファイルがすべて再レビューになります（0.40.0 からの更新は、工程 00b の記録し直しだけです）。0.40.1 からは、プラグインの更新で工程の記録・承認・完了記録は失効しません（版ごとの影響は [UPGRADING.md](docs/UPGRADING.md)）。
 
 ### リポジトリにコピーして入れる
 
