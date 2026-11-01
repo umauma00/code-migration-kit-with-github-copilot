@@ -11,16 +11,22 @@ file bound to the person's home, and copied them again on every command.
 - The worker home takes only `config.json` (the signed-in account and trusted
   folders) and `settings.json`, and links only `installed-plugins`,
   `marketplaces`, `agents`, `skills`, `hooks` and `extensions`. The person's
-  MCP servers (`mcp-config.json`) and the CLI's own state stay behind; workers
-  use no MCP server (the kit already passed `--disable-builtin-mcps`).
+  MCP servers (`mcp-config.json`) and the CLI's own state stay behind. Workers
+  were already limited to `--available-tools view,grep,glob`, so no MCP tool
+  reached them; MCP servers that come with a plugin still start.
 - A worker home made by 0.34.0 to 0.40.1 (no `.migration-kit-worker-home.json`
-  marker) is emptied once, session records, index and logs excepted. Links
-  are removed as links, never followed.
+  marker) is emptied once, keeping `session-state`, `session-store.db`, `logs`
+  and `pkg` (locks go too, so no lock outlives its binding). Links are removed
+  as links, never followed. One kit process empties it at a time, and the
+  marker is written only when everything went. A worker home that is a link,
+  or resolves to the person's home, is refused (workers use the person's home
+  for that command, with a warning).
 - A worker that cannot start its MCP servers or its storage in the worker home
-  (the CLI's MCP host, MCP ownership storage, protected storage and writer
-  lock messages) is repeated in the person's home, like a missing sign-in, and
-  the rest of that command stays there, with a warning in the run report
-  instead of a failure.
+  (CLI 1.0.105's MCP host, MCP ownership storage and protected storage
+  messages; lock contention does not count) before the model answered is
+  repeated in the person's home, like a missing sign-in, and the rest of that
+  command stays there, with a warning in the run report instead of a failure.
+  `doctor --check-cli` follows workers there when it checks the agents.
 - Test: `tests/worker-home-state-2026-11-01.test.mjs` (what the worker home
   takes and leaves, the one-time emptying that keeps records and never follows
   links, the failure patterns, the fallback and a failure in both homes).
