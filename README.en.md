@@ -48,7 +48,7 @@ copilot plugin install code-migration-kit@code-migration-kit-marketplace
 
 In VS Code and the GitHub Copilot app, add the same source (`umauma00/code-migration-kit-with-github-copilot`) as a marketplace and install `code-migration-kit`. VS Code also finds plugins the CLI installed. Each app's screens, updates and installing from an internal Git server are in [PLUGIN.en.md](docs/PLUGIN.en.md).
 
-**Do not update the kit in the middle of a migration.** A new version can revoke approvals and send every finished file back to review. Update after the migration ends or before the next one (each version's effect is in [UPGRADING.en.md](docs/UPGRADING.en.md)).
+**Do not update to 0.40.0 in the middle of a migration.** That one update revokes approvals once and sends every finished file back to review. From 0.40.0 on, a plugin update keeps approvals and completion records (each version's effect is in [UPGRADING.en.md](docs/UPGRADING.en.md)).
 
 ### As a copy in the repository
 
@@ -112,7 +112,7 @@ Before 03, guardrails (`migration/guardrails.json`) are installed with your conf
 - **The original source is never rewritten.** Workers only read files; the kit itself writes only the target files.
 - **Reviews are independent.** Both reviewers receive the same frozen input and never see each other's results. Only when the input is too large do they get a file list with hashes and read it with read-only tools, which is recorded. The input limit `maxReviewInputBytes` is 1048576 bytes (1 MiB) for new installs.
 - **"Done" is checked against records.** A file merely existing is never done; hashes of inputs, outputs and reviews are kept. When the source or the rules change, the related approvals and completions are revoked automatically.
-- **The RULEBOOK is protected.** After phase 01, an AI edit of `migration/RULEBOOK.md` first keeps the current text in `migration/rulebook-history/`. Once translation has started, the edit asks for confirmation and says how many finished files it sends back to review (in auto mode the edit is refused and the file is repaired instead), because any RULEBOOK change reviews every finished file again.
+- **The RULEBOOK is protected.** After phase 01, an AI edit of `migration/RULEBOOK.md` first keeps the current text in `migration/rulebook-history/`. Once translation has started, the edit asks for confirmation (in auto mode the edit is refused and the file is repaired instead). After phase 02, `rulebook changes` shows a change and the files it may touch, and `rulebook accept` keeps everything else, so only the files you choose are redone.
 - **Work is not cut short.** Normally nothing stops on time or call counts, and transient network errors are retried after a wait ([every stop condition](docs/INTERRUPTION-POLICY.en.md)).
 
 ## AI usage and billing

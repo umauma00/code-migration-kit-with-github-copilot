@@ -24,6 +24,7 @@ import { diagnoseBuild } from './diagnostic_queue.mjs';
 import { sessionsStatus, pruneSessions } from '../lib/sessions.mjs';
 import { prepareWorkerHome } from '../lib/worker-home.mjs';
 import { usageReport, usageMarkdown } from '../lib/usage.mjs';
+import { rulebookChanges, acceptRulebook, rulebookMarkdown } from '../lib/rulebook.mjs';
 import { buildLoop } from '../lib/build-loop.mjs';
 import { readPreferences, setPreferences, preferencesReport } from '../lib/preferences.mjs';
 import { autoModeOn } from '../lib/auto-mode.mjs';
@@ -71,6 +72,11 @@ export const usage = `Usage: node migration-kit/scripts/run_migration.mjs COMMAN
                               Source as the only specification: scaffold source-only preparation
   judge                       Runtime: original/mutation; source-only: validate preparation
   judge-prepare               Validate/reuse the judge at 00b before map/rules exist
+  rulebook changes [--format json|markdown]
+                              After phase 02: how the RULEBOOK differs from the reviewed version and which finished units it may touch
+  rulebook accept --note TEXT --redo listed|all|none|PATH,PATH
+                              Keep phases, approvals and finished units under the changed RULEBOOK and send back
+                              only the chosen units (host-confirmed human gate)
   approve STAGE --note TEXT   Review/approve translation, build, smoke, parity, post-parity, handoff
                               translation may use --batch N or --targets PATH,PATH, and --complete-phase 03
                               to record the reviewed phase 03 in the same confirmation
@@ -421,6 +427,16 @@ export async function main(argv = process.argv.slice(2)) {
     if (args.format && !['json', 'markdown'].includes(args.format)) throw new Error('usage format must be json or markdown');
     const report = usageReport(root, { runId: args.run });
     console.log(args.format === 'markdown' ? usageMarkdown(report, language) : JSON.stringify(report, null, 2));
+    return;
+  }
+  if (cmd === 'rulebook') {
+    // changes is read-only; accept is a human gate (the hook asks the person).
+    if (args.format && !['json', 'markdown'].includes(args.format)) throw new Error('rulebook format must be json or markdown');
+    const config = loadConfig(root);
+    const result = args._[1] === 'changes' ? rulebookChanges(root, config)
+      : args._[1] === 'accept' ? acceptRulebook(root, config, { note: args.note, redo: args.redo })
+      : (() => { throw new Error('Use rulebook changes [--format json|markdown] | accept --note TEXT --redo listed|all|none|PATH,PATH'); })();
+    console.log(args.format === 'markdown' ? rulebookMarkdown(result) : JSON.stringify(result, null, 2));
     return;
   }
   if (cmd === 'guidance') {

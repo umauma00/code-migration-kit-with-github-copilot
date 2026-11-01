@@ -176,7 +176,7 @@ test('plugin doctor requires mounting support and config rejects an unknown runt
   assert.throws(() => loadConfig(f.root), /runtime must/);
 });
 
-test('plugin runtime fingerprints survive relocation and change with bundled worker updates', async t => {
+test('plugin runtime fingerprints survive relocation and a plugin update (the kit is not an input)', async t => {
   const f = prepare(t, { layout: 'plugin' }), before = contextHash(f.root, f.config);
   const copy = fs.mkdtempSync(path.join(os.tmpdir(), 'migration-plugin-package-'));
   t.after(() => fs.rmSync(copy, { recursive: true, force: true }));
@@ -184,6 +184,9 @@ test('plugin runtime fingerprints survive relocation and change with bundled wor
   for (const file of ['plugin.json', 'package.json']) fs.copyFileSync(path.join(kitRoot, file), path.join(copy, file));
   const copiedCore = await import(pathToFileURL(path.join(copy, 'lib/core.mjs')).href);
   assert.equal(copiedCore.contextHash(f.root, f.config), before);
+  // 0.40.0: a plugin update keeps phases, approvals and finished units, as
+  // upstream; the project's own agents and hooks stay inputs (tests above).
   fs.appendFileSync(path.join(copy, 'com.github.copilot/agents/code-migration-plugin-implementer.agent.md'), '\nUpdated translation rules.\n');
-  assert.notEqual(copiedCore.contextHash(f.root, f.config), before);
+  fs.appendFileSync(path.join(copy, 'lib/markers.mjs'), '\n// updated\n');
+  assert.equal(copiedCore.contextHash(f.root, f.config), before);
 });

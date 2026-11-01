@@ -73,9 +73,11 @@ test('02 names the changed input part; a record without parts still explains its
   const f = recorded(t);
   later(f, 'migration/RULEBOOK.md', `${fs.readFileSync(safePath(f.root, 'migration/RULEBOOK.md'), 'utf8')}Keep error messages.\n`);
   const stale = phaseCommand(f.root, f.config, 'next').stale;
-  assert.equal(stale.phase, '02'); assert.equal(stale.action, 'record-again');
+  // 0.40.0: only the RULEBOOK changed, so the person can accept it (rulebook accept).
+  assert.equal(stale.phase, '02'); assert.equal(stale.action, 'accept-rulebook');
   assert.ok(stale.reasons.some(r => r.kind === 'evidence' && r.files.includes('migration/RULEBOOK.md')));
-  assert.ok(stale.reasons.some(r => r.part === 'artifacts'));
+  assert.ok(stale.reasons.some(r => r.part === 'rulebook'));
+  assert.match(stale.next, /rulebook changes.*rulebook accept --note TEXT --redo/s);
   // Records made before 0.26.0 carry no parts: the reason says it is unsure.
   for (const id of ['00', '02']) {
     const file = safePath(f.root, `migration/phases/${id}.json`), r = readJSON(file);

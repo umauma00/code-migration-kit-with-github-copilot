@@ -1,6 +1,16 @@
-# Upgrading (0.39.0 and earlier releases)
+# Upgrading (0.40.0 and earlier releases)
 
 [日本語](UPGRADING.md) | English
+
+## 0.40.0 (finished work survives a RULEBOOK change and a kit update)
+
+**Do not update to this release in the middle of a migration.** How approvals and completion records are fingerprinted changes, so this one update makes existing approvals and completion records go stale once and every finished file is reviewed again. Update after the migration ends, or before the next one.
+
+1. After phase 02, `rulebook changes --format markdown` shows how the RULEBOOK differs from the reviewed version and which finished files it may touch (those whose inventory construct, classification or symbol appears in a changed line). `rulebook accept --note "why" --redo listed|all|none|PATH,...` accepts the change: phases 02 and 03, the approvals and the finished files stay current, and only the chosen files are reviewed again by the next `translate` (the host asks the person to confirm). Without it, as before, phases 02 and 03 are recorded again and every file is reviewed again.
+2. Acceptances are recorded in `migration/phases/rulebook-amendments.json`, which only the runner writes (the hook refuses an agent writing it). Change the RULEBOOK again after accepting and accept again. The RULEBOOK as phase 02 recorded it is kept in `migration/rulebook-history/` for the diff.
+3. A plugin update no longer revokes approvals and completion records (as upstream). Each finished file still passes its own checks (output, reviews, arbitration, trailer). The project's `.github/agents`, `.claude/agents` and `.github/hooks` (and `.github/extensions` in a copy install) reach workers and stay inputs; updating a copy install replaces those files, so a release that changes worker profiles still revokes there.
+4. Auto mode runs `rulebook accept` unasked, like the other approvals. After translation started the agent never edits the RULEBOOK (the hook refuses), so this only accepts a change the person made; the redo choice is listed (all when a changed section matches no file).
+5. With a copy install, replace the whole `migration-kit/`, the `.github/skills/` SKILL.md files and `.github/agents/migration-orchestrator.agent.md` with the contents of a temporary install. A plugin takes it with an update alone.
 
 ## 0.39.0 (documents rewritten)
 

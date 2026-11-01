@@ -1,3 +1,49 @@
+# 0.40.0 — 2026-11-01
+
+Finished work now survives a RULEBOOK change and a kit update, as upstream
+does: a change no longer revokes everything; the person decides what to redo
+(upstream rule 6, regenerate only the slice the changed rule touches). On the
+Mac run of 2026-11-01 one RULEBOOK line sent all 347 finished units back to
+review, and every kit update had the same effect.
+
+- `rulebook changes [--format json|markdown]` (read-only) compares the
+  RULEBOOK with the version phase 02 recorded, section by section, and lists
+  the finished units whose inventory rows (construct, classification or
+  symbol) appear in a changed line or a changed section's `construct:` tag.
+  Sections that match no file are named, so the person can widen the choice.
+- `rulebook accept --note TEXT --redo listed|all|none|PATH,...` is a human gate
+  (the hook asks; auto mode runs it unasked like the other approvals and
+  chooses listed, or all when a section matches no file). It records the new
+  RULEBOOK as the reviewed one in `migration/phases/rulebook-amendments.json`
+  (written only by the runner; the hook refuses agent writes), so phases 02
+  and 03, the judge, the approvals and the finished units stay current, and
+  sends only the chosen units back to review (their output is kept). It is
+  refused when anything else changed since phase 02, and the record must hold
+  again or nothing is written. Without it the records go stale as before.
+- Phase evidence and the input fingerprint (contextHash) hash the RULEBOOK by
+  that identity, and the RULEBOOK is its own part (`rulebook`), so a stale 02
+  or 03 caused only by it says so: `phase next` and the phase-order guidance
+  offer `rulebook changes` / `rulebook accept` first.
+- The kit's own files (plugin lib, scripts, templates, bundled agents,
+  plugin.json, package.json; migration-kit/lib and scripts in a copy install)
+  are no longer part of the fingerprint, so a plugin update keeps approvals
+  and finished units. Each finished unit still passes its own checks (output,
+  reviews, arbitration, trailer). The project's `.github/agents`,
+  `.claude/agents` and `.github/hooks` (and `.github/extensions` in a copy
+  install) reach workers and stay inputs.
+- Phase 02's RULEBOOK is kept in `migration/rulebook-history/` when 02 is
+  recorded and on every acceptance, for the diff.
+- The hook's question before a RULEBOOK edit after translation started now
+  says that `rulebook accept` lets the person choose which finished units to
+  redo. The skill and the orchestrator describe the flow.
+- Updating to this release changes the fingerprint once, so existing
+  approvals and completion records go stale one last time.
+
+tests/rulebook-amend-2026-11-01.test.mjs covers the diff and the listed units,
+accepting with each redo choice, the records that stay current, a second
+change after an accepted one, refusal when another input changed, the hook
+(ask, auto mode, the protected record), the guidance and a plugin update.
+
 # 0.39.0 — 2026-11-01
 
 Documents only; no kit code changed.

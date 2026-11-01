@@ -206,7 +206,7 @@ node migration-kit/scripts/run_migration.mjs repair \
   --target ported/example.mjs --evidence migration/diagnostic-slice.txt
 ```
 
-修正はレビュー→裁定→確認された指摘の修正を通ります（再レビューは `fixPolicy: rereview` のときだけ）。出力が変わると古いビルド以降の承認は無効になるため、改めて確認・承認してください。元ソース、設定、ルール、比較器が変わった場合は、judgeから再検証し、事前試行の更新を確認してtranslationを再承認します。ただし実行上限（`concurrency`、`maxAgentCalls`、`maxFixRounds`、各タイムアウト・再試行、`maxRunInputBytes`、`maxAiCreditsPerCall`）、文書・工程プロンプト・スキル・Copilot指示の変更はワーカーの出力に影響しないため、レビュー済みの単位・工程記録・承認を失効させません。
+修正はレビュー→裁定→確認された指摘の修正を通ります（再レビューは `fixPolicy: rereview` のときだけ）。出力が変わると古いビルド以降の承認は無効になるため、改めて確認・承認してください。元ソース、設定、ルール、比較器が変わった場合は、judgeから再検証し、事前試行の更新を確認してtranslationを再承認します。02の後にルールだけを変えた場合は、`rulebook changes` で変更点と関係しそうなファイルを確かめ、`rulebook accept --note TEXT --redo listed|all|none|PATH,...` で受け入れると、工程記録・承認・ほかの完了済み単位はそのままで、選んだ単位だけをレビューし直します（[手順](ORDERED-WORKFLOW.md#rulebook-amendment)）。キット（プラグイン）の更新も、承認と完了記録を失効させません。ただし実行上限（`concurrency`、`maxAgentCalls`、`maxFixRounds`、各タイムアウト・再試行、`maxRunInputBytes`、`maxAiCreditsPerCall`）、文書・工程プロンプト・スキル・Copilot指示の変更はワーカーの出力に影響しないため、レビュー済みの単位・工程記録・承認を失効させません。
 
 smoke・parityの失敗も同じ経路で修正します（上流Step 6）。元の実装で同じ入力を実行して分類したうえで、`repair-round --stage smoke|parity` を使うと、変換後ファイルを指す出力行がレビュー付き修正のキューになります。比較器がケース単位でしか報告しない場合は、確認した退行を `file<TAB>module<TAB>code<TAB>message` 形式で書き、`diagnostic_queue.mjs --stage parity --diagnostics migration/PATH.tsv` → `repair --queue` を実行します。元テスト（original）の失敗は継承・環境の問題なので、runnerはキューにしません。修正後はbuild・smoke・parityを改めて承認・実行します。
 
