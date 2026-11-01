@@ -24,7 +24,7 @@ copilot plugin install code-migration-kit@code-migration-kit-marketplace
 copilot plugin list
 ```
 
-更新は `copilot plugin marketplace update code-migration-kit-marketplace` の後に `copilot plugin update code-migration-kit` です。手元のcheckoutを使う場合は `copilot plugin marketplace add /path/to/code-migration-kit` で登録します。ローカルのマーケットプレイスから入れたプラグインはcheckoutを直接読み、変更は新しいセッション（または `/restart`）で反映されます。
+更新は `copilot plugin marketplace update code-migration-kit-marketplace` の後に `copilot plugin update code-migration-kit` です。手元のcheckoutを使う場合は `copilot plugin marketplace add /path/to/code-migration-kit` で登録します。ローカルのマーケットプレイスから入れたプラグインはcheckoutを直接読み、変更は新しいセッション（または `/restart`）で反映されます。移行の途中では更新しないでください。版が変わると承認が失効し、完了済みのファイルがすべて再レビューになることがあります（[UPGRADING.md](UPGRADING.md)）。
 
 ### VS Code
 

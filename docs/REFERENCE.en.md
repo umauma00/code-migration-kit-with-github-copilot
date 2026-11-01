@@ -84,7 +84,7 @@ The minimum settings in `migration/config.json`:
 | `phaseModels` | Explicit host models for rulebook, judgeAudit, dependencyAudit, inventoryAudit, stressA/B, stressInspector and designAudit. Preparation audits run in the parent and are never inherited by the automatic runner |
 | `designInputs` | Design documents included in full in the frozen input and protected. A link alone does not count as the body. This does not enable a redesign module runner |
 | `packageMap` | Optional source→target package declaration JSON. When set, phase 01 records a separate package-cycle audit |
-| `markerPolicy` | `todo-lines-v1` for new installs: the number of lines with TODO(port) must match the trailer's todos. Existing projects without it keep the old contract |
+| `markerPolicy` | `todo-lines-v1` for new installs: the number of lines with TODO(port) must match the trailer's todos. The trailer goes after the last closing brace as `// PORT STATUS: confidence=medium todos=2` (a bracketed `todos=[2]` counts the same). Existing projects without it keep the old contract |
 | `workerBackend` | `copilot-cli` only (may be omitted). The native backend was removed in 0.3.0 |
 | `concurrency` | Concurrent AI calls, 4 for new installs, at most 64, both reviews included. CLI workers are separate processes, so the account's rate limits, not Copilot's subagent concurrency, are the practical limit |
 | `dependencyOrder` | `auto` (new installs): hold a dependent until its dependencies have reviewed receipts only when a per-unit typecheck needs them; without one the approved scope fans out as upstream does. `reviewed` (unset, existing configs): always wait. `none`: never wait (not combinable with a typecheck) |

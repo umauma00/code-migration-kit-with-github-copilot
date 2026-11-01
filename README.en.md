@@ -48,6 +48,8 @@ copilot plugin install code-migration-kit@code-migration-kit-marketplace
 
 In VS Code and the GitHub Copilot app, add the same source (`umauma00/code-migration-kit-with-github-copilot`) as a marketplace and install `code-migration-kit`. VS Code also finds plugins the CLI installed. Each app's screens, updates and installing from an internal Git server are in [PLUGIN.en.md](docs/PLUGIN.en.md).
 
+**Do not update the kit in the middle of a migration.** A new version can revoke approvals and send every finished file back to review. Update after the migration ends or before the next one (each version's effect is in [UPGRADING.en.md](docs/UPGRADING.en.md)).
+
 ### As a copy in the repository
 
 Clone the kit and copy it into the repository you migrate. Ask in chat "clone this kit and install it into this repository with `scripts/install.mjs`" and the AI does it. By hand, preview first, then apply with `--apply`:
@@ -110,6 +112,7 @@ Before 03, guardrails (`migration/guardrails.json`) are installed with your conf
 - **The original source is never rewritten.** Workers only read files; the kit itself writes only the target files.
 - **Reviews are independent.** Both reviewers receive the same frozen input and never see each other's results. Only when the input is too large do they get a file list with hashes and read it with read-only tools, which is recorded. The input limit `maxReviewInputBytes` is 1048576 bytes (1 MiB) for new installs.
 - **"Done" is checked against records.** A file merely existing is never done; hashes of inputs, outputs and reviews are kept. When the source or the rules change, the related approvals and completions are revoked automatically.
+- **The RULEBOOK is protected.** After phase 01, an AI edit of `migration/RULEBOOK.md` first keeps the current text in `migration/rulebook-history/`. Once translation has started, the edit asks for confirmation and says how many finished files it sends back to review (in auto mode the edit is refused and the file is repaired instead), because any RULEBOOK change reviews every finished file again.
 - **Work is not cut short.** Normally nothing stops on time or call counts, and transient network errors are retried after a wait ([every stop condition](docs/INTERRUPTION-POLICY.en.md)).
 
 ## AI usage and billing

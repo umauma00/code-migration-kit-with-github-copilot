@@ -84,7 +84,7 @@ node migration-kit/scripts/run_migration.mjs doctor --check-cli
 | `phaseModels` | rulebook、judgeAudit、dependencyAudit、inventoryAudit、stressA/B、stressInspector、designAuditの明示的なhost model指定。準備監査は親が実行し、自動runnerへの暗黙継承はしない |
 | `designInputs` | 全文を固定入力へ含め、保護する設計文書のパス配列。リンクだけでは本文を渡した扱いにしない。redesignのmodule runnerを有効化する設定ではない |
 | `packageMap` | 任意のsource→target package宣言JSON。指定時は01で別のpackage cycle監査を記録 |
-| `markerPolicy` | 新規は`todo-lines-v1`：TODO(port)のある行数と末尾todosを照合。未指定の既存案件は従来契約を維持 |
+| `markerPolicy` | 新規は`todo-lines-v1`：TODO(port)のある行数と末尾todosを照合。末尾行は最後の閉じ括弧の後に `// PORT STATUS: confidence=medium todos=2` の形で書く（`todos=[2]` のような角括弧付きも同じ数として受け付ける）。未指定の既存案件は従来契約を維持 |
 | `workerBackend` | `copilot-cli` のみ（省略可）。0.3.0でnative方式を削除 |
 | `concurrency` | 同時AI呼び出し数。新規導入の初期値4、上限64。2つのレビューも含めてこの数以下。CLI方式では各呼び出しが別プロセスなので、Copilotのsubagent同時実行数ではなく、アカウントのレート制限が実質の上限 |
 | `dependencyOrder` | `auto`（新規導入）: 単位型チェックがあるときだけ、依存先のレビュー完了まで依存元を待たせる。型チェックがなければ上流と同じく承認範囲を一斉に展開する。`reviewed`（省略時・既存設定）: 常に待つ。`none`: 待たない（型チェックとは併用不可） |

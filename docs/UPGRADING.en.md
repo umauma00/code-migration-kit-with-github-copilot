@@ -1,15 +1,24 @@
-# Upgrading (0.37.0 and earlier releases)
+# Upgrading (0.39.0 and earlier releases)
 
 [日本語](UPGRADING.md) | English
 
-## 0.37.0 (documents rewritten)
+## 0.39.0 (documents rewritten)
 
 No kit code changed.
 
 1. README, the guides and docs are rewritten for the current version. The detail README used to carry moved to [detailed usage](REFERENCE.en.md).
-2. With a plugin install the version number changes, so existing approvals and completion records go stale once. Record them again as `phase next`'s `stale` shows.
+2. With a plugin install the version number changes, so existing approvals and completion records go stale once and every finished file is reviewed again. Only documents changed, so **do not update in the middle of a migration**; update after it ends or before the next one.
 3. With a copy install only documents and a link in the skill change, so approvals and completion records stay valid. Replace the whole `migration-kit/` and the `.github/skills/` SKILL.md files with the contents of a temporary install (configuration questions now point at detailed usage instead of README).
 4. Development records (`history/` and TESTING) are no longer kept in the repository. Read them at commit 0bea302 on GitHub if needed.
+
+## 0.38.0 (a RULEBOOK edit no longer sends every unit back to review)
+
+**Do not update in the middle of a migration.** Kit files (lib, scripts, templates) change, so existing approvals and completion records go stale once and every finished unit is reviewed again. Update after the migration ends, or before the next one.
+
+1. The RULEBOOK template now shows the trailer as `// PORT STATUS: confidence=medium todos=2`. The check accepts the bracketed `todos=[2]` as the same count, so **do not edit an existing RULEBOOK** for it (that edit sends every unit back to review).
+2. The arbiter's example names a real reference, and an arbitration with an unknown, repeated or missing reference is asked for once more before the unit blocks.
+3. After phase 01, an agent's edit of `migration/RULEBOOK.md` first keeps the current text in `migration/rulebook-history/`; once translation has started the hook asks the person, naming how many finished units the edit sends back. In auto mode it does not ask (autopilot cannot show a confirmation): the edit is refused with the way on, and the run goes on. Reading the file or naming it in a note never asks; a script that opens the file itself is not seen.
+4. In a copy install, replace all of `migration-kit/` with the temporary install's. The plugin needs only an update.
 
 ## 0.35.0 (the autopilot handoff is right in every app)
 

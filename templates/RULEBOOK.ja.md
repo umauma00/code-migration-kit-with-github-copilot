@@ -109,11 +109,15 @@ config の outputRoots の中に収めます。
 翻訳したファイルは、最後に状態の行を付けて終えます。
 
 ```
-// PORT STATUS: confidence=[high|medium|low] todos=[N]
+// PORT STATUS: confidence=medium todos=2
 ```
 
+これは書き方の例です。`confidence=` には `high`・`medium`・`low` のどれかを、
+`todos=` には `TODO(port)` を含む行の数を数字だけで書きます（角括弧は付けません）。
+コメントは移行先の1行コメントの書き方にし、ファイルの最後の閉じ括弧の後に置きます。
+クラスや関数の中には置きません。
 レビュアーは、この行をファイルの実際の `TODO(port)` の数と照らし合わせます。
-少なく数えている行は指摘の対象です。
+多く数えている行も、少なく数えている行も指摘の対象です。
 
 config の markerPolicy が `todo-lines-v1` のときは、マーカーを含む行の数を数えます
 （1行に2つあっても1と数えます）。PORT STATUS の行は、空でない最後の行に1つだけ置き、

@@ -306,17 +306,25 @@ const reviewLenses = {
 // on the size ("Session host did not acknowledge ... delivery within 120s").
 const implementationRoles = ['implementer', 'fixer'];
 export const usesWorkInput = (role, workMode) => implementationRoles.includes(role) && (workMode === 'frozen' || workMode === 'tool-assisted');
-export function agentPrompt({ role, unit, extra = {}, reviewInput, frozenInput, reviewMode = 'frozen', reviewFocus, workInput, workMode }) {
+// With markerPolicy todo-lines-v1 the coordinator rejects a trailer that is
+// not plain digits on the last nonempty line. Workers copied the template's
+// `todos=[N]` brackets and put the trailer inside the class, which blocked
+// finished units, so the writing roles get the exact form.
+const trailerRule = ' The LAST nonempty line of content is exactly one status trailer in the target\'s line-comment syntax, after the final closing brace (never inside a class or function), for example `// PORT STATUS: confidence=medium todos=2`: confidence is your own high, medium or low, and todos is the plain decimal number of lines containing TODO(port) in YOUR content, counted, not copied from this example, without brackets.';
+export function agentPrompt({ role, unit, extra = {}, reviewInput, frozenInput, reviewMode = 'frozen', reviewFocus, workInput, workMode, markerPolicy }) {
+  const trailer = markerPolicy === 'todo-lines-v1' ? trailerRule : '';
   const contracts = {
     // Only the fold benchmark (lib/bench.mjs) hands the implementer findings;
     // the translation loop never does, so its implementer prompt is unchanged.
-    implementer: `Return {"schemaVersion":1,"kind":"implementation","target":"PATH","content":"COMPLETE TARGET FILE","summary":"reason"}. Translate faithfully; preserve source behavior. Return code, do not write files.${Array.isArray(extra.confirmedFindings) ? ' The target exists: apply ONLY extra.confirmedFindings to it and preserve all other behavior.' : ''}`,
-    fixer: 'Return {"schemaVersion":1,"kind":"implementation","target":"PATH","content":"COMPLETE FIXED FILE","summary":"changes"}. Apply ONLY confirmed findings; preserve all other behavior. Return code, do not write files.',
+    implementer: `Return {"schemaVersion":1,"kind":"implementation","target":"PATH","content":"COMPLETE TARGET FILE","summary":"reason"}. Translate faithfully; preserve source behavior. Return code, do not write files.${Array.isArray(extra.confirmedFindings) ? ' The target exists: apply ONLY extra.confirmedFindings to it and preserve all other behavior.' : ''}${trailer}`,
+    fixer: `Return {"schemaVersion":1,"kind":"implementation","target":"PATH","content":"COMPLETE FIXED FILE","summary":"changes"}. Apply ONLY confirmed findings; preserve all other behavior. Return code, do not write files.${trailer}`,
     // single exists only in the fold benchmark (lib/bench.mjs); config validation rejects it.
     ...Object.fromEntries(Object.entries(reviewLenses).map(([reviewer, lens]) => [reviewer, reviewFocus === 'shared' || reviewFocus === 'single'
       ? `Check ${lens} first, then ${reviewLenses[reviewer === 'reviewer-rules' ? 'reviewer-semantics' : 'reviewer-rules']}. ${reviewFocus === 'single' ? 'You are the only reviewer' : 'You are one of two independent full reviewers'}: report every defect either check finds.`
       : `Check ${lens}.`])),
-    arbiter: 'Return {"schemaVersion":1,"kind":"arbitration","target":"PATH","decisions":[{"finding":"reviewer-role:ID","confirmed":true,"reason":"source/rule evidence"}]}. Decide EVERY supplied finding exactly once. Default to not confirmed when evidence is insufficient. Each samePlace pair is two findings citing the same source location: confirm both only if they ask for compatible changes; if they conflict, confirm at most the one the evidence supports.',
+    // The example once read "reviewer-role:ID" and models copied it literally
+    // (63 of 533 arbitrations in one project), which blocked the unit.
+    arbiter: 'Return {"schemaVersion":1,"kind":"arbitration","target":"PATH","decisions":[{"finding":"reviewer-semantics:F1","confirmed":true,"reason":"source/rule evidence"}]}. Each decision\'s finding is the supplied finding\'s reference copied exactly (such as "reviewer-semantics:F1" or "reviewer-rules:F2"); extra.references lists every one. Decide EVERY supplied finding exactly once. Default to not confirmed when evidence is insufficient. Each samePlace pair is two findings citing the same source location: confirm both only if they ask for compatible changes; if they conflict, confirm at most the one the evidence supports.',
     surveyor: 'Return {"schemaVersion":1,"kind":"survey","survey":"KIND from the input","target":"PATH","items":[...]} following the task in the frozen input exactly. Every item cites PATH:LINE inside the given files. Return only facts the given files show; never propose code.',
     'preparation-auditor': 'You are an independent, hostile preparation auditor. Return the frozen request\'s responseContract with "target":"PATH" added: {"schemaVersion":1,"kind":"preparation-audit","task":"TASK","inputHash":"HASH","target":"PATH","verdict":"pass|changes","findings":[{"id":"F1","message":"specific problem","evidence":"source/assertion/rule:line proof","proposedFix":"proposal only"}]}. Copy task and inputHash unchanged. pass requires zero findings; missing evidence is a changes finding, never an invented pass.'
   };
@@ -400,7 +408,7 @@ export function createCopilotAdapter({ command = 'copilot', prefixArgs = [], ver
     let result;
     // Surveyors get their scope as a frozen input, like tool-free reviewers.
     const frozenRole = role === 'surveyor' || role === 'preparation-auditor';
-    const prompt = agentPrompt({ role, unit, extra: { ...extra, designInputs: config.designInputs ?? [] }, reviewInput: frozenRole ? undefined : reviewInput, frozenInput: frozenRole ? reviewInput : undefined, reviewMode, reviewFocus: config.reviewFocus, workInput, workMode });
+    const prompt = agentPrompt({ role, unit, extra: { ...extra, designInputs: config.designInputs ?? [] }, reviewInput: frozenRole ? undefined : reviewInput, frozenInput: frozenRole ? reviewInput : undefined, reviewMode, reviewFocus: config.reviewFocus, workInput, workMode, markerPolicy: config.markerPolicy });
     const promptBytes = Buffer.byteLength(prompt);
     // Outside the project: the file is CLI output, not migration evidence.
     const usageDir = fs.mkdtempSync(path.join(os.tmpdir(), 'migration-kit-usage-')), usageFile = path.join(usageDir, 'usage.json');

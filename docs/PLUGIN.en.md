@@ -24,7 +24,7 @@ copilot plugin install code-migration-kit@code-migration-kit-marketplace
 copilot plugin list
 ```
 
-To update, run `copilot plugin marketplace update code-migration-kit-marketplace`, then `copilot plugin update code-migration-kit`. To use a local checkout, register it with `copilot plugin marketplace add /path/to/code-migration-kit`. A plugin from a local marketplace reads the checkout directly; changes take effect in a new session (or after `/restart`).
+To update, run `copilot plugin marketplace update code-migration-kit-marketplace`, then `copilot plugin update code-migration-kit`. To use a local checkout, register it with `copilot plugin marketplace add /path/to/code-migration-kit`. A plugin from a local marketplace reads the checkout directly; changes take effect in a new session (or after `/restart`). Do not update in the middle of a migration: a new version can revoke approvals and send every finished file back to review ([UPGRADING.en.md](UPGRADING.en.md)).
 
 ### VS Code
 
