@@ -16,6 +16,7 @@ import { rulebookChanges, acceptRulebook, rulebookDiff, rulebookMarkdown } from 
 import { interactiveDecision } from '../lib/guardrails.mjs';
 import { failureGuidance } from '../lib/guidance.mjs';
 import { autoModeFile } from '../lib/auto-mode.mjs';
+import { migrationStatus, statusMarkdown } from '../lib/status.mjs';
 
 const inventory = 'file\tsymbol\tsource_construct\tclassification\ttarget_translation\tevidence\tstatus\n' +
   'src/math_ops.py\tdivide\tfloor-division\tSEMANTIC\tMath.floor of the quotient\tsrc/math_ops.py:4\tconfirmed\n' +
@@ -160,6 +161,7 @@ test('the hook asks before rulebook accept (unasked in auto mode) and keeps agen
   // Auto mode takes the conservative scope only.
   // Auto mode never drops a listed file.
   assert.throws(() => acceptRulebook(f.root, f.config, { note: 'auto', redo: 'none' }), /In auto mode --redo none is refused while 1 listed file/);
+  assert.throws(() => acceptRulebook(f.root, f.config, { note: 'auto', redo: ' , ' }), /In auto mode --redo none is refused while 1 listed file/, 'a list naming no file is none');
   assert.throws(() => acceptRulebook(f.root, f.config, { note: 'auto', redo: 'ported/main.mjs' }), /keeps every listed file; missing: ported\/math_ops\.mjs/);
   assert.equal(acceptRulebook(f.root, f.config, { note: 'auto', redo: 'listed' }).auto, true, 'recorded as decided without the person');
   assert.equal(readJSON(safePath(f.root, rulebookAmendmentsFile)).log[0].auto, true);
@@ -168,13 +170,28 @@ test('the hook asks before rulebook accept (unasked in auto mode) and keeps agen
   // names the files it affects, or none when it cannot affect translated code.
   amend(f, '\nKeep error messages.\n');
   assert.deepEqual(rulebookChanges(f.root, f.config).candidates, []);
-  assert.throws(() => acceptRulebook(f.root, f.config, { note: 'auto', redo: 'listed' }), /read the changed sections that match no file by words \(Division\)/);
   const named = acceptRulebook(f.root, f.config, { note: 'Error messages: only text_ops raises errors', redo: 'ported/text_ops.mjs' });
-  assert.deepEqual(named.redo, ['ported/text_ops.mjs']);
+  // math_ops still waits for its review from the first change: an unfinished unit is always sent back.
+  assert.deepEqual(named.redo, ['ported/math_ops.mjs', 'ported/text_ops.mjs']);
   assert.deepEqual(finished(f), [false, false, true], 'math_ops from the first change and text_ops; main stays done');
   amend(f, '\nWording only.\n');
-  assert.equal(acceptRulebook(f.root, f.config, { note: 'Wording only; no translated code is affected', redo: 'none' }).redo.length, 0);
-  assert.equal(readJSON(safePath(f.root, rulebookAmendmentsFile)).log.length, 3);
+  assert.equal(acceptRulebook(f.root, f.config, { note: 'Wording only; no translated code is affected', redo: 'none' }).kept, 1, 'no finished unit is sent back');
+  assert.deepEqual(finished(f), [false, false, true]);
+  // When the agent cannot tell, it passes listed: no stop, a warning in status.
+  amend(f, '\nPrefer clear names.\n');
+  const unsure = acceptRulebook(f.root, f.config, { note: 'Could not tell which files naming affects', redo: ' Listed ' });
+  assert.deepEqual(unsure.unresolved, ['Division']);
+  assert.match(unsure.warning, /Not checked against finished units: Division/);
+  assert.match(rulebookMarkdown(unsure), /- Warning: Not checked/);
+  assert.deepEqual(autoModeReport(f.root).rulebookUnchecked.map(w => w.sections), [['Division']]);
+  assert.match(statusMarkdown(migrationStatus(f.root), 'en'), /Warning: RULEBOOK changes auto mode accepted[\s\S]*- .*: Division/);
+  // A list that names no file is none, under none's checks.
+  amend(f, '\nfloor-division rounds toward negative infinity.\n');
+  // It names only math_ops, which is not finished: no finished file is listed, so the section counts as unmatched.
+  assert.deepEqual(rulebookChanges(f.root, f.config).unmatched, ['Division']);
+  assert.equal(acceptRulebook(f.root, f.config, { note: 'Only math_ops, already waiting for review', redo: ' , ' }).kept, 1);
+  assert.deepEqual(finished(f), [false, false, true]);
+  assert.equal(readJSON(safePath(f.root, rulebookAmendmentsFile)).log.length, 5);
 });
 
 test('an acceptance needs its log entry, and re-recording 02 leaves nothing to accept', async t => {

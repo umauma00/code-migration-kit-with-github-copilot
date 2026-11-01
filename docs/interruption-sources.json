@@ -1157,7 +1157,7 @@
     },
     {
       "path": "lib/guidance.mjs",
-      "sha256": "2df1fee87db7356960aacc392cc3a136d20f41cfadfab87d87da730c38497642",
+      "sha256": "6d138e49c290ba138075a1c9c1032b69dfca114f5caffa5e0b0793de53281f0c",
       "entries": [
         {
           "line": 76,
@@ -2165,7 +2165,7 @@
     },
     {
       "path": "lib/preferences.mjs",
-      "sha256": "ff3383d5f96917e38fb57f4a7fb8220a5fc9064497f82c89f370dbafd050e659",
+      "sha256": "7cb20dc3d0fcc5f4080042c4cd8a5af4c712c4eb5b6e8976f62710b07bfde8ad",
       "entries": [
         {
           "line": 48,
@@ -2626,70 +2626,60 @@
     },
     {
       "path": "lib/rulebook.mjs",
-      "sha256": "cb5c22ec16585466e13d628d7413ccf6c984d277c6b56534fcac93cb97be6332",
+      "sha256": "921f04e159ee1c1edbcba03aeae8b7e0cb6dd865423a0e58e88010470d8a420c",
       "entries": [
         {
-          "line": 88,
+          "line": 89,
           "kind": "error-or-exit-candidate",
           "code": "if (!identity) throw new Error('Phase 02 is not recorded with a RULEBOOK; a RULEBOOK change before phase 02 needs no acceptance (record phase 02 when it is reviewed)');"
         },
         {
-          "line": 90,
+          "line": 91,
           "kind": "error-or-exit-candidate",
           "code": "if (!raw) throw new Error(`Required artifact missing: ${rulebookFile}`);"
         },
         {
-          "line": 111,
+          "line": 112,
           "kind": "error-or-exit-candidate",
           "code": "if (!note?.trim()) throw new Error('rulebook accept requires --note saying what changed and why');"
         },
         {
-          "line": 112,
+          "line": 113,
           "kind": "error-or-exit-candidate",
           "code": "if (typeof redo !== 'string' || !redo.trim()) throw new Error('rulebook accept requires --redo listed|all|none|PATH,PATH');"
         },
         {
-          "line": 116,
+          "line": 121,
           "kind": "error-or-exit-candidate",
           "code": "if (!changes.changed) throw new Error(changes.next);"
         },
         {
-          "line": 117,
+          "line": 122,
           "kind": "error-or-exit-candidate",
           "code": "if (changes.other.length) throw new Error(changes.next);"
         },
         {
-          "line": 127,
-          "kind": "error-or-exit-candidate",
-          "code": "if (changes.previous === null) throw new Error('In auto mode rulebook accept takes --redo all: the reviewed RULEBOOK version is not kept, so what changed is unknown');"
-        },
-        {
-          "line": 128,
-          "kind": "error-or-exit-candidate",
-          "code": "if (redo === 'listed' && changes.unmatched.length) throw new Error(`In auto mode, read the changed sections that match no file by words (${changes.unmatched.join(', ')}) and pass the files they affect along with the listed ones (--redo ${keep},...; just the listed files when they affect no other)${listed.length ? '' : ', --redo none when they cannot affect translated code'}, or all`);"
-        },
-        {
-          "line": 129,
+          "line": 135,
           "kind": "error-or-exit-candidate",
           "code": "if (redo === 'none' && listed.length) throw new Error(`In auto mode --redo none is refused while ${listed.length} listed file(s) may be touched: pass listed, or the listed files with more`);"
         },
         {
-          "line": 130,
+          "line": 136,
           "kind": "error-or-exit-candidate",
           "code": "if (missing.length) throw new Error(`In auto mode a file list keeps every listed file; missing: ${missing.join(', ')}`);"
         },
         {
-          "line": 137,
+          "line": 144,
           "kind": "error-or-exit-candidate",
           "code": "if (changes.previous === null) throw new Error('--redo listed needs the reviewed RULEBOOK version, which is not kept; choose all, none or name the files');"
         },
         {
-          "line": 142,
+          "line": 149,
           "kind": "error-or-exit-candidate",
           "code": "if (unknown.length) throw new Error(`Not manifest targets: ${unknown.join(', ')}`);"
         },
         {
-          "line": 169,
+          "line": 177,
           "kind": "error-or-exit-candidate",
           "code": "throw new Error(`Phase 02 is still out of date after accepting the RULEBOOK: ${why}`);"
         }
@@ -2994,7 +2984,7 @@
     },
     {
       "path": "lib/status.mjs",
-      "sha256": "c89728abdc7f4adf7882acbdef7649d0011f6becd802e12ffc679ab0e76a0d7d",
+      "sha256": "b6362853f83b15d1d7171d0c703ee51b8eb2bacca8bf89fb06f3e991ffa379f2",
       "entries": [
         {
           "line": 78,
@@ -5128,5 +5118,5 @@
       ]
     }
   ],
-  "candidateLines": 932
+  "candidateLines": 930
 }

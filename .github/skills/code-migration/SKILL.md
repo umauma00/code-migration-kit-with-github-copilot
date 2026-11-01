@@ -560,10 +560,11 @@ it can miss a file, and that none leaves finished code on the old rule: offer it
 only for a change that cannot affect translated code (wording, a rule for files
 not yet translated). Then run `rulebook accept --note TEXT --redo
 listed|all|none|PATH,...` with that choice (the host asks them to confirm; in
-auto mode do not ask: pass listed, or for a changed section that matches no file
-read it against the inventory and pass the listed files plus the files it
-affects, or none when nothing is listed and it cannot affect translated code;
-the note says which files and why, and the report lists them).
+auto mode do not ask and do not stop: pass listed, or for a changed section that
+matches no file read it against the inventory and pass the listed files plus the
+files it affects, or none when nothing is listed and it cannot affect translated
+code; when you cannot tell, pass listed and go on: the result's warning names
+those sections, so put it in the report. The note says which files and why).
 Phases 02 and 03, the approvals and the other finished units stay current, and
 the next `translate` reviews only the chosen units again. Without it, phases 02
 and 03 go stale and every finished unit is reviewed again. A kit (plugin)

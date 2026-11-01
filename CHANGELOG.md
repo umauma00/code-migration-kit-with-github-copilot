@@ -15,9 +15,11 @@ review, and every kit update had the same effect.
   (the hook asks; auto mode runs it unasked like the other approvals and
   chooses listed; for a changed section that matches no file by words, the
   agent reads it and adds the files it affects, or none when nothing is listed
-  and it cannot affect translated code, instead of redoing every unit. The
-  runner refuses an auto-mode choice that drops a listed file, and status
-  names an acceptance made in auto mode). It records the new
+  and it cannot affect translated code, instead of redoing every unit; when it
+  cannot tell, it passes listed and the run goes on, and status and the report
+  warn which sections were not checked against finished files. The runner
+  refuses an auto-mode choice that drops a listed file, and status names an
+  acceptance made in auto mode). It records the new
   RULEBOOK as the reviewed one in `migration/phases/rulebook-amendments.json`
   (written only by the runner; the hook refuses agent writes), so phases 02
   and 03, the judge, the approvals and the finished units stay current, and
