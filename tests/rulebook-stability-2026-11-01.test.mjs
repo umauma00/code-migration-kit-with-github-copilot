@@ -141,10 +141,17 @@ test('after phase 01 an edit keeps the replaced version; after translation start
   assert.match(asked.reason, /every finished unit \(2 now\) be reviewed again/);
   assert.match(asked.reason, /fixed by repair, not in the RULEBOOK/);
   assert.ok(asked.reason.includes(`${rulebookHistoryDir}/${saved[0]}`));
-  // A shell write asks too; reading does not.
-  assert.equal(editRulebook(f, 'echo rule >> migration/RULEBOOK.md').decision, 'ask');
-  assert.equal(editRulebook(f, 'cat migration/RULEBOOK.md'), null);
-  assert.equal(editRulebook(f, 'rg -n PORT migration/RULEBOOK.md'), null);
+  // Real shell writes ask too; reads, copies out and quoted mentions do not.
+  for (const command of ['echo rule >> migration/RULEBOOK.md', 'echo rule > migration/RULEBOOK.md', 'cat x | tee -a migration/RULEBOOK.md',
+    'sed -i s/a/b/ migration/RULEBOOK.md', 'perl -pi -e s/a/b/ migration/RULEBOOK.md', 'cp /tmp/r.md migration/RULEBOOK.md',
+    'mv migration/RULEBOOK.md /tmp/old.md', 'rm migration/RULEBOOK.md', 'Set-Content -Path migration/RULEBOOK.md -Value x',
+    'Out-File -FilePath migration/RULEBOOK.md', 'git checkout -- migration/RULEBOOK.md', 'git restore migration/RULEBOOK.md'])
+    assert.equal(editRulebook(f, command)?.decision, 'ask', command);
+  for (const command of ['cat migration/RULEBOOK.md', 'rg -n PORT migration/RULEBOOK.md', 'sed -n 1,10p migration/RULEBOOK.md',
+    "awk '/PORT/' migration/RULEBOOK.md", 'sha256sum migration/RULEBOOK.md', 'Get-Content migration/RULEBOOK.md',
+    `python3 -c "print(open('migration/RULEBOOK.md').read())"`, 'cp migration/RULEBOOK.md /tmp/copy.md', 'git add migration/RULEBOOK.md',
+    'git commit -am "update migration/RULEBOOK.md"', 'node migration-kit/scripts/run_migration.mjs repair --note "see migration/RULEBOOK.md"'])
+    assert.equal(editRulebook(f, command), null, command);
   // Other files are untouched by this check.
   assert.equal(interactiveDecision({ toolName: 'apply_patch', toolArgs: patch('migration/gap-report.md'), cwd: f.root }, f.root), null);
 

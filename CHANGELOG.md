@@ -30,7 +30,12 @@ The blocks themselves came from the kit:
   keeps the current text in `migration/rulebook-history/` (named by its hash,
   kept once), and once translation has started the hook asks the person,
   saying how many finished units the edit sends back to review and that format
-  problems are repaired, not fixed in the RULEBOOK. Runner commands that write
+  problems are repaired, not fixed in the RULEBOOK. Only real writes count:
+  edit tools, and in a shell a redirect, `tee`, `sed -i`/`perl -i`, a copy or
+  move onto it, moving or removing it, PowerShell's content writers and
+  `git checkout`/`git restore`; reading it (`sed -n`, `awk`, hashes, scripts),
+  copying it elsewhere and quoting its path in a note never ask. A script that
+  opens the file itself is not seen (best effort). Runner commands that write
   the RULEBOOK (`policy-record`) are unchanged. The skill and the orchestrator
   say the same: a unit blocked in translation is repaired.
 

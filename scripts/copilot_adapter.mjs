@@ -310,7 +310,7 @@ export const usesWorkInput = (role, workMode) => implementationRoles.includes(ro
 // not plain digits on the last nonempty line. Workers copied the template's
 // `todos=[N]` brackets and put the trailer inside the class, which blocked
 // finished units, so the writing roles get the exact form.
-const trailerRule = ' The LAST nonempty line of content is exactly one status trailer in the target\'s line-comment syntax, after the final closing brace (never inside a class or function), for example `// PORT STATUS: confidence=medium todos=2`: confidence is high, medium or low, and todos is the plain decimal number of lines containing TODO(port), without brackets.';
+const trailerRule = ' The LAST nonempty line of content is exactly one status trailer in the target\'s line-comment syntax, after the final closing brace (never inside a class or function), for example `// PORT STATUS: confidence=medium todos=2`: confidence is your own high, medium or low, and todos is the plain decimal number of lines containing TODO(port) in YOUR content, counted, not copied from this example, without brackets.';
 export function agentPrompt({ role, unit, extra = {}, reviewInput, frozenInput, reviewMode = 'frozen', reviewFocus, workInput, workMode, markerPolicy }) {
   const trailer = markerPolicy === 'todo-lines-v1' ? trailerRule : '';
   const contracts = {
