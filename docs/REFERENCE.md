@@ -93,7 +93,7 @@ node migration-kit/scripts/run_migration.mjs doctor --check-cli
 | `executionMode` | 既定・未指定は `continuous`。旧設定の時間・呼び出し数・修正回数・累計入力・リトライ回数で打ち切らず、終了まで継続する。利用者が明示的に `bounded` を選んだ場合だけ以下の上限を適用する。continuous で効かない値が書かれていれば `doctor` が表示する。[停止条件一覧](INTERRUPTION-POLICY.md) |
 | `maxFixRounds`, `maxAgentCalls` | boundedモードだけで使う1単位の修正回数・1実行のAI呼び出し数上限。continuousでは適用しない。`translate --max-calls N` を利用者が明示した場合は、その実行の有限上限として扱う |
 | `maxRunInputBytes` | boundedモードだけで使う入力累計bytesの上限。通常実行は量だけで打ち切らず、`usageEstimate` とCLIの使用量を記録する |
-| `workerCopilotHome` | 既定・未指定は `separate`。キットが動かす作業用 Copilot CLI は `~/.copilot` の隣の `~/.copilot-migration-kit-workers` で動き、利用者の会話記録・記録 DB を共有しない（サインイン・設定・プラグインは利用者のもの）。そこでサインインできなければ自動で `~/.copilot` に戻る。`shared` で常に `~/.copilot` |
+| `workerCopilotHome` | 既定・未指定は `separate`。キットが動かす作業用 Copilot CLI は `~/.copilot` の隣の `~/.copilot-migration-kit-workers` で動き、利用者の会話記録・記録 DB を共有しない（サインイン・設定・プラグインは利用者のもの。利用者の MCP サーバーと CLI 内部の状態は持ち込まない）。そこでサインインできない、または MCP・保存領域を起動できなければ自動で `~/.copilot` に戻る。`shared` で常に `~/.copilot` |
 | `maxAiCreditsPerCall` | boundedモードだけで各workerへ渡す任意の `--max-ai-credits`（CLIの最小値30）。continuousでは渡さない。サービス側の残高・組織上限は外部制約 |
 | `timeoutSeconds` | boundedモードだけで使うCLI呼び出し時間上限。0は期限なし。通常実行は旧設定が600でも打ち切らない |
 | `transientRetries`, `transientRetryDelayMs` | レート制限・5xx・通信障害を待って再試行する。通常実行は回数で打ち切らない（Copilot CLI 内部の受け渡し待ちの詰まりだけは5回まで）。boundedだけ既定2回。待機は既定5秒から倍増、最大60秒 |

@@ -1,3 +1,30 @@
+# 0.40.2 — 2026-11-01
+
+Worker CLIs no longer all fail while starting MCP servers in the kit's worker
+home. On 2026-11-01 (Windows, Copilot CLI 1.0.105) every phase 00b survey
+worker failed that way, before the prompt, in three runs in a row. The 0.34.0
+worker home copied every top-level file of `~/.copilot` except session
+records, which included the CLI's MCP ownership records
+(`mcp-installations.json`, `mcp-activations.json`) and a `-writer.binding`
+file bound to the person's home, and copied them again on every command.
+
+- The worker home takes only `config.json` (the signed-in account and trusted
+  folders) and `settings.json`, and links only `installed-plugins`,
+  `marketplaces`, `agents`, `skills`, `hooks` and `extensions`. The person's
+  MCP servers (`mcp-config.json`) and the CLI's own state stay behind; workers
+  use no MCP server (the kit already passed `--disable-builtin-mcps`).
+- A worker home made by 0.34.0 to 0.40.1 (no `.migration-kit-worker-home.json`
+  marker) is emptied once, session records, index and logs excepted. Links
+  are removed as links, never followed.
+- A worker that cannot start its MCP servers or its storage in the worker home
+  (the CLI's MCP host, MCP ownership storage, protected storage and writer
+  lock messages) is repeated in the person's home, like a missing sign-in, and
+  the rest of that command stays there, with a warning in the run report
+  instead of a failure.
+- Test: `tests/worker-home-state-2026-11-01.test.mjs` (what the worker home
+  takes and leaves, the one-time emptying that keeps records and never follows
+  links, the failure patterns, the fallback and a failure in both homes).
+
 # 0.40.0 — 2026-11-01
 
 Finished work now survives a RULEBOOK change and a kit update, as upstream

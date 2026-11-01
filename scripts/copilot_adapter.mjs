@@ -13,7 +13,7 @@ import { runtimeLayout } from '../lib/runtime.mjs';
 import { sessionIdPattern } from '../lib/sessions.mjs';
 import { recordCallUsage } from '../lib/usage.mjs';
 import { prepareWorkerHome, workerCopilotHome as workerHomeOf } from '../lib/worker-home.mjs';
-import { isSignedOut } from '../lib/failures.mjs';
+import { isSignedOut, isHomeStateFailure } from '../lib/failures.mjs';
 
 // Worker sessions hold source code and prompts. They carry a runner-chosen
 // ID and name, so receipts point at their transcript and
@@ -371,9 +371,10 @@ export function createCopilotAdapter({ command = 'copilot', prefixArgs = [], ver
     return check.result;
   };
   // Workers run in the kit's own CLI home (lib/worker-home.mjs). If the CLI is
-  // not signed in there, the call is repeated in the person's home and, once
-  // that works, every later call of this command stays there; the run
-  // continues and says so.
+  // not signed in there, or cannot start its MCP servers or its own storage
+  // there, the call is repeated in the person's home and, once that works,
+  // every later call of this command stays there; the run continues and says
+  // so.
   let sharedHome = false, homeWarning;
   const workerHome = (root, config) => {
     if (sharedHome) return null;
@@ -428,18 +429,21 @@ export function createCopilotAdapter({ command = 'copilot', prefixArgs = [], ver
     } catch (e) { fs.rmSync(usageDir, { recursive: true, force: true }); throw e; }
     try {
       result = await runProcess(command, argv, options);
-      if (home && result.code !== 0 && isSignedOut(`${copilotStreamError(processOutputLines(result)) ?? ''}\n${result.stderr}`)) {
-        // Not signed in in the worker home: no model request was made. The
-        // call is repeated in the person's home; once that works, the rest of
-        // this command stays there. A CLI signed out in both homes stops the
-        // run as a sign-in problem, as before.
+      const homeFailure = home && result.code !== 0 ? `${copilotStreamError(processOutputLines(result)) ?? ''}\n${result.stderr}` : '';
+      const signedOut = homeFailure && isSignedOut(homeFailure), homeState = homeFailure && !signedOut && isHomeStateFailure(homeFailure);
+      if (signedOut || homeState) {
+        // Not signed in in the worker home, or the CLI could not start its MCP
+        // servers or storage there: no prompt was sent. The call is repeated
+        // in the person's home; once that works, the rest of this command
+        // stays there. A CLI that fails in both homes stops or fails as it
+        // would have in the person's home.
         fs.rmSync(usageFile, { force: true });
         result = await runProcess(command, argv, { ...options, env: copilotEnv(worker) });
         home = null;
         if (result.code === 0) {
           if (!sharedHome) {
             sharedHome = true;
-            homeWarning = `Workers use the person's Copilot CLI home for the rest of this command: the CLI was not signed in in the kit's worker home ${workerHomeOf(root, config)}`;
+            homeWarning = `Workers use the person's Copilot CLI home for the rest of this command: ${signedOut ? 'the CLI was not signed in' : 'the CLI could not start its MCP servers or its storage'} in the kit's worker home ${workerHomeOf(root, config)}`;
             console.error(`WARNING: ${homeWarning}`);
           }
           versionFields.cliHomeWarning = homeWarning;

@@ -243,7 +243,7 @@ export async function doctor(root, config, { checkCLI = false, command = 'copilo
       try { home = prepareWorkerHome(root, config); } catch (e) { homeError = e.message; }
       checks.push({ check: 'worker Copilot CLI home', ok: true, status: home ? 'separate' : homeError ? 'shared: the worker home could not be prepared' : 'shared',
         ...(home ? { path: home } : {}), ...(homeError ? { warning: `Workers will use the person's Copilot CLI home: ${homeError}` } : {}),
-        note: 'Workers run in a Copilot CLI home of their own (workerCopilotHome), with the person\'s settings and sign-in but not their session records. A local sandbox must let workers write there as well as to ~/.copilot.' });
+        note: 'Workers run in a Copilot CLI home of their own (workerCopilotHome), with the person\'s sign-in, settings and plugins but not their session records, MCP servers or CLI state. A local sandbox must let workers write there as well as to ~/.copilot.' });
       const env = copilotEnv('reviewer-rules', home);
       const version = await runProcess(command, ['--version'], { cwd: root, env, signal, timeoutMs });
       checks.push({ check: 'Copilot executable', ok: version.code === 0, detail: version.stdout.trim() });
