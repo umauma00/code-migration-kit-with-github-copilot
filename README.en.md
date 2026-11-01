@@ -48,7 +48,7 @@ copilot plugin install code-migration-kit@code-migration-kit-marketplace
 
 In VS Code and the GitHub Copilot app, add the same source (`umauma00/code-migration-kit-with-github-copilot`) as a marketplace and install `code-migration-kit`. VS Code also finds plugins the CLI installed. Each app's screens, updates and installing from an internal Git server are in [PLUGIN.en.md](docs/PLUGIN.en.md).
 
-**Do not update from a release before 0.40.0 to 0.40.1 in the middle of a migration.** That one update revokes approvals once and sends every finished file back to review (from 0.40.0, only phase 00b is recorded again). From 0.40.1 on, a plugin update keeps phase records, approvals and completion records (each version's effect is in [UPGRADING.en.md](docs/UPGRADING.en.md)).
+**Do not update from a release before 0.40.0 to 0.40.1 in the middle of a migration.** That one update revokes approvals once and sends every finished file back to review (from 0.40.0, phases 00b to 03 are only checked and recorded again). From 0.40.1 on, a plugin update keeps phase records, approvals and completion records (each version's effect is in [UPGRADING.en.md](docs/UPGRADING.en.md)).
 
 ### As a copy in the repository
 
