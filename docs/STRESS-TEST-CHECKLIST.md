@@ -54,7 +54,7 @@ cd /tmp/bakeoff-b && copilot -p "Port these files to TARGET_LANGUAGE the way a f
 | `Phase 03 requires human-installed command guardrails` | 手順2が未実施 | 禁止リストに合意し、`guardrails install` の確認で許可する。AI がファイルを直接作ることはできません（hook が拒否します） |
 | `Phase 02 is not reviewed for current inputs` / `Phase 02's record is out of date` | RULEBOOK などを変えたため 02 の記録が失効（後者は変わったものと次の一手を示す） | 表示された次の一手に従う（報告に足したメモを取り除く、変更を確認して 02 を記録し直す、またはやり直す）。`judge` の再実行は、その後 `Run judge successfully for these inputs` と出たときだけ（再実行すると準備済みの pilot は使えなくなる） |
 | `Run judge successfully for these inputs` | 入力が変わり judge の結果が古い | `judge` を再実行 |
-| `Phase 02's record is out of date because phase 00b's record is`・`Phase 00b's record is out of date`（`judge-report.md changed` など報告の変更）／`Pilot parent phase 02 is out of date` | 記録済みの報告（judge の結果のメモなど）を書き換えた | メモを足しただけなら、足した部分をファイル編集でバイト単位のまま（改行コードも含めて）取り除く。git restore などは使わない（guardrails で禁止）。記録し直しも judge の再実行も不要で、pilot もそのまま使える。誤りを直した変更や、取り除いても `phase next` が古いと示すときは、表示どおり確認して記録し直す（pilot は準備し直し） |
+| `Phase 02's record is out of date because phase 00b's record is`・`Phase 00b's record is out of date`（`judge-report.md changed` など報告の変更）／`Pilot parent phase 02 is out of date` | 記録済みの報告（judge の結果のメモなど）を書き換えた | メモを足しただけなら、足した部分をファイル編集でバイト単位のまま（改行コードも含めて）取り除く。git restore などは使わない（guardrails で禁止されていることがある）。記録し直しも judge の再実行も不要で、pilot もそのまま使える。誤りを直した変更や、取り除いても `phase next` が古いと示すときは、表示どおり確認して記録し直す（pilot は準備し直し） |
 | `Pilot target must be a new directory` | pilot の作業場所が既に存在する | 新しい外部ディレクトリを指定 |
 | `unable to ask user for confirmation` | 承認の確認を出せないセッション（非対話の実行など） | 表示されたコマンドを人間が自分のターミナルで実行 |
 | `repository hooks load in Copilot CLI` が失敗 | フォルダが未信頼で hook が無効 | `copilot` を対話起動してフォルダを信頼する |

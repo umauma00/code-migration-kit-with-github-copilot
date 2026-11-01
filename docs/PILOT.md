@@ -50,8 +50,10 @@ The coordinator copies source, judge, build inputs and kit profiles, but never
 production outputs, state, gates or phase-03 results. A UUID grant is saved in
 both production `migration/pilots/ID.json` and pilot `migration/pilot.json`.
 It binds parent preparation/judge, child fixed inputs, paths, exact targets and
-the authorized boundary. Changes or revocation require a new pilot. Removing
-the parent grant revokes it. A copied pilot receipt cannot satisfy production
+the authorized boundary. Changes or revocation require a new pilot; the
+exception is a note added to a parent report of phases 00 to 02, which stops the
+pilot only until it is removed byte for byte (the parent's `phase next` says so).
+Removing the parent grant revokes it. A copied pilot receipt cannot satisfy production
 completion; production translation still requires reviewed 03.
 
 `pilot run` can repeat judge and resume reviewed units. Its local approvals are

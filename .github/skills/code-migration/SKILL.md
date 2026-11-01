@@ -269,7 +269,8 @@ evidence, not just a report/template's existence.
 Never edit a recorded phase's report (feasibility.md, judge-report.md,
 depmap/report.md, gap-report.md; stress-test/report.md once 03 is recorded) to
 note progress or a later result such as the formal judge outcome: write it in
-the current phase's report before that phase is recorded, or in chat. The record
+the report of the phase you are working on while it is not yet recorded
+(stress-test/report.md during 03), or in chat. The record
 binds the file, so the edit makes that phase and every later one be recorded
 again (for a report of 00 to 02 a prepared pilot cannot run until it is undone,
 and recording again ends it). Removing an added note byte for byte, with the

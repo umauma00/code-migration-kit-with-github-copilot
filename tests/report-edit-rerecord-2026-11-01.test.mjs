@@ -5,9 +5,9 @@
 // validation". The 00b record binds that file, so 00b to 02 had to be recorded
 // again; after pilot prepare the same edit would also have ended the pilot.
 // The prompts now keep such notes out of recorded reports. When one is added
-// anyway, phase next, the gate errors, the guidance, the pilot and the fast
-// status say first to remove it (with a file edit, not git, which the
-// guardrails deny), which keeps every record and the pilot.
+// anyway, phase next, the gate errors, the guidance, pilot plan, the pilot and
+// the fast status say first to remove it (with a file edit, not git, which the
+// guardrails may deny), which keeps every record and the pilot.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -19,8 +19,9 @@ import { safePath, atomicWrite, writeJSON, readJSON, contextHash, loadConfig, ph
 import { phaseCommand } from '../scripts/phase_cli.mjs';
 import { install } from '../scripts/install.mjs';
 import { phaseStaleness, phaseReports, requirePhase } from '../lib/phases.mjs';
+import { acceptRulebook } from '../lib/rulebook.mjs';
 import { runStage, currentRecord } from '../lib/pipeline.mjs';
-import { preparePilot, requirePilot } from '../lib/pilot.mjs';
+import { planPilot, preparePilot, requirePilot } from '../lib/pilot.mjs';
 import { installGuardrails, guardrailDecision } from '../lib/guardrails.mjs';
 import { migrationStatus } from '../lib/status.mjs';
 import { statusSnapshot } from '../lib/status-snapshot.mjs';
@@ -33,7 +34,7 @@ const escape = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const report = 'migration/judge-report.md';
 const deferred = '# Judge report\nScope: three files. Formal judge: deferred until after phase 02.\n';
 const noted = '# Judge report\nScope: three files. Formal judge: passed (preparation validated, equivalence unverified).\n';
-const removeFirst = /first remove exactly what you added with your file edit tool, not git \(byte for byte, line endings included; the migration guardrails may deny git restore and git checkout\)/;
+const removeFirst = /first remove exactly what you added \(git diff of those files shows it\) with your file edit tool, not git \(byte for byte, line endings included; the migration guardrails may deny git restore and git checkout\)/;
 
 // Phases 00 to 02 recorded in strict order and the formal judge run, as at the
 // start of phase 03.
@@ -70,8 +71,10 @@ test('a note added to a recorded report: removing it comes first everywhere, and
   assert.deepEqual(next.stale.later, ['01', '02']);
   assert.equal(next.stale.pilots, undefined, 'no pilot was prepared');
   // Removing comes before recording again, and auto mode is told to do it.
-  assert.match(next.stale.next, new RegExp(`^Phase 00b was recorded, then migration/judge-report\\.md changed; the source files, settings and verification files did not\\. If you made that edit only to note progress or a later result \\(such as the formal judge outcome\\), ${removeFirst.source}.*this record is then current again without recording anything, and so are the later ones unless something else changed in them \\(phase next shows it\\)\\. Otherwise, or if phase next still shows this record out of date, check only that change .*then record again with phase complete 00b --note TEXT .*then phases 01, 02 in order\\. This is not a new review of the whole phase\\. In auto mode do this without asking`));
+  assert.match(next.stale.next, new RegExp(`^Phase 00b was recorded, then migration/judge-report\\.md changed; the source files, settings and verification files did not\\. If you made that edit only to note progress or a later result \\(such as the formal judge outcome\\), ${removeFirst.source}\\. This record is then current again without recording anything, and so are the later ones unless something else changed in them \\(phase next shows it\\)\\. Write such a note in the report of the phase you are working on while it is not yet recorded \\(migration/stress-test/report\\.md during phase 03\\), or in chat\\. Otherwise, or if phase next still shows this record out of date, check only that change .*then record again with phase complete 00b --note TEXT .*then phases 01, 02 in order\\. This is not a new review of the whole phase\\. In auto mode do this without asking`));
   assert.ok(next.stale.next.indexOf('first remove') < next.stale.next.indexOf('record again with'));
+  // Not "the current phase", which phase next shows as 00b here.
+  assert.doesNotMatch(next.stale.next, /current phase/);
   // The formal judge does not depend on the report.
   assert.ok(judgeCurrent(f));
   // A gate reached first (phase start 03) names the cause, 00b, with the same text.
@@ -86,7 +89,11 @@ test('a note added to a recorded report: removing it comes first everywhere, and
   assert.equal(guide.recommended, 'remove-report-note');
   assert.match(guide.options[0].label, /If only a note was added to phase 00b's report, remove it \(nothing is recorded again\)/);
   assert.match(guide.options[0].reason, /Do not use git restore/);
-  assert.equal(failureGuidance(gate, { root: f.root, language: 'ja' }).options[0].label, '工程 00b の報告に足したメモだけなら、それを取り除く（記録し直しは不要）');
+  // The card also says what to do when the removal was not exact.
+  assert.match(guide.options[0].reason, /If phase next still shows the record out of date after the removal \(the bytes differ, line endings for example\), or the edit corrected an error, record again as phase next says\./);
+  const ja = failureGuidance(gate, { root: f.root, language: 'ja' }).options[0];
+  assert.equal(ja.label, '工程 00b の報告に足したメモだけなら、それを取り除く（記録し直しは不要）');
+  assert.match(ja.reason, /取り除いた後も phase next が古いと示すとき（改行コードなどが元と違う）や、誤りを直した変更なら、phase next のとおり記録し直します。/);
   // The fast view flags the file while it differs.
   assert.deepEqual(statusSnapshot(f.root).workflow.changedSinceRecord, [{ phase: '00b', files: [report] }]);
   // A removal that is not byte for byte (line endings changed) leaves the
@@ -149,11 +156,11 @@ test('a pilot prepared on phase 02: named, kept by removing the note, ended by r
   // The pilot says what to do instead of only asking for a new one.
   const error = gateError(() => requirePilot(child, config));
   assert.equal(error.code, 'pilot-parent-stale');
-  assert.match(error.message, new RegExp(`^Pilot parent phase 02 is out of date since this pilot was prepared: in ${escape(fs.realpathSync(f.root))}, migration/judge-report\\.md changed after phase 00b was recorded\\. If that edit only noted progress or a later result \\(such as the formal judge outcome\\), remove exactly what was added with a file edit tool, not git, and this pilot works again; phase next in .* says the same\\. Recording those phases again instead ends this pilot \\(pilot prepare and pilot run again\\)\\.$`));
+  assert.match(error.message, new RegExp(`^Pilot parent phase 02 is out of date since this pilot was prepared: in ${escape(fs.realpathSync(f.root))}, migration/judge-report\\.md changed after phase 00b was recorded\\. If that edit only noted progress or a later result \\(such as the formal judge outcome\\), remove exactly what was added with a file edit tool, not git, and this pilot works again \\(in auto mode do this without asking\\); phase next --root "${escape(fs.realpathSync(f.root))}" says the same\\. Recording those phases again instead ends this pilot \\(pilot prepare and pilot run again\\)\\.$`));
   // So does its status.
   const pilotStatus = migrationStatus(child);
   assert.equal(pilotStatus.nextActions.length, 1);
-  assert.match(pilotStatus.nextActions[0], /^Bring the parent project .* up to date as its phase next says \(if it says to remove a note added to a report, that keeps this pilot\)/);
+  assert.match(pilotStatus.nextActions[0], new RegExp(`^Bring the parent project .* up to date as phase next --root "${escape(fs.realpathSync(f.root))}" says \\(if it says to remove a note added to a report, that keeps this pilot\\)`));
   assert.ok(!pilotStatus.nextActions.some(a => /Prepare a new authorized pilot/.test(a)));
   const stale = phaseCommand(f.root, f.config, 'next').stale;
   assert.deepEqual(stale.pilots, [real]);
@@ -179,7 +186,7 @@ test('a pilot prepared on phase 02: named, kept by removing the note, ended by r
   // the pilot no longer suggests removing it, and nothing names the pilot.
   atomicWrite(safePath(f.root, report), noted);
   phaseCommand(f.root, f.config, 'complete', '00b', { note: 'Judge result noted in the report; plan unchanged' });
-  assert.throws(() => requirePilot(child, config), /^Error: Pilot parent phase 02 is out of date since this pilot was prepared; phase next in .* says what to record again, which ends this pilot \(pilot prepare and pilot run again\)\.$/);
+  assert.throws(() => requirePilot(child, config), /^Error: Pilot parent phase 02 is out of date since this pilot was prepared; phase next --root ".*" says what to record again, which ends this pilot \(pilot prepare and pilot run again\)\.$/);
   atomicWrite(safePath(f.root, report), deferred);
   assert.equal(phaseStaleness(f.root, f.config, '00b').pilots, undefined);
   atomicWrite(safePath(f.root, report), noted);
@@ -191,6 +198,51 @@ test('a pilot prepared on phase 02: named, kept by removing the note, ended by r
   // A later note no longer names the ended pilot.
   atomicWrite(safePath(f.root, report), `${noted}Another note.\n`);
   assert.equal(phaseCommand(f.root, f.config, 'next').stale.pilots, undefined);
+});
+
+// Counts reads of the given files while fn runs.
+function readsOf(files, fn) {
+  const real = files.map(file => fs.realpathSync(file)), counts = real.map(() => 0), original = fs.readFileSync;
+  fs.readFileSync = function (file, ...rest) {
+    if (typeof file === 'string') { const i = real.indexOf(path.resolve(file)); if (i >= 0) counts[i]++; }
+    return original.call(this, file, ...rest);
+  };
+  try { fn(); } finally { fs.readFileSync = original; }
+  return counts;
+}
+
+test('pilot plan, pilot prepare and a refused rulebook accept name the phase whose report changed; a refused gate reads no more than a passing one', async t => {
+  const f = await atPhase03(t), source = safePath(f.root, 'src/math_ops.py');
+  // A passing gate hashes the sources once for the whole chain of records
+  // (it was once per record: 8 reads of each source file here in 0.41.0).
+  const [passing] = readsOf([source], () => requirePhase(f.root, f.config, '02'));
+  assert.ok(passing <= 5, `source reads of a passing gate: ${passing}`);
+  atomicWrite(safePath(f.root, report), noted);
+  // Refused, it reads no more (it was 12 in 0.41.0 and 18 before this check).
+  const [refused] = readsOf([source], () => assert.throws(() => requirePhase(f.root, f.config, '02'), /because phase 00b's record is/));
+  assert.ok(refused <= passing, `source reads of a refused gate: ${refused} (passing: ${passing})`);
+  // pilot plan and pilot prepare say what 00b needs instead of "Review parent
+  // phases 00 through 02", and the guidance recommends removing the note.
+  const plan = gateError(() => planPilot(f.root, f.config, { sources: ['src/math_ops.py'] }));
+  assert.match(plan.message, /^Phase 00b's record is out of date, so a pilot cannot be authorized yet\. Phase 00b was recorded, then migration\/judge-report\.md changed/);
+  assert.match(plan.message, removeFirst);
+  assert.equal(failureGuidance(plan, { root: f.root, language: 'en' }).recommended, 'remove-report-note');
+  const child = `${f.root}-pilot`;
+  t.after(() => fs.rmSync(child, { recursive: true, force: true }));
+  assert.throws(() => preparePilot(f.root, f.config, { target: child, sources: ['src/math_ops.py'], note: 'Disposable trial of one file' }), /^Error: Phase 00b's record is out of date, so a pilot cannot be authorized yet\./);
+  assert.ok(!fs.existsSync(child), 'nothing was prepared');
+  // A RULEBOOK change cannot be accepted while 00b is out of date; the refusal names 00b.
+  const rules = safePath(f.root, 'migration/RULEBOOK.md'), rulesBytes = fs.readFileSync(rules);
+  fs.appendFileSync(rules, '\n## Division\nKeep the divisor sign.\n');
+  assert.throws(() => acceptRulebook(f.root, f.config, { note: 'Division keeps the divisor sign', redo: 'none' }),
+    /^Error: Phase 02 is still out of date after accepting the RULEBOOK: Phase 02's record is out of date because phase 00b's record is\. Phase 00b was recorded, then migration\/judge-report\.md changed/);
+  atomicWrite(rules, rulesBytes);
+  // Removing the note: the pilot can be planned.
+  atomicWrite(safePath(f.root, report), deferred);
+  assert.ok(planPilot(f.root, f.config, { sources: ['src/math_ops.py'] }));
+  // Nothing recorded yet: the message is the one it was.
+  const g = prepare(t, { count: 3 });
+  assert.throws(() => planPilot(g.root, g.config, { sources: ['src/math_ops.py'] }), /^Error: Review parent phases 00 through 02 before authorizing a pilot$/);
 });
 
 test('only report edits get the hint; a removed pilot workspace or unreadable pilots are not named', async t => {
@@ -299,7 +351,8 @@ test('the prompts and docs keep progress notes out of recorded reports and say h
   assert.match(b, /The formal judge runs after 02:\s+its receipt is `migration\/results\/judge\.json` and phase 03's report states its\s+result\. Write no pending-judge status here and never come back to update this\s+file for it: the 00b record binds the file/);
   const three = kitText('prompts/03-stress-test.md');
   assert.match(three, /State the formal judge result there\. Never edit the reports of recorded phases\s+\(feasibility\.md, judge-report\.md, depmap\/report\.md, gap-report\.md\) to note\s+progress or a result/);
-  assert.match(three, /If you added a note by mistake,\s+remove exactly what you added with the file edit tool \(not git, which the\s+guardrails deny\): nothing is recorded again\./);
+  assert.match(three, /If you added a note by mistake,\s+remove exactly what you added with the file edit tool \(not git: the guardrails\s+may deny git restore and git checkout\); then nothing is recorded again unless a\s+phase was recorded again since \(`phase next` shows it\)\./);
+  assert.match(b, /a later edit makes 00b and every\s+later recorded phase be recorded again/);
   const handoff = kitText('docs/PHASE-HANDOFF.md');
   assert.match(handoff, /A recorded phase's reports are its evidence: the record binds their bytes\. Never\s+edit/);
   assert.match(handoff, /authorization as required by the runner \(a recorded phase's report only to correct it,\s+never to note progress or a result/);
@@ -327,4 +380,21 @@ test('the prompts and docs keep progress notes out of recorded reports and say h
     assert.doesNotMatch(kitText(doc), /every later one be recorded again and ends a prepared pilot/, doc);
     assert.doesNotMatch(kitText(doc), /undo it exactly/, doc);
   }
+  // Where such a note goes: the report of the phase being worked on, never
+  // "the current phase's", which phase next shows as the out-of-date one.
+  for (const doc of ['docs/PHASE-HANDOFF.md', 'docs/ORDERED-WORKFLOW.en.md', 'skills/code-migration/SKILL.md', '.github/skills/code-migration/SKILL.md', 'lib/core.mjs']) {
+    assert.doesNotMatch(kitText(doc), /current phase's report(?: before that phase is recorded| or in chat)/, doc);
+  }
+  for (const doc of ['docs/PHASE-HANDOFF.md', 'docs/ORDERED-WORKFLOW.en.md', 'skills/code-migration/SKILL.md', '.github/skills/code-migration/SKILL.md']) {
+    assert.match(kitText(doc), /the report of the phase you\s+are working on while it is not yet recorded\s+\(`?stress-test\/report\.md`? during 03\),?\s+or in chat/, doc);
+  }
+  assert.match(kitText('docs/ORDERED-WORKFLOW.md'), /メモは、作業中でまだ記録していない工程の報告（03 なら stress-test\/report\.md）かチャットに書く。/);
+  // The guardrails may be waived, so no doc says they always deny git restore.
+  assert.match(kitText('docs/STRESS-TEST-CHECKLIST.en.md'), /not with git restore \(the guardrails may deny it\)/);
+  assert.match(kitText('docs/STRESS-TEST-CHECKLIST.md'), /git restore などは使わない（guardrails で禁止されていることがある）/);
+  for (const doc of ['prompts/03-stress-test.md', 'docs/STRESS-TEST-CHECKLIST.en.md', 'docs/STRESS-TEST-CHECKLIST.md']) {
+    assert.doesNotMatch(kitText(doc), /which the\s+guardrails deny\)|\(the guardrails deny it\)|guardrails で禁止）/, doc);
+  }
+  // The pilot doc names the exception to "changes require a new pilot".
+  assert.match(kitText('docs/PILOT.md'), /Changes or revocation require a new pilot; the\s+exception is a note added to a parent report of phases 00 to 02, which stops the\s+pilot only until it is removed byte for byte/);
 });

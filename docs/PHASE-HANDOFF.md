@@ -335,8 +335,9 @@ judge design solely to create the new report format.
 A recorded phase's reports are its evidence: the record binds their bytes. Never
 edit `feasibility.md`, `judge-report.md`, `depmap/report.md`, `gap-report.md` (or
 `stress-test/report.md` once 03 is recorded) to note progress or a later result,
-such as the formal judge outcome: put the note in the current phase's report
-before that phase is recorded, or in chat. The edit makes that phase and every
+such as the formal judge outcome: put the note in the report of the phase you
+are working on while it is not yet recorded (`stress-test/report.md` during 03),
+or in chat. The edit makes that phase and every
 later one be recorded again. For a report of 00 to 02 a prepared pilot cannot run
 until the edit is undone, and recording again ends it; after the translation
 approval an edit to `feasibility.md` or `stress-test/report.md` also makes that
