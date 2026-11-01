@@ -12,7 +12,7 @@ replace `migration-kit/` with the plugin's absolute path.
 
 | # | Do | Who | Check |
 |---|---|---|---|
-| 1 | Confirm 00–02 are recorded and judge succeeded. State the judge result in the 03 report; never edit the 00–02 reports (feasibility.md, judge-report.md, depmap/report.md, gap-report.md) to add a note (the edit makes 00b–02 and later phases be recorded again and ends a prepared pilot) | AI | `status --format checklist` shows "Current: 03" |
+| 1 | Confirm 00–02 are recorded and judge succeeded. State the judge result in the 03 report; never edit the 00–02 reports (feasibility.md, judge-report.md, depmap/report.md, gap-report.md) to add a note (the edit makes that phase and every later one be recorded again, and a prepared pilot cannot run until it is undone) | AI | `status --format checklist` shows "Current: 03" |
 | 2 | The AI proposes a deny list from `guardrails show` adapted to this target's build/test commands (or a waiver with its reason) in chat, and runs `guardrails install` after agreement | **Human** agrees; the host confirms | doctor `command guardrails` is installed / waived |
 | 3 | `phase start 03` | AI | A start record exists |
 | 4 | Pick 3 files that exercise the most risky rulebook sections and inventory rows; write the scores and file:line proof to `migration/stress-test/report.md` | AI | The report has a selection table |
@@ -54,9 +54,9 @@ cd /tmp/bakeoff-b && copilot -p "Port these files to TARGET_LANGUAGE the way a f
 | Message | Cause | What to do |
 |---|---|---|
 | `Phase 03 requires human-installed command guardrails` | Step 2 not done | Agree the deny list and allow `guardrails install` when the host asks; the AI cannot write the file directly (the hook denies it) |
-| `Phase 02 is not reviewed for current inputs` / `Phase 02's record is out of date` | RULEBOOK or another input changed, invalidating 02 (the second names what changed and the next step) | Follow the named step (check the change and record 02 again, or redo it), then rerun `judge` |
+| `Phase 02 is not reviewed for current inputs` / `Phase 02's record is out of date` | RULEBOOK or another input changed, invalidating 02 (the second names what changed and the next step) | Follow the named step (remove a note added to a report, check the change and record 02 again, or redo it). Rerun `judge` only if it then says `Run judge successfully for these inputs` (rerunning it ends a prepared pilot) |
 | `Run judge successfully for these inputs` | Inputs changed since judge | Rerun `judge` |
-| `Phase 00b's record is out of date` (`judge-report.md changed`) / `Pilot parent phase 02 is out of date` | A recorded report was edited (a note of the judge result, for example) | If the edit only added a note, undo it byte for byte, line endings included (nothing is recorded again and the pilot stays usable). If it corrected an error, or `phase next` still shows the record out of date after the undo, check it and record again as shown (prepare the pilot again) |
+| `Phase 02's record is out of date because phase 00b's record is`, `Phase 00b's record is out of date` (a report changed, such as `judge-report.md changed`) / `Pilot parent phase 02 is out of date` | A recorded report was edited (a note of the judge result, for example) | If the edit only added a note, remove exactly what was added with a file edit, byte for byte and line endings included, not with git restore (the guardrails deny it). Nothing is recorded again, judge is not rerun and the pilot stays usable. If it corrected an error, or `phase next` still shows the record out of date, check it and record again as shown (prepare the pilot again) |
 | `Pilot target must be a new directory` | The pilot workspace already exists | Choose a new outside directory |
 | `unable to ask user for confirmation` | The session cannot show the approval confirmation (non-interactive run) | The human runs the shown command in their own terminal |
 | `repository hooks load in Copilot CLI` fails | Untrusted folder, hooks off | Start `copilot` interactively and trust the folder |

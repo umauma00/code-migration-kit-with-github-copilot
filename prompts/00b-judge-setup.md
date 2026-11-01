@@ -11,7 +11,7 @@ report is not the runner's validation receipt. The formal judge runs after 02:
 its receipt is `migration/results/judge.json` and phase 03's report states its
 result. Write no pending-judge status here and never come back to update this
 file for it: the 00b record binds the file, so a later edit makes 00b to 02 be
-recorded again and ends a prepared pilot.
+recorded again, which ends a prepared pilot.
 
 For verificationMode source-only, follow [source-only preparation](../docs/SOURCE-ONLY.md).
 Do not require an executable original environment or original/mutation commands.

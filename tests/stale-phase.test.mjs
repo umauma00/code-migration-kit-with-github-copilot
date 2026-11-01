@@ -36,7 +36,9 @@ test('an artifact changed after its record: check that change and record again, 
   assert.deepEqual(next.stale.reasons[0].files, ['migration/depmap/report.md']);
   assert.equal(next.stale.record, 'phase complete 01 --note TEXT');
   assert.deepEqual(next.stale.later, ['02'], 'phases recorded after it are named');
-  assert.match(next.stale.next, /the source files, settings and verification files did not\. Check only that change.*not a new review of the whole phase\. In auto mode do this without asking/);
+  // 0.41.1: a report-only change first says to remove a note the agent added;
+  // checking the change and recording again follows in the same text.
+  assert.match(next.stale.next, /the source files, settings and verification files did not\. If you made that edit only to note progress.*Otherwise, or if phase next still shows this record out of date, check only that change.*not a new review of the whole phase\. In auto mode do this without asking/);
   assert.match(phaseCommand(f.root, f.config, 'check', '01').stale.next, /migration\/depmap\/report\.md changed/);
   assert.throws(() => requirePhase(f.root, f.config, '01'), /record is out of date.*depmap\/report\.md changed/s);
   // The fast view does not hash, but it no longer says only "recorded".

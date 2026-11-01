@@ -9,22 +9,35 @@ prepare` the same edit would also have ended the pilot.
 
 - Phase 00b's prompt no longer asks for a pending-judge status: the formal
   judge's receipt is `migration/results/judge.json` and phase 03's report
-  states its result. Phase 03's prompt and checklist, the skill, the phase
-  handoff and the ordered workflow say never to edit a recorded phase's report
-  (`feasibility.md`, `judge-report.md`, `depmap/report.md`, `gap-report.md`;
-  `stress-test/report.md` once 03 is recorded) to note progress or a result.
-- When only a phase's own reports changed, `phase next` says that undoing an
-  added note byte for byte makes the records current again with nothing
-  recorded again, and to record again if it does not (`stale.reportsOnly`). It
-  names a pilot prepared on phase 02's record and the current judge receipt
-  that recording again would end (`stale.pilots`). The pilot's own error says
-  the same instead of only "prepare a new isolated pilot".
+  states its result. Phase 03's prompt and checklist say never to edit the
+  reports of 00 to 02 (`feasibility.md`, `judge-report.md`,
+  `depmap/report.md`, `gap-report.md`) to note progress or a result; the
+  skill, the phase handoff and the ordered workflow say the same and add
+  `stress-test/report.md` once 03 is recorded.
+- When a phase is out of date only because its own reports changed, and every
+  later record still names the one before it, `phase next` first says to
+  remove a note the agent added, with its file edit tool and not git (the
+  guardrails deny git restore and git checkout), and that the records are then
+  current with nothing recorded again; otherwise, or if that does not do it,
+  to record again (`stale.reportsOnly`). It names the pilots that recording 02
+  again would end (`stale.pilots`: prepared on 02's record and the current
+  judge receipt, with their workspace and grant still in place).
+- A gate refused because only an earlier record is out of date (`phase start
+  03`, `judge` and the like after a note in `judge-report.md`) names the
+  earliest such phase and what it needs, instead of "only phase 01's record
+  changed". The phase-order guidance then recommends removing the note first.
+- The pilot's error for an out-of-date parent 02 says to remove the note when
+  that is the cause (and otherwise that recording again ends the pilot), and
+  the pilot's status says to bring the parent up to date instead of "Prepare a
+  new authorized pilot". `status --fast` no longer reports a report changed
+  when its bytes are the recorded ones again.
 - Records still bind their reports as before; this release changes prompts and
   guidance only. Updating from 0.40.1 or later keeps every record.
-- Test: `tests/report-edit-rerecord-2026-11-01.test.mjs` (the note, its undo,
-  the pilot named, kept by an undo and ended by recording again, no hint for
-  non-report inputs, a predecessor recorded again, a removed pilot workspace
-  or a changed judge receipt, and the prompts).
+- Test: `tests/report-edit-rerecord-2026-11-01.test.mjs` (the note and its
+  removal, the gate error and guidance, the pilot named, kept by the removal
+  and ended by recording again, its error and status, `status --fast`, no hint
+  for non-report inputs, a later record made again or a removed or changed
+  pilot, a source-only source-as-spec project, and the prompts).
 
 # 0.41.0 — 2026-11-01
 
