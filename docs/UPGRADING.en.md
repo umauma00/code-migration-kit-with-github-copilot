@@ -1,6 +1,16 @@
-# Upgrading (0.41.0 and earlier releases)
+# Upgrading (0.42.0 and earlier releases)
 
 [日本語](UPGRADING.md) | English
+
+## 0.42.0 (a pilot all blocked on the CLI's lock; the workers' default CLI home)
+
+On 2026-11-01 a phase 03 pilot on Windows (kit 0.40.0, Copilot CLI 1.0.105, one worker at a time) stayed at 0 of 40. Every worker CLI failed when sending its prompt with "The shared writer lock timed out." (it waited too long for one of its own write locks), and the kit marked each file unfinished at once, without a retry.
+
+1. The CLI's lock waits ("The shared writer lock timed out.", "MCP installation storage is busy", "Another process is changing MCP configuration") are now transient failures: the same call is retried, like the 120 s stall up to 5 times per call (bounded mode: `transientRetries` if lower). `status` shows the retry while it lasts. If the call still fails, the guidance first suggests switching the workers' CLI home (`workerCopilotHome`) to the other setting.
+2. `workerCopilotHome` now defaults to `shared`: worker CLIs run in the person's `~/.copilot` (or `COPILOT_HOME`), as in 0.33.0 and earlier. The kit's own worker home (`separate`) failed every worker twice on the same PC on the same day (kit 0.40.0: while starting MCP servers, and with the lock wait above). Rerun with `shared`, the same pilot finished its first file with no lock wait; neither failure is on record for workers in `~/.copilot`. Worker sessions now sit beside the person's own; `sessions prune` removes only the ones the kit recorded. To keep the worker home, set `"workerCopilotHome": "separate"` in `migration/config.json`. Both are run settings, so approvals and completion records are kept. A `~/.copilot-migration-kit-workers` no longer used may be deleted (the kit does not delete it).
+3. A pilot's input check now reads each file of the production project and of the pilot copy once per check. Before, one check read the production sources about 11 times and the copy about 6 times (in a fixture pilot, 51 reads down to 6 per failed unit). On that Windows PC one check took about 1 min 45 s (a file shows `validating` for the length of one check), and a file with three AI calls runs eight checks. What is checked does not change: a change to the production project or to the copy still stops the pilot at the next check. Production translation (04) checks also read each source once instead of three times.
+4. Updating from 0.40.1 or later keeps approvals, completion records, phase records and prepared pilots (no input changed). Updating from 0.40.0 needs phases 00b to 03 recorded again, as described under 0.40.1, and a prepared pilot prepared again.
+5. In a copy install, replace all of `migration-kit/` with the temporary install's contents. A plugin install takes it with the update.
 
 ## 0.41.0 (the kit repairs slips of one translation answer itself)
 

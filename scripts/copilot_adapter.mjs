@@ -382,8 +382,9 @@ export function createCopilotAdapter({ command = 'copilot', prefixArgs = [], ver
     }
     return check.result;
   };
-  // Workers run in the kit's own CLI home (lib/worker-home.mjs). If the CLI is
-  // not signed in there, or cannot start its MCP servers or its own storage
+  // With workerCopilotHome "separate" workers run in the kit's own CLI home
+  // (lib/worker-home.mjs; the default "shared" uses the person's). If the CLI
+  // is not signed in there, or cannot start its MCP servers or its own storage
   // there, the call is repeated in the person's home and, once that works,
   // every later call of this command stays there; the run continues and says
   // so.

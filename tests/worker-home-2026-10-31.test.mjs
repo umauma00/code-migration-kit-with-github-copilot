@@ -16,6 +16,9 @@ import { prepareWorkerHome, workerCopilotHome, userCopilotHome, resetPreparedWor
 import { sessionsStatus, pruneSessions, recordSession } from '../lib/sessions.mjs';
 import { isSignedOut, isSystemicFailure } from '../lib/failures.mjs';
 
+// These tests are about the kit's own worker home, which workers use only
+// with workerCopilotHome "separate" (shared is the default since 0.42.0).
+const separate = { workerCopilotHome: 'separate' };
 // A person's CLI home in a temporary folder, restored after the test.
 function personHome(t) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kit-person-home-')), home = path.join(dir, '.copilot');
@@ -39,9 +42,9 @@ test('the worker home carries the person\'s settings and plugins but none of the
   fs.writeFileSync(path.join(home, 'mcp-config.json'), '{"mcpServers":{}}');
   for (const name of ['session-store.db', 'session-store.db-wal', 'session-store.db-shm', 'command-history-state.json', 'settings.json.lock']) fs.writeFileSync(path.join(home, name), 'record');
   for (const dir of ['installed-plugins/p', 'agents', 'session-state/11111111-1111-4111-8111-111111111111', 'logs', 'pkg']) fs.mkdirSync(path.join(home, dir), { recursive: true });
-  const worker = prepareWorkerHome(root, {});
+  const worker = prepareWorkerHome(root, separate);
   assert.equal(worker, `${home}-migration-kit-workers`);
-  assert.equal(worker, workerCopilotHome(root, {}));
+  assert.equal(worker, workerCopilotHome(root, separate));
   // 2026-11-01: the person's MCP servers (mcp-config.json) stay behind.
   assert.deepEqual(fs.readdirSync(worker).filter(name => name !== workerHomeMarker).sort(), ['agents', 'config.json', 'installed-plugins', 'settings.json']);
   assert.equal(fs.readFileSync(path.join(worker, 'config.json'), 'utf8'), fs.readFileSync(path.join(home, 'config.json'), 'utf8'));
@@ -58,24 +61,24 @@ test('the worker home carries the person\'s settings and plugins but none of the
 test('settings are copied once per process, and a worker index past the limit starts over', t => {
   const home = personHome(t), root = project(t);
   fs.writeFileSync(path.join(home, 'config.json'), '{"a":1}');
-  const worker = prepareWorkerHome(root, {});
+  const worker = prepareWorkerHome(root, separate);
   fs.writeFileSync(path.join(home, 'config.json'), '{"a":2}');
-  assert.equal(prepareWorkerHome(root, {}), worker);
+  assert.equal(prepareWorkerHome(root, separate), worker);
   assert.equal(fs.readFileSync(path.join(worker, 'config.json'), 'utf8'), '{"a":1}', 'no rewrite while workers may be running');
   resetPreparedWorkerHomes();
   fs.writeFileSync(path.join(worker, 'session-store.db'), Buffer.alloc(1024));
-  prepareWorkerHome(root, {});
+  prepareWorkerHome(root, separate);
   assert.equal(fs.readFileSync(path.join(worker, 'config.json'), 'utf8'), '{"a":2}', 'a new process takes the current settings');
   assert.ok(fs.existsSync(path.join(worker, 'session-store.db')), 'a small worker index is kept');
   resetPreparedWorkerHomes();
   fs.truncateSync(path.join(worker, 'session-store.db'), workerIndexLimitBytes + 1);
   fs.writeFileSync(path.join(worker, 'session-store.db-wal'), 'x');
-  prepareWorkerHome(root, {});
+  prepareWorkerHome(root, separate);
   assert.ok(fs.existsSync(path.join(worker, 'session-store.db')), 'an index written to just now may be in use by another kit process');
   resetPreparedWorkerHomes();
   const idle = (Date.now() - workerIndexIdleMs - 60000) / 1000;
   for (const name of ['session-store.db', 'session-store.db-wal']) fs.utimesSync(path.join(worker, name), idle, idle);
-  prepareWorkerHome(root, {});
+  prepareWorkerHome(root, separate);
   assert.ok(!fs.existsSync(path.join(worker, 'session-store.db')) && !fs.existsSync(path.join(worker, 'session-store.db-wal')));
 });
 
@@ -98,7 +101,7 @@ console.log(JSON.stringify({ type: 'assistant.message', data: { content: JSON.st
 console.log(JSON.stringify({ type: 'result', exitCode: 0 }));
 `);
   const adapter = createCopilotAdapter({ command: process.execPath, prefixArgs: [script] });
-  const call = () => adapter({ root: f.root, config: f.config, role: 'implementer', unit: f.units[0], extra: {} });
+  const call = () => adapter({ root: f.root, config: { ...f.config, ...separate }, role: 'implementer', unit: f.units[0], extra: {} });
   return { call, homes: () => fs.readFileSync(log, 'utf8').trim().split('\n').map(line => JSON.parse(line)) };
 }
 
@@ -169,13 +172,13 @@ test('settings kept as symbolic links are followed, and a folder the CLI made is
   fs.symlinkSync(path.join(elsewhere, 'config.json'), path.join(home, 'config.json'));
   fs.symlinkSync(path.join(elsewhere, 'agents'), path.join(home, 'agents'), process.platform === 'win32' ? 'junction' : 'dir');
   for (const dir of ['skills/s', 'hooks/h']) fs.mkdirSync(path.join(home, dir), { recursive: true });
-  const worker = workerCopilotHome(root, {});
+  const worker = workerCopilotHome(root, separate);
   // A worker home already in the current layout (see the 2026-11-01 test for an older one).
   fs.mkdirSync(worker, { recursive: true });
   fs.writeFileSync(path.join(worker, workerHomeMarker), '{"layout":2}');
   fs.mkdirSync(path.join(worker, 'skills'), { recursive: true });
   fs.mkdirSync(path.join(worker, 'hooks/kept'), { recursive: true });
-  prepareWorkerHome(root, {});
+  prepareWorkerHome(root, separate);
   assert.equal(fs.readFileSync(path.join(worker, 'config.json'), 'utf8'), '{"linked":true}');
   assert.ok(!fs.lstatSync(path.join(worker, 'config.json')).isSymbolicLink(), 'a copy, never a link to the person\'s file');
   assert.ok(fs.existsSync(path.join(worker, 'agents/x')));
@@ -185,18 +188,18 @@ test('settings kept as symbolic links are followed, and a folder the CLI made is
   resetPreparedWorkerHomes();
   fs.rmSync(path.join(worker, 'skills'));
   fs.symlinkSync(elsewhere, path.join(worker, 'skills'), process.platform === 'win32' ? 'junction' : 'dir');
-  prepareWorkerHome(root, {});
+  prepareWorkerHome(root, separate);
   assert.equal(fs.realpathSync(path.join(worker, 'skills')), fs.realpathSync(path.join(home, 'skills')));
   // A folder the person removed is unlinked; a file the CLI keeps there stays.
   resetPreparedWorkerHomes();
   fs.rmSync(path.join(home, 'skills'), { recursive: true });
   fs.writeFileSync(path.join(worker, 'cli-own.json'), '{}');
-  prepareWorkerHome(root, {});
+  prepareWorkerHome(root, separate);
   assert.ok(!fs.existsSync(path.join(worker, 'skills')) && fs.existsSync(path.join(worker, 'cli-own.json')));
   if (process.platform !== 'win32') {
     resetPreparedWorkerHomes();
     fs.writeFileSync(path.join(home, 'settings.json'), '{}', { mode: 0o664 });
-    prepareWorkerHome(root, {});
+    prepareWorkerHome(root, separate);
     assert.equal(fs.statSync(path.join(worker, 'settings.json')).mode & 0o777, 0o600, 'readable by the person only');
   }
 });
@@ -205,7 +208,7 @@ test('a relative COPILOT_HOME inside the project puts the worker home in the use
   const f = prepare(t);
   const previous = process.env.COPILOT_HOME; process.env.COPILOT_HOME = '.copilot-test-home';
   t.after(() => { if (previous === undefined) delete process.env.COPILOT_HOME; else process.env.COPILOT_HOME = previous; });
-  const worker = workerCopilotHome(f.root, {});
+  const worker = workerCopilotHome(f.root, separate);
   assert.ok(path.relative(f.root, worker).startsWith('..'), worker);
   assert.equal(path.dirname(worker), os.homedir());
   assert.equal(sessionStateDirs(f.root)[0], path.join(worker, 'session-state'));
@@ -218,11 +221,11 @@ test('a refused request or a call that also fails in the person\'s home does not
   const refused = cliDouble(f, `const n = fs.existsSync(${JSON.stringify(counter)}) ? 1 : 0; if (!n) { fs.writeFileSync(${JSON.stringify(counter)}, '1'); process.stderr.write('Error: 401 Unauthorized\\n'); process.exit(1); }`);
   await refused.call().catch(() => {});
   await refused.call();
-  assert.deepEqual(refused.homes().map(h => h.home), [workerCopilotHome(f.root, {}), workerCopilotHome(f.root, {})]);
+  assert.deepEqual(refused.homes().map(h => h.home), [workerCopilotHome(f.root, separate), workerCopilotHome(f.root, separate)]);
   // Signed out in both homes: stops as before, and the next call tries the worker home again.
   fs.rmSync(safePath(f.root, 'homes.jsonl'));
   const both = cliDouble(f, `process.stderr.write('To authenticate, you can use any of the following methods\\n'); process.exit(1);`);
   assert.equal(isSystemicFailure(await both.call().catch(e => e)), true);
   await both.call().catch(() => {});
-  assert.deepEqual(both.homes().map(h => h.home), [workerCopilotHome(f.root, {}), home, workerCopilotHome(f.root, {}), home]);
+  assert.deepEqual(both.homes().map(h => h.home), [workerCopilotHome(f.root, separate), home, workerCopilotHome(f.root, separate), home]);
 });

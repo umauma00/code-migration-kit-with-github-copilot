@@ -1,3 +1,55 @@
+# 0.42.0 — 2026-11-01
+
+A phase 03 pilot no longer blocks every unit at once on the Copilot CLI's own
+lock, its input checks no longer read the whole source tree again and again,
+and workers run in the person's own CLI home again by default. On 2026-11-01
+a Windows pilot (kit 0.40.0, Copilot CLI 1.0.105, one worker at a time) stayed
+at 0 of 40: every worker failed at session.send with "The shared writer lock
+timed out." and the kit blocked each unit at once, several minutes apart.
+
+- The CLI's lock waits ("The shared writer lock timed out.", "MCP installation
+  storage is busy", "Another process is changing MCP configuration") are
+  transient: the same call is retried with the usual backoff, in the same CLI
+  home, up to 5 times per call like the CLI's event stall (bounded mode:
+  `transientRetries` if lower). Before, the unit was blocked at the first one,
+  and the guidance read it as a deadline ("timed out"). `status` names the
+  wait while it lasts, and the attempt record marks each such retry
+  `cliLock: true`. When the retries run out, the guidance (`cli-lock`) first
+  suggests running the workers in the other CLI home (`workerCopilotHome`),
+  then a rerun, then a check for a Copilot CLI left from an earlier run.
+  Switching the home is a run setting: approvals and finished units are kept.
+- `workerCopilotHome` now defaults to `shared`: workers run in the person's
+  `~/.copilot` (or `COPILOT_HOME`), as before 0.34.0. The kit's own worker
+  home (`separate`) failed every worker on that Windows PC twice on the same
+  day (kit 0.40.0): while starting MCP servers (from the copies 0.40.2 stopped
+  making), and at the prompt with the lock above. Neither failure was seen
+  with workers in the person's home: rerun with `shared`, the same pilot
+  finished its first unit with no lock error, and a Mac had run that way all
+  along. The reason the worker home was made (a large session index behind the CLI's 120 s
+  event stall, 2026-10-31) was never confirmed. `"workerCopilotHome":
+  "separate"` keeps the worker home, with its fallback to `~/.copilot`.
+  Worker sessions now sit beside the person's own; `sessions prune` removes
+  only the ones the kit recorded. `doctor --check-cli` says which home
+  workers use.
+- A pilot's input check (when a unit is dispatched, before and after every
+  worker call, after a retry wait, and when a unit fails or completes) reads
+  each file once. It computed the pilot's context twice and, for the
+  production project, the context twice, the source fingerprint of phases 00
+  to 02 four times and the phase 00b judge inputs once, each reading every
+  source file again; one context alone read a source file three times (the
+  source tree, the manifest and the review dependency map). In a fixture
+  pilot that was 33 reads of a production source file and 18 of its pilot
+  copy per failed unit, and 136 per finished unit; it is now 3 and 3, and 16.
+  On that Windows PC one check took about 1 min 45 s (the time a unit shows
+  `validating` is one check), and a unit with three worker calls runs eight.
+  The context, the phase chain and the judge inputs of one check share one
+  read (`readMemo` in `lib/core.mjs`), and every `contextHash` reads a file
+  once, so production runs check faster too. What a check compares did not
+  change: a change to the production project or to the pilot copy still stops
+  the pilot at the next check.
+- Updating from 0.40.1 or later keeps approvals, finished units, phase
+  records and prepared pilots: no input changed.
+
 # 0.41.0 — 2026-11-01
 
 The translation run now repairs slips of one worker answer by itself, so the
