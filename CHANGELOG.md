@@ -1,3 +1,29 @@
+# 0.40.1 — 2026-11-01
+
+A kit update now keeps phase 00b and the phases after it, as 0.40.0 said.
+0.40.0 took the kit's own files out of the input fingerprint (contextHash),
+but phase 00b's judge input fingerprint still hashed the kit's lib, scripts and
+templates (`migration-kit/` in a copy install). Updating the kit therefore made
+00b stale, phases 00b to 03 went stale in a chain, translation could not go on
+until they were recorded again, and `rulebook accept` was refused because phase
+02 stayed out of date.
+
+- The judge input fingerprint no longer includes the kit's own files. The
+  verification files, commands, sources and the source-only plan still count.
+- Updating from 0.40.0 makes the 00b record stale once (its fingerprint
+  formula changes), and with it 01 to 03 in order. A record made before
+  0.40.1 is marked as a format change (`judge-format`), so `phase next` says
+  to check and record again, not to redo the phase; new 00b records carry
+  `judgeInputSchema: 2`. Finished units and approvals are not affected. If
+  judge is run again, its preparation (the original and mutation commands)
+  runs again once too. A migration that already recorded 05c or 06 records
+  them again as well (in runtime mode: the parity and post-parity run and
+  approval). Updating from an earlier release has the one-time effect
+  described for 0.40.0.
+- Test: `tests/kit-update-keeps-phases-2026-11-01.test.mjs` (plugin and copy
+  install updates keep 00b to 02 current; a real judge input still makes 00b
+  stale; a 0.40.0 record is recorded again without losing anything).
+
 # 0.40.0 — 2026-11-01
 
 Finished work now survives a RULEBOOK change and a kit update, as upstream

@@ -1,6 +1,13 @@
-# Upgrading (0.40.0 and earlier releases)
+# Upgrading (0.40.1 and earlier releases)
 
 [日本語](UPGRADING.md) | English
+
+## 0.40.1 (a kit update no longer makes phases 00b to 03 stale)
+
+In 0.40.0 the judge input record of phase 00b still included the kit's own files, so a kit update made 00b to 03 stale in a chain and translation could not go on until they were recorded again (`rulebook accept` was also refused because phase 02 stayed out of date). This release takes them out.
+
+1. Updating from 0.40.0 makes the 00b record stale once, because its fingerprint changes, and with it 01 to 03 in order. `phase next` says to check and record again, not to redo the phase (auto mode does it without asking); no phase work is redone. Finished files and approvals are kept. If judge is run again, its preparation (the original and mutation commands) runs again once too. A migration that already recorded 05c or 06 records them again as well (in runtime mode, the parity and post-parity run and approval).
+2. Updating from a release before 0.40.0 has the one-time effect described under 0.40.0 below (every finished file reviewed again).
 
 ## 0.40.0 (finished work survives a RULEBOOK change and a kit update)
 
