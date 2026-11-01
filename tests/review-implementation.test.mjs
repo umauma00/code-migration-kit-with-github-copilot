@@ -180,23 +180,24 @@ test('count policy gives both reviewers identical measured evidence and rejects 
   await runStage(f.root, f.config, 'judge'); approve(f.root, f.config, 'translation', 'Fixture count convention');
   const body = fs.readFileSync(path.join(mini, 'expected/math_ops.mjs'), 'utf8').replace(/^\/\/ PORT STATUS:.*$/m, '').trimEnd();
   const bad = body + '\n// TODO(port): one; TODO(port): second occurrence on the same line\n// PORT STATUS: confidence=high todos=0\n';
-  // A file already written with the mismatch is reviewed (an implementer's
-  // answer with one goes to the fixer before any review, since 0.41.0).
+  // Since 0.41.0 a file with the mismatch goes to the fixer before any review;
+  // one the fixer cannot correct never completes.
   write(f, f.units[0].target, bad);
-  const inputs = [];
   await assert.rejects(translate(f.root, f.config, call => {
-    assert.notEqual(call.role, 'implementer');
-    if (call.reviewInput) inputs.push(call.reviewInput); return fake(call);
+    assert.ok(call.role === 'fixer', call.role); return fake(call);
   }), /PORT STATUS count/);
-  assert.equal(inputs[0], inputs[1]); assert.equal(JSON.parse(inputs[0]).markerEvidence.actual, 1);
   assert.equal(done(f.root, f.units[0], contextHash(f.root, f.config)), false);
   write(f, 'migration/count-diagnostic.txt', 'One literal TODO(port) line; declared todos=0. Correct only the numeric trailer.\n');
   let first = true;
+  const inputs = [];
   await translate(f.root, f.config, call => {
+    if (call.reviewInput) inputs.push(call.reviewInput);
     if (call.role === 'reviewer-rules' && first) { first = false; return wrap(result(call.role, call.unit, { findings: [{ id: 'COUNT', message: 'Trailer undercounts', evidence: 'ported/math_ops.mjs:6 contains TODO(port)', rule: 'Fixture count convention' }] })); }
     if (call.role === 'fixer') return wrap(result(call.role, call.unit, { content: bad.replace('todos=0', 'todos=1') }));
     return fake(call);
   }, { onlyTarget: f.units[0].target, evidence: 'migration/count-diagnostic.txt' });
+  // Both reviewers get the same measured count (literal lines, not occurrences).
+  assert.equal(inputs[0], inputs[1]); assert.equal(JSON.parse(inputs[0]).markerEvidence.actual, 1);
   assert.equal(done(f.root, f.units[0], contextHash(f.root, f.config)), true);
   assert.equal(unitState(f.root, f.units[0]).markerEvidence.actual, 1);
 });

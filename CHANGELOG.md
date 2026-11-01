@@ -24,21 +24,27 @@ edit, which would have sent all 328 finished units back to review.
   finding this file cannot fix (an inventory or RULEBOOK change, another file)
   is recorded as a `TODO(port): <reference>: <what is needed>` line instead of
   returning the file unchanged. A single-pass fix is not reviewed again, so one
-  that changes no code (only TODO(port) lines or the trailer) is asked once to
-  fix or name each finding it leaves open; findings about the trailer or a
-  TODO(port) line itself are exempt. What a single-pass fix leaves unfixed is
-  kept in its receipt (`singlePass.flagged`) and reported in the run summary
-  (`selfRepairs.flagged` and a warning), so the person hears of it. Accepting
-  such flags without a review is single-pass's deliberate trade-off, as
-  upstream.
+  that changes no code (only comments, such as TODO(port) lines and the
+  trailer, or the spacing around lines) is asked once to fix or name each
+  finding it leaves open; findings about comments (the PORT STATUS trailer, a
+  TODO(port) line, a doc comment, a license header) are exempt, and a
+  reference is named only whole (`reviewer-rules:F10` does not name
+  `reviewer-rules:F1`). Telling code from comments is a heuristic, not a
+  parser: a comment opener inside a string, for instance, can make a real
+  change look like none (one extra correction). What a single-pass fix leaves
+  unfixed is kept in its receipt (`singlePass.flagged`) and reported in the run
+  summary (`selfRepairs.flagged` and a warning), so the person hears of it.
+  Accepting such flags without a review is single-pass's deliberate trade-off,
+  as upstream.
 - A wrong trailer still on a written file is no longer a block on the first
   try: it becomes the confirmed finding `marker:M1` for the fixer, like a
-  typecheck error, and the fixed file is reviewed. A file written for review
-  (the implementer's, or a fix under rereview) goes to the fixer at once,
-  without first spending two reviewer calls on it; a file reviewed with a
-  wrong trailer (left by an earlier run) goes there when the unit would
-  complete. Trailer fixes have their own limit, two per run, and are not fix
-  rounds: `maxFixRounds` neither stops them nor counts them, so a bounded unit
+  typecheck error, and the fixed file is reviewed. A file goes to the fixer
+  before any review spends two reviewer calls on it: the implementer's or a
+  rereview fix (still wrong after its correction), one an earlier run left, or
+  a unit resumed after a block (such as the two units a 0.40.2 run blocked at
+  completion). A single-pass fix with a wrong trailer goes there when the unit
+  would complete. Trailer fixes have their own limit, two per run, and are not
+  fix rounds: `maxFixRounds` neither stops them nor counts them, so a bounded unit
   whose rounds are used gets the trailer reason, never "Fix-round limit
   reached" with its advice to amend the RULEBOOK. After two trailer fixes in
   one run the unit blocks with the reason.
@@ -54,8 +60,10 @@ edit, which would have sent all 328 finished units back to review.
   fix stays a fix, without new reviews), counts the circuit breaker
   (`maxConsecutiveFailures`) afresh, and drops a unit's earlier error only once
   the unit runs again, so a unit a stop or the call budget never restarts
-  keeps it. A repair run does not add the pass. The run summary counts all of
-  this in `selfRepairs` (`corrections`, `markerFixes`, `repass: {units, done}`,
+  keeps it. No pass follows a tripped circuit breaker, a used-up call budget
+  or an interruption, and a repair run does not add one. The run summary
+  counts all of this in `selfRepairs` (`corrections`, which include the
+  arbiter's reference re-ask, `markerFixes`, `repass: {units, done}`,
   `flagged`).
 - The failure guidance and the skill say the runner already retried, so a unit
   still blocked takes the guidance's recommended option (a rerun for an
@@ -65,15 +73,17 @@ edit, which would have sent all 328 finished units back to review.
   earlier, 0.40.0's one-time full re-review still applies.
 - Test: `tests/self-repair-2026-11-01.test.mjs` (the trailer reasons and the
   unchanged evidence fields, the slip classes, the prompts, the implementer's
-  trailer correction, the trailer sent to the fixer before any review and a
-  file reviewed with a wrong trailer, the block after two trailer fixes, the
-  trailer fix under a used-up `maxFixRounds` and under rereview, the unchanged
-  fix that flags, a flag-only fix asked to name its finding and what fixes
-  leave open, the reviewer's JSON correction, an answer that ended without a
-  final message, the extra pass, its limit to one, a fixer slip during a
-  trailer fix on the pass, the breaker and the budget on the pass, a refused
-  fix that keeps its round, no pass in a repair run, and a dependent unit that
-  runs after the pass).
+  trailer correction, the trailer sent to the fixer before any review, from an
+  earlier run's file and from a unit 0.40.2 blocked at completion, the block
+  after two trailer fixes, also in continuous mode, the trailer fix under a
+  used-up `maxFixRounds`, under rereview and after `verify-fix`, a forged
+  trailer-fix receipt, the unchanged fix that flags, what counts as code, fixes
+  that only comment or name another finding, what fixes leave open, the
+  reviewer's JSON correction, an answer that ended without a final message, the
+  arbiter's counted re-ask, the extra pass, its limit to one, a fixer slip
+  during a trailer fix on the pass, the breaker and the budget on the pass and
+  no pass after a tripped breaker, a refused fix that keeps its round, no pass
+  in a repair run, and a dependent unit that runs after the pass).
 
 # 0.40.2 — 2026-11-01
 

@@ -123,7 +123,7 @@ test('configuration rejects unknown scheduling values, none with typecheck and c
 
 test('fixPolicy single-pass: one fix of the confirmed findings completes on the original two reviews', async t => {
   const f = prepare(t); f.config.fixPolicy = 'single-pass'; f.config.commands.typecheck = null; await approved(f);
-  const unit = f.units[0], fixed = `${result('implementer', unit).content}\n// fixed: floor division\n`, calls = [];
+  const unit = f.units[0], fixed = `${result('implementer', unit).content}\nexport const floorDivision = true;\n`, calls = [];
   const report = await translate(f.root, f.config, async args => {
     calls.push(args.role);
     if (args.role.startsWith('reviewer-')) return { ...await fake(args), result: result(args.role, unit, { findings: [finding] }) };
