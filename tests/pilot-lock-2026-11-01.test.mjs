@@ -25,14 +25,20 @@ import { doctor } from '../scripts/run_migration.mjs';
 import { isTransientFailure, isSystemicFailure, isLimitedRetry, isHomeStateFailure, isCliLock, hostStallRetries } from '../lib/failures.mjs';
 import { failureGuidance } from '../lib/guidance.mjs';
 import { migrationStatus } from '../lib/status.mjs';
-import { workerCopilotHome, prepareWorkerHome, workerHomeDefault, resetPreparedWorkerHomes } from '../lib/worker-home.mjs';
+import { workerCopilotHome, prepareWorkerHome, workerHomeDefault, resetPreparedWorkerHomes, sessionStateDirs } from '../lib/worker-home.mjs';
+import { runSurvey } from '../lib/survey.mjs';
+import { initSourceSpec } from '../lib/source-spec.mjs';
+import { sessionsStatus, pruneSessions, recordSession } from '../lib/sessions.mjs';
 
 const lockError = 'Copilot implementer failed (exit 1): Error: Request session.send failed with message: The shared writer lock timed out.';
 
 test('the CLI\'s lock waits are retried a few times, never a stop or a reason to move workers', () => {
   for (const message of [lockError,
     'Copilot surveyor failed (exit 1): Error: MCP installation storage is busy; retry after the current operation completes.',
-    'Copilot reviewer-rules failed (exit 1): Error: Another process is changing MCP configuration.']) {
+    'Copilot reviewer-rules failed (exit 1): Error: Another process is changing MCP configuration.',
+    // The CLI can report them as a failed MCP host start: still a wait, never a home problem.
+    'Copilot implementer failed (exit 1): Error: Failed to initialize MCP host: Another process is changing MCP configuration.',
+    'Copilot surveyor failed (exit 1): Error: Failed to initialize MCP host: MCP installation storage is busy; retry after the current operation completes.']) {
     const e = new Error(message);
     assert.equal(isCliLock(e), true, message);
     assert.equal(isTransientFailure(e), true, message);
@@ -47,6 +53,8 @@ test('the CLI\'s lock waits are retried a few times, never a stop or a reason to
   assert.equal(isTransientFailure(new Error(`Process timed out after 600000ms (explicit bounded deadline); ${lockError}`)), false);
   // A lock that changed under the CLI is not a busy one.
   assert.equal(isTransientFailure(new Error('Copilot implementer failed (exit 1): The shared writer lock or its directory changed.')), false);
+  // A home that cannot start its MCP host for another reason still moves workers.
+  assert.equal(isHomeStateFailure(new Error('Copilot implementer failed (exit 1): Error: Failed to initialize MCP host: The protected storage writer association does not match.')), true);
 });
 
 async function lockedRun(t, executionMode) {
@@ -72,7 +80,8 @@ test('a worker whose CLI waits on its lock is retried, the unit completes, and s
   assert.equal(implementer.retries.length, 2);
   assert.ok(implementer.retries.every(r => r.cliLock === true && !r.hostStall), JSON.stringify(implementer.retries));
   assert.equal(seen.retrying?.[0]?.cliLock, true);
-  assert.ok(seen.nextActions.some(a => /retried after a transient failure \(a lock inside the Copilot CLI/.test(a)), seen.nextActions.join('\n'));
+  assert.ok(seen.nextActions.some(a => /retried after a transient failure \(a lock inside the Copilot CLI.*if it persists, check for a Copilot CLI left from an earlier run/.test(a)), seen.nextActions.join('\n'));
+  assert.ok(!seen.nextActions.some(a => /lowering concurrency/.test(a)), 'fewer workers is not the answer to a lock');
 });
 
 for (const [mode, calls] of [['continuous', hostStallRetries + 1], ['bounded', 3]]) test(`a lock that never comes free blocks the unit after ${calls} calls in ${mode} mode`, async t => {
@@ -87,20 +96,23 @@ for (const [mode, calls] of [['continuous', hostStallRetries + 1], ['bounded', 3
   assert.equal(failureGuidance(failure, { language: 'ja' }).id, 'cli-lock');
 });
 
-test('guidance for a lock that stayed busy offers the other CLI home first; switching keeps approvals', t => {
+test('guidance for a lock that stayed busy: from the kit\'s own home go back to ~/.copilot first, from ~/.copilot look for a leftover CLI first', t => {
   const f = prepare(t);
-  for (const [home, first] of [[undefined, 'separate-home'], ['shared', 'separate-home'], ['separate', 'shared-home']]) {
+  const fromShared = ['leftover-cli', 'rerun', 'separate-home', 'pause'], fromSeparate = ['shared-home', 'rerun', 'leftover-cli', 'pause'];
+  for (const [home, order] of [[undefined, fromShared], ['shared', fromShared], ['separate', fromSeparate]]) {
     const config = { ...f.config };
     if (home) config.workerCopilotHome = home; else delete config.workerCopilotHome;
     writeJSON(safePath(f.root, 'migration/config.json'), config);
     for (const language of ['ja', 'en']) {
       const g = failureGuidance(new Error(lockError), { root: f.root, language });
       assert.equal(g.id, 'cli-lock', `${home} ${language}`);
-      assert.deepEqual(g.options.map(o => o.id), [first, 'rerun', 'leftover-cli', 'pause'], `${home} ${language}`);
+      assert.deepEqual(g.options.map(o => o.id), order, `${home} ${language}`);
     }
   }
   // Without a project, the default home (shared) is assumed.
-  assert.equal(failureGuidance(new Error(lockError)).recommended, 'separate-home');
+  assert.equal(failureGuidance(new Error(lockError)).recommended, 'leftover-cli');
+  // A network error next to the lock text is still the lock's guidance, like the stall.
+  assert.equal(failureGuidance(new Error(`connect ETIMEDOUT 140.82.112.21:443; ${lockError}`)).id, 'cli-lock');
   // It says "timed out", but it is not the kit's deadline; a cancellation is not described as retried.
   assert.notEqual(failureGuidance(new Error(lockError)).id, 'timeout');
   assert.notEqual(failureGuidance(new Error(`Interrupted; ${lockError}`)).id, 'cli-lock');
@@ -144,6 +156,27 @@ console.log(JSON.stringify({ type: 'result', exitCode: 0 }));
   assert.equal(fs.existsSync(`${home}-migration-kit-workers`), false, 'no worker home is made');
 });
 
+test('a lock wait the CLI reports as a failed MCP host start keeps workers in their own home', async t => {
+  const home = personHome(t), f = prepare(t);
+  t.after(() => fs.rmSync(`${home}-migration-kit-workers`, { recursive: true, force: true }));
+  const script = safePath(f.root, 'locked-cli.mjs'), log = safePath(f.root, 'homes.jsonl');
+  atomicWrite(script, `import fs from 'node:fs';
+if (process.argv.includes('--version')) { console.log('GitHub Copilot CLI 1.0.105.'); process.exit(0); }
+for await (const _ of process.stdin);
+fs.appendFileSync(${JSON.stringify(log)}, JSON.stringify(process.env.COPILOT_HOME) + '\\n');
+process.stderr.write('Error: Failed to initialize MCP host: Another process is changing MCP configuration.\\n');
+process.exit(1);
+`);
+  const adapter = createCopilotAdapter({ command: process.execPath, prefixArgs: [script] });
+  const config = { ...f.config, workerCopilotHome: 'separate' };
+  const failure = await adapter({ root: f.root, config, role: 'implementer', unit: f.units[0], extra: {} }).then(() => null, e => e);
+  assert.ok(failure, 'the call fails');
+  assert.equal(failure.cliHomeWarning, undefined);
+  assert.deepEqual(fs.readFileSync(log, 'utf8').trim().split('\n').map(line => JSON.parse(line)), [`${home}-migration-kit-workers`], 'never repeated in the person\'s home');
+  assert.equal(isTransientFailure(failure), true);
+  assert.equal(isLimitedRetry(failure), true);
+});
+
 test('doctor names the CLI home workers use, shared by default and separate when chosen', async t => {
   const home = personHome(t), f = prepare(t);
   t.after(() => fs.rmSync(`${home}-migration-kit-workers`, { recursive: true, force: true }));
@@ -164,6 +197,30 @@ process.exit(1);
   assert.equal(separate.status, 'separate');
   assert.equal(separate.path, `${home}-migration-kit-workers`);
   assert.match(separate.note, /home of their own/);
+  // A worker home that is a link is refused: workers fall back, and doctor does not call that the default.
+  fs.rmSync(`${home}-migration-kit-workers`, { recursive: true, force: true });
+  fs.symlinkSync(home, `${home}-migration-kit-workers`, 'dir');
+  resetPreparedWorkerHomes();
+  const refused = await check({ ...f.config, workerCopilotHome: 'separate' });
+  assert.equal(refused.status, 'shared: the worker home could not be prepared');
+  assert.match(refused.note, /"separate", but its home could not be prepared/);
+  assert.doesNotMatch(refused.note, /the default/);
+});
+
+test('sessions status names the session folder of the current setting first', t => {
+  const home = personHome(t), f = prepare(t);
+  const [workerState, personState] = sessionStateDirs(f.root);
+  const id = recordSession(f.root, '1-abcdef12', { role: 'implementer', target: f.units[0].target });
+  fs.mkdirSync(path.join(personState, id), { recursive: true }); fs.writeFileSync(path.join(personState, id, 'events.jsonl'), '{}\n');
+  for (const [config, first] of [[undefined, personState], [f.config, personState], [{ ...f.config, workerCopilotHome: 'shared' }, personState], [{ ...f.config, workerCopilotHome: 'separate' }, workerState]]) {
+    const status = sessionsStatus(f.root, { config });
+    assert.equal(status.sessionState, first, JSON.stringify(config?.workerCopilotHome));
+    assert.deepEqual([...status.sessionStates].sort(), [workerState, personState].sort());
+    assert.equal(status.present, 1);
+  }
+  assert.equal(home, path.dirname(personState));
+  const pruned = pruneSessions(f.root, { config: f.config });
+  assert.deepEqual([pruned.sessionState, pruned.removed], [personState, 1]);
 });
 
 // A production project with phases 00 to 02 recorded and its judge run.
@@ -225,7 +282,7 @@ test('a pilot\'s input checks read each production and pilot file once per check
   // production source and 18 of its pilot copy (11 and 6 per check).
   const [parent, copy] = [0, 1].map(i => marks[1].reads[i] - marks[0].reads[i]);
   assert.ok(parent <= 3, `production reads per failed unit: ${parent}`);
-  assert.ok(copy <= 4, `pilot copy reads per failed unit: ${copy}`);
+  assert.ok(copy <= 3, `pilot copy reads per failed unit: ${copy}`);
 });
 
 test('a pilot still stops when the production project or its own copy changes between worker calls', async t => {
@@ -240,4 +297,26 @@ test('a pilot still stops when the production project or its own copy changes be
     assert.match(failure.message, where === 'parent' ? /Pilot parent preparation or judge changed/ : /Migration inputs changed during worker invocation/, where);
     assert.equal(fs.existsSync(path.join(child, 'ported/math_ops.mjs')), false, `${where}: nothing written after the change`);
   }
+});
+
+const contractsAnswer = ({ unit, reviewInput }) => ({ result: { schemaVersion: 1, kind: 'survey', survey: 'contracts', target: unit.target,
+  items: JSON.parse(reviewInput).files.map(x => ({ file: x.path, publicInterface: 'functions', inputsOutputsErrors: 'ints', edgeCases: 'none', evidence: `${x.path}:1`, unknowns: 'none' })) } });
+
+test('a survey retries the CLI\'s lock wait, names it in its progress line, and stops retrying at the same cap', async t => {
+  const f = prepare(t, { count: 1, executionMode: 'continuous' });
+  initSourceSpec(f.root, f.config, { apply: true });
+  const config = { ...loadConfig(f.root), transientRetryDelayMs: 1 };
+  let calls = 0;
+  const stages = [];
+  await runSurvey(f.root, config, 'contracts', async args => { if (++calls <= 2) throw new Error(lockError); return contractsAnswer(args); },
+    { onProgress: event => stages.push(event.stage) });
+  assert.equal(calls, 3, 'two waits, then the answer');
+  assert.ok(stages.some(stage => /surveyor waiting after a lock inside the Copilot CLI \(retry 1\)/.test(stage)), stages.join('\n'));
+  // A lock that never comes free: the first call and hostStallRetries retries, then the part fails.
+  const g = prepare(t, { count: 1, executionMode: 'continuous' });
+  initSourceSpec(g.root, g.config, { apply: true });
+  let forever = 0;
+  const failure = await runSurvey(g.root, { ...loadConfig(g.root), transientRetryDelayMs: 1 }, 'contracts', async () => { forever++; throw new Error(lockError); }).then(() => null, e => e);
+  assert.ok(failure, 'the survey reports the failed part');
+  assert.equal(forever, hostStallRetries + 1);
 });

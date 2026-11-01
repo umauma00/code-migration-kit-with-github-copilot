@@ -13,12 +13,18 @@ timed out." and the kit blocked each unit at once, several minutes apart.
   transient: the same call is retried with the usual backoff, in the same CLI
   home, up to 5 times per call like the CLI's event stall (bounded mode:
   `transientRetries` if lower). Before, the unit was blocked at the first one,
-  and the guidance read it as a deadline ("timed out"). `status` names the
-  wait while it lasts, and the attempt record marks each such retry
-  `cliLock: true`. When the retries run out, the guidance (`cli-lock`) first
-  suggests running the workers in the other CLI home (`workerCopilotHome`),
-  then a rerun, then a check for a Copilot CLI left from an earlier run.
-  Switching the home is a run setting: approvals and finished units are kept.
+  and the guidance read it as a deadline ("timed out"). A lock wait the CLI
+  reports as a failed MCP host start ("Failed to initialize MCP host: Another
+  process is changing MCP configuration.") is the same wait: it never moves
+  workers to the person's home. `status` names the wait while a file's call
+  retries (the attempt record marks each such retry `cliLock: true`) and
+  suggests checking for a CLI left from an earlier run if it persists; a
+  survey names it in its progress line. When the retries run out, the
+  guidance (`cli-lock`) suggests going back to `shared` first when workers ran
+  in their own home (`workerCopilotHome` `separate`), and when they ran in
+  `~/.copilot` a check for a Copilot CLI left from an earlier run first, then
+  a rerun, then their own home. Switching the home is a run setting:
+  approvals and finished units are kept.
 - `workerCopilotHome` now defaults to `shared`: workers run in the person's
   `~/.copilot` (or `COPILOT_HOME`), as before 0.34.0. The kit's own worker
   home (`separate`) failed every worker on that Windows PC twice on the same
@@ -30,8 +36,10 @@ timed out." and the kit blocked each unit at once, several minutes apart.
   event stall, 2026-10-31) was never confirmed. `"workerCopilotHome":
   "separate"` keeps the worker home, with its fallback to `~/.copilot`.
   Worker sessions now sit beside the person's own; `sessions prune` removes
-  only the ones the kit recorded. `doctor --check-cli` says which home
-  workers use.
+  only the ones the kit recorded, and `sessions status` names the folder of
+  the current setting first (`sessionState`). `doctor --check-cli` says which
+  home workers use, and that a `separate` home that could not be prepared
+  falls back to the person's.
 - A pilot's input check (when a unit is dispatched, before and after every
   worker call, after a retry wait, and when a unit fails or completes) reads
   each file once. It computed the pilot's context twice and, for the

@@ -157,7 +157,8 @@ test('sessions status and prune find worker sessions in the worker home and in t
   for (const [dir, id] of [[workerState, inWorker], [personState, inPerson]]) { fs.mkdirSync(path.join(dir, id), { recursive: true }); fs.writeFileSync(path.join(dir, id, 'events.jsonl'), '{}\n'); }
   const own = path.join(personState, '22222222-2222-4222-8222-222222222222'); fs.mkdirSync(own);
   const status = sessionsStatus(f.root);
-  assert.equal(status.recorded, 3); assert.equal(status.present, 2); assert.deepEqual(status.sessionStates, [workerState, personState]);
+  // Both are searched; the folder of the current setting (the default, shared) is named first.
+  assert.equal(status.recorded, 3); assert.equal(status.present, 2); assert.deepEqual(status.sessionStates, [personState, workerState]);
   assert.equal(pruneSessions(f.root).removed, 2);
   assert.ok(!fs.existsSync(path.join(workerState, inWorker)) && !fs.existsSync(path.join(personState, inPerson)));
   assert.ok(fs.existsSync(own), 'the person\'s own sessions are never touched');
