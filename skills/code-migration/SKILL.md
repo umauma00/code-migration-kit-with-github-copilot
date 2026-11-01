@@ -571,7 +571,10 @@ After an edit (yours or the person's) once phase 02 is recorded, run
 finished units it may touch in plain words (no commands or paths). Ask one
 `ask_user` question for the redo choice: only the files the change may touch
 (recommended; all when a changed section matches no file), every finished file,
-none, or files the person names. Then run `rulebook accept --note TEXT --redo
+none, or files the person names. Say that the list is found by matching words, so
+it can miss a file, and that none leaves finished code on the old rule: offer it
+only for a change that cannot affect translated code (wording, a rule for files
+not yet translated). Then run `rulebook accept --note TEXT --redo
 listed|all|none|PATH,...` with that choice (the host asks them to confirm; in
 auto mode do not ask: choose listed, or all when a changed section matches no file).
 Phases 02 and 03, the approvals and the other finished units stay current, and

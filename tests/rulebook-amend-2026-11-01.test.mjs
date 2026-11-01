@@ -59,6 +59,9 @@ test('accepting a RULEBOOK change keeps phases, approvals and finished units, an
   assert.equal(stale.action, 'accept-rulebook');
   assert.match(stale.next, /rulebook changes.*rulebook accept --note TEXT --redo listed\|all\|none\|PATH/s);
   assert.equal(failureGuidance("Phase 02's record is out of date. x", { root: f.root }).options[0].id, 'accept-rulebook');
+  // A translate refused for a stale approval offers the same way first, not a redo of judge and approval.
+  await assert.rejects(translate(f.root, f.config, fake), /approval is stale/);
+  assert.equal(failureGuidance('translation approval is stale; inputs or outputs changed', { root: f.root }).options[0].id, 'accept-rulebook');
 
   const changes = rulebookChanges(f.root, f.config);
   assert.equal(changes.changed, true);
