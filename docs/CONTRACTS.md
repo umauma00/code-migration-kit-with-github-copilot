@@ -107,10 +107,28 @@ after one fix. Its receipt keeps both reviews of the earlier candidate and adds
 sorted `confirmed` finding references and whether an arbitration applied. The
 receipt is valid only while the fixer record's content is exactly the current
 target, every unrejected finding is in `confirmed`, and the records keep their
-hashes. A fixer that returns the reviewed candidate unchanged fails the unit. A fix
-of a typecheck-only finding has no reviews of its own, so it is reviewed as usual;
+hashes. A fixer that returns the reviewed candidate unchanged is asked once more
+to change the file or record what this file cannot fix as a
+`TODO(port): <reference>: <what is needed>` line; unchanged again, it fails the
+unit. A fix of a typecheck-only finding has no reviews of its own, so it is reviewed as usual;
 with a unit typecheck configured, `verify-fix` runs it once and a failure returns
 the unit to the full review loop.
+
+With `markerPolicy: "todo-lines-v1"` a unit completes only with exactly one
+PORT STATUS trailer, on the last nonempty line, whose `todos` is the number of
+lines containing `TODO(port)`. The implementer's and the fixer's files are
+checked before they are written, with one correction. A wrong trailer found
+when the unit would complete becomes the confirmed finding `marker:M1` for the
+fixer, and the fixed file is reviewed again; after two such fixes in one run the
+unit is blocked with the reason. An invalid `markerEvidence` carries `problem`
+(what is wrong, with line numbers); a valid one keeps its six fields, so
+existing receipts still match.
+
+A worker answer that is not one JSON object or has the wrong shape, and an
+arbitration with miswritten references, is asked once more with a `correction`
+saying what was wrong. Units still blocked by such a slip, or by an unchanged
+single-pass fix, get one more pass before a translate run ends (not a repair
+run); the run summary counts these in `selfRepairs`.
 
 Before every worker call (retries included) the runner appends `{id, role,
 target, at}` to `migration/runs/<run>/cli-sessions.jsonl` and passes that `id` as

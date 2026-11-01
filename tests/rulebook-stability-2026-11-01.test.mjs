@@ -105,9 +105,10 @@ test('an arbiter that copies the placeholder is asked once more and the unit fin
 
 test('a second miswritten arbitration still blocks the unit with the recorded wording', async t => {
   const f = await ready(t);
-  const { calls, adapter } = arbitrated([['reviewer-role:F1'], ['reviewer-role:F1']]);
+  const { calls, adapter } = arbitrated([['reviewer-role:F1'], ['reviewer-role:F1'], ['reviewer-role:F1'], ['reviewer-role:F1']]);
   const run = await translate(f.root, f.config, adapter).catch(e => e);
-  assert.equal(calls.filter(c => c.role === 'arbiter').length, 2);
+  // 0.41.0: the run's last pass asks twice more before the unit stays blocked.
+  assert.equal(calls.filter(c => c.role === 'arbiter').length, 4);
   const state = unitState(f.root, f.units[0]);
   assert.equal(state.status, 'blocked'); assert.equal(state.error, 'Unknown/duplicate arbitration finding');
   assert.notEqual(run?.done, 1);

@@ -1,3 +1,55 @@
+# 0.41.0 — 2026-11-01
+
+The translation run now repairs slips of one worker answer by itself, so the
+person no longer has to rerun `translate` and ask what to do. On 2026-11-01 a
+Mac run (kit 0.31.0) ended phase 04 with 19 of 347 units blocked after three
+reruns: 14 arbiters copied a placeholder reference, 2 PORT STATUS trailers sat
+above the closing brace (reviewers and the arbiter saw only "invalid", so a
+rerun reviewed the same file again and stopped at the same place), 2 fixers
+returned the file unchanged for an inventory gap they could not fix, and 1
+reviewer wrote text after its JSON. The orchestrator then proposed a RULEBOOK
+edit, which would have sent all 328 finished units back to review.
+
+- A worker answer that is not one JSON object or has the wrong shape is asked
+  once more, in place, with a `correction` naming what was wrong (the parser's
+  reason, such as text after the object). Reviewers, who see no extra task
+  data, get the correction written into their prompt. This was already done
+  for arbitration references (0.38.0).
+- The implementer's and the fixer's files are checked before they are written:
+  a PORT STATUS trailer in the wrong place, with the wrong count or missing,
+  and a single-pass fix that changed nothing, are sent back once with the exact
+  problem.
+- The fixer contract follows upstream's "can't fix it, flag it": a confirmed
+  finding this file cannot fix (an inventory or RULEBOOK change, another file)
+  is recorded as a `TODO(port): <reference>: <what is needed>` line instead of
+  returning the file unchanged.
+- A wrong trailer still on the written file when the unit would complete is
+  no longer a block on the first try: it becomes the confirmed finding
+  `marker:M1` for the fixer, like a typecheck error, and the fixed file is
+  reviewed again. After two such fixes in one run the unit blocks with the
+  reason.
+- An invalid trailer now says why, with line numbers, in the review and fix
+  evidence (`markerEvidence.problem`) and in the error ("the PORT STATUS line is
+  line 83, but line 85 "}" follows it: move the trailer below it, ..."). A valid
+  trailer's evidence keeps its six fields, so finished units stay finished.
+- Units still blocked by a contract slip, arbitration references or an
+  unchanged fix get one more pass before the run ends; a unit waiting on such
+  a unit runs after it. A repair run does not add the pass. The run summary
+  counts all of this in `selfRepairs` (`corrections`, `markerFixes`,
+  `repass: {units, done}`).
+- The failure guidance and the skill say the runner already retried, so a unit
+  still blocked takes the guidance's recommended option (a rerun for an
+  arbitration slip, repair for a trailer or an unchanged fix; in auto mode
+  without asking), never a RULEBOOK edit.
+- Updating from 0.40.x keeps approvals and finished units. From 0.39.0 or
+  earlier, 0.40.0's one-time full re-review still applies.
+- Test: `tests/self-repair-2026-11-01.test.mjs` (the trailer reasons and the
+  unchanged evidence fields, the slip classes, the prompts, the implementer's
+  trailer correction, the trailer sent to the fixer and reviewed again, the
+  block after two trailer fixes, the unchanged fix that flags, the reviewer's
+  JSON correction, the extra pass, its limit to one, no pass in a repair run,
+  and a dependent unit that runs after the pass).
+
 # 0.40.2 — 2026-11-01
 
 Worker CLIs no longer all fail while starting MCP servers in the kit's worker

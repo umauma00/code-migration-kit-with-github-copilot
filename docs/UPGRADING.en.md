@@ -1,6 +1,16 @@
-# Upgrading (0.40.2 and earlier releases)
+# Upgrading (0.41.0 and earlier releases)
 
 [日本語](UPGRADING.md) | English
+
+## 0.41.0 (the kit repairs slips of one translation answer itself)
+
+A slip in one answer (text around the JSON or the wrong shape, arbitration references, a PORT STATUS trailer in the wrong place or with the wrong count, a fix that changed nothing) blocked its unit, and the person had to rerun `translate` and ask what to do (2026-11-01, Mac, kit 0.31.0: 19 of 347 units). This release repairs them inside the run.
+
+1. The role that slipped is told what was wrong and asked once more, in place. The fixer is told to record a finding this file cannot fix (an inventory or RULEBOOK change, a change in another file) as a `TODO(port): <reference>: <what is needed>` line instead of returning the file unchanged.
+2. A wrong trailer still on the written file goes to the fixer as a confirmed finding, and the fixed file is reviewed again (twice per run at most). The reason (which line, which count) is in the review and fix evidence and in the error.
+3. Units still blocked (except by a trailer) get one more pass before the run ends; a repair run does not add it. The run summary's `selfRepairs` counts all of this. A unit still blocked after that takes the failure guidance's recommended option (a rerun for an arbitration slip, repair for a trailer or an unchanged fix; in auto mode without asking); the RULEBOOK is not edited for it.
+4. Updating from 0.40.x keeps approvals and completion records (a valid trailer's record keeps its form). Updating from 0.39.0 or earlier re-reviews every unit once, as in the 0.40.0 note below, so **do not update from those releases in the middle of a migration.**
+5. In a copy install, replace all of `migration-kit/` and the SKILL.md under `.github/skills/` with the temporary install's contents. A plugin install takes it with the update.
 
 ## 0.40.2 (worker CLIs all failing while starting MCP servers)
 
