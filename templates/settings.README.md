@@ -1,8 +1,7 @@
 # Copilot permissions
 
-`claude-settings.reference.json` is historical reference, not a Copilot policy.
-Do not copy it into a Copilot settings file. CLI 1.0.93 reads user settings from
-`~/.copilot/settings.json`; do not configure user settings in `config.json`.
+CLI 1.0.93 reads user settings from `~/.copilot/settings.json`; do not
+configure user settings in `config.json`.
 
 The automated runner starts a fresh `copilot -p` call for each role with:
 

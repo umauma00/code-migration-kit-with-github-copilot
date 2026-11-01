@@ -4994,11 +4994,6 @@
       ]
     },
     {
-      "path": "templates/claude-settings.reference.json",
-      "sha256": "8f1874a8b1335bd5aff96ad757a30ee0f68d589009a5899b852168d6e393ef5a",
-      "entries": []
-    },
-    {
       "path": "templates/guardrails.json",
       "sha256": "9ca3b693b5cf574676836e0c469caa2241ec29e7264a5d6067040ae8f39ce1b1",
       "entries": []

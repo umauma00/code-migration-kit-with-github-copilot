@@ -48,6 +48,22 @@ tests/rulebook-stability-2026-11-01.test.mjs covers the bracketed trailer, the
 prompts, the arbiter's second chance and its block, and the hook before
 phase 01, after it and after translation started.
 
+# 0.36.0 — 2026-10-31
+
+A sweep of the repository for files nothing uses. Every script, library
+module, prompt, test helper, fixture and example is still read by the kit, a
+test, CI or a document, so only one file goes.
+
+- `templates/claude-settings.reference.json` is removed. It was the upstream
+  Claude Code permission file, kept as a reference that the kit, Copilot CLI
+  and VS Code never read, yet every copy install wrote it into
+  `migration-kit/templates/`. Command limits for Copilot live in
+  `migration/guardrails.json` (from `templates/guardrails.json`) and the
+  hooks, as before. A copy installed by an earlier version keeps its stale
+  copy until `migration-kit/` is replaced; it can be deleted by hand.
+- `templates/settings.README.md` no longer mentions it, and
+  `docs/interruption-sources.json` was regenerated without it.
+
 # 0.35.0 — 2026-10-31
 
 The auto-mode handoff at the end of setup said "switch to autopilot with
