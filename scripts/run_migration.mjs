@@ -85,7 +85,7 @@ export const usage = `Usage: node migration-kit/scripts/run_migration.mjs COMMAN
   stress-b command --dir DIR [--model ID]
                               Phase 03 comparison B: the exact isolated copilot -p command, with the model's own file tools
   pilot plan --sources src/a,src/b [--through STAGE]
-                              Read-only: the files a pilot would cover (chosen + the files they use), to show before asking
+                              Read-only: the files a pilot would cover (chosen + the files they use; in auto mode a translation-only pilot without a unit typecheck keeps the chosen only), to show before asking
   pilot prepare --target NEW_DIR --sources src/a,src/b --note TEXT [--through translation|build|smoke|parity] [--expect-total N]
   pilot run --root PILOT_DIR  Run only the explicitly authorized, isolated pilot
   repair --target PATH --evidence migration/PATH | repair --queue migration/QUEUE.json [--max-calls N]

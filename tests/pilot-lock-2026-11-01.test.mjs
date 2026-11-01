@@ -53,8 +53,11 @@ test('the CLI\'s lock waits are retried a few times, never a stop or a reason to
   assert.equal(isTransientFailure(new Error(`Process timed out after 600000ms (explicit bounded deadline); ${lockError}`)), false);
   // A lock that changed under the CLI is not a busy one.
   assert.equal(isTransientFailure(new Error('Copilot implementer failed (exit 1): The shared writer lock or its directory changed.')), false);
-  // A home that cannot start its MCP host for another reason still moves workers.
+  // A home that cannot start its MCP host for another reason still moves workers,
+  // also when the CLI waited on a lock first.
   assert.equal(isHomeStateFailure(new Error('Copilot implementer failed (exit 1): Error: Failed to initialize MCP host: The protected storage writer association does not match.')), true);
+  assert.equal(isHomeStateFailure(new Error('Copilot surveyor failed (exit 1): Error: Failed to initialize MCP host: MCP installation storage is busy; retry after the current operation completes.\nError: MCP installation ownership storage failed.')), true);
+  assert.equal(isHomeStateFailure(new Error('Copilot implementer failed (exit 1): Error: Failed to initialize MCP host: Another process is changing MCP configuration.\nError: Failed to initialize MCP host: The protected storage writer lease is invalid.')), true);
 });
 
 async function lockedRun(t, executionMode) {
@@ -94,6 +97,15 @@ for (const [mode, calls] of [['continuous', hostStallRetries + 1], ['bounded', 3
   assert.match(failure.message, /The shared writer lock timed out/);
   assert.equal(count, calls);
   assert.equal(failureGuidance(failure, { language: 'ja' }).id, 'cli-lock');
+});
+
+test('a 120-second stall and a lock wait share one retry cap: alternating, the unit blocks after the same number of calls', async t => {
+  const f = await lockedRun(t, 'continuous');
+  const stall = 'Copilot implementer failed (exit 1): session.error query: session event delivery failed: session host did not complete the assistant.reasoning event within 120s';
+  let count = 0;
+  const failure = await translate(f.root, f.config, async () => { throw new Error(count++ % 2 ? lockError : stall); }).then(() => null, e => e);
+  assert.ok(failure, 'the run reports the blocked unit');
+  assert.equal(count, hostStallRetries + 1);
 });
 
 test('guidance for a lock that stayed busy: from the kit\'s own home go back to ~/.copilot first, from ~/.copilot look for a leftover CLI first', t => {

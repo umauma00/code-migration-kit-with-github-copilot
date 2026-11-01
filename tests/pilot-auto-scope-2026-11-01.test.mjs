@@ -9,9 +9,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { prepare, fake } from './helpers.mjs';
-import { safePath, atomicWrite, writeJSON, loadConfig, readManifest } from '../lib/core.mjs';
+import { safePath, atomicWrite, writeJSON, readJSON, loadConfig, readManifest } from '../lib/core.mjs';
 import { runStage, runPilot } from '../lib/pipeline.mjs';
-import { planPilot, preparePilot, pilotNeedsDependencies } from '../lib/pilot.mjs';
+import { planPilot, preparePilot, requirePilot, pilotNeedsDependencies } from '../lib/pilot.mjs';
+import { migrationStatus } from '../lib/status.mjs';
 import { phaseCommand } from '../scripts/phase_cli.mjs';
 import { setPreferences } from '../lib/preferences.mjs';
 
@@ -51,11 +52,12 @@ test('in auto mode a translation-only pilot translates only the chosen files; re
   assert.match(plan.plain.ja, /使っている 2 ファイルは変換せず、AIの確認で元のコードを読むだけ/);
   assert.match(plan.plain.ja, /ビルドや動作確認はしません/);
   assert.doesNotMatch(plan.plain.ja, /grant|target|translation|pilot/i);
-  assert.match(plan.plain.en, /^Try only the 1 chosen files .* the 2 files they use are not translated/);
+  assert.match(plan.plain.en, /^Try only the chosen file in a copy outside the project\. In auto mode the 2 files used by it are not translated; /);
   assert.deepEqual(fs.readdirSync(safePath(f.root, 'migration')).sort(), before, 'plan writes nothing');
 
   const grant = preparePilot(f.root, f.config, { target: child, sources: ['src/main.py'], note: 'Auto mode: 1 chosen file', expectTotal: 1 });
-  assert.deepEqual([grant.sources, grant.targets, grant.scopeKind], [['src/main.py'], ['ported/main.mjs'], 'chosen-only']);
+  assert.deepEqual([grant.sources, grant.targets, grant.scopeKind, grant.readOnly], [['src/main.py'], ['ported/main.mjs'], 'chosen-only', plan.readOnly]);
+  assert.deepEqual(readJSON(safePath(child, 'migration/pilot.json')).readOnly, plan.readOnly, 'the copy\'s grant names them too');
   const config = loadConfig(child);
   assert.deepEqual(readManifest(child, config).map(u => u.source), ['src/main.py']);
   // The originals of the files it uses are in the copy for the reviewers.
@@ -75,6 +77,23 @@ test('in auto mode a translation-only pilot translates only the chosen files; re
   }
   const translation = run.results.find(r => r.stage === 'translation').result;
   assert.deepEqual([translation.done, translation.total, translation.errors, translation.scopeComplete], [1, 1, [], true]);
+  // Status counts the chosen file only and finds nothing missing.
+  const status = migrationStatus(child);
+  assert.deepEqual([status.purpose, status.done, status.total, status.blockers, status.workflow.policy], ['pilot', 1, 1, [], 'isolated-pilot']);
+});
+
+test('a pilot prepared before 0.42.0 (no scopeKind in its grant) still runs', async t => {
+  const f = await reviewed(t), child = childPath(t, f);
+  const grant = preparePilot(f.root, f.config, { target: child, sources: ['src/main.py'], note: 'Prepared by an earlier kit', expectTotal: 3 });
+  const { scopeKind, readOnly, ...earlier } = grant;
+  assert.deepEqual([scopeKind, readOnly], ['with-dependencies', undefined]);
+  // Both copies of the grant must stay identical, as the earlier kit wrote them.
+  writeJSON(safePath(f.root, `migration/pilots/${grant.id}.json`), earlier);
+  writeJSON(safePath(child, 'migration/pilot.json'), earlier);
+  const config = loadConfig(child);
+  assert.equal(requirePilot(child, config).id, grant.id);
+  const run = await runPilot(child, config, fake);
+  assert.equal(run.results.find(r => r.stage === 'translation').result.done, 3);
 });
 
 test('auto mode still translates the files they use when a unit typecheck or a later boundary needs them', async t => {
@@ -93,7 +112,7 @@ test('auto mode still translates the files they use when a unit typecheck or a l
   }
 });
 
-test('outside auto mode the pilot keeps the files they use, and a count planned in auto mode is not prepared after leaving it', async t => {
+test('outside auto mode the pilot keeps the files they use, and a count planned in one mode is not prepared in the other', async t => {
   const f = await reviewed(t), child = childPath(t, f);
   for (const mode of [undefined, 'normal', 'relaxed']) {
     if (mode) setPreferences(f.root, { phaseMode: mode });
@@ -109,4 +128,15 @@ test('outside auto mode the pilot keeps the files they use, and a count planned 
   setPreferences(f.root, { phaseMode: 'auto' });
   const two = planPilot(f.root, f.config, { sources: ['src/main.py', 'src/math_ops.py'] });
   assert.deepEqual([two.sources, two.readOnly], [['src/math_ops.py', 'src/main.py'], ['src/text_ops.py']]);
+  assert.match(two.plain.en, /^Try only the 2 chosen files in a copy outside the project\. In auto mode the file used by them is not translated; /);
+  // The other way round: a count planned outside auto mode is not prepared in it.
+  setPreferences(f.root, { phaseMode: 'normal' });
+  assert.equal(planPilot(f.root, f.config, { sources: ['src/main.py'] }).counts.total, 3);
+  setPreferences(f.root, { phaseMode: 'auto' });
+  assert.throws(() => preparePilot(f.root, f.config, { target: child, sources: ['src/main.py'], note: 'Planned outside auto mode', expectTotal: 3 }), /1 files, not the 3 approved/);
+  assert.equal(fs.existsSync(child), false);
+  // Outside auto mode the grant has the full scope and no untranslated list.
+  setPreferences(f.root, { phaseMode: 'normal' });
+  const grant = preparePilot(f.root, f.config, { target: child, sources: ['src/main.py'], note: 'Normal mode: 1 chosen file and the 2 it uses', expectTotal: 3 });
+  assert.deepEqual([grant.scopeKind, grant.sources.length, 'readOnly' in grant], ['with-dependencies', 3, false]);
 });

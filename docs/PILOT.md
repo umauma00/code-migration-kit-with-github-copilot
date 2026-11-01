@@ -31,24 +31,28 @@ Source-only cannot authorize parity. The destination must be new and outside
 production, including when a parent directory is a symlink alias. Existing work
 is never overwritten. Dependencies that have manifest units expand the selection
 (the declared review dependencies, transitively), so the scope is usually larger
-than the files chosen. `pilot plan` returns that final scope without writing
-anything: `counts` (requested, added, total), the added files and a `plain`
-sentence in the person's language. Ask for permission with the final count, for
-example "選んだ 4 ファイルと、それらが使っている 22 ファイル、合わせて 26 ファイル",
+than the files chosen (in auto mode a translation-only pilot without a unit
+typecheck keeps the chosen files only; see below). `pilot plan` returns that
+final scope without writing anything: `counts` (requested, added, total), the
+added files and a `plain` sentence in the person's language. Ask for permission
+with the final count, for example "選んだ 4 ファイルと、それらが使っている 22 ファイル、合わせて 26 ファイル",
 and run `pilot prepare` with the same `--sources` and `--through`, passing that
-count as `--expect-total N` (and naming it in `--note`). Prepare refuses when the
-scope no longer has that many files, and needs no second question. In auto mode pilot
-prepare runs unasked: still run `pilot plan` and give its count in the phase
-report. Auto mode also keeps the pilot small, like upstream (the same three files
-as the bakeoff, nothing added): choose 3 files, and a translation-only pilot
-without a unit typecheck (`commands.typecheck`) translates only those
-(`scopeKind: "chosen-only"`). The files they use stay in the copy as originals,
-listed in `readOnly`; the reviewers read them there, as they always do, and nothing
-needs them translated. A unit typecheck or a build, smoke or parity boundary
-needs the files they use translated, so those pilots keep them in auto mode too
-(`scopeKind: "with-dependencies"`); then, among equally risky candidates, choose
-the ones whose `pilot plan` total is smallest. If the count is too large for them,
-offer choosing other files before preparing anything; nothing needs revoking yet.
+count as `--expect-total N` (and naming it in `--note`). Prepare refuses when
+the scope no longer has that many files, and needs no second question. In auto
+mode pilot prepare runs unasked: still run `pilot plan` and give its count in
+the phase report. Auto mode also keeps the pilot small, like upstream (the same
+three files as the bakeoff, nothing added: "run the same [3] files through the
+pilot run" in upstream's prompts/03-stress-test.md at the UPSTREAM.json commit):
+choose 3 files, and a translation-only pilot without a unit typecheck
+(`commands.typecheck`) translates only those (`scopeKind: "chosen-only"`). The
+files they use stay in the copy as originals, listed in `readOnly` by both
+`pilot plan` and `pilot prepare` (and in the grant); the reviewers read them
+there, as they always do, and nothing needs them translated. A unit typecheck or
+a build, smoke or parity boundary needs the files they use translated, so those
+pilots keep them in auto mode too (`scopeKind: "with-dependencies"`); then,
+among equally risky candidates, choose the ones whose `pilot plan` total is
+smallest. If the count is too large for them, offer choosing other files before
+preparing anything; nothing needs revoking yet.
 Inspect the returned requestedSources, sources, targets and boundary before running.
 If a whole-project build/parity command requires additional outputs, include
 those sources explicitly or choose translation-only scope. The kit cannot make
