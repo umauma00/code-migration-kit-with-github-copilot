@@ -29,10 +29,12 @@ edit, which would have sent all 328 finished units back to review.
   findings whose message is about the trailer or a TODO(port) line are exempt,
   and a reference is named only whole (`reviewer-rules:F10`, `:F1-b` and
   `:F1.2` do not name `reviewer-rules:F1`). Only the flags are left out of the
-  comparison: any other edit, comments and spacing included, is a change, so a
-  real fix is never told it fixed nothing (guessing each language's comments
-  did that to a Python dedent, `a // b`, or a line starting with `*`). A fix
-  that adds some other edit next to an unnamed flag is therefore not caught.
+  comparison (a TODO(port) or PORT STATUS comment after its opener, outside
+  quotes, or a line that starts with one): any other edit, comments and
+  spacing included, is a change, so a real fix is not told it fixed nothing
+  (guessing each language's comments did that to a Python dedent, `a // b`, or
+  a line starting with `*`). A fix that adds some other edit next to an
+  unnamed flag is therefore not caught.
   What a single-pass fix leaves unfixed is kept in its receipt
   (`singlePass.flagged`) and reported in the run summary (`selfRepairs.flagged`
   and a warning), so the person hears of it. Accepting such flags without a

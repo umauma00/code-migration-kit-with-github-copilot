@@ -448,6 +448,9 @@ test('what a single-pass fix leaves open: named flags next to a code change; not
     { name: 'a trailer finding that does not say PORT STATUS', findings: [{ ...finding, message: 'The trailer claims more certainty than the rounding has' }], fixed: `${body()}\n// PORT STATUS: confidence=medium todos=0\n`, flagged: undefined },
     { name: 'a comment fix: an edit besides flags is a change', findings: [{ ...finding, message: 'The doc comment of divide misstates the rounding' }], fixed: `${body().replace('export function divide', '// Floor division, as in the source.\nexport function divide')}\n// PORT STATUS: confidence=high todos=0\n`, flagged: undefined },
     { name: 'a flag naming F1 at the end of a sentence', findings: [finding], fixed: `${body()}\n// TODO(port): the inventory decides this, see reviewer-rules:F1.\n// PORT STATUS: confidence=medium todos=1\n`, flagged: ['reviewer-rules:F1'] },
+    { name: 'a flag naming F1 before a hyphen', findings: [finding], fixed: `${body()}\n// TODO(port): reviewer-rules:F1- the inventory decides this\n// PORT STATUS: confidence=medium todos=1\n`, flagged: ['reviewer-rules:F1'] },
+    { name: 'a trailer finding called the status line', findings: [{ ...finding, message: 'The footer status line overstates the certainty' }], fixed: `${body()}\n// PORT STATUS: confidence=medium todos=0\n`, flagged: undefined },
+    { name: 'a trailer finding written in Japanese', findings: [{ ...finding, message: '末尾行の確信度が高すぎる' }], fixed: `${body()}\n// PORT STATUS: confidence=medium todos=0\n`, flagged: undefined },
     // Not caught, by design: so that a real change never reads as none, any
     // edit besides flags is a change, and no review follows a single-pass fix.
     { name: 'a comment on a code line next to an unnamed flag', findings: [finding], fixed: `${commented}\n// TODO(port): later\n// PORT STATUS: confidence=medium todos=1\n`, flagged: undefined }];
@@ -488,7 +491,8 @@ test('a fix is compared without the kit\'s flags only: every other edit is a cha
     ['x = 1\n', 'x = 1  # TODO(port): x\n'], ['select 1;\n', 'select 1; -- TODO(port): x\n'], ['Dim a\n', "Dim a\n' TODO(port): x\nREM TODO(port): y\n"],
     ['/**\n * doc\n */\n', '/**\n * doc\n * TODO(port): x\n */\n'], ['    doThing();\n', '    /* TODO(port): x */ doThing();\n'],
     ['<div/>\n', '<!-- TODO(port): x --> <div/>\n'], ['}\n// PORT STATUS: confidence=high todos=0\n', '} // PORT STATUS: confidence=medium todos=0\n'],
-    ['a\n// PORT STATUS: confidence=high todos=0\n}\n', 'a\n}\n// PORT STATUS: confidence=high todos=0\n'], ['a();\r\nb();\r\n', 'a(); // TODO(port): x\r\nb();\r\n']]) {
+    ['a\n// PORT STATUS: confidence=high todos=0\n}\n', 'a\n}\n// PORT STATUS: confidence=high todos=0\n'], ['a();\r\nb();\r\n', 'a(); // TODO(port): x\r\nb();\r\n'],
+    ['<p>ab</p>\n', '<p>a<!-- TODO(port): x -->b</p>\n'], ['foo("a", "b")\n', 'foo("a", /* TODO(port): x */ "b")\n'], ['a(); b();\n', 'a(); /* TODO(port): x */ b(); // TODO(port): y\n']]) {
     assert.equal(withoutFlags(before), withoutFlags(after), JSON.stringify(after));
   }
   // Real changes, several of which a guess at each language's comments read as none.
@@ -497,12 +501,17 @@ test('a fix is compared without the kit\'s flags only: every other edit is a cha
     ['q = a // b\n', 'q = a // abs(b)\n'], ['total = a\n  * b;\n', 'total = a\n  * c;\n'], ['# define MAX 10\n', '# define MAX 20\n'],
     ['print("Port status: %s" % s)\n', 'print("Port status: %s" % t)\n'], ['Log("TODO(port): x"); x = 1;\n', 'Log("TODO(port): x"); x = 2;\n'],
     ['a();\n', 'a(); // checked\n'], ['/// <summary>A</summary>\n', '/// <summary>B</summary>\n'], ['a();\nb();\n', 'a();\n\nb();\n'],
-    ['a();\r\n', 'a();\n'], ['a();  \n', 'a();\n'], ["f(1, 'TODO(port)', x)\n", "f(1, 'TODO(port)', y)\n"]]) {
+    ['a();\r\n', 'a();\n'], ['a();  \n', 'a();\n'], ["f(1, 'TODO(port)', x)\n", "f(1, 'TODO(port)', y)\n"],
+    // A flag-like comment inside a string is not a flag.
+    ['s = "// TODO(port): x"; call(1)\n', 's = "// TODO(port): x"; call(2)\n'], ['url = "http://TODO(port).x"; n = 1\n', 'url = "http://TODO(port).x"; n = 2\n'],
+    ['s = "/* TODO(port): x"; n = 1; /* c */\n', 's = "/* TODO(port): x"; n = 2; /* c */\n'], ['s = "<!-- TODO(port): x"; n = 1; -->\n', 's = "<!-- TODO(port): x"; n = 2; -->\n'],
+    ['s = "a # TODO(port): x"; n = 1\n', 's = "a # TODO(port): x"; n = 2\n'], ["'TODO(port): a', 1\n", "'TODO(port): a', 2\n"], ['**TODO(port)** do x\n', '**TODO(port)** do y\n'],
+    ['<p>a b</p>\n', '<p>a<!-- TODO(port): x -->b</p>\n']]) {
     assert.notEqual(withoutFlags(before), withoutFlags(after), JSON.stringify(after));
   }
   // Linear on lines no real file has (an earlier scan took seconds on them).
   const started = Date.now();
-  for (const line of ['#'.repeat(200000), `${' '.repeat(200000)}x`, '/* '.repeat(70000), 'x("TODO(port)");'.repeat(15000), '/* TODO(port) */ '.repeat(12000)]) withoutFlags(line);
+  for (const line of ['#'.repeat(200000), `${' '.repeat(200000)}x`, '/* '.repeat(70000), 'x("TODO(port)");'.repeat(15000), '/* TODO(port) */ '.repeat(12000), 'a/*TODO(port)*/b'.repeat(80000)]) withoutFlags(line);
   assert.ok(Date.now() - started < 3000, `${Date.now() - started} ms`);
 });
 

@@ -111,8 +111,9 @@ hashes. A fixer that returns the reviewed candidate unchanged is asked once more
 to change the file or record what this file cannot fix as a
 `TODO(port): <reference>: <what is needed>` line; unchanged again, it fails the
 unit without using up a fix round. A fix that changes nothing but the kit's
-flags (TODO(port) comments and the PORT STATUS trailer; any other edit,
-comments and spacing included, is a change) is asked once to fix or name each
+flags (TODO(port) comments and the PORT STATUS trailer, after a comment opener
+outside quotes or starting a line; any other edit, comments and spacing
+included, is a change) is asked once to fix or name each
 finding it leaves open, except findings whose message is about the trailer or a
 TODO(port) line; a reference counts as named only whole.
 `singlePass.flagged` lists the findings the fix left unfixed (named in a
