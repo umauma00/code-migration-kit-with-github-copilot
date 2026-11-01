@@ -51,13 +51,16 @@ test('the sandbox setup question is plain in Japanese apart from the blocked pat
 
 test('the pilot plan sentences for the approval question are plain in both languages', () => {
   const source = read('lib/pilot.mjs');
-  const ja = source.match(/ja: `([^`]*)`/)[1], en = source.match(/en: `([^`]*)`/)[1];
-  // The sentence branches sit inside \${...} as quoted strings; check them too.
-  // A single word in quotes is a compared value ('translation'), not a sentence.
+  // Every sentence of the plan (the file count with and without the files they
+  // use, the auto-mode note and the whole sentence), and the branches that sit
+  // inside \${...} as quoted strings. A single word in quotes is a compared
+  // value ('translation'), not a sentence.
+  const ja = [...source.matchAll(/ja: `([^`]*)`/g)].map(m => m[1]), en = [...source.matchAll(/en: `([^`]*)`/g)].map(m => m[1]);
+  assert.ok(ja.length >= 4 && en.length >= 4, 'every sentence is found');
   const branches = text => [...text.matchAll(/'((?:\\.|[^'])*)'/g)].map(m => m[1]).filter(b => !/^[\w-]+$/.test(b));
-  assert.ok(branches(ja).length >= 3 && branches(en).length >= 3, 'every branch is found');
-  for (const part of [ja, ...branches(ja)]) assert.deepEqual(jargon(part), [], part);
-  for (const part of [en, ...branches(en)]) assert.doesNotMatch(part.replace(/\$\{[^}]*\}/g, ''), /grant|target|translation-only|manifest|judge|boundary|scope/i, part);
+  assert.ok(ja.flatMap(branches).length >= 3 && en.flatMap(branches).length >= 3, 'every branch is found');
+  for (const part of [...ja, ...ja.flatMap(branches)]) assert.deepEqual(jargon(part), [], part);
+  for (const part of [...en, ...en.flatMap(branches)]) assert.doesNotMatch(part.replace(/\$\{[^}]*\}/g, ''), /grant|target|translation-only|manifest|judge|boundary|scope/i, part);
 });
 
 test('Japanese question and reply examples in the handoff contract are plain', () => {

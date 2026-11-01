@@ -2,7 +2,8 @@
 
 A phase 03 pilot no longer blocks every unit at once on the Copilot CLI's own
 lock, its input checks no longer read the whole source tree again and again,
-and workers run in the person's own CLI home again by default. On 2026-11-01
+workers run in the person's own CLI home again by default, and an auto-mode
+pilot translates only the files it chose when nothing needs more. On 2026-11-01
 a Windows pilot (kit 0.40.0, Copilot CLI 1.0.105, one worker at a time) stayed
 at 0 of 40: every worker failed at session.send with "The shared writer lock
 timed out." and the kit blocked each unit at once, several minutes apart.
@@ -47,6 +48,17 @@ timed out." and the kit blocked each unit at once, several minutes apart.
   once, so production runs check faster too. What a check compares did not
   change: a change to the production project or to the pilot copy still stops
   the pilot at the next check.
+- In auto mode a pilot stays small, like upstream (the same three files as
+  the bakeoff, nothing added). Phase 03 chooses 3 files there, and a
+  translation-only pilot without a unit typecheck translates only those:
+  `pilot plan` and `pilot prepare` no longer add the files they use
+  (`scopeKind: "chosen-only"`; they stay in the copy as originals, listed in
+  `readOnly`, and the reviewers read them there as before). On 2026-11-01 an
+  auto-mode pilot chose 3 files and the kit added the 37 they use, unasked:
+  40 files, about half a day on that PC. A unit typecheck or a build, smoke or
+  parity boundary needs those files translated, so those pilots keep them
+  (`scopeKind: "with-dependencies"`), and outside auto mode nothing changes:
+  the person is asked with the full count.
 - Updating from 0.40.1 or later keeps approvals, finished units, phase
   records and prepared pilots: no input changed.
 

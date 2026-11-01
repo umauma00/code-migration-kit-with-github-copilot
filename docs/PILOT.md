@@ -39,7 +39,15 @@ and run `pilot prepare` with the same `--sources` and `--through`, passing that
 count as `--expect-total N` (and naming it in `--note`). Prepare refuses when the
 scope no longer has that many files, and needs no second question. In auto mode pilot
 prepare runs unasked: still run `pilot plan` and give its count in the phase
-report. If the count is too large for them,
+report. Auto mode also keeps the pilot small, like upstream (the same three files
+as the bakeoff, nothing added): choose 3 files, and a translation-only pilot
+without a unit typecheck (`commands.typecheck`) translates only those
+(`scopeKind: "chosen-only"`). The files they use stay in the copy as originals,
+listed in `readOnly`; the reviewers read them there, as they always do, and nothing
+needs them translated. A unit typecheck or a build, smoke or parity boundary
+needs the files they use translated, so those pilots keep them in auto mode too
+(`scopeKind: "with-dependencies"`); then, among equally risky candidates, choose
+the ones whose `pilot plan` total is smallest. If the count is too large for them,
 offer choosing other files before preparing anything; nothing needs revoking yet.
 Inspect the returned requestedSources, sources, targets and boundary before running.
 If a whole-project build/parity command requires additional outputs, include
