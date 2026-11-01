@@ -110,25 +110,38 @@ target, every unrejected finding is in `confirmed`, and the records keep their
 hashes. A fixer that returns the reviewed candidate unchanged is asked once more
 to change the file or record what this file cannot fix as a
 `TODO(port): <reference>: <what is needed>` line; unchanged again, it fails the
-unit. A fix of a typecheck-only finding has no reviews of its own, so it is reviewed as usual;
+unit without using up a fix round. A fix that changes no code (only TODO(port)
+lines or the trailer) is asked once to fix or name each finding it leaves open,
+except findings about the trailer or a TODO(port) line. `singlePass.flagged`
+lists the findings the fix left unfixed (named in a TODO(port) line it added, or
+all but those marker findings when it changed no code); the run summary repeats
+them in `selfRepairs.flagged` and `warnings`. No review checks that a flagged
+finding could not be fixed: that is single-pass's trade-off, as upstream.
+A fix of a typecheck-only finding has no reviews of its own, so it is reviewed as usual;
 with a unit typecheck configured, `verify-fix` runs it once and a failure returns
 the unit to the full review loop.
 
 With `markerPolicy: "todo-lines-v1"` a unit completes only with exactly one
 PORT STATUS trailer, on the last nonempty line, whose `todos` is the number of
 lines containing `TODO(port)`. The implementer's and the fixer's files are
-checked before they are written, with one correction. A wrong trailer found
-when the unit would complete becomes the confirmed finding `marker:M1` for the
-fixer, and the fixed file is reviewed again; after two such fixes in one run the
-unit is blocked with the reason. An invalid `markerEvidence` carries `problem`
-(what is wrong, with line numbers); a valid one keeps its six fields, so
-existing receipts still match.
+checked before they are written, with one correction. A wrong trailer on a
+written file becomes the confirmed finding `marker:M1` for the fixer, and the
+fixed file is reviewed: a file written for review goes to the fixer at once, a
+reviewed file (an earlier run's, or a single-pass fix) when the unit would
+complete. A trailer fix is not a fix round (`maxFixRounds` neither stops nor
+counts it) and keeps its stage `fix` with no reviews when resumed; after two
+in one run the unit is blocked with the reason. An invalid `markerEvidence`
+carries `problem` (what is wrong, with line numbers); a valid one keeps its six
+fields, so existing receipts still match.
 
-A worker answer that is not one JSON object or has the wrong shape, and an
+A worker answer that is not one JSON object or has the wrong shape, one that
+ended without a final message ("Copilot JSONL is incomplete"), and an
 arbitration with miswritten references, is asked once more with a `correction`
 saying what was wrong. Units still blocked by such a slip, or by an unchanged
 single-pass fix, get one more pass before a translate run ends (not a repair
-run); the run summary counts these in `selfRepairs`.
+run), resuming where they stopped; the circuit breaker counts that pass afresh,
+and a unit the pass never restarts keeps its error. The run summary counts these
+in `selfRepairs` (`corrections`, `markerFixes`, `repass`, `flagged`).
 
 Before every worker call (retries included) the runner appends `{id, role,
 target, at}` to `migration/runs/<run>/cli-sessions.jsonl` and passes that `id` as

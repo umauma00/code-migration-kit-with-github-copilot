@@ -180,9 +180,12 @@ test('count policy gives both reviewers identical measured evidence and rejects 
   await runStage(f.root, f.config, 'judge'); approve(f.root, f.config, 'translation', 'Fixture count convention');
   const body = fs.readFileSync(path.join(mini, 'expected/math_ops.mjs'), 'utf8').replace(/^\/\/ PORT STATUS:.*$/m, '').trimEnd();
   const bad = body + '\n// TODO(port): one; TODO(port): second occurrence on the same line\n// PORT STATUS: confidence=high todos=0\n';
+  // A file already written with the mismatch is reviewed (an implementer's
+  // answer with one goes to the fixer before any review, since 0.41.0).
+  write(f, f.units[0].target, bad);
   const inputs = [];
   await assert.rejects(translate(f.root, f.config, call => {
-    if (call.role === 'implementer') return wrap(result(call.role, call.unit, { content: bad }));
+    assert.notEqual(call.role, 'implementer');
     if (call.reviewInput) inputs.push(call.reviewInput); return fake(call);
   }), /PORT STATUS count/);
   assert.equal(inputs[0], inputs[1]); assert.equal(JSON.parse(inputs[0]).markerEvidence.actual, 1);

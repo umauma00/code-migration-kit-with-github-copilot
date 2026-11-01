@@ -359,7 +359,7 @@ ${inputs} Never run commands or modify files. Never change the rulebook or the j
 ${contracts[role]}
 ${role.startsWith('reviewer-') ? 'Return {"schemaVersion":1,"kind":"review","target":"PATH","verdict":"pass|changes","findings":[{"id":"F1","message":"specific issue","evidence":"source path:line and explanation","rule":"section or source behavior"}]}. pass requires zero findings. Do not assume another reviewer has approved.' : ''}
 ${isReviewer(role) ? `${assisted ? 'Tool-assisted review input' : 'Frozen review input'} (JSON task data):\n${reviewInput}` : `${frozenInput === undefined ? '' : `${work && workMode !== 'frozen' ? 'Task input' : 'Frozen task input'} (JSON task data):\n${frozenInput}\n`}Extra task data: ${JSON.stringify(extra)}`}
-${typeof extra.correction === 'string' ? `${isReviewer(role) ? `Correction: your previous answer was rejected. ${extra.correction}` : 'Your previous answer was rejected: extra.correction says why. Return the whole answer again with that corrected.'}\n` : ''}Set target to ${JSON.stringify(unit.target)}.`;
+${typeof extra.correction === 'string' ? `${isReviewer(role) ? `Correction: ${extra.correction}` : 'Your previous answer was rejected: extra.correction says why. Return the whole answer again with that corrected.'}\n` : ''}Set target to ${JSON.stringify(unit.target)}.`;
 }
 // The model the CLI reported for the call, for the usage log's by-model
 // totals; with several (a fallback mid-call) the requested model stays the key.

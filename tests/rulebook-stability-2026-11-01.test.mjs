@@ -190,7 +190,8 @@ test('after phase 01 an edit keeps the replaced version; after translation start
 
 test('the skill and the orchestrator say a blocked unit is repaired, not fixed in the RULEBOOK', () => {
   for (const rel of ['skills/code-migration/SKILL.md', '.github/skills/code-migration/SKILL.md'])
-    assert.match(fs.readFileSync(path.join(kitRoot, rel), 'utf8'), /repair that unit,\nnever edit the RULEBOOK for it/, rel);
+    // 0.41.0: the runner retries first; what is left takes the guidance's option, never the RULEBOOK.
+    assert.match(fs.readFileSync(path.join(kitRoot, rel), 'utf8'), /a\nrerun for an arbitration slip, repair for a trailer or an unchanged fix; in auto\nmode without asking\), and never edit the RULEBOOK for it/, rel);
   for (const rel of ['.github/agents/migration-orchestrator.agent.md', 'com.github.copilot/agents/code-migration-plugin-orchestrator.agent.md'])
     assert.match(fs.readFileSync(path.join(kitRoot, rel), 'utf8'), /a unit blocked in translation is repaired, never fixed by editing the RULEBOOK/, rel);
 });

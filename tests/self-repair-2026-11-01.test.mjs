@@ -27,17 +27,20 @@ const inside = () => { const b = body(), i = b.lastIndexOf('}'); return `${b.sli
 const answer = (call, value) => ({ result: value, requestedModel: 'test-double', observedModel: null, tokens: null, aiCredits: null });
 const content = (call, text) => answer(call, result(call.role, call.unit, { content: text }));
 
-async function setup(t, { single = true, typecheck = null, executionMode } = {}) {
-  const f = prepare(t, executionMode ? { executionMode } : {});
+async function setup(t, { single = true, typecheck = null, executionMode, count, overrides = {} } = {}) {
+  const f = prepare(t, { ...(executionMode ? { executionMode } : {}), ...(count ? { count } : {}) });
   f.config.markerPolicy = 'todo-lines-v1';
   if (single) f.config.fixPolicy = 'single-pass';
   f.config.commands.typecheck = typecheck;
+  Object.assign(f.config, overrides);
   writeJSON(safePath(f.root, 'migration/config.json'), f.config);
   await runStage(f.root, f.config, 'judge');
   approve(f.root, f.config, 'translation', 'Self-repair fixture only');
   return f;
 }
 const summary = (f, report) => readJSON(safePath(f.root, `migration/runs/${report.runId}/summary.json`));
+// The two reviewers run side by side: their order is not part of the contract.
+const roles = calls => calls.map(c => c.role.startsWith('reviewer-') ? 'reviewer' : c.role);
 
 test('an invalid trailer says why; a valid one keeps exactly the recorded fields', () => {
   const valid = markerEvidence(policy, good());
@@ -64,7 +67,7 @@ test('an invalid trailer says why; a valid one keeps exactly the recorded fields
 });
 
 test('slip classes: contract slips are asked again; arbitration and unchanged fixes get one more pass; a trailer does not', () => {
-  for (const m of ['Agent did not return one valid JSON object; no completion recorded', 'Result schemaVersion/target mismatch', 'Expected implementation result',
+  for (const m of ['Agent did not return one valid JSON object; no completion recorded', 'Copilot JSONL is incomplete: successful result and final assistant message required', 'Result schemaVersion/target mismatch', 'Expected implementation result',
     'Result requires content', 'Invalid review result', 'Duplicate finding id', 'Review verdict contradicts findings', 'Invalid arbitration result', 'Arbitration requires confirmed boolean']) {
     assert.equal(contractSlip(new Error(m)), true, m); assert.equal(unitSlip(m), true, m);
   }
@@ -95,8 +98,8 @@ test('prompts: the fixer flags what this file cannot fix; a correction reaches e
   }
   // Reviewers do not see extra task data, so the correction is written out.
   assert.doesNotMatch(agentPrompt({ role: 'reviewer-rules', unit, reviewInput: '{}' }), /Correction:/);
-  assert.match(agentPrompt({ role: 'reviewer-rules', unit, reviewInput: '{}', extra: { correction: 'Text followed the JSON object.' } }),
-    /\nCorrection: your previous answer was rejected\. Text followed the JSON object\.\nSet target to "ported\/A\.java"\.$/);
+  assert.match(agentPrompt({ role: 'reviewer-rules', unit, reviewInput: '{}', extra: { correction: 'Your previous answer was rejected: Text followed the JSON object.' } }),
+    /\nCorrection: Your previous answer was rejected: Text followed the JSON object\.\nSet target to "ported\/A\.java"\.$/);
 });
 
 test('an implementer whose trailer sits above the closing brace is told where and asked once more', async t => {
@@ -117,7 +120,7 @@ test('an implementer whose trailer sits above the closing brace is told where an
   assert.deepEqual(summary(f, report).selfRepairs, { corrections: 1, markerFixes: 0 });
 });
 
-test('a wrong trailer found at the end goes to the fixer as a finding and the fixed file is reviewed again', async t => {
+test('a trailer still wrong after its correction goes to the fixer as a finding at once; only the fixed file is reviewed', async t => {
   const f = await setup(t);
   const calls = [];
   // The implementer keeps the trailer inside the function, also after the correction.
@@ -133,12 +136,33 @@ test('a wrong trailer found at the end goes to the fixer as a finding and the fi
   const [m1] = fixers[0].extra.confirmedFindings;
   assert.equal(m1.reference, 'marker:M1');
   assert.match(m1.message, /^The PORT STATUS trailer is wrong: the PORT STATUS line is line \d+, but line \d+ "}" follows it/);
-  // Reviewed before (pass) and again after the fix: the fixed file has its own reviews.
-  assert.equal(calls.filter(c => c.role.startsWith('reviewer-')).length, 4);
+  // No review of the file with the wrong trailer: the fixed file has its own reviews.
+  assert.deepEqual(roles(calls), ['implementer', 'implementer', 'fixer', 'reviewer', 'reviewer']);
   const context = contextHash(f.root, f.config), state = unitState(f.root, f.units[0]);
   assert.equal(done(f.root, f.units[0], context), true);
   assert.equal(state.markerEvidence.valid, true); assert.equal(state.markerEvidence.problem, undefined);
+  // The trailer fix is not a fix round.
+  assert.equal(state.round, 0);
   assert.deepEqual(summary(f, report).selfRepairs, { corrections: 1, markerFixes: 1 });
+});
+
+test('a file reviewed with a wrong trailer (written by an earlier run) goes to the fixer, and the fixed file is reviewed again', async t => {
+  const f = await setup(t);
+  // The 0.31.0 runs left such files behind: reviewed, then looping review -> done.
+  fs.mkdirSync(path.dirname(safePath(f.root, f.units[0].target)), { recursive: true });
+  fs.writeFileSync(safePath(f.root, f.units[0].target), inside());
+  const calls = [];
+  const report = await translate(f.root, f.config, async call => {
+    calls.push(call);
+    if (call.role === 'fixer') return content(call, good());
+    return fake(call);
+  });
+  assert.equal(report.done, 1);
+  assert.deepEqual(roles(calls), ['reviewer', 'reviewer', 'fixer', 'reviewer', 'reviewer']);
+  assert.equal(calls[2].extra.confirmedFindings[0].reference, 'marker:M1');
+  assert.equal(fs.readFileSync(safePath(f.root, f.units[0].target), 'utf8'), good());
+  assert.equal(done(f.root, f.units[0], contextHash(f.root, f.config)), true);
+  assert.deepEqual(summary(f, report).selfRepairs, { corrections: 0, markerFixes: 1 });
 });
 
 test('a trailer the fixer cannot place blocks after two fixes in the run, with the reason, and gets no extra pass', async t => {
@@ -283,4 +307,166 @@ test('a unit waiting on a slipped dependency runs once the extra pass finishes i
   assert.equal(mathArbiters, 3);
   assert.equal(done(f.root, main, contextHash(f.root, f.config)), true);
   assert.deepEqual(summary(f, report).selfRepairs.repass, { units: 1, done: 1 });
+});
+
+// A reviewed candidate with a code change, and the same with the trailer above the closing brace.
+const changed = () => `${body()}\nexport const reviewed = true;`;
+const fixedGood = () => `${changed()}\n// PORT STATUS: confidence=high todos=0\n`;
+const fixedInside = () => { const b = changed(), i = b.lastIndexOf('}'); return `${b.slice(0, i)}// PORT STATUS: confidence=high todos=0\n${b.slice(i)}\n`; };
+// reviewer-rules raises the given findings on its first call only.
+const firstReview = (findings, fixer, implementer = () => good()) => {
+  const calls = [];
+  const adapter = async call => {
+    calls.push(call);
+    if (call.role === 'implementer') return content(call, implementer(call));
+    if (call.role === 'reviewer-rules' && calls.filter(c => c.role === 'reviewer-rules').length === 1) return answer(call, result(call.role, call.unit, { findings }));
+    if (call.role === 'fixer') return content(call, fixer(call, calls.filter(c => c.role === 'fixer').length));
+    return fake(call);
+  };
+  return { calls, adapter };
+};
+const slip = () => Object.assign(new Error('Agent did not return one valid JSON object; no completion recorded'), { code: 'INVALID_AGENT_RESULT', parseError: 'Unexpected end of JSON input' });
+
+test('a trailer fix is not held to maxFixRounds: a bounded unit whose rounds are used still gets its trailer fixed', async t => {
+  const f = await setup(t, { executionMode: 'bounded', overrides: { maxFixRounds: 1 } });
+  // The single-pass fix uses the one round and keeps the trailer above the brace.
+  const { calls, adapter } = firstReview([finding], (call, n) => n <= 2 ? fixedInside() : fixedGood());
+  const report = await translate(f.root, f.config, adapter);
+  assert.equal(report.done, 1); assert.deepEqual(report.errors, []);
+  assert.deepEqual(roles(calls), ['implementer', 'reviewer', 'reviewer', 'arbiter', 'fixer', 'fixer', 'fixer', 'reviewer', 'reviewer']);
+  assert.equal(calls.filter(c => c.role === 'fixer')[2].extra.confirmedFindings[0].reference, 'marker:M1');
+  const state = unitState(f.root, f.units[0]);
+  assert.equal(state.round, 1, 'the trailer fix is not a fix round');
+  assert.equal(done(f.root, f.units[0], contextHash(f.root, f.config)), true);
+  assert.deepEqual(summary(f, report).selfRepairs, { corrections: 1, markerFixes: 1 });
+});
+
+test('a trailer the fixer cannot place under the bounded limit blocks with the trailer reason, never the fix-round limit', async t => {
+  const f = await setup(t, { executionMode: 'bounded', overrides: { maxFixRounds: 1 } });
+  const { calls, adapter } = firstReview([finding], () => fixedInside());
+  const error = await translate(f.root, f.config, adapter).catch(e => e);
+  assert.match(error.message, /PORT STATUS count mismatch or invalid trailer: TODO\(port\) lines=0, claimed=0\. The PORT STATUS line is line \d+/);
+  assert.doesNotMatch(error.message, /Fix-round limit reached/);
+  assert.equal(failureGuidance(error.report.errors[0].error).id, 'unit-slip');
+  // One reviewed fix and two trailer fixes, each asked once more; one review only.
+  assert.equal(calls.filter(c => c.role === 'fixer').length, 6);
+  assert.equal(calls.filter(c => c.role.startsWith('reviewer-')).length, 2);
+  assert.equal(unitState(f.root, f.units[0]).markerRepair.count, 2);
+});
+
+test('with fixPolicy rereview a fix whose trailer is still wrong goes to the fixer before it is reviewed', async t => {
+  const f = await setup(t, { single: false });
+  const { calls, adapter } = firstReview([finding], (call, n) => n <= 2 ? fixedInside() : fixedGood());
+  const report = await translate(f.root, f.config, adapter);
+  assert.equal(report.done, 1);
+  assert.deepEqual(roles(calls), ['implementer', 'reviewer', 'reviewer', 'arbiter', 'fixer', 'fixer', 'fixer', 'reviewer', 'reviewer']);
+  const state = unitState(f.root, f.units[0]);
+  assert.equal(state.singlePass, undefined); assert.equal(state.round, 1);
+  assert.equal(fs.readFileSync(safePath(f.root, f.units[0].target), 'utf8'), fixedGood());
+  assert.equal(done(f.root, f.units[0], contextHash(f.root, f.config)), true);
+  assert.deepEqual(summary(f, report).selfRepairs, { corrections: 1, markerFixes: 1 });
+});
+
+test('a fixer that slips during a trailer fix resumes at the fix on the last pass, not at review', async t => {
+  const f = await setup(t, { executionMode: 'continuous' });
+  const calls = [];
+  const report = await translate(f.root, f.config, async call => {
+    calls.push(call);
+    if (call.role === 'implementer') return content(call, inside());
+    if (call.role === 'fixer') { if (calls.filter(c => c.role === 'fixer').length <= 2) throw slip(); return content(call, good()); }
+    return fake(call);
+  });
+  assert.equal(report.done, 1); assert.deepEqual(report.errors, []);
+  assert.deepEqual(roles(calls), ['implementer', 'implementer', 'fixer', 'fixer', 'fixer', 'reviewer', 'reviewer']);
+  assert.equal(calls.filter(c => c.role === 'fixer')[2].extra.confirmedFindings[0].reference, 'marker:M1');
+  assert.deepEqual(summary(f, report).selfRepairs, { corrections: 2, markerFixes: 1, repass: { units: 1, done: 1 } });
+});
+
+test('the last pass keeps every unit\'s error: its breaker counts afresh, and a unit it never restarts keeps the first error', async t => {
+  const f = await setup(t, { executionMode: 'bounded', count: 2, overrides: { concurrency: 1, maxConsecutiveFailures: 3 } });
+  const slipping = async call => { if (call.role === 'implementer') throw slip(); return fake(call); };
+  const error = await translate(f.root, f.config, slipping).catch(e => e);
+  // Two units, two failures each pass: the breaker does not trip on the last pass.
+  assert.deepEqual(error.report.errors.map(e => e.target).sort(), f.units.map(u => u.target).sort());
+  assert.ok(error.report.errors.every(e => /^Agent did not return one valid JSON object/.test(e.error)));
+  assert.deepEqual(error.report.selfRepairs, { corrections: 4, markerFixes: 0, repass: { units: 2, done: 0 } });
+
+  // The call budget ends the last pass after its first unit: the other keeps its error.
+  const g = await setup(t, { executionMode: 'bounded', count: 2, overrides: { concurrency: 1, maxConsecutiveFailures: 3 } });
+  const stopped = await translate(g.root, g.config, slipping, { maxCalls: 5 }).catch(e => e);
+  assert.equal(stopped.report.errors.length, 2);
+  const limited = stopped.report.errors.find(e => /Agent call limit reached/.test(e.error));
+  const kept = stopped.report.errors.find(e => /^Agent did not return one valid JSON object/.test(e.error));
+  assert.ok(limited && kept, JSON.stringify(stopped.report.errors));
+  assert.notEqual(limited.target, kept.target);
+  assert.equal(unitState(g.root, g.units.find(u => u.target === kept.target)).status, 'blocked');
+});
+
+test('a single-pass fix refused for changing nothing does not use up a fix round', async t => {
+  const f = await setup(t, { executionMode: 'bounded', overrides: { maxFixRounds: 1 } });
+  const unchanged = firstReview([finding], () => good());
+  const error = await translate(f.root, f.config, unchanged.adapter).catch(e => e);
+  assert.match(error.message, /Fixer returned the reviewed candidate unchanged/);
+  assert.equal(failureGuidance(error.report.errors[0].error).id, 'unit-slip');
+  // Two refused fixes (the last pass included), each asked once more.
+  assert.equal(unchanged.calls.filter(c => c.role === 'fixer').length, 4);
+  assert.equal(unitState(f.root, f.units[0]).round, 0);
+  // A rerun resumes at the fix with its round still free.
+  const fixing = firstReview([], () => fixedGood());
+  const report = await translate(f.root, f.config, fixing.adapter);
+  assert.equal(report.done, 1);
+  assert.deepEqual(roles(fixing.calls), ['fixer']);
+  assert.equal(unitState(f.root, f.units[0]).round, 1);
+});
+
+test('a single-pass fix that only adds an unnamed TODO(port) line is asked to fix or name the finding; what it leaves open is reported', async t => {
+  const f = await setup(t);
+  const named = `${body()}\n// TODO(port): reviewer-rules:F1: the inventory needs a rounding decision\n// PORT STATUS: confidence=medium todos=1\n`;
+  const { calls, adapter } = firstReview([finding], (call, n) => n === 1 ? `${body()}\n// TODO(port): needs a decision\n// PORT STATUS: confidence=medium todos=1\n` : named);
+  const report = await translate(f.root, f.config, adapter);
+  assert.equal(report.done, 1);
+  const fixers = calls.filter(c => c.role === 'fixer');
+  assert.equal(fixers.length, 2);
+  assert.match(fixers[1].extra.correction, /^Your change fixes no code \(it changes only TODO\(port\) lines or the trailer\), so reviewer-rules:F1 is neither fixed nor named\. Fix each finding in extra\.confirmedFindings in the code; only when this file cannot fix one, name its reference in its TODO\(port\) line .* and count it in the PORT STATUS trailer\. Return the complete file again with this corrected\.$/);
+  const state = unitState(f.root, f.units[0]);
+  assert.deepEqual(state.singlePass.flagged, ['reviewer-rules:F1']);
+  assert.equal(done(f.root, f.units[0], contextHash(f.root, f.config)), true);
+  const recorded = summary(f, report);
+  assert.deepEqual(recorded.selfRepairs.flagged, [{ target: f.units[0].target, references: ['reviewer-rules:F1'] }]);
+  assert.ok(recorded.warnings.some(w => w === `${f.units[0].target}: its single-pass fix left reviewer-rules:F1 unfixed (flagged with TODO(port), or no code changed for it); no review follows a single-pass fix`), recorded.warnings);
+});
+
+test('what a single-pass fix leaves open: named flags next to a code change; nothing for a code fix or a trailer fix', async t => {
+  const second = { ...finding, id: 'F2', message: 'Null input is not handled', evidence: 'src/math_ops.py:2 has no null check' };
+  const cases = [
+    { name: 'code change and one flag', findings: [finding, second], fixed: `${changed()}\n// TODO(port): reviewer-rules:F2: the inventory needs a null decision\n// PORT STATUS: confidence=medium todos=1\n`, flagged: ['reviewer-rules:F2'] },
+    { name: 'code change only', findings: [finding], fixed: fixedGood(), flagged: undefined },
+    { name: 'trailer only', findings: [{ ...finding, message: 'The PORT STATUS confidence should be medium: the rounding is unverified', evidence: 'last line' }], fixed: `${body()}\n// PORT STATUS: confidence=medium todos=0\n`, flagged: undefined }];
+  for (const c of cases) {
+    const f = await setup(t);
+    const { calls, adapter } = firstReview(c.findings, () => c.fixed);
+    const report = await translate(f.root, f.config, adapter);
+    assert.equal(report.done, 1, c.name);
+    assert.equal(calls.filter(x => x.role === 'fixer').length, 1, `${c.name}: no correction`);
+    assert.deepEqual(unitState(f.root, f.units[0]).singlePass.flagged, c.flagged, c.name);
+    assert.deepEqual(summary(f, report).selfRepairs?.flagged, c.flagged && [{ target: f.units[0].target, references: c.flagged }], c.name);
+  }
+});
+
+test('an answer that ended without a final message is asked again', async t => {
+  const f = await setup(t);
+  const calls = [];
+  const report = await translate(f.root, f.config, async call => {
+    calls.push(call);
+    if (call.role === 'implementer') {
+      if (calls.length === 1) throw new Error('Copilot JSONL is incomplete: successful result and final assistant message required');
+      return content(call, good());
+    }
+    return fake(call);
+  });
+  assert.equal(report.done, 1);
+  const implementers = calls.filter(c => c.role === 'implementer');
+  assert.equal(implementers.length, 2);
+  assert.equal(implementers[1].extra.correction, 'Your previous answer was rejected: Copilot JSONL is incomplete: successful result and final assistant message required. It ended without a final answer (an empty message or a tool call): your last message must be exactly one JSON object in the contract\'s form.');
+  assert.equal(failureGuidance('Copilot JSONL is incomplete: successful result and final assistant message required').id, 'worker-output');
 });

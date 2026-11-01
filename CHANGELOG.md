@@ -10,11 +10,12 @@ returned the file unchanged for an inventory gap they could not fix, and 1
 reviewer wrote text after its JSON. The orchestrator then proposed a RULEBOOK
 edit, which would have sent all 328 finished units back to review.
 
-- A worker answer that is not one JSON object or has the wrong shape is asked
-  once more, in place, with a `correction` naming what was wrong (the parser's
-  reason, such as text after the object). Reviewers, who see no extra task
-  data, get the correction written into their prompt. This was already done
-  for arbitration references (0.38.0).
+- A worker answer that is not one JSON object or has the wrong shape, or that
+  ended without a final message (an empty reply or a tool call, "Copilot JSONL
+  is incomplete"), is asked once more, in place, with a `correction` naming
+  what was wrong (the parser's reason, such as text after the object).
+  Reviewers, who see no extra task data, get the correction written into
+  their prompt. This was already done for arbitration references (0.38.0).
 - The implementer's and the fixer's files are checked before they are written:
   a PORT STATUS trailer in the wrong place, with the wrong count or missing,
   and a single-pass fix that changed nothing, are sent back once with the exact
@@ -22,21 +23,40 @@ edit, which would have sent all 328 finished units back to review.
 - The fixer contract follows upstream's "can't fix it, flag it": a confirmed
   finding this file cannot fix (an inventory or RULEBOOK change, another file)
   is recorded as a `TODO(port): <reference>: <what is needed>` line instead of
-  returning the file unchanged.
-- A wrong trailer still on the written file when the unit would complete is
-  no longer a block on the first try: it becomes the confirmed finding
-  `marker:M1` for the fixer, like a typecheck error, and the fixed file is
-  reviewed again. After two such fixes in one run the unit blocks with the
-  reason.
+  returning the file unchanged. A single-pass fix is not reviewed again, so one
+  that changes no code (only TODO(port) lines or the trailer) is asked once to
+  fix or name each finding it leaves open; findings about the trailer or a
+  TODO(port) line itself are exempt. What a single-pass fix leaves unfixed is
+  kept in its receipt (`singlePass.flagged`) and reported in the run summary
+  (`selfRepairs.flagged` and a warning), so the person hears of it. Accepting
+  such flags without a review is single-pass's deliberate trade-off, as
+  upstream.
+- A wrong trailer still on a written file is no longer a block on the first
+  try: it becomes the confirmed finding `marker:M1` for the fixer, like a
+  typecheck error, and the fixed file is reviewed. A file written for review
+  (the implementer's, or a fix under rereview) goes to the fixer at once,
+  without first spending two reviewer calls on it; a file reviewed with a
+  wrong trailer (left by an earlier run) goes there when the unit would
+  complete. Trailer fixes have their own limit, two per run, and are not fix
+  rounds: `maxFixRounds` neither stops them nor counts them, so a bounded unit
+  whose rounds are used gets the trailer reason, never "Fix-round limit
+  reached" with its advice to amend the RULEBOOK. After two trailer fixes in
+  one run the unit blocks with the reason.
+- A fix refused for changing nothing no longer uses up a fix round, so a
+  rerun is not stopped by the fix-round limit.
 - An invalid trailer now says why, with line numbers, in the review and fix
   evidence (`markerEvidence.problem`) and in the error ("the PORT STATUS line is
   line 83, but line 85 "}" follows it: move the trailer below it, ..."). A valid
   trailer's evidence keeps its six fields, so finished units stay finished.
 - Units still blocked by a contract slip, arbitration references or an
   unchanged fix get one more pass before the run ends; a unit waiting on such
-  a unit runs after it. A repair run does not add the pass. The run summary
-  counts all of this in `selfRepairs` (`corrections`, `markerFixes`,
-  `repass: {units, done}`).
+  a unit runs after it. The pass resumes each unit where it stopped (a trailer
+  fix stays a fix, without new reviews), counts the circuit breaker
+  (`maxConsecutiveFailures`) afresh, and drops a unit's earlier error only once
+  the unit runs again, so a unit a stop or the call budget never restarts
+  keeps it. A repair run does not add the pass. The run summary counts all of
+  this in `selfRepairs` (`corrections`, `markerFixes`, `repass: {units, done}`,
+  `flagged`).
 - The failure guidance and the skill say the runner already retried, so a unit
   still blocked takes the guidance's recommended option (a rerun for an
   arbitration slip, repair for a trailer or an unchanged fix; in auto mode
@@ -45,10 +65,15 @@ edit, which would have sent all 328 finished units back to review.
   earlier, 0.40.0's one-time full re-review still applies.
 - Test: `tests/self-repair-2026-11-01.test.mjs` (the trailer reasons and the
   unchanged evidence fields, the slip classes, the prompts, the implementer's
-  trailer correction, the trailer sent to the fixer and reviewed again, the
-  block after two trailer fixes, the unchanged fix that flags, the reviewer's
-  JSON correction, the extra pass, its limit to one, no pass in a repair run,
-  and a dependent unit that runs after the pass).
+  trailer correction, the trailer sent to the fixer before any review and a
+  file reviewed with a wrong trailer, the block after two trailer fixes, the
+  trailer fix under a used-up `maxFixRounds` and under rereview, the unchanged
+  fix that flags, a flag-only fix asked to name its finding and what fixes
+  leave open, the reviewer's JSON correction, an answer that ended without a
+  final message, the extra pass, its limit to one, a fixer slip during a
+  trailer fix on the pass, the breaker and the budget on the pass, a refused
+  fix that keeps its round, no pass in a repair run, and a dependent unit that
+  runs after the pass).
 
 # 0.40.2 — 2026-11-01
 
