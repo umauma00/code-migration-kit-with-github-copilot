@@ -141,6 +141,18 @@ test('without the reviewed version kept, listed is refused and the person names 
   assert.match(changes.next, /cannot be listed/);
   assert.throws(() => acceptRulebook(f.root, f.config, { note: 'x', redo: 'listed' }), /--redo listed needs the reviewed RULEBOOK version/);
   assert.deepEqual(acceptRulebook(f.root, f.config, { note: 'x', redo: 'ported/math_ops.mjs' }).redo, ['ported/math_ops.mjs']);
+  // Auto mode does not stop: listed (or none) goes on, always with the warning.
+  fs.rmSync(safePath(f.root, rulebookHistoryDir), { recursive: true, force: true });
+  writeJSON(safePath(f.root, autoModeFile), { schemaVersion: 1, enabledAt: new Date().toISOString() });
+  const prefs = safePath(f.root, 'migration/preferences.json');
+  writeJSON(prefs, { ...(fs.existsSync(prefs) ? readJSON(prefs) : { schemaVersion: 1, userLanguage: null }), phaseMode: 'auto' });
+  amend(f, '\nKeep error messages.\n');
+  assert.match(rulebookChanges(f.root, f.config).next, /In auto mode pass --redo listed/);
+  const auto = acceptRulebook(f.root, f.config, { note: 'History missing; could not tell', redo: 'listed' });
+  assert.match(auto.warning, /what changed is unknown/);
+  fs.rmSync(safePath(f.root, rulebookHistoryDir), { recursive: true, force: true });
+  amend(f, '\nWording.\n');
+  assert.match(acceptRulebook(f.root, f.config, { note: 'History missing', redo: 'none' }).warning, /what changed is unknown/);
 });
 
 test('the hook asks before rulebook accept (unasked in auto mode) and keeps agents off its record', async t => {
@@ -187,8 +199,8 @@ test('the hook asks before rulebook accept (unasked in auto mode) and keeps agen
   assert.match(statusMarkdown(migrationStatus(f.root), 'en'), /Warning: RULEBOOK changes auto mode accepted[\s\S]*- .*: Division/);
   // A list that names no file is none, under none's checks.
   amend(f, '\nfloor-division rounds toward negative infinity.\n');
-  // It names only math_ops, which is not finished: no finished file is listed, so the section counts as unmatched.
-  assert.deepEqual(rulebookChanges(f.root, f.config).unmatched, ['Division']);
+  // It names only math_ops, which already waits for review: covered, not unmatched.
+  assert.deepEqual(rulebookChanges(f.root, f.config).unmatched, []);
   assert.equal(acceptRulebook(f.root, f.config, { note: 'Only math_ops, already waiting for review', redo: ' , ' }).kept, 1);
   assert.deepEqual(finished(f), [false, false, true]);
   assert.equal(readJSON(safePath(f.root, rulebookAmendmentsFile)).log.length, 5);

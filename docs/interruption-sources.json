@@ -2626,60 +2626,60 @@
     },
     {
       "path": "lib/rulebook.mjs",
-      "sha256": "921f04e159ee1c1edbcba03aeae8b7e0cb6dd865423a0e58e88010470d8a420c",
+      "sha256": "8f1670ae96140d0f634c3f7b7eef1295ee25cce7c663ef5e1e20dcb1e9b118f0",
       "entries": [
         {
-          "line": 89,
+          "line": 90,
           "kind": "error-or-exit-candidate",
           "code": "if (!identity) throw new Error('Phase 02 is not recorded with a RULEBOOK; a RULEBOOK change before phase 02 needs no acceptance (record phase 02 when it is reviewed)');"
         },
         {
-          "line": 91,
+          "line": 92,
           "kind": "error-or-exit-candidate",
           "code": "if (!raw) throw new Error(`Required artifact missing: ${rulebookFile}`);"
         },
         {
-          "line": 112,
+          "line": 113,
           "kind": "error-or-exit-candidate",
           "code": "if (!note?.trim()) throw new Error('rulebook accept requires --note saying what changed and why');"
         },
         {
-          "line": 113,
+          "line": 114,
           "kind": "error-or-exit-candidate",
           "code": "if (typeof redo !== 'string' || !redo.trim()) throw new Error('rulebook accept requires --redo listed|all|none|PATH,PATH');"
         },
         {
-          "line": 121,
+          "line": 122,
           "kind": "error-or-exit-candidate",
           "code": "if (!changes.changed) throw new Error(changes.next);"
         },
         {
-          "line": 122,
+          "line": 123,
           "kind": "error-or-exit-candidate",
           "code": "if (changes.other.length) throw new Error(changes.next);"
         },
         {
-          "line": 135,
+          "line": 136,
           "kind": "error-or-exit-candidate",
           "code": "if (redo === 'none' && listed.length) throw new Error(`In auto mode --redo none is refused while ${listed.length} listed file(s) may be touched: pass listed, or the listed files with more`);"
         },
         {
-          "line": 136,
+          "line": 137,
           "kind": "error-or-exit-candidate",
           "code": "if (missing.length) throw new Error(`In auto mode a file list keeps every listed file; missing: ${missing.join(', ')}`);"
         },
         {
-          "line": 144,
+          "line": 147,
           "kind": "error-or-exit-candidate",
-          "code": "if (changes.previous === null) throw new Error('--redo listed needs the reviewed RULEBOOK version, which is not kept; choose all, none or name the files');"
+          "code": "if (changes.previous === null && !autoPhases(root)) throw new Error('--redo listed needs the reviewed RULEBOOK version, which is not kept; choose all, none or name the files');"
         },
         {
-          "line": 149,
+          "line": 152,
           "kind": "error-or-exit-candidate",
           "code": "if (unknown.length) throw new Error(`Not manifest targets: ${unknown.join(', ')}`);"
         },
         {
-          "line": 177,
+          "line": 181,
           "kind": "error-or-exit-candidate",
           "code": "throw new Error(`Phase 02 is still out of date after accepting the RULEBOOK: ${why}`);"
         }
