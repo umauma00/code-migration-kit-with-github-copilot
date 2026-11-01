@@ -138,9 +138,13 @@ test('after phase 01 an edit keeps the replaced version; after translation start
 
   writeJSON(safePath(f.root, 'migration/gates/translation.json'), { schemaVersion: 1, stage: 'translation' });
   for (const [id, status] of [['a', 'done'], ['b', 'done'], ['c', 'blocked']]) writeJSON(safePath(f.root, `migration/state/units/${id}.json`), { status });
+  // Without a phase 02 record there is nothing to accept: the cost is named.
+  assert.match(editRulebook(f).reason, /The edit sends every finished unit \(2 now\) back to review/);
+  writeJSON(safePath(f.root, 'migration/phases/02.json'), { schemaVersion: 1, phase: '02' });
   const asked = editRulebook(f);
   assert.equal(asked.decision, 'ask');
-  assert.match(asked.reason, /every finished unit \(2 now\) be reviewed again/);
+  // 0.40.0: rulebook accept lets the person choose what to redo.
+  assert.match(asked.reason, /`rulebook accept` lets you choose which of the 2 finished units to redo/);
   assert.match(asked.reason, /fixed by repair, not in the RULEBOOK/);
   assert.ok(asked.reason.includes(`${rulebookHistoryDir}/${saved[0]}`));
   // Real shell writes ask too; reads, copies out and quoted mentions do not.
@@ -180,7 +184,7 @@ test('after phase 01 an edit keeps the replaced version; after translation start
   writeJSON(prefs, { ...(fs.existsSync(prefs) ? readJSON(prefs) : { schemaVersion: 1 }), userLanguage: 'ja' });
   const ja = editRulebook(f);
   assert.equal(ja.decision, 'ask');
-  assert.match(ja.reason, /完了済み 2 件のレビューのやり直し/);
+  assert.match(ja.reason, /`rulebook accept` で、完了済み 2 件のうち作り直す単位をあなたが選びます/);
 });
 
 test('the skill and the orchestrator say a blocked unit is repaired, not fixed in the RULEBOOK', () => {
@@ -201,7 +205,7 @@ test('in auto mode the edit is refused with the way on, since autopilot cannot s
   const denied = editRulebook(f);
   assert.equal(denied.decision, 'deny');
   assert.match(denied.reason, /Repair the blocked units without changing the RULEBOOK/);
-  assert.match(denied.reason, /1 now/);
+  assert.match(denied.reason, /a rule change is the person's decision/);
   assert.equal(editRulebook(f, 'sed -i s/a/b/ migration/RULEBOOK.md').decision, 'deny');
   assert.equal(editRulebook(f, 'sed -n 1,5p migration/RULEBOOK.md'), null);
   assert.equal(history(f).length, 1);

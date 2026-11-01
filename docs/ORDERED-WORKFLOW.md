@@ -54,6 +54,21 @@ node migration-kit/scripts/run_migration.mjs phase start 05c
 node migration-kit/scripts/run_migration.mjs phase complete 05c --note "source-onlyのため比較は対象外。動作同等性は未検証"
 ```
 
+<a id="rulebook-amendment"></a>
+### 02の後にRULEBOOKを変えたとき（受け入れ）
+
+02の記録の後にRULEBOOKだけが変わった場合、`phase next` は記録し直しではなく受け入れを案内する（上流の規則6：直したルールが関わる部分だけを作り直す）。
+
+```sh
+node migration-kit/scripts/run_migration.mjs rulebook changes --format markdown
+node migration-kit/scripts/run_migration.mjs rulebook accept --note "変更点と理由" --redo listed
+```
+
+- `rulebook changes` は読むだけ。02で記録した版（`migration/rulebook-history/`）との節ごとの差分と、変更行に inventory の構文・分類・シンボルが出てくる完了済みファイルの一覧を示す。どのファイルにも一致しない節も名前を出す。
+- `rulebook accept` は人間の判断で、ホストが確認を求める。`--redo` は listed（一覧のファイル）・all・none・ファイルの列挙。工程02・03、承認、ほかの完了済みファイルはそのまま有効で、選んだファイルだけが次の `translate` でレビューし直しになる（出力は残す）。
+- RULEBOOK以外（ソース・設定・inventory など）も変わっていれば受け入れられず、今までどおり記録し直す。受け入れは `migration/phases/rulebook-amendments.json` に残り、runnerだけが書く。
+- 自動モードでは確認なしで実行し、listed を選ぶ。言葉の一致でファイルが見つからない節は、全部を作り直さず、AI がその節を読んで影響するファイルを足す（一覧が空で訳し済みのコードに影響しなければ none）。判断できないときは止まらずに進み、確かめていない節を状況報告に警告として出す。一覧のファイルを外す選択は実行側が拒否する。
+
 この制御はキットの入口とrunnerに適用する。VS Code自体の任意の編集を禁止する機能ではない。
 工程TODOも現在の記録に合わせ、完了を確認できない工程をチェック済みにしない。
 利用量の記録は[main形式のcost-log](COST-LOG.md)を参照。
@@ -93,7 +108,7 @@ autopilot は確認（フックの ask）を自動で拒否するため、`norma
 - `auto` に切り替える操作（`preferences --phase-mode auto` と、`phaseMode: "auto"` を含む `settings apply`。後者は確認の理由に自動モードへの切り替えと書かれます）は、どのモードでも人の確認が必要です。`--phase-mode` の値が文字どおりの `normal`・`relaxed` 以外（変数・`$(...)` など）のときも確認します。`auto` から抜ける操作は確認なしです。
 - `auto` が効くのは、runner が書く記録 `migration/phases/auto-mode.json` があるときだけです。エージェントがこのファイルを直接書くことはフックが拒否します。`auto` から抜けるとこの記録は `migration/phases/retired/` へ移ります。preferences.json を手で `auto` にしただけでは無効で、関門は緩和モードと同じく確認し、status がその旨を表示します。
 - guardrails が未設置なら、03・04・05 の関門でテンプレート（`templates/guardrails.json`）をそのまま設置し、`installedBy: "auto-mode"` を記録します。既にあるファイルは変えません。
-- 上流の規則3（承認ゲートで止まる）からの逸脱として、`auto` を選んだ時刻と内容を `migration/phases/auto-mode.json` に残します（RULEBOOK に書くと contextHash が変わり承認が失効するため、別ファイルです）。工程の中で決めた選択を人に聞かずに RULEBOOK に書くことは、上流の規則1（RULEBOOK の変更は人に回す）からの逸脱でもあり、報告の「人の確認なしで決めたもの」に載せます。RULEBOOK がまだ無い 00b・01 で出た選択は、RULEBOOK を書くときに入れます。変換を始めた後は、自動モードでも AI による RULEBOOK の書き換えをフックが拒否します（完了済みがすべて再レビューになるため）。そのときに見つかったルールの問題は、報告に載せて人の判断に回します。
+- 上流の規則3（承認ゲートで止まる）からの逸脱として、`auto` を選んだ時刻と内容を `migration/phases/auto-mode.json` に残します（RULEBOOK に書くと contextHash が変わり承認が失効するため、別ファイルです）。工程の中で決めた選択を人に聞かずに RULEBOOK に書くことは、上流の規則1（RULEBOOK の変更は人に回す）からの逸脱でもあり、報告の「人の確認なしで決めたもの」に載せます。RULEBOOK がまだ無い 00b・01 で出た選択は、RULEBOOK を書くときに入れます。変換を始めた後は、自動モードでも AI による RULEBOOK の書き換えをフックが拒否します（ルールの変更は利用者が決めるため）。そのときに見つかったルールの問題は、報告に載せて人の判断に回します。
 - `auto` で作った工程記録・承認・見送りには `auto: true` が付きます。status は「自動モード：オン」と「自動モードが人の確認なしで記録したもの」を出し、チェックリストでは【自動・人の確認なし】が付きます。見送りと build-loop の許可も一覧に入ります。`normal` や `relaxed` に戻しても一覧は残り、人が完了・承認し直すとその記録は置き換わります（工程を記録し直すと、その上に作った後続の工程も記録し直しになります。費用の記録は増えません）。逆に、人が記録した有効な承認・見送りを `auto` が置き換えることはありません（範囲を指定した翻訳承認と build-loop の承認は、その範囲・回の記録として書き直します）。
 - 限界：フックはコマンドの文字列を読みます。ファイルを直接書く手段をすべて見分けられるわけではないため（変数で組み立てたパスなど）、`auto` の記録や承認ファイルの偽造は、普通モードの承認ファイルと同じく完全には防げません。
 - 初期設定は手動です。自動モードを選んだ後の初期設定の質問には毎回「自動モードを選択済み・まだ手動・残り◯回ほど」の1行（`setupNotice`）が付きます。初期設定が終わると（仕様が無い場合は source-as-spec への切り替えまで済ませてから）、`autoHandoff` の案内を出して 00 を始める前に止まります。autopilot モードに切り替えて「続けて」と送ると 00 から進みます（切り替えなくても、ある程度は自動で進みます）。切り替え方は Copilot CLI・GitHub Copilot app・VS Code で違い、キットはどのアプリかを判別できないため、案内にはキーや操作の場所を書きません。00 の調査で初期設定の答え（元のコードが動くか、仕様があるか）が違うと分かったときは、理由を書いて止まり、autopilot を解除して対話で決めてもらいます。

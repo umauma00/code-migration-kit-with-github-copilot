@@ -293,7 +293,7 @@ footer { padding-top: 40px; color: var(--muted); font-size: 13px; display: grid;
     <div class="calls">
       <div class="call"><div class="who"><span class="chip worker">implementer・reviewer×2・arbiter・fixer</span></div><div class="how">1ファイルごとに下の「1ファイルの処理」を実行<span class="from">ランナーの translate（オーケストレーターは status --wait で待つ）</span></div><div class="n">1ファイル3〜5</div></div>
     </div>
-    <dl class="gates"><dt>確認</dt><dd>変換そのものは確認なし（03 の最後に承認済み）。まとまりに分けたときは、まとまりごとに承認</dd><dt>止まった時</dt><dd>末尾行（PORT STATUS）の書式や裁定の書き間違いで止まったファイルは、translate の再実行か修理（repair）で直します。ルールブックは直しません（直すと完了済みがすべて再レビューになります）</dd></dl>
+    <dl class="gates"><dt>確認</dt><dd>変換そのものは確認なし（03 の最後に承認済み）。まとまりに分けたときは、まとまりごとに承認</dd><dt>止まった時</dt><dd>末尾行（PORT STATUS）の書式や裁定の書き間違いで止まったファイルは、translate の再実行か修理（repair）で直します。ルールブックは直しません。本当にルールの問題なら、変更した後に <code>rulebook accept</code> で受け入れ、作り直すファイルだけを選びます</dd></dl>
   </article>
 
   <article class="phase" id="p-05">
@@ -390,7 +390,8 @@ footer { padding-top: 40px; color: var(--muted); font-size: 13px; display: grid;
         <tr><td>build-loop・試運転の準備・source-as-spec</td><td>確認</td><td>確認</td><td>確認なし</td></tr>
         <tr><td>ガードレールの設置</td><td>確認</td><td>確認</td><td>ひな形どおりの初回だけ確認なし</td></tr>
         <tr><td>前提が足りない工程を見送る</td><td>できない</td><td>「直す／進む」を聞き、進むなら確認</td><td>理由を記録して進む</td></tr>
-        <tr><td>変換開始後の AI によるルールブックの書き換え</td><td>確認（再レビューになる件数を表示）</td><td>確認（同じ）</td><td>拒否（修理で直す）</td></tr>
+        <tr><td>変換開始後の AI によるルールブックの書き換え</td><td>確認（完了済みの件数を表示）</td><td>確認（同じ）</td><td>拒否（修理で直す）</td></tr>
+        <tr><td>工程02の後のルールブックの変更の受け入れ（<code>rulebook accept</code>）</td><td>確認（作り直すファイルを選ぶ）</td><td>確認（同じ）</td><td>確認なし（一覧のファイル、合わない節があれば全件）</td></tr>
         <tr><td>会話記録の削除・自動モードへの切り替え</td><td>確認</td><td>確認</td><td>確認</td></tr>
         <tr><td>モデル・設定ファイルの記録</td><td>確認なし</td><td>確認なし</td><td>確認なし</td></tr>
       </tbody>
@@ -426,7 +427,7 @@ footer { padding-top: 40px; color: var(--muted); font-size: 13px; display: grid;
         <tr><td>ワーカーの起動</td><td>Claude Code のサブエージェント</td><td>ランナーが1回ごとに新しい copilot プロセスを起動。ツール・モデル・指示ファイルの遮断をコマンドで固定</td></tr>
         <tr><td>ファイルを書くのは</td><td>実装担当が自分で書く</td><td>ワーカーは JSON を返すだけ。書くのはランナーだけ</td></tr>
         <tr><td>裁定の範囲</td><td>2人の意見が分かれたものだけ</td><td>すべての指摘（同じ行への指摘でも直し方が違うことがあるため）</td></tr>
-        <tr><td>ルールブックの変更</td><td>変更は人に回す（規則1）</td><td>工程01の後の AI の書き換えは前の版を残し、変換開始後は確認（自動モードでは拒否）</td></tr>
+        <tr><td>ルールブックの変更</td><td>変更は人に回す（規則1）</td><td>工程01の後の AI の書き換えは前の版を残し、変換開始後は確認（自動モードでは拒否）。工程02の後の変更は <code>rulebook accept</code> で受け入れ、作り直すファイルだけを選ぶ（上流の規則6と同じ）</td></tr>
         <tr><td>承認</td><td>次のプロンプトを貼ることが承認</td><td>承認をハッシュ付きで記録し、入力が変わると自動で失効。承認のコマンドではアプリが人に確認</td></tr>
         <tr><td>完了の判定</td><td>出力ファイルがあれば完了</td><td>レビュー済みでハッシュの合う記録があるときだけ完了</td></tr>
         <tr><td>工程の順番</td><td>手順書の案内に任せる</td><td>10工程の開始・完了を記録し、前の工程が揃うまで次に進まない</td></tr>

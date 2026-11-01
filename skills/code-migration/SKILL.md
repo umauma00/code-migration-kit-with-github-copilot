@@ -560,15 +560,32 @@ reviewed work). A run that stops at its AI call budget is a budget stop: rerun
 
 A unit blocked after translation started (a PORT STATUS trailer, an arbitration
 format slip, a fixer that changed nothing) is a unit problem: repair that unit,
-never edit the RULEBOOK for it. Every finished unit's record carries the
-RULEBOOK's hash, so any edit after translation started makes all of them be
-reviewed again. Propose a RULEBOOK amendment only for a real rule problem: say
-in chat what changes and how many finished units it sends back (status shows
-the count), then make the edit. The hook's confirmation, which shows the edit,
-is the person's decision, so do not ask with a question tool first; the person
-may also edit the file themselves. In auto mode the hook refuses the edit:
-list the rule problem in the report instead. The replaced version is kept in
-`migration/rulebook-history/`.
+never edit the RULEBOOK for it. Propose a RULEBOOK amendment only for a real
+rule problem: say in chat what changes, then make the edit. The hook's
+confirmation, which shows the edit, is the person's decision, so do not ask
+with a question tool first; the person may also edit the file themselves. In
+auto mode the hook refuses the edit: list the rule problem in the report
+instead. The replaced version is kept in `migration/rulebook-history/`.
+After an edit (yours or the person's) once phase 02 is recorded, run
+`rulebook changes --format markdown` and tell the person what changed and which
+finished units it may touch in plain words (no commands or paths). Ask one
+`ask_user` question for the redo choice: only the files the change may touch
+(recommended; for a changed section no file matches by words, read it and add
+the files it affects), every finished file,
+none, or files the person names. Say that the list is found by matching words, so
+it can miss a file, and that none leaves finished code on the old rule: offer it
+only for a change that cannot affect translated code (wording, a rule for files
+not yet translated). Then run `rulebook accept --note TEXT --redo
+listed|all|none|PATH,...` with that choice (the host asks them to confirm; in
+auto mode do not ask and do not stop: pass listed, or for a changed section that
+matches no file read it against the inventory and pass the listed files plus the
+files it affects, or none when nothing is listed and it cannot affect translated
+code; when you cannot tell, pass listed and go on: the result's warning names
+those sections, so put it in the report. The note says which files and why).
+Phases 02 and 03, the approvals and the other finished units stay current, and
+the next `translate` reviews only the chosen units again. Without it, phases 02
+and 03 go stale and every finished unit is reviewed again. A kit (plugin)
+update keeps them too; the project's own agents and hooks still count.
 
 After a failed build, propose `build-loop --note TEXT [--through build|smoke|parity]
 [--max-rounds N] [--max-calls N]` (defaults: build only, continuous until clean;
