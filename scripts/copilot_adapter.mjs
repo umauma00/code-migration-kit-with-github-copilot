@@ -388,7 +388,7 @@ export function createCopilotAdapter({ command = 'copilot', prefixArgs = [], ver
   const workerHome = (root, config) => {
     if (sharedHome) return null;
     try { return prepareWorkerHome(root, config); }
-    catch (e) { sharedHome = true; homeWarning = `Workers use the person's Copilot CLI home: the kit's worker home could not be prepared (${e.message.slice(0, 200)})`; console.error(`WARNING: ${homeWarning}`); return null; }
+    catch (e) { sharedHome = true; homeWarning = `Workers use the person's Copilot CLI home: the kit's worker home could not be prepared (${e.message.slice(0, 600)})`; console.error(`WARNING: ${homeWarning}`); return null; }
   };
   return async ({ root, config, role, unit, extra, signal, reviewInput, reviewMode = 'frozen', workInput, workMode, runId, sessionId, model: modelOverride }) => {
     // Oversized reviews run on the read-only twin profile of the same reviewer.

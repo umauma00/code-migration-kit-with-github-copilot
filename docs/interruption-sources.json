@@ -3303,7 +3303,7 @@
     },
     {
       "path": "lib/worker-home.mjs",
-      "sha256": "22765269b2e91a930cc222b00ff05aa6603a6981e321c1140449de672483807f",
+      "sha256": "2e7d9dcca7c006d194aeecdb01400042e6c0aa39ec855aa40874ca3935c03127",
       "entries": [
         {
           "line": 120,
@@ -3321,12 +3321,12 @@
           "code": "if (pending) throw new Error(pending);"
         },
         {
-          "line": 171,
+          "line": 175,
           "kind": "pid-probe",
           "code": "const alive = pid => { try { process.kill(pid, 0); return true; } catch (e) { return e.code === 'EPERM'; } };"
         },
         {
-          "line": 194,
+          "line": 200,
           "kind": "loop-exit-candidate",
           "code": "try { fs.writeFileSync(ownerFile, JSON.stringify({ pid: process.pid, token })); break; }"
         }
@@ -3512,7 +3512,7 @@
     },
     {
       "path": "scripts/copilot_adapter.mjs",
-      "sha256": "dd583be1f71f944280c0fe0dfe46944fad978b63b30792098ac0dce478ae0104",
+      "sha256": "db094b4179d00028504e086afda772637c11af631b548731b0bd1f1669f34743",
       "entries": [
         {
           "line": 9,
