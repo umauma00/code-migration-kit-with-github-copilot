@@ -140,16 +140,19 @@ test('an older worker home is emptied by one kit process at a time, and a broken
   fs.mkdirSync(lock, { recursive: true });
   fs.writeFileSync(path.join(worker, 'mcp-installations.json'), 'old');
   fs.writeFileSync(path.join(worker, workerHomeMarker), 'not json');
-  // Another process is emptying it: this one leaves it and goes on.
-  prepareWorkerHome(root, {});
+  fs.writeFileSync(path.join(lock, 'owner'), 'another process');
+  // Another process is emptying it: this one waits, then uses the person's home for now and tries again next time.
+  assert.equal(prepareWorkerHome(root, {}, { upgradeWaitMs: 300 }), null);
   assert.ok(fs.existsSync(path.join(worker, 'mcp-installations.json')));
+  assert.ok(fs.existsSync(lock), 'another process\'s lock is left alone');
   assert.equal(fs.readFileSync(path.join(worker, workerHomeMarker), 'utf8'), 'not json');
   // A lock left by a process that ended mid-way is taken over after a while.
   resetPreparedWorkerHomes();
   const old = (Date.now() - workerHomeUpgradeLockMs - 60000) / 1000;
   fs.utimesSync(lock, old, old);
-  prepareWorkerHome(root, {});
+  assert.equal(prepareWorkerHome(root, {}), worker);
   assert.ok(!fs.existsSync(path.join(worker, 'mcp-installations.json')) && !fs.existsSync(lock));
+  assert.deepEqual(fs.readdirSync(worker).filter(name => name.startsWith('.migration-kit-upgrading')), [], 'the stale lock was taken over and removed');
   assert.deepEqual(JSON.parse(fs.readFileSync(path.join(worker, workerHomeMarker), 'utf8')), { layout: workerHomeLayout });
 });
 

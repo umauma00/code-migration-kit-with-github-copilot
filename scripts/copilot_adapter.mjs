@@ -438,10 +438,10 @@ export function createCopilotAdapter({ command = 'copilot', prefixArgs = [], ver
     } catch (e) { fs.rmSync(usageDir, { recursive: true, force: true }); throw e; }
     try {
       result = await runProcess(command, argv, options);
-      // Only a CLI that stopped before the model answered: a call that already
-      // reached the model is never paid for twice.
-      const homeFailure = home && result.code !== 0 && !modelAnswered(result) ? `${copilotStreamError(processOutputLines(result)) ?? ''}\n${result.stderr}` : '';
-      const signedOut = homeFailure && isSignedOut(homeFailure), homeState = homeFailure && !signedOut && isHomeStateFailure(homeFailure);
+      const homeFailure = home && result.code !== 0 ? `${copilotStreamError(processOutputLines(result)) ?? ''}\n${result.stderr}` : '';
+      // MCP or storage: only a CLI that stopped before the model answered, so
+      // a call that already reached the model is never paid for twice.
+      const signedOut = homeFailure && isSignedOut(homeFailure), homeState = homeFailure && !signedOut && isHomeStateFailure(homeFailure) && !modelAnswered(result);
       if (signedOut || homeState) {
         // Not signed in in the worker home, or the CLI could not start its MCP
         // servers or storage there, before the model answered. The call is repeated

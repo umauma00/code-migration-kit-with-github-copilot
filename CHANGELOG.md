@@ -17,8 +17,11 @@ file bound to the person's home, and copied them again on every command.
 - A worker home made by 0.34.0 to 0.40.1 (no `.migration-kit-worker-home.json`
   marker) is emptied once, keeping `session-state`, `session-store.db`, `logs`
   and `pkg` (locks go too, so no lock outlives its binding). Links are removed
-  as links, never followed. One kit process empties it at a time, and the
-  marker is written only when everything went. A worker home that is a link,
+  as links, never followed. One kit process empties it at a time (another
+  waits up to 30 seconds, then uses the person's home for that call); a stale
+  lock is taken over after 10 minutes. The marker is written once nothing tied
+  to the person's home is left; anything else Windows kept open is warned
+  about. A worker home that is a link,
   or resolves to the person's home, is refused (workers use the person's home
   for that command, with a warning).
 - A worker that cannot start its MCP servers or its storage in the worker home
@@ -26,10 +29,14 @@ file bound to the person's home, and copied them again on every command.
   messages; lock contention does not count) before the model answered is
   repeated in the person's home, like a missing sign-in, and the rest of that
   command stays there, with a warning in the run report instead of a failure.
-  `doctor --check-cli` follows workers there when it checks the agents.
+  `doctor --check-cli` follows workers there when it checks the agents. A
+  failure in both homes fails that unit as before (each unit then starts the
+  CLI twice) and does not stop the run.
 - Test: `tests/worker-home-state-2026-11-01.test.mjs` (what the worker home
   takes and leaves, the one-time emptying that keeps records and never follows
-  links, the failure patterns, the fallback and a failure in both homes).
+  links, the upgrade lock and its takeover, a worker home that is a link, the
+  failure patterns, the fallback, no repeat after the model answered, a
+  failure in both homes, and doctor's agent check).
 
 # 0.40.0 — 2026-11-01
 
