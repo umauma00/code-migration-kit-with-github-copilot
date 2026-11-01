@@ -2,7 +2,7 @@
 
 日本語 | [English](PLUGIN.en.md)
 
-Node.js 22以上、Agent Plugins 1.0に対応したGitHub Copilot CLI・VS Code・GitHub Copilot appのどれかを使います。ワーカーは常にCopilot CLIで動くため、VS Codeやappから進める場合もCopilot CLIが必要です（未導入ならAIが同意を得てインストールし、サインインを始めます）。確認したCLIは1.0.93・1.0.95・1.0.98です。移行対象の言語環境とテストも必要です。
+Node.js 22以上、Agent Plugins 1.0に対応したGitHub Copilot CLI・VS Code・GitHub Copilot appのどれかを使います。ワーカーは常にCopilot CLIで動くため、VS Codeやappから進める場合もCopilot CLIが必要です（未導入ならAIが同意を得てインストールし、サインインを始めます）。実際の CLI と疑似のモデルでの通信は 1.0.93〜1.0.98 で確認しています。2026-10-31 時点の最新版 1.0.105 でも、キットが CLI に渡すオプションはすべて有効です（`copilot --help` で確認）。移行対象の言語環境とテストも必要です。
 
 ## インストール
 
@@ -24,7 +24,7 @@ copilot plugin install code-migration-kit@code-migration-kit-marketplace
 copilot plugin list
 ```
 
-更新は `copilot plugin marketplace update code-migration-kit-marketplace` の後に `copilot plugin update code-migration-kit` です。手元のcheckoutを使う場合は `copilot plugin marketplace add /path/to/code-migration-kit` で登録します。ローカルのマーケットプレイスから入れたプラグインはcheckoutを直接読み、変更は新しいセッション（または `/restart`）で反映されます。
+更新は `copilot plugin marketplace update code-migration-kit-marketplace` の後に `copilot plugin update code-migration-kit` です。手元のcheckoutを使う場合は `copilot plugin marketplace add /path/to/code-migration-kit` で登録します。ローカルのマーケットプレイスから入れたプラグインはcheckoutを直接読み、変更は新しいセッション（または `/restart`）で反映されます。移行の途中では更新しないでください。版が変わると承認が失効し、完了済みのファイルがすべて再レビューになることがあります（[UPGRADING.md](UPGRADING.md)）。
 
 ### VS Code
 
@@ -45,6 +45,14 @@ copilot plugin list
 
 Copilot 実行方式のチャットで使える `/plugin` コマンドは、Customizations 画面と別の一覧を持ちます。入れた画面で管理してください。
 
+VS Code でセッションを始めるときは次のようにします（VS Code 1.144、2026-10-31 時点の公式文書で確認）。
+
+- 実行方式（harness）は **Copilot** にします。1.144 では新しいセッションの既定です。プラグインはこの実行方式で読まれます。**Local** は 1.144 では既定で表示されず、Agents window では使えません。Local を使う場合はコピー導入に `--harness vscode-local` を付けます（[詳しい使い方](REFERENCE.md#コピー導入で置かれるもの)）。
+- チャットビューでも **Agents window** でも、エージェントの選択欄で `code-migration-plugin-orchestrator` を選びます。
+- Agents window では、分離方法を **Folder** にします。**New Worktree** のセッションは常に「Allow all」で動き、確認ダイアログが出ません。キットの承認は確認ダイアログで人が許可する前提なので、使わないでください。New Worktree はコミット済みのファイルから始まるため、まだコミットしていない `migration/` も引き継がれません。
+- 権限は **Manual permissions**（既定）か **Assisted permissions** にします。**Allow all** では確認が出ません。
+- 通しで自動に進めたいときは、初期設定で自動モードを選び、初期設定が終わってから autopilot モードに切り替えて「続けて」と送ります。
+
 ### GitHub Copilot app
 
 1. サイドバーの **Customize** を開き、マーケットプレイスの選択欄の横にあるマーケットプレイス設定から、上の登録元を GitHub リポジトリとして追加します。リンク `ghapp://plugins/marketplace/add?source=umauma00%2Fcode-migration-kit-with-github-copilot` を開くと入力済みのフォームが出ます（確認後に追加）。
@@ -54,7 +62,7 @@ app でセッションを始めるときは次のようにします。
 
 - **Environment** は **This computer** にします。キットは手元の Copilot CLI でワーカーを動かし、移行の記録を手元のファイルに書くためです（Cloud は未確認）。
 - **Workspace** は **Current checkout** にします。**New worktree** はセッションごとに別の作業コピーを作り、未コミットの `migration/` が引き継がれません。別のワークツリーに移行がある状態で初期化しようとすると、初期化のプレビューがその場所（`existingMigrations`）を返し、オーケストレーターがそちらで再開するか質問します。
-- エージェントの選択欄（または `/agent`）で `code-migration-plugin-orchestrator` を選びます。セッションモードの **Autopilot** はキットの自動モード（`phaseMode: auto`）に対応します。
+- エージェントの選択欄（または `/agent`）で `code-migration-plugin-orchestrator` を選びます。通しで自動に進めたいときは、初期設定で自動モードを選び、初期設定が終わってから autopilot モードに切り替えて「続けて」と送ります。
 - ツールの権限は **Ask every time** か **Assisted** にします。ゲートのコマンドは確認を前提にしています。**Approve all** で確認が出るかは未確認です。
 - ローカルのサンドボックスが有効なセッションでワーカーがネットワークやサインインに届かない場合は、そのセッションで `/sandbox off` にします。オフにするとそのセッションのコマンドはサンドボックスの制限なしで動くため、信頼できるリポジトリでだけ行ってください。
 
@@ -79,25 +87,25 @@ GitLab などに置いたcheckoutも、Git URL（`https://git.example.com/group/
 }
 ```
 
-### 調べた一次情報（2026-10-29）
+### 調べた一次情報（2026-10-29。VS Code のセッションの設定は 2026-10-31 に再確認）
 
 - GitHub Docs: [Customizing the GitHub Copilot app](https://docs.github.com/en/copilot/how-tos/github-copilot-app/customize-github-copilot-app)、[Opening the app with deep links](https://docs.github.com/en/copilot/how-tos/github-copilot-app/open-with-deep-links)、[Agent sessions](https://docs.github.com/en/copilot/how-tos/github-copilot-app/agent-sessions)
 - GitHub Docs: [Finding and installing plugins for Copilot CLI](https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/plugins-finding-installing)、[CLI plugin reference](https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-plugin-reference)、[Plugins](https://docs.github.com/en/copilot/concepts/customizations/plugins)
-- VS Code: [Agent plugins](https://code.visualstudio.com/docs/agent-customization/agent-plugins)、[Agent plugin reference](https://code.visualstudio.com/docs/agents/reference/agent-plugin-reference)
+- VS Code: [Agent plugins](https://code.visualstudio.com/docs/agent-customization/agent-plugins)、[Agent plugin reference](https://code.visualstudio.com/docs/agents/reference/agent-plugin-reference)、[Agent harnesses](https://code.visualstudio.com/docs/agents/run/agent-harnesses)、[Agents window](https://code.visualstudio.com/docs/agents/run/agents-window)、[Approvals](https://code.visualstudio.com/docs/agents/run/approvals)、[1.144 リリースノート](https://code.visualstudio.com/updates/v1_144)
 
 ## 新しい案件を開始する
 
-移行対象リポジトリをVS Codeで開き、Copilotチャットのエージェント一覧から `code-migration-plugin-orchestrator` を選んで（Copilot CLIでは `/agent`）、「PythonからJavaScriptへ移行を開始して」などと依頼します。利用できるモデルIDを指定してください。オーケストレーターは初期化と設定を確認し、事前調査から一工程ずつ進めます。
+移行対象リポジトリを開き、エージェントの選択欄（Copilot CLI と app では `/agent` も可）で `code-migration-plugin-orchestrator` を選んで、「PythonからJavaScriptへ移行を開始して」などと依頼します。オーケストレーターは報告の言語を聞いて初期化し、モデルなどを1問ずつ聞いてから、事前調査から一工程ずつ進めます。
 
-手動で初期化する場合は、対象リポジトリをcwdにして以下を実行します。`MODEL_ID` はアカウントで利用可能なモデルIDへ置き換えます。
+手動で初期化する場合は、対象リポジトリをcwdにして以下を実行します（モデルは導入後に質問で選びます）。
 
 各工程の最後に、Copilotは成果物へのリンク・確認ポイント・次の工程・返信例を報告します。追加の判断が必要な場合、利用可能な質問ツールで「次へ進む／修正する／中断する」を確認します。質問ツールが使えない環境では同じ選択肢をチャットに表示して返信を待ちます。すでに明示した指示は繰り返し確認しません。本番変換・ビルド・smoke・parityには、現在の成果物に対する承認を明示します。詳細と例は [工程末の報告と確認](PHASE-HANDOFF.md) を参照してください。
 
 開始・再開時には、親の調整エージェントがCopilotのTODOに10工程の一覧を作り、現在の工程・承認待ち・修正中・停止を表示します。工程末の報告にも完了した工程数と次の工程を含めます。再開時は保存した成果物・検証記録を確認して更新し、TODOのチェックだけで承認・完了と判断しません。TODOが使えない環境ではチャットの一覧に切り替えます。詳細は [工程のTODO表示](PHASE-HANDOFF.md#track-the-ten-phases-in-the-host-todo-list) を参照してください。
 
 ```bash
-node /path/to/code-migration-kit/scripts/install.mjs --target . --layout plugin --model MODEL_ID --language ja
-node /path/to/code-migration-kit/scripts/install.mjs --target . --layout plugin --model MODEL_ID --language ja --apply
+node /path/to/code-migration-kit/scripts/install.mjs --target . --layout plugin --language ja
+node /path/to/code-migration-kit/scripts/install.mjs --target . --layout plugin --language ja --apply
 ```
 
 VS Code・Copilot CLI・GitHub Copilot appのどれから開始する場合も、親エージェントがターミナルでrunnerを動かし、runnerがCopilot CLIのワーカーを起動します。これらのコマンドもAIがチャットから実行します。
@@ -127,4 +135,4 @@ node /path/to/code-migration-kit/scripts/run_migration.mjs status
 
 担当の衝突とhook変更後の失効は、`node tests/verify_plugin_resolution.mjs /absolute/path/to/runtime.node` でCLI 1.0.93の実際の探索・選択・hook APIと照合できます。この内部APIへの依存は検証用スクリプトだけです。
 
-macOSの実CLI（1.0.95・1.0.98）と疑似プロバイダーの間で、プラグイン方式の変換・独立レビュー（ツール付きレビューを含む）・ガードレールhookによる拒否を確認しました。古いCLI（1.0.40）はプラグインのエージェントを読み込めず、`doctor` が不足する担当IDを報告します。VS Code UI・GitHub Copilot appでの動作と、認証済み実モデルでの移植品質は未検証です。実案件の前に [LIVE-SMOKE.md](LIVE-SMOKE.md) の小規模確認を行い、同文書の `migration-kit/` をプラグインの絶対パスへ読み替えてください。
+macOSの実CLI（1.0.95・1.0.98）と疑似のモデルの間で、プラグイン方式の変換・独立レビュー（ツール付きレビューを含む）・ガードレールhookによる拒否を確認しました。古いCLI（1.0.40）はプラグインのエージェントを読み込めず、`doctor` が不足する担当IDを報告します。VS Code・GitHub Copilot app の画面での網羅的な動作確認と、最後の工程まで通した実モデルでの移植品質は未検証です。実案件の前に [LIVE-SMOKE.md](LIVE-SMOKE.md) の小規模確認を行い、同文書の `migration-kit/` をプラグインの絶対パスへ読み替えてください。

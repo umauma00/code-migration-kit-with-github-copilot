@@ -2,7 +2,7 @@
 
 日本語 | [English](LIVE-SMOKE.en.md)
 
-自動テストはCopilot認証やAI呼び出しを行いません。この手順は、自分の環境で通常CLI経路を確認するためのものです。モデル呼び出しには利用枠・料金が発生します。
+自動テストはCopilot認証やAI呼び出しを行いません。この手順は、自分の環境で通常CLI経路を確認するためのものです。モデルの呼び出しはアカウントの GitHub AI Credits を使います。
 
 VS Codeから進める場合も、ワーカーは同じCopilot CLIです。チャットだけで完遂できること（下の確認項目）も合わせて確認してください。
 
@@ -29,10 +29,11 @@ VS Codeから進める場合も、ワーカーは同じCopilot CLIです。チ�
 
 権限確認は使い捨てディレクトリで実施します。レビュー担当がread/searchを含むツールを使えないこと、他のワーカーが編集・shellを使えないこと、通常セッションは役割環境変数なしで利用できることを確認してください。テストで確認したhookのJSON変換と、実際のCLI/IDEがそのhookを実行することは別の確認項目です。
 
-VS Codeを使う場合は、選択した実行方式で入口とhooksの実動作を別途確認してください。
+VS Code と GitHub Copilot アプリでは、入口とhooksの実動作を別途確認してください。
 
-- **Copilot（Agent Host）**：エージェント一覧にオーケストレーターだけが見え、指定した工程を起動できることを確認します。`code-migration`・`depmap-adapter` スキルが `/` メニューに出ないこと、ワーカーが一覧に出ないことも確認します。
-- **Local**：導入時に `--harness vscode-local` を指定し、VS Codeのチャットでも実行方式をLocalへ切り替えます。Copilot（Agent Host）と同じ入口の確認に加え、Local用hooksが実際に呼ばれることを確認します。導入時の `--harness` 指定だけではチャットの実行方式は変わりません。
+- **VS Code（Copilot 実行方式・既定）**：エージェント一覧にオーケストレーターだけが見え、指定した工程を起動できることを確認します。`code-migration`・`depmap-adapter` スキルが `/` メニューに出ないこと、ワーカーが一覧に出ないことも確認します。Agents window では **Folder** 分離で同じ確認をします（**New Worktree** は常に Allow all で確認が出ないため使いません）。
+- **VS Code（Local 実行方式）**：1.144 では Local は既定で表示されず、Agents window では使えません。使う場合はコピー導入で `--harness vscode-local` を指定し、チャットの実行方式も Local にします。入口の確認に加え、Local 用hooksが実際に呼ばれることを確認します。導入時の `--harness` 指定だけではチャットの実行方式は変わりません。
+- **GitHub Copilot アプリ**：Environment **This computer**、Workspace **Current checkout**、ツールの許可 **Ask every time** または **Assisted** で、エージェント選択または `/agent` からオーケストレーターを選べること、人の判断のコマンドで確認が出ることを確認します。
 
 Dynamic Workflowsは [専用の確認事項](DYNAMIC-WORKFLOWS.md) を追加してから試してください。
 
@@ -40,37 +41,25 @@ Dynamic Workflowsは [専用の確認事項](DYNAMIC-WORKFLOWS.md) を追加し�
 
 ## 人間ゲートとワーカーセッションの実機確認（未実施）
 
-自動テストとloopbackでの確認は、プロンプトモードのワーカーまでです。次の項目は実機で確認し、結果をキット本体のリポジトリの `history/validation/copilot-cli-1.0.98-review-2026-10-18.json` の `liveChecks`（未実施は `null`）に記録してください。
+自動テストとloopbackでの確認は、プロンプトモードのワーカーまでです。次の項目は実機で確認し、結果は下の各項目の名前（例：`liveCLIInteractiveAsk`）を付けて、キット本体のリポジトリの Issue または PR に記録してください。未実施の項目は未実施と書きます。
 
 - **対話CLI（信頼済みフォルダ）**：`node migration-kit/scripts/run_migration.mjs approve translation --note test` をAIに実行させます。確認が出ること、「No」で実行されないこと、「Yes」の後にCLI自身の許可確認がもう一度出るか（[copilot-cli#3042](https://github.com/github/copilot-cli/issues/3042)）を記録します（`liveCLIInteractiveAsk`）。
 - **autopilot**：同じコマンドが確認なしに拒否されることを確認します（CLI 1.0.97以降の仕様、`liveCLIAutopilot`）。`--allow-all` / `--yolo` のときに確認が出るかも記録します（公式の記載なし、`liveCLIAllowAll`）。
 - **autopilotでの質問**：autopilotで選択が必要な場面（例：失敗時の選択）を作ります。`ask_user` に自動の応答（利用者は不在なので自律的に進めるよう求める文面）が返ったとき、AIが何も選ばず、保留の判断を伝えて止まるかを記録します。応答の文面も残します（CLI 1.0.98の変更履歴ではautopilotが `ask_user` を自動処理、`liveCLIAutopilotAskUser`）。
-- **VS Code**：LocalとCopilotの各実行方式で同じことを確認し（`liveVSCodeAsk`）、Copilot実行方式で `.github/hooks` が読み込まれるかを記録します（`liveVSCodeCopilotHarnessRepoHooks`）。権限レベル「Allow all」、Autopilot、`/yolo` のときに確認が出るか、拒否されるか、確認なしに通るかも記録します（`liveVSCodeAllowAll`）。通る場合は、ゲートのコマンドを実行する間は「Manual permissions」に戻すよう案内します。
+- **VS Code**：Copilot 実行方式（使う場合は Local も）で同じことを確認し（`liveVSCodeAsk`）、Copilot実行方式で `.github/hooks` が読み込まれるかを記録します（`liveVSCodeCopilotHarnessRepoHooks`）。権限レベル「Allow all」、Autopilot、`/yolo`、Agents window の New Worktree のときに確認が出るか、拒否されるか、確認なしに通るかも記録します（`liveVSCodeAllowAll`）。通る場合は、ゲートのコマンドを実行する間は「Manual permissions」に戻すよう案内します。
 - **未信頼フォルダのhook**：未信頼のコピー導入で `node tests/verify_cli_transport.mjs` を再実行し、ツール付きレビュアーでhookが効くこと（`migration/runs` を読めない）と、他のロールが動くことを記録します（`liveRepoHooksAssistedReviewersOnly`）。疑似モデルでの同じ確認は `doctor --check-cli` の `tool-assisted reviewer hook loads in prompt mode` が毎回行います。
 - **sandbox**：VS Code・Copilot CLIのローカルsandbox（2026-10-07 GA。既定はオフ）を有効にした状態で `doctor --check-cli` と1単位の `translate` を実行し、端末から起動したワーカーCLIが `~/.copilot` と作業用ホーム `~/.copilot-migration-kit-workers`（`doctor --check-cli` の `worker Copilot CLI home` に表示）への書き込みとCopilot APIへの通信を行えるかを記録します（`liveSandboxWorkers`）。失敗する場合はsandboxの許可設定を見直すか、runnerをsandbox外で実行する承認を利用者に求めます。sandboxを回避する設定をAIが勝手に変えてはいけません。
 
-## VS Code orchestration checklist (pending live verification)
+## チャットだけで最後まで進める確認（未実施）
 
-These checks require actual VS Code; offline fixtures do not establish UI behavior.
+画面の動きは自動テストでは確かめられないため、VS Code または Copilot アプリの実機で確認します。
 
-- Start via plugin skill, repository skill and Local prompt: user-facing parent
-  shows all ten phases before long work; planning children return advice.
-- Confirm actual exposed TODO tool/schema, response and rendered list separately.
-  Preserve unrelated tasks, avoid duplicates; verify chat fallback on unavailable,
-  failed or reported invisible TODO. Local children never use TODO/question tools.
-- Drive the whole fixture from chat only: the agent checks/installs the Copilot CLI,
-  starts `copilot login` and relays its code, proposes and runs `guardrails install`,
-  and the host asks before every human-gate command (not for `models set` and `settings apply`, which record the person's choice). Nothing is typed by the person.
-- During translate, confirm the background terminal and a responsive parent, slot
-  refill, the reviewer cap and the CLI-reported models in the run summary.
-- Invoke actual built-in Rubber Duck if exposed; record unavailable otherwise.
-  Save adoption/rejection and actual fix/reverification references.
-- Press VS Code Stop during implementation and between the two reviews. Inspect
-  runner process, terminal and worker processes. If still active, Ctrl+C the runner;
-  verify the lock release and that late results are rejected.
-- Rerun translate: completed units reuse valid receipts, only missing reviews rerun,
-  blocked/stopped status matches evidence. Confirm changed inputs require fresh approval.
-- Walk source-only through judge, approval, reviewed implementation, actual build/smoke
-  and handoff: no original invocation, no passed parity, final equivalence unverified.
+- 小さな検証用リポジトリを、チャットだけで最後まで進めます。AIがCopilot CLIの有無を確かめて導入し、`copilot login` を始めてコードを伝え、禁止リストを提案して `guardrails install` を実行すること、人の判断のコマンドの前に毎回確認が出ること（`models set`・`settings apply` は人の選んだ内容の記録なので出ません）を確認します。人がコマンドを打つ場面がないことも確認します。
+- 最初の設定の質問（モデル・移行先・進め方・元のプログラムを動かせるか・仕様の有無）が `ask_user` で出て、答えが `migration/run-settings.json` に入ることを確認します。
+- 長い処理の前に10工程の一覧と進み具合が見えること、長い処理（translate など）の間も進み具合が表示され、チャットが応答することを確認します。
+- translate の実行中に、空いた枠に次の単位が入ること、レビュー担当の同時数の上限、実行の要約にCLIが報告したモデルが出ることを確認します。
+- 実装中と2つのレビューの間でチャットの停止ボタンを押し、ランナーとワーカーのプロセスが残るかを確かめます。残る場合はランナーを止め、ロックが外れること、遅れて届いた結果が採用されないことを確認します。
+- translate を再実行し、完了した単位は有効な記録を再利用し、足りないレビューだけを再実行すること、入力を変えたら承認がやり直しになることを確認します。
+- source-only では、元のプログラムを一度も起動せずに比較器・承認・レビュー付きの実装・実際の build/smoke・引き継ぎまで進み、parity が合格扱いにならず、最終的な同等性が未検証と書かれることを確認します。
 
-Current repository automation does not claim these live checks have passed.
+このリポジトリの自動テストは、これらの実機確認が済んだとは主張しません。

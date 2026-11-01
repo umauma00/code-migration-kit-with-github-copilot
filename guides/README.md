@@ -1,14 +1,12 @@
 # 視覚的なガイド
 
-このリポジトリの仕組みとファイル構成を説明するHTMLです。
+ブラウザーで直接開ける HTML です。ビルドやサーバーの起動は要りません。
 
 | ガイド | 内容 |
 |---|---|
-| [migration-guide.html](migration-guide.html) | AI Agent・ランナー・人間の役割、移行フロー、データ構造、API、例外処理、設計上の判断 |
-| [repository-file-map.html](repository-file-map.html) | 各ディレクトリと主要ファイルの役割、導入先への配置、読む順番 |
+| [migration-guide.html](migration-guide.html) | 登場するもの（あなた・オーケストレーター・ランナー・ワーカー）、工程ごとに何をして、誰がどこから何回 AI を呼ぶか、1ファイルの翻訳とレビューの流れ、呼び出し回数の目安、確認の出方（normal・relaxed・auto）、元の Claude Code 版キットとの違い |
+| [repository-file-map.html](repository-file-map.html) | 各フォルダと主なファイルの役割、コピー導入で置かれる場所、読む順番 |
 
-ブラウザーでHTMLを直接開いてください。ビルドやサーバーの起動は不要です。
+ファイル構成図の「開く」は、このリポジトリのファイルへの相対リンクです。共有するときはリポジトリ内の配置を保ってください。
 
-技術ガイドは参照したソースをHTML内に保存しています。ファイル構成図の「ソースを開く」は、このリポジトリのファイルへの相対リンクです。ファイル構成図を共有するときは、リポジトリ内の配置を保ってください。
-
-運用手順は [README](../README.md)、実行時のルールは [OPERATING-MANUAL](../docs/OPERATING-MANUAL.md) を参照してください。
+使い方は [README](../README.md)、設定とコマンドの詳細は [詳しい使い方](../docs/REFERENCE.md)、オーケストレーターが読む規則は [OPERATING-MANUAL](../docs/OPERATING-MANUAL.md) にあります。

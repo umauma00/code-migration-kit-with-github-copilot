@@ -1,3 +1,34 @@
+# 0.39.0 — 2026-11-01
+
+Documents only; no kit code changed.
+
+- README (ja/en) is rewritten for the current version: the three supported apps
+  and their session settings (VS Code 1.144: Copilot harness, Agents window
+  Folder isolation, New Worktree runs Allow all), the five setup questions, the
+  ten phases with links to their prompts, safety, AI usage in GitHub AI
+  Credits and what has been verified. The detail it used to carry moved to the
+  new docs/REFERENCE.md and docs/REFERENCE.en.md.
+- guides/migration-guide.html is rewritten. For each phase it shows what is
+  done, who calls the AI (the orchestrator, the runner's workers or a direct
+  `copilot -p`), from where and how many times; the per-file translation and
+  review loop; an estimator of call counts; the confirmations per mode; and
+  what differs from the original Claude Code kit.
+- PLUGIN, LIVE-SMOKE, WINDOWS, REVIEW-BENCHMARK, CONTRIBUTING, guides/README
+  and the file map are brought up to date (VS Code 1.144, the Copilot app,
+  the Windows run up to phase 03).
+- README, PLUGIN, REFERENCE and the guide describe 0.36.0 to 0.38.0: the
+  RULEBOOK protection (history kept, a confirmation after translation started,
+  refused in auto mode), the PORT STATUS trailer form, repairing a blocked unit
+  instead of editing the RULEBOOK, and not updating the kit in the middle of a
+  migration.
+- The orchestrator skill and OPERATING-MANUAL send configuration questions to
+  REFERENCE instead of README.
+- Removed development records that only described past work: `history/` and
+  docs/TESTING. Links to them in CHANGELOG and UPGRADING point at commit
+  0bea302 on GitHub.
+- tests/doc-links.test.mjs checks that every relative link in the documents
+  resolves (anchors included) and that every English document in docs/ has
+  a Japanese twin linked both ways.
 # 0.38.0 — 2026-11-01
 
 A Mac run (C# to Java, 347 units, auto mode) finished translation with 333
@@ -1811,7 +1842,7 @@ silence or output volume; continuous execution stays continuous.
   paths and cross-package edges. Report edges originating outside the selected
   roots; reject required dependencies outside the scope without replacing a map.
 - Add rereview regressions and CLI/workflow worker transport validation. See
-  [fixes and rereview](history/reviews/2026-10-10-copilot-rereview-fixes.md) and
+  [fixes and rereview](https://github.com/umauma00/code-migration-kit-with-github-copilot/blob/0bea302/history/reviews/2026-10-10-copilot-rereview-fixes.md) and
   [upgrading](docs/UPGRADING.md).
 
 # 0.1.4 — 2026-10-10
@@ -1827,7 +1858,7 @@ silence or output volume; continuous execution stays continuous.
 - Use concrete view/grep/glob tools for implementer, fixer and arbiter; reviewers
   remain tool-free. Check the machine-output CLI flag in doctor.
 - Add compatibility regressions and an opt-in real-CLI/local-provider integration
-  check. See [fix verification](history/reviews/2026-10-10-copilot-fixes.md).
+  check. See [fix verification](https://github.com/umauma00/code-migration-kit-with-github-copilot/blob/0bea302/history/reviews/2026-10-10-copilot-fixes.md).
 
 Existing installations must create/audit the review dependency map and update
 worker profiles. See [upgrading](docs/UPGRADING.md). Actual AI migration quality,
@@ -1846,7 +1877,7 @@ account authentication, VS Code and SDK sessions remain unverified.
   omit the new field; the runner does not infer unknown output-option semantics.
 
 Live model/IDE/SDK consumption and macOS/Windows remain unverified.
-See [review fixes](history/REVIEW-FIXES.md) and [validation](docs/TESTING.md).
+See [review fixes](https://github.com/umauma00/code-migration-kit-with-github-copilot/blob/0bea302/history/REVIEW-FIXES.md) and [validation](https://github.com/umauma00/code-migration-kit-with-github-copilot/blob/0bea302/docs/TESTING.md).
 
 # 0.1.2 — 2026-10-08
 
@@ -1860,7 +1891,7 @@ See [review fixes](history/REVIEW-FIXES.md) and [validation](docs/TESTING.md).
 - Add seven rereview regression tests and update contracts and upgrade notes.
 
 Live model/IDE/SDK consumption and macOS/Windows remain unverified.
-See [review fixes](history/REVIEW-FIXES.md) and [validation](docs/TESTING.md).
+See [review fixes](https://github.com/umauma00/code-migration-kit-with-github-copilot/blob/0bea302/history/REVIEW-FIXES.md) and [validation](https://github.com/umauma00/code-migration-kit-with-github-copilot/blob/0bea302/docs/TESTING.md).
 
 # 0.1.1 — 2026-10-08
 
@@ -1877,7 +1908,7 @@ See [review fixes](history/REVIEW-FIXES.md) and [validation](docs/TESTING.md).
 - Add 15 regression tests and update setup, contracts, live checks and upgrade notes.
 
 Live model/IDE/SDK consumption and macOS/Windows remain unverified.
-See [review fixes](history/REVIEW-FIXES.md) and [validation](docs/TESTING.md).
+See [review fixes](https://github.com/umauma00/code-migration-kit-with-github-copilot/blob/0bea302/history/REVIEW-FIXES.md) and [validation](https://github.com/umauma00/code-migration-kit-with-github-copilot/blob/0bea302/docs/TESTING.md).
 
 # 0.1.0 — 2026-10-08
 

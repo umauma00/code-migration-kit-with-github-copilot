@@ -2,7 +2,7 @@
 
 日本語 | [English](WINDOWS.en.md)
 
-このキットは Windows を主な実行環境として扱います。GitHub Actions の `windows-latest`（Windows Server、PowerShell 7、Node 22、Python 3.12）で、`npm test` と `npm run demo` を毎回実行しています。Copilot CLI と VS Code を使った実機での確認は、まだ済んでいません（[LIVE-SMOKE](LIVE-SMOKE.md) の手順で確認します）。
+このキットは Windows を主な実行環境として扱います。GitHub Actions の `windows-latest`（Windows Server、PowerShell 7、Node 22、Python 3.12）で、`npm test` と `npm run demo` を毎回実行しています。メンテナーの Windows PC では、ログインした実モデルで工程03の試行まで動かしました（2026-10-31 時点）。最後の工程までの実行と、VS Code・Copilot アプリの画面からの網羅的な確認はまだです（[実アカウントでの小規模確認](LIVE-SMOKE.md) の手順で確認します）。
 
 ## 用意するもの
 

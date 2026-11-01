@@ -33,7 +33,7 @@ the parent's context is the migration's most expensive shared resource. Open a
 document when the current phase prompt links it or a step needs it:
 [preparation audits](../../../docs/PREPARATION-AUDITS.md) for 00b/01/02,
 [execution scopes](../../../docs/EXECUTION-SCOPES.md) for approved batches/repair queues, and
-[usage](../../../README.md) for installation or configuration questions. On resumption,
+[detailed usage](../../../docs/REFERENCE.md) for installation or configuration questions. On resumption,
 re-read the current phase prompt, not the whole kit.
 Locate the installed kit at `migration-kit/`; when maintaining the kit itself,
 its scripts and prompts are at repository root.

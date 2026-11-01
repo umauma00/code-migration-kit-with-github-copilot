@@ -225,4 +225,4 @@ your ecosystem.
 
 ## License
 
-Apache-2.0 — see [LICENSE](LICENSE).
+Apache-2.0 — see [LICENSE](../LICENSE).
