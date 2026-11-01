@@ -153,7 +153,12 @@ test('after phase 01 an edit keeps the replaced version; after translation start
     `python3 -c "open('migration/RULEBOOK.md','w').write('x')"`, `python3 - <<'PY'\nfrom pathlib import Path\nPath('migration/RULEBOOK.md').write_text('x')\nPY`,
     `node -e "require('fs').writeFileSync('migration/RULEBOOK.md','x')"`, "[IO.File]::WriteAllText('migration/RULEBOOK.md', 'x')",
     'awk -i inplace "{print}" migration/RULEBOOK.md', 'sponge migration/RULEBOOK.md', 'dd if=/tmp/r of=migration/RULEBOOK.md', 'ln -sf /tmp/r migration/RULEBOOK.md',
-    'New-Item -Path migration/RULEBOOK.md -ItemType File -Force', 'Copy-Item -Destination migration/RULEBOOK.md -Path /tmp/r.md'])
+    'New-Item -Path migration/RULEBOOK.md -ItemType File -Force', 'Copy-Item -Destination migration/RULEBOOK.md -Path /tmp/r.md',
+    'New-Item -ItemType File -Force migration/RULEBOOK.md',
+    "python3 <<'EOF'\nprint(1)\nEOF\npython3 <<'EOF'\nopen('migration/RULEBOOK.md','w').write('x')\nEOF",
+    "cat <<'EOF' | python3\nopen('migration/RULEBOOK.md','w').write('x')\nEOF",
+    `echo "open('migration/RULEBOOK.md','w').write('x')" | python3`,
+    `node -e "require('fs').writeFileSync('migration/RULEBOOK.md','x')" scripts/run_migration.mjs`])
     assert.equal(editRulebook(f, command)?.decision, 'ask', command);
   for (const command of ['cat migration/RULEBOOK.md', 'rg -n PORT migration/RULEBOOK.md', 'sed -n 1,10p migration/RULEBOOK.md',
     "awk '/PORT/' migration/RULEBOOK.md", 'sha256sum migration/RULEBOOK.md', 'Get-Content migration/RULEBOOK.md',
@@ -163,7 +168,9 @@ test('after phase 01 an edit keeps the replaced version; after translation start
     `python3 -c "print(open('migration/RULEBOOK.md').read())"`, 'bash -lc "sed -n 1,5p migration/RULEBOOK.md"',
     `python3 - <<'PY'\nfrom pathlib import Path\nrules = Path('migration/RULEBOOK.md').read_text()\nPath('migration/gap-report.md').write_text(rules[:10])\nPY`,
     'node migration-kit/scripts/run_migration.mjs repair --root . --note "writeFile slip in migration/RULEBOOK.md"',
-    'python3 scripts/audit.py --out /tmp/r.md\ngrep -n writeFile migration/RULEBOOK.md', 'Copy-Item -Path migration/RULEBOOK.md -Destination /tmp/r.md'])
+    'python3 scripts/audit.py --out /tmp/r.md\ngrep -n writeFile migration/RULEBOOK.md', 'Copy-Item -Path migration/RULEBOOK.md -Destination /tmp/r.md',
+    "New-Item -Path notes.txt -Value 'see migration/RULEBOOK.md'",
+    "python3 <<'EOF'\nprint(open('migration/RULEBOOK.md').read())\nEOF\npython3 <<'EOF'\nopen('/tmp/out.txt','w').write('x')\nEOF"])
     assert.equal(editRulebook(f, command), null, command);
   // Other files are untouched by this check.
   assert.equal(interactiveDecision({ toolName: 'apply_patch', toolArgs: patch('migration/gap-report.md'), cwd: f.root }, f.root), null);

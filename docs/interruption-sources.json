@@ -1071,7 +1071,7 @@
     },
     {
       "path": "lib/guardrails.mjs",
-      "sha256": "a05404d9daf286bb233dfc9c3f5d66b861e62d1265545b22fa94efea4f6ec663",
+      "sha256": "20fe7a1f710ce794eb88650a98203c5904fcc02f1e247f485034d61f1666f95b",
       "entries": [
         {
           "line": 47,
@@ -1144,7 +1144,7 @@
           "code": "try { fs.writeFileSync(file, text, { flag: 'wx' }); } catch (e) { if (e.code !== 'EEXIST') throw e; }"
         },
         {
-          "line": 767,
+          "line": 772,
           "kind": "loop-exit-candidate",
           "code": "for (const line of lines.slice(at + 1)) { if (line.trim() === tag) break; body.push(line); }"
         }
