@@ -13,7 +13,9 @@ review, and every kit update had the same effect.
   Sections that match no file are named, so the person can widen the choice.
 - `rulebook accept --note TEXT --redo listed|all|none|PATH,...` is a human gate
   (the hook asks; auto mode runs it unasked like the other approvals and
-  chooses listed, or all when a section matches no file). It records the new
+  chooses listed, or all when a section matches no file; the runner refuses
+  `none` or a path list in auto mode, and status names an acceptance made in
+  auto mode). It records the new
   RULEBOOK as the reviewed one in `migration/phases/rulebook-amendments.json`
   (written only by the runner; the hook refuses agent writes), so phases 02
   and 03, the judge, the approvals and the finished units stay current, and

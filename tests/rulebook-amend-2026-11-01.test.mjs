@@ -7,7 +7,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { ready, fake } from './helpers.mjs';
-import { safePath, atomicWrite, writeJSON, readJSON, contextHash, done, unitState, rulebookAmendmentsFile, rulebookHistoryDir } from '../lib/core.mjs';
+import { safePath, atomicWrite, writeJSON, readJSON, fileHash, contextHash, done, unitState, rulebookAmendmentsFile, rulebookHistoryDir } from '../lib/core.mjs';
+import { autoModeReport } from '../lib/preferences.mjs';
 import { runStage, approve, translate, requireGate } from '../lib/pipeline.mjs';
 import { phaseCommand } from '../scripts/phase_cli.mjs';
 import { currentPhase, phaseStaleness } from '../lib/phases.mjs';
@@ -111,7 +112,8 @@ test('a second change is compared with the accepted version; every redo choice w
   assert.ok(third.unmatched.length >= 1);
   assert.match(third.next, /changed sections matching no file/);
   const all = acceptRulebook(f.root, f.config, { note: 'third', redo: 'all' });
-  assert.deepEqual(all.redo, ['ported/math_ops.mjs'], 'the others were already sent back');
+  assert.deepEqual(all.redo, ['ported/math_ops.mjs', 'ported/text_ops.mjs', 'ported/main.mjs'], 'units waiting for review are sent back too');
+  assert.equal(all.kept, 0);
   assert.deepEqual(finished(f), [false, false, false]);
 });
 
@@ -152,6 +154,27 @@ test('the hook asks before rulebook accept (unasked in auto mode) and keeps agen
   writeJSON(prefs, { ...(fs.existsSync(prefs) ? readJSON(prefs) : { schemaVersion: 1, userLanguage: null }), phaseMode: 'auto' });
   assert.equal(shell(accept), null, 'auto mode records it unasked, like the other approvals');
   amend(f, '\n## Division\nfloor-division keeps the sign of the divisor.\n');
+  // Auto mode takes the conservative scope only.
+  assert.throws(() => acceptRulebook(f.root, f.config, { note: 'auto', redo: 'none' }), /In auto mode rulebook accept takes --redo listed or all/);
+  assert.throws(() => acceptRulebook(f.root, f.config, { note: 'auto', redo: 'ported/main.mjs' }), /In auto mode/);
   assert.equal(acceptRulebook(f.root, f.config, { note: 'auto', redo: 'listed' }).auto, true, 'recorded as decided without the person');
   assert.equal(readJSON(safePath(f.root, rulebookAmendmentsFile)).log[0].auto, true);
+  assert.ok(autoModeReport(f.root).records.includes('rulebook accept'), 'status lists it as decided without the person');
+  amend(f, '\nKeep error messages.\n');
+  assert.throws(() => acceptRulebook(f.root, f.config, { note: 'auto', redo: 'listed' }), /takes --redo all/);
+});
+
+test('an acceptance needs its log entry, and re-recording 02 leaves nothing to accept', async t => {
+  const f = await translated(t);
+  amend(f, '\n## Division\nfloor-division keeps the sign of the divisor.\n');
+  // A mapping without the entry that accepted it (a forged file) is ignored.
+  const raw = fileHash(rules(f)), identity = readJSON(safePath(f.root, 'migration/phases/02.json')).evidence.find(e => e[0] === 'migration/RULEBOOK.md')[1];
+  writeJSON(safePath(f.root, rulebookAmendmentsFile), { schemaVersion: 1, accepted: { [raw]: identity }, log: [] });
+  assert.notEqual(contextHash(f.root, f.config), f.context);
+  fs.rmSync(safePath(f.root, rulebookAmendmentsFile));
+  // Recording 02 again on the new RULEBOOK: the later phases are stale for the
+  // predecessor, and accepting is no longer offered.
+  phaseCommand(f.root, f.config, 'complete', '02', { note: 'Recorded again on the clarified division rule' });
+  assert.equal(rulebookChanges(f.root, f.config).changed, false);
+  assert.notEqual(phaseStaleness(f.root, f.config, '02')?.action, 'accept-rulebook');
 });

@@ -400,7 +400,7 @@
     },
     {
       "path": "lib/core.mjs",
-      "sha256": "707ef9173613d49ce8ef71acf38794187d30bdf69277c744c2848e153c9a7598",
+      "sha256": "b08283898c3a7504d2128b8d5aacaf342a275db3eb4a093a07e4720c04a5b582",
       "entries": [
         {
           "line": 26,
@@ -813,87 +813,87 @@
           "code": "export const operationalConfigKeys = ['executionMode', 'concurrency', 'maxAgentCalls', 'maxFixRounds', 'timeoutSeconds', 'commandTimeoutSeconds',"
         },
         {
-          "line": 510,
+          "line": 512,
           "kind": "error-or-exit-candidate",
           "code": "try { fs.writeFileSync(file, text, { flag: 'wx' }); } catch (e) { if (e.code !== 'EEXIST') throw e; }"
         },
         {
-          "line": 530,
+          "line": 532,
           "kind": "error-or-exit-candidate",
           "code": "if (!fileHash(at(p))) throw new Error(`Required artifact missing: ${p}`);"
         },
         {
-          "line": 533,
+          "line": 535,
           "kind": "error-or-exit-candidate",
           "code": "if (!fs.existsSync(at(dir))) throw new Error(missingRootMessage(config, dir, 'Input root missing'));"
         },
         {
-          "line": 562,
+          "line": 564,
           "kind": "error-or-exit-candidate",
           "code": "catch (e) { if (e instanceof SyntaxError) return null; throw e; }"
         },
         {
-          "line": 565,
+          "line": 567,
           "kind": "error-or-exit-candidate",
           "code": "if (!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(id)) throw new Error('Invalid repair intent ID');"
         },
         {
-          "line": 570,
+          "line": 572,
           "kind": "error-or-exit-candidate",
           "code": "if (!checksum || fileHash(file) !== checksum) throw new Error('Repair intent receipt missing or changed; restore its bound evidence before resuming');"
         },
         {
-          "line": 575,
+          "line": 577,
           "kind": "error-or-exit-candidate",
           "code": "j.diagnosticHash !== hash(j.diagnostic) || !/^[a-f0-9]{24}$/.test(j.unitId))) throw new Error('Invalid repair intent receipt');"
         },
         {
-          "line": 583,
+          "line": 585,
           "kind": "error-or-exit-candidate",
           "code": "if (ref.schemaVersion !== 1 || ref.kind !== 'repair-intent-reference') throw new Error('Invalid active repair reference');"
         },
         {
-          "line": 647,
+          "line": 649,
           "kind": "pid-probe",
           "code": "const pidAlive = pid => { try { process.kill(pid, 0); return true; } catch (e) { return e.code !== 'ESRCH'; } };"
         },
         {
-          "line": 674,
+          "line": 676,
           "kind": "error-or-exit-candidate",
           "code": "catch (e) { if (e.code === 'ENOENT') return undefined; if (e instanceof SyntaxError) return null; throw e; }"
         },
         {
-          "line": 694,
+          "line": 696,
           "kind": "error-or-exit-candidate",
           "code": "if (e.code !== 'EEXIST') throw e;"
         },
         {
-          "line": 700,
+          "line": 702,
           "kind": "error-or-exit-candidate",
           "code": "try { fs.renameSync(claim, aside); } catch (error) { if (error.code === 'ENOENT') return; throw error; }"
         },
         {
-          "line": 718,
+          "line": 720,
           "kind": "error-or-exit-candidate",
           "code": "try { fs.linkSync(pending, lock); return; } catch (e) { if (e.code !== 'EEXIST') throw e; }"
         },
         {
-          "line": 721,
+          "line": 723,
           "kind": "error-or-exit-candidate",
           "code": "if (!ownerGone(owner)) throw liveError(owner);"
         },
         {
-          "line": 726,
+          "line": 728,
           "kind": "error-or-exit-candidate",
           "code": "if (blocker) throw new Error(`The ${name} lock's recovery claim ${path.basename(lock)}.recover is held by pid ${blocker.pid}${ownerHost(blocker)}; confirm no runner command is running there, then run unlock --pid ${blocker.pid}`);"
         },
         {
-          "line": 727,
+          "line": 729,
           "kind": "error-or-exit-candidate",
           "code": "throw new Error(`Could not take the ${name} lock while other commands kept taking it; rerun the command`);"
         },
         {
-          "line": 741,
+          "line": 743,
           "kind": "error-or-exit-candidate",
           "code": "if (loop) throw new Error(`A build-loop (grant ${loop.id}, pid ${loop.pid}) is running; wait for it to finish or interrupt that process before other runner commands`);"
         }
@@ -1076,7 +1076,7 @@
     },
     {
       "path": "lib/guardrails.mjs",
-      "sha256": "570c1ec5a19a47e4b67a8ff01222a462ed5b5ae08e847e35fae1210cf5e9a871",
+      "sha256": "86428f2d5845129bfd03b27077f9b2fd182b02342ca61a82d049067d3fca9fd9",
       "entries": [
         {
           "line": 47,
@@ -1431,7 +1431,7 @@
     },
     {
       "path": "lib/phases.mjs",
-      "sha256": "c60daed0cd76f3eece61083854c247dbeb961c0b2be226081dcc51376672727d",
+      "sha256": "39024a77bb46a0f73b0e954e7239f584292a064a35f14959bc5d3758b4c084ae",
       "entries": [
         {
           "line": 60,
@@ -2165,7 +2165,7 @@
     },
     {
       "path": "lib/preferences.mjs",
-      "sha256": "5155ca5c723cb9a8a7f89e72cc3cbfc72dd16c4f9254cbdf563b92fa51f35111",
+      "sha256": "ff3383d5f96917e38fb57f4a7fb8220a5fc9064497f82c89f370dbafd050e659",
       "entries": [
         {
           "line": 48,
@@ -2626,7 +2626,7 @@
     },
     {
       "path": "lib/rulebook.mjs",
-      "sha256": "a5e6927742699df42ce164843b582b957e73d3b02883eddceaa5beb467191af9",
+      "sha256": "6869855cd770a4c28766251569e3599c912ee362bdff6e3bd168028c198e0f72",
       "entries": [
         {
           "line": 88,
@@ -2659,19 +2659,24 @@
           "code": "if (changes.other.length) throw new Error(changes.next);"
         },
         {
-          "line": 125,
+          "line": 122,
+          "kind": "error-or-exit-candidate",
+          "code": "throw new Error(`In auto mode rulebook accept takes --redo ${changes.unmatched.length || changes.previous === null ? 'all (a changed section matches no file)' : 'listed or all'}`);"
+        },
+        {
+          "line": 129,
           "kind": "error-or-exit-candidate",
           "code": "if (changes.previous === null) throw new Error('--redo listed needs the reviewed RULEBOOK version, which is not kept; choose all, none or name the files');"
         },
         {
-          "line": 130,
+          "line": 134,
           "kind": "error-or-exit-candidate",
           "code": "if (unknown.length) throw new Error(`Not manifest targets: ${unknown.join(', ')}`);"
         },
         {
-          "line": 141,
+          "line": 161,
           "kind": "error-or-exit-candidate",
-          "code": "throw new Error(`Phase 02 is still out of date after accepting the RULEBOOK: ${phaseStaleness(root, config, '02')?.next ?? 'follow phase next'}`);"
+          "code": "throw new Error(`Phase 02 is still out of date after accepting the RULEBOOK: ${why}`);"
         }
       ]
     },
@@ -2963,7 +2968,7 @@
     },
     {
       "path": "lib/status-snapshot.mjs",
-      "sha256": "b975ffded42c136cdf3c9fc68b152c4e427cc13a4dbc98a8940004d7d034d1e0",
+      "sha256": "a32eb0f096b54402117ee6c67f4e67b31d125e7670f7d3d8223122b019cc6cad",
       "entries": [
         {
           "line": 39,
@@ -5108,5 +5113,5 @@
       ]
     }
   ],
-  "candidateLines": 928
+  "candidateLines": 929
 }

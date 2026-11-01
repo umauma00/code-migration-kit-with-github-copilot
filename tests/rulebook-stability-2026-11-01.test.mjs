@@ -138,6 +138,9 @@ test('after phase 01 an edit keeps the replaced version; after translation start
 
   writeJSON(safePath(f.root, 'migration/gates/translation.json'), { schemaVersion: 1, stage: 'translation' });
   for (const [id, status] of [['a', 'done'], ['b', 'done'], ['c', 'blocked']]) writeJSON(safePath(f.root, `migration/state/units/${id}.json`), { status });
+  // Without a phase 02 record there is nothing to accept: the cost is named.
+  assert.match(editRulebook(f).reason, /The edit sends every finished unit \(2 now\) back to review/);
+  writeJSON(safePath(f.root, 'migration/phases/02.json'), { schemaVersion: 1, phase: '02' });
   const asked = editRulebook(f);
   assert.equal(asked.decision, 'ask');
   // 0.40.0: rulebook accept lets the person choose what to redo.
