@@ -116,11 +116,15 @@ apply the UNKNOWN rule, keep moving.
 Every translated file ends with a status trailer:
 
 ```
-// PORT STATUS: confidence=[high|medium|low] todos=[N]
+// PORT STATUS: confidence=medium todos=2
 ```
 
+This is an example. Write `confidence=` as one of `high`, `medium` or `low`,
+and `todos=` as the plain number of lines containing `TODO(port)` — no
+brackets. Use the target's line-comment syntax and put the trailer after the
+file's last closing brace, never inside a class or function.
 Reviewers check the trailer against the file's actual `TODO(port)` count —
-a trailer that undercounts is a finding.
+a trailer that overcounts or undercounts is a finding.
 
 For config.markerPolicy `todo-lines-v1`, count literal lines containing the marker
 (two occurrences on one line count once). Keep exactly one PORT STATUS trailer

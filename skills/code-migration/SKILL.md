@@ -558,6 +558,15 @@ by itself; if it persists, offer a lower `concurrency` after the run (it keeps
 reviewed work). A run that stops at its AI call budget is a budget stop: rerun
 `translate`, or propose `translate --max-calls N` with the number the person agrees.
 
+A unit blocked after translation started (a PORT STATUS trailer, an arbitration
+format slip, a fixer that changed nothing) is a unit problem: repair that unit,
+never edit the RULEBOOK for it. Every finished unit's record carries the
+RULEBOOK's hash, so any edit after translation started makes all of them be
+reviewed again. Propose a RULEBOOK amendment only for a real rule problem, and
+before it tell the person how many finished units it sends back (status shows
+the count). The hook asks the person again and keeps the replaced version in
+`migration/rulebook-history/`.
+
 After a failed build, propose `build-loop --note TEXT [--through build|smoke|parity]
 [--max-rounds N] [--max-calls N]` (defaults: build only, continuous until clean;
 state the stages and absence of an implicit round/call deadline): one host-confirmed

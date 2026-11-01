@@ -1,3 +1,43 @@
+# 0.38.0 — 2026-11-01
+
+A Mac run (C# to Java, 347 units, auto mode) finished translation with 333
+units and 14 blocked. To clear them, the orchestrator fixed one example line in
+the project's RULEBOOK, and that one edit sent all 347 finished units back to
+review: every unit's record carries the RULEBOOK's hash, so phases 02 and 03
+were recorded again and the whole translation re-reviewed (about three hours).
+The blocks themselves came from the kit:
+
+- The RULEBOOK template showed the trailer as
+  `// PORT STATUS: confidence=[high|medium|low] todos=[N]`, and workers copied
+  the brackets (`todos=[2]`), which the marker check rejected. The templates
+  (English and Japanese) now show `// PORT STATUS: confidence=medium todos=2`
+  and say what goes in each field, without brackets, after the last closing
+  brace. The check accepts `todos=[2]`, `confidence=[low]` and spaces around the
+  values as the same count,
+  so existing RULEBOOKs need no edit. Under `markerPolicy` todo-lines-v1 the
+  implementer and fixer prompts also name the trailer's exact form and place
+  (in that project 3 files had it inside the class). A wrong count still fails.
+- The arbiter's contract example read `"finding":"reviewer-role:ID"`, and
+  models copied it: 63 of the project's 533 arbitrations used
+  `reviewer-role:`, and each blocked its unit at once. The example is now
+  `"reviewer-semantics:F1"`, the arbiter gets every reference to decide in
+  `extra.references`, and an arbitration that names an unknown, repeated or
+  missing reference is asked for once more, with the slip and the references
+  named, before the unit blocks (the recorded error wording is unchanged).
+- Nothing kept an agent from editing the RULEBOOK after phase 01, so a
+  person's wording could be replaced and a format problem could be "fixed" in
+  the rules. From phase 01 on, an agent's edit of `migration/RULEBOOK.md` first
+  keeps the current text in `migration/rulebook-history/` (named by its hash,
+  kept once), and once translation has started the hook asks the person,
+  saying how many finished units the edit sends back to review and that format
+  problems are repaired, not fixed in the RULEBOOK. Runner commands that write
+  the RULEBOOK (`policy-record`) are unchanged. The skill and the orchestrator
+  say the same: a unit blocked in translation is repaired.
+
+tests/rulebook-stability-2026-11-01.test.mjs covers the bracketed trailer, the
+prompts, the arbiter's second chance and its block, and the hook before
+phase 01, after it and after translation started.
+
 # 0.35.0 — 2026-10-31
 
 The auto-mode handoff at the end of setup said "switch to autopilot with
