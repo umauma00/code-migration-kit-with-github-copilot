@@ -158,13 +158,23 @@ test('the hook asks before rulebook accept (unasked in auto mode) and keeps agen
   assert.equal(shell(accept), null, 'auto mode records it unasked, like the other approvals');
   amend(f, '\n## Division\nfloor-division keeps the sign of the divisor.\n');
   // Auto mode takes the conservative scope only.
-  assert.throws(() => acceptRulebook(f.root, f.config, { note: 'auto', redo: 'none' }), /In auto mode rulebook accept takes --redo listed or all/);
-  assert.throws(() => acceptRulebook(f.root, f.config, { note: 'auto', redo: 'ported/main.mjs' }), /In auto mode/);
+  // Auto mode never drops a listed file.
+  assert.throws(() => acceptRulebook(f.root, f.config, { note: 'auto', redo: 'none' }), /In auto mode --redo none is refused while 1 listed file/);
+  assert.throws(() => acceptRulebook(f.root, f.config, { note: 'auto', redo: 'ported/main.mjs' }), /keeps every listed file; missing: ported\/math_ops\.mjs/);
   assert.equal(acceptRulebook(f.root, f.config, { note: 'auto', redo: 'listed' }).auto, true, 'recorded as decided without the person');
   assert.equal(readJSON(safePath(f.root, rulebookAmendmentsFile)).log[0].auto, true);
   assert.ok(autoModeReport(f.root).records.includes('rulebook accept'), 'status lists it as decided without the person');
+  // A section no file matches by words: not every unit. The agent reads it and
+  // names the files it affects, or none when it cannot affect translated code.
   amend(f, '\nKeep error messages.\n');
-  assert.throws(() => acceptRulebook(f.root, f.config, { note: 'auto', redo: 'listed' }), /takes --redo all/);
+  assert.deepEqual(rulebookChanges(f.root, f.config).candidates, []);
+  assert.throws(() => acceptRulebook(f.root, f.config, { note: 'auto', redo: 'listed' }), /read the changed sections that match no file by words \(Division\)/);
+  const named = acceptRulebook(f.root, f.config, { note: 'Error messages: only text_ops raises errors', redo: 'ported/text_ops.mjs' });
+  assert.deepEqual(named.redo, ['ported/text_ops.mjs']);
+  assert.deepEqual(finished(f), [false, false, true], 'math_ops from the first change and text_ops; main stays done');
+  amend(f, '\nWording only.\n');
+  assert.equal(acceptRulebook(f.root, f.config, { note: 'Wording only; no translated code is affected', redo: 'none' }).redo.length, 0);
+  assert.equal(readJSON(safePath(f.root, rulebookAmendmentsFile)).log.length, 3);
 });
 
 test('an acceptance needs its log entry, and re-recording 02 leaves nothing to accept', async t => {

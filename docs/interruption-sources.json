@@ -1431,7 +1431,7 @@
     },
     {
       "path": "lib/phases.mjs",
-      "sha256": "39024a77bb46a0f73b0e954e7239f584292a064a35f14959bc5d3758b4c084ae",
+      "sha256": "69b95c03ad452b2f19fa5a394c2633c4aaf838027cf2e3fcf8ef7b2450e5b529",
       "entries": [
         {
           "line": 60,
@@ -2626,7 +2626,7 @@
     },
     {
       "path": "lib/rulebook.mjs",
-      "sha256": "6869855cd770a4c28766251569e3599c912ee362bdff6e3bd168028c198e0f72",
+      "sha256": "cb5c22ec16585466e13d628d7413ccf6c984d277c6b56534fcac93cb97be6332",
       "entries": [
         {
           "line": 88,
@@ -2659,22 +2659,37 @@
           "code": "if (changes.other.length) throw new Error(changes.next);"
         },
         {
-          "line": 122,
+          "line": 127,
           "kind": "error-or-exit-candidate",
-          "code": "throw new Error(`In auto mode rulebook accept takes --redo ${changes.unmatched.length || changes.previous === null ? 'all (a changed section matches no file)' : 'listed or all'}`);"
+          "code": "if (changes.previous === null) throw new Error('In auto mode rulebook accept takes --redo all: the reviewed RULEBOOK version is not kept, so what changed is unknown');"
+        },
+        {
+          "line": 128,
+          "kind": "error-or-exit-candidate",
+          "code": "if (redo === 'listed' && changes.unmatched.length) throw new Error(`In auto mode, read the changed sections that match no file by words (${changes.unmatched.join(', ')}) and pass the files they affect along with the listed ones (--redo ${keep},...; just the listed files when they affect no other)${listed.length ? '' : ', --redo none when they cannot affect translated code'}, or all`);"
         },
         {
           "line": 129,
           "kind": "error-or-exit-candidate",
+          "code": "if (redo === 'none' && listed.length) throw new Error(`In auto mode --redo none is refused while ${listed.length} listed file(s) may be touched: pass listed, or the listed files with more`);"
+        },
+        {
+          "line": 130,
+          "kind": "error-or-exit-candidate",
+          "code": "if (missing.length) throw new Error(`In auto mode a file list keeps every listed file; missing: ${missing.join(', ')}`);"
+        },
+        {
+          "line": 137,
+          "kind": "error-or-exit-candidate",
           "code": "if (changes.previous === null) throw new Error('--redo listed needs the reviewed RULEBOOK version, which is not kept; choose all, none or name the files');"
         },
         {
-          "line": 134,
+          "line": 142,
           "kind": "error-or-exit-candidate",
           "code": "if (unknown.length) throw new Error(`Not manifest targets: ${unknown.join(', ')}`);"
         },
         {
-          "line": 161,
+          "line": 169,
           "kind": "error-or-exit-candidate",
           "code": "throw new Error(`Phase 02 is still out of date after accepting the RULEBOOK: ${why}`);"
         }
@@ -5113,5 +5128,5 @@
       ]
     }
   ],
-  "candidateLines": 929
+  "candidateLines": 932
 }
