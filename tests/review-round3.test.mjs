@@ -187,7 +187,9 @@ test('transient failures retry; unit failures stay isolated; systemic failures a
   writeJSON(safePath(g.root, 'migration/config.json'), g.config); await approved(g);
   const implemented = [];
   const streak = await translate(g.root, g.config, async args => { if (args.role === 'implementer') { implemented.push(args.unit.target); throw new Error('Agent did not return one valid JSON object'); } return fake(args); }).catch(e => e);
-  assert.equal(implemented.length, 2, 'the third unit is not dispatched');
+  assert.equal(new Set(implemented).size, 2, 'the third unit is not dispatched');
+  // 0.41.0: each answer that is not one JSON object is asked once more first.
+  assert.equal(implemented.length, 4);
   assert.match(streak.message, /Stopped dispatching after 2 consecutive unit failures/);
 });
 

@@ -558,9 +558,20 @@ by itself; if it persists, offer a lower `concurrency` after the run (it keeps
 reviewed work). A run that stops at its AI call budget is a budget stop: rerun
 `translate`, or propose `translate --max-calls N` with the number the person agrees.
 
-A unit blocked after translation started (a PORT STATUS trailer, an arbitration
-format slip, a fixer that changed nothing) is a unit problem: repair that unit,
-never edit the RULEBOOK for it. Propose a RULEBOOK amendment only for a real
+The runner repairs slips of one answer itself: it asks the same role once more,
+saying what was wrong (not one JSON object or the wrong shape, an answer that
+ended without a final message, arbitration references, a PORT STATUS trailer in
+the wrong place or with the wrong count, a single-pass fix that changed
+nothing), sends a wrong trailer left on a written file back to the fixer (twice
+per run, not counted as fix rounds), and gives units still blocked by a slip
+one more pass before the run ends. The run summary's `selfRepairs` counts them:
+mention the counts in the report. `selfRepairs.flagged` lists the findings a
+single-pass fix left unfixed, as `TODO(port)` lines no review checked: name them
+in the report as open items for the person, not as a stop. A unit still blocked after translation
+started (a PORT STATUS trailer, an arbitration format slip, a fixer that changed
+nothing) is a unit problem: take the failure guidance's recommended option (a
+rerun for an arbitration slip, repair for a trailer or an unchanged fix; in auto
+mode without asking), and never edit the RULEBOOK for it. Propose a RULEBOOK amendment only for a real
 rule problem: say in chat what changes, then make the edit. The hook's
 confirmation, which shows the edit, is the person's decision, so do not ask
 with a question tool first; the person may also edit the file themselves. In

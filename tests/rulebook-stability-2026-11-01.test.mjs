@@ -105,9 +105,10 @@ test('an arbiter that copies the placeholder is asked once more and the unit fin
 
 test('a second miswritten arbitration still blocks the unit with the recorded wording', async t => {
   const f = await ready(t);
-  const { calls, adapter } = arbitrated([['reviewer-role:F1'], ['reviewer-role:F1']]);
+  const { calls, adapter } = arbitrated([['reviewer-role:F1'], ['reviewer-role:F1'], ['reviewer-role:F1'], ['reviewer-role:F1']]);
   const run = await translate(f.root, f.config, adapter).catch(e => e);
-  assert.equal(calls.filter(c => c.role === 'arbiter').length, 2);
+  // 0.41.0: the run's last pass asks twice more before the unit stays blocked.
+  assert.equal(calls.filter(c => c.role === 'arbiter').length, 4);
   const state = unitState(f.root, f.units[0]);
   assert.equal(state.status, 'blocked'); assert.equal(state.error, 'Unknown/duplicate arbitration finding');
   assert.notEqual(run?.done, 1);
@@ -189,7 +190,8 @@ test('after phase 01 an edit keeps the replaced version; after translation start
 
 test('the skill and the orchestrator say a blocked unit is repaired, not fixed in the RULEBOOK', () => {
   for (const rel of ['skills/code-migration/SKILL.md', '.github/skills/code-migration/SKILL.md'])
-    assert.match(fs.readFileSync(path.join(kitRoot, rel), 'utf8'), /repair that unit,\nnever edit the RULEBOOK for it/, rel);
+    // 0.41.0: the runner retries first; what is left takes the guidance's option, never the RULEBOOK.
+    assert.match(fs.readFileSync(path.join(kitRoot, rel), 'utf8'), /a\nrerun for an arbitration slip, repair for a trailer or an unchanged fix; in auto\nmode without asking\), and never edit the RULEBOOK for it/, rel);
   for (const rel of ['.github/agents/migration-orchestrator.agent.md', 'com.github.copilot/agents/code-migration-plugin-orchestrator.agent.md'])
     assert.match(fs.readFileSync(path.join(kitRoot, rel), 'utf8'), /a unit blocked in translation is repaired, never fixed by editing the RULEBOOK/, rel);
 });

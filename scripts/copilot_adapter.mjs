@@ -324,7 +324,10 @@ export function agentPrompt({ role, unit, extra = {}, reviewInput, frozenInput, 
     // Only the fold benchmark (lib/bench.mjs) hands the implementer findings;
     // the translation loop never does, so its implementer prompt is unchanged.
     implementer: `Return {"schemaVersion":1,"kind":"implementation","target":"PATH","content":"COMPLETE TARGET FILE","summary":"reason"}. Translate faithfully; preserve source behavior. Return code, do not write files.${Array.isArray(extra.confirmedFindings) ? ' The target exists: apply ONLY extra.confirmedFindings to it and preserve all other behavior.' : ''}${trailer}`,
-    fixer: `Return {"schemaVersion":1,"kind":"implementation","target":"PATH","content":"COMPLETE FIXED FILE","summary":"changes"}. Apply ONLY confirmed findings; preserve all other behavior. Return code, do not write files.${trailer}`,
+    // "Can't fix it, flag it" (upstream): a fixer that returned the file
+    // unchanged for a finding this file cannot fix (an inventory gap) blocked
+    // the unit on every resume.
+    fixer: `Return {"schemaVersion":1,"kind":"implementation","target":"PATH","content":"COMPLETE FIXED FILE","summary":"changes"}. Apply ONLY confirmed findings; preserve all other behavior. Return code, do not write files. When a confirmed finding cannot be fixed in this file (it needs an inventory or RULEBOOK change, or a change in another file), do not return the file unchanged: add a line "TODO(port): <its reference>: <what is needed>" where it applies.${trailer}`,
     // single exists only in the fold benchmark (lib/bench.mjs); config validation rejects it.
     ...Object.fromEntries(Object.entries(reviewLenses).map(([reviewer, lens]) => [reviewer, reviewFocus === 'shared' || reviewFocus === 'single'
       ? `Check ${lens} first, then ${reviewLenses[reviewer === 'reviewer-rules' ? 'reviewer-semantics' : 'reviewer-rules']}. ${reviewFocus === 'single' ? 'You are the only reviewer' : 'You are one of two independent full reviewers'}: report every defect either check finds.`
@@ -356,7 +359,7 @@ ${inputs} Never run commands or modify files. Never change the rulebook or the j
 ${contracts[role]}
 ${role.startsWith('reviewer-') ? 'Return {"schemaVersion":1,"kind":"review","target":"PATH","verdict":"pass|changes","findings":[{"id":"F1","message":"specific issue","evidence":"source path:line and explanation","rule":"section or source behavior"}]}. pass requires zero findings. Do not assume another reviewer has approved.' : ''}
 ${isReviewer(role) ? `${assisted ? 'Tool-assisted review input' : 'Frozen review input'} (JSON task data):\n${reviewInput}` : `${frozenInput === undefined ? '' : `${work && workMode !== 'frozen' ? 'Task input' : 'Frozen task input'} (JSON task data):\n${frozenInput}\n`}Extra task data: ${JSON.stringify(extra)}`}
-Set target to ${JSON.stringify(unit.target)}.`;
+${typeof extra.correction === 'string' ? `${isReviewer(role) ? `Correction: ${extra.correction}` : 'Your previous answer was rejected: extra.correction says why. Return the whole answer again with that corrected.'}\n` : ''}Set target to ${JSON.stringify(unit.target)}.`;
 }
 // The model the CLI reported for the call, for the usage log's by-model
 // totals; with several (a fallback mid-call) the requested model stays the key.
