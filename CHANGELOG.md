@@ -46,9 +46,11 @@ The blocks themselves came from the kit:
 - On that Mac the 14 blocked units were reported as an unknown error whose
   choices included "review the previous artifacts and settings", which led to
   the RULEBOOK edit. A blocked unit's trailer, arbitration or unchanged-fix
-  error now gets its own guidance: rerun translate (only stopped units resume,
-  finished ones are kept), or repair the unit with the error as evidence; the
-  RULEBOOK is left alone. The fix-round-limit guidance, whose first choice is a
+  error now gets its own guidance, and the RULEBOOK is left alone: an
+  arbitration slip recommends rerunning translate (the unit resumes at
+  arbitration with its reviews; finished units are kept), a wrong trailer or
+  an unchanged fix recommends repair with the error as evidence, since a plain
+  rerun reviews the same output again. The fix-round-limit guidance, whose first choice is a
   RULEBOOK amendment, now says the amendment sends finished units back to
   review.
 

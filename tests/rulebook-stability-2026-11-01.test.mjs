@@ -208,12 +208,14 @@ test('in auto mode the edit is refused with the way on, since autopilot cannot s
 });
 
 test('a unit slip is guided to a rerun or repair, never to a RULEBOOK edit', () => {
-  for (const message of ['Unknown/duplicate arbitration finding', 'Arbiter omitted findings',
-    'PORT STATUS count mismatch or invalid trailer: TODO(port) lines=1, claimed=2. Return one final confidence/todos trailer matching the agreed marker policy.',
-    'Fixer returned the reviewed candidate unchanged; confirmed findings remain open (fixPolicy single-pass)']) {
+  const cases = [['Unknown/duplicate arbitration finding', 'arbitration-slip', 'rerun'], ['Arbiter omitted findings', 'arbitration-slip', 'rerun'],
+    ['PORT STATUS count mismatch or invalid trailer: TODO(port) lines=1, claimed=2. Return one final confidence/todos trailer matching the agreed marker policy.', 'unit-slip', 'repair'],
+    ['Fixer returned the reviewed candidate unchanged; confirmed findings remain open (fixPolicy single-pass)', 'unit-slip', 'repair']];
+  for (const [message, id, first] of cases) {
     const g = failureGuidance(message, { language: 'ja' });
-    assert.equal(g.id, 'unit-slip', message);
-    assert.deepEqual(g.options.map(o => o.id), ['rerun', 'repair', 'pause']);
+    assert.equal(g.id, id, message);
+    assert.equal(g.options[0].id, first, message);
+    assert.deepEqual(g.options.map(o => o.id).sort(), ['pause', 'repair', 'rerun']);
     assert.ok(g.options.every(o => !/RULEBOOK/.test(JSON.stringify(o))));
   }
 });
