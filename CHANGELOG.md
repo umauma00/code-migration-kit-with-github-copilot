@@ -30,12 +30,17 @@ The blocks themselves came from the kit:
   keeps the current text in `migration/rulebook-history/` (named by its hash,
   kept once), and once translation has started the hook asks the person,
   saying how many finished units the edit sends back to review and that format
-  problems are repaired, not fixed in the RULEBOOK. Only real writes count:
-  edit tools, and in a shell a redirect, `tee`, `sed -i`/`perl -i`, a copy or
-  move onto it, moving or removing it, PowerShell's content writers and
-  `git checkout`/`git restore`; reading it (`sed -n`, `awk`, hashes, scripts),
-  copying it elsewhere and quoting its path in a note never ask. A script that
-  opens the file itself is not seen (best effort). Runner commands that write
+  problems are repaired, not fixed in the RULEBOOK. In auto mode it does not
+  ask, since autopilot cannot show a confirmation (on that Mac, an ask at 00b
+  ended the autopilot session): the edit is refused with the way on (repair
+  the unit, report the rule problem) and the run goes on. Only real writes
+  count: edit tools, and in a shell a redirect, `tee`, `sed -i`/`perl -i`/
+  `awk -i inplace`, a copy, link or move onto it, moving or removing it,
+  PowerShell's content writers, `git checkout`/`git restore`, the same inside
+  `bash -c`/`powershell -Command` strings and `$(...)`, and an interpreter line
+  that names the file with a write call; reading it (`sed -n`, `awk`, hashes,
+  scripts that only read it), copying it elsewhere and quoting its path in a
+  note never ask. A path kept in a script variable is not seen (best effort). Runner commands that write
   the RULEBOOK (`policy-record`) are unchanged. The skill and the orchestrator
   say the same: a unit blocked in translation is repaired.
 

@@ -562,9 +562,12 @@ A unit blocked after translation started (a PORT STATUS trailer, an arbitration
 format slip, a fixer that changed nothing) is a unit problem: repair that unit,
 never edit the RULEBOOK for it. Every finished unit's record carries the
 RULEBOOK's hash, so any edit after translation started makes all of them be
-reviewed again. Propose a RULEBOOK amendment only for a real rule problem, and
-before it tell the person how many finished units it sends back (status shows
-the count). The hook asks the person again and keeps the replaced version in
+reviewed again. Propose a RULEBOOK amendment only for a real rule problem: say
+in chat what changes and how many finished units it sends back (status shows
+the count), then make the edit. The hook's confirmation, which shows the edit,
+is the person's decision, so do not ask with a question tool first; the person
+may also edit the file themselves. In auto mode the hook refuses the edit:
+list the rule problem in the report instead. The replaced version is kept in
 `migration/rulebook-history/`.
 
 After a failed build, propose `build-loop --note TEXT [--through build|smoke|parity]

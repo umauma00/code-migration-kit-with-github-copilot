@@ -12,6 +12,7 @@ import { translate, arbitrationProblem } from '../lib/pipeline.mjs';
 import { markerEvidence } from '../lib/markers.mjs';
 import { agentPrompt } from '../scripts/copilot_adapter.mjs';
 import { interactiveDecision, rulebookHistoryDir } from '../lib/guardrails.mjs';
+import { autoModeFile } from '../lib/auto-mode.mjs';
 import { kitRoot } from '../scripts/install.mjs';
 
 const policy = { markerPolicy: 'todo-lines-v1' };
@@ -145,12 +146,21 @@ test('after phase 01 an edit keeps the replaced version; after translation start
   for (const command of ['echo rule >> migration/RULEBOOK.md', 'echo rule > migration/RULEBOOK.md', 'cat x | tee -a migration/RULEBOOK.md',
     'sed -i s/a/b/ migration/RULEBOOK.md', 'perl -pi -e s/a/b/ migration/RULEBOOK.md', 'cp /tmp/r.md migration/RULEBOOK.md',
     'mv migration/RULEBOOK.md /tmp/old.md', 'rm migration/RULEBOOK.md', 'Set-Content -Path migration/RULEBOOK.md -Value x',
-    'Out-File -FilePath migration/RULEBOOK.md', 'git checkout -- migration/RULEBOOK.md', 'git restore migration/RULEBOOK.md'])
+    'Out-File -FilePath migration/RULEBOOK.md', 'git checkout -- migration/RULEBOOK.md', 'git restore migration/RULEBOOK.md',
+    // Inside a shell's command string, a substitution, or an interpreter program that writes.
+    'bash -lc "echo x > migration/RULEBOOK.md"', 'sh -c "sed -i s/a/b/ migration/RULEBOOK.md"', 'pwsh -Command "Set-Content migration/RULEBOOK.md x"',
+    `powershell -NoProfile -Command "(Get-Content migration/RULEBOOK.md) -replace 'a','b' | Set-Content migration/RULEBOOK.md"`,
+    `python3 -c "open('migration/RULEBOOK.md','w').write('x')"`, `python3 - <<'PY'\nfrom pathlib import Path\nPath('migration/RULEBOOK.md').write_text('x')\nPY`,
+    `node -e "require('fs').writeFileSync('migration/RULEBOOK.md','x')"`, "[IO.File]::WriteAllText('migration/RULEBOOK.md', 'x')",
+    'awk -i inplace "{print}" migration/RULEBOOK.md', 'sponge migration/RULEBOOK.md', 'dd if=/tmp/r of=migration/RULEBOOK.md', 'ln -sf /tmp/r migration/RULEBOOK.md'])
     assert.equal(editRulebook(f, command)?.decision, 'ask', command);
   for (const command of ['cat migration/RULEBOOK.md', 'rg -n PORT migration/RULEBOOK.md', 'sed -n 1,10p migration/RULEBOOK.md',
     "awk '/PORT/' migration/RULEBOOK.md", 'sha256sum migration/RULEBOOK.md', 'Get-Content migration/RULEBOOK.md',
     `python3 -c "print(open('migration/RULEBOOK.md').read())"`, 'cp migration/RULEBOOK.md /tmp/copy.md', 'git add migration/RULEBOOK.md',
-    'git commit -am "update migration/RULEBOOK.md"', 'node migration-kit/scripts/run_migration.mjs repair --note "see migration/RULEBOOK.md"'])
+    'git commit -am "update migration/RULEBOOK.md"', 'node migration-kit/scripts/run_migration.mjs repair --note "see migration/RULEBOOK.md"',
+    'perl -Mstrict -ne print migration/RULEBOOK.md', 'ruby -rdigest -ne p migration/RULEBOOK.md', 'tee /tmp/x < migration/RULEBOOK.md',
+    `python3 -c "print(open('migration/RULEBOOK.md').read())"`, 'bash -lc "sed -n 1,5p migration/RULEBOOK.md"',
+    `python3 - <<'PY'\nfrom pathlib import Path\nrules = Path('migration/RULEBOOK.md').read_text()\nPath('migration/gap-report.md').write_text(rules[:10])\nPY`])
     assert.equal(editRulebook(f, command), null, command);
   // Other files are untouched by this check.
   assert.equal(interactiveDecision({ toolName: 'apply_patch', toolArgs: patch('migration/gap-report.md'), cwd: f.root }, f.root), null);
@@ -167,4 +177,21 @@ test('the skill and the orchestrator say a blocked unit is repaired, not fixed i
     assert.match(fs.readFileSync(path.join(kitRoot, rel), 'utf8'), /repair that unit,\nnever edit the RULEBOOK for it/, rel);
   for (const rel of ['.github/agents/migration-orchestrator.agent.md', 'com.github.copilot/agents/code-migration-plugin-orchestrator.agent.md'])
     assert.match(fs.readFileSync(path.join(kitRoot, rel), 'utf8'), /a unit blocked in translation is repaired, never fixed by editing the RULEBOOK/, rel);
+});
+
+test('in auto mode the edit is refused with the way on, since autopilot cannot show a confirmation', t => {
+  const f = prepare(t);
+  writeJSON(safePath(f.root, 'migration/phases/01.json'), { schemaVersion: 1, phase: '01' });
+  writeJSON(safePath(f.root, 'migration/gates/translation.json'), { schemaVersion: 1, stage: 'translation' });
+  writeJSON(safePath(f.root, 'migration/state/units/a.json'), { status: 'done' });
+  writeJSON(safePath(f.root, autoModeFile), { schemaVersion: 1, enabledAt: new Date().toISOString() });
+  const prefs = safePath(f.root, 'migration/preferences.json');
+  writeJSON(prefs, { ...(fs.existsSync(prefs) ? readJSON(prefs) : { schemaVersion: 1, userLanguage: null }), phaseMode: 'auto' });
+  const denied = editRulebook(f);
+  assert.equal(denied.decision, 'deny');
+  assert.match(denied.reason, /Repair the blocked units without changing the RULEBOOK/);
+  assert.match(denied.reason, /1 now/);
+  assert.equal(editRulebook(f, 'sed -i s/a/b/ migration/RULEBOOK.md').decision, 'deny');
+  assert.equal(editRulebook(f, 'sed -n 1,5p migration/RULEBOOK.md'), null);
+  assert.equal(history(f).length, 1);
 });

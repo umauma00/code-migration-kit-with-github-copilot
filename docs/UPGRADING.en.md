@@ -8,7 +8,7 @@
 
 1. The RULEBOOK template now shows the trailer as `// PORT STATUS: confidence=medium todos=2`. The check accepts the bracketed `todos=[2]` as the same count, so **do not edit an existing RULEBOOK** for it (that edit sends every unit back to review).
 2. The arbiter's example names a real reference, and an arbitration with an unknown, repeated or missing reference is asked for once more before the unit blocks.
-3. After phase 01, an agent's edit of `migration/RULEBOOK.md` first keeps the current text in `migration/rulebook-history/`; once translation has started the hook asks the person, naming how many finished units the edit sends back. Reading the file or naming it in a note never asks; a script that opens the file itself is not seen.
+3. After phase 01, an agent's edit of `migration/RULEBOOK.md` first keeps the current text in `migration/rulebook-history/`; once translation has started the hook asks the person, naming how many finished units the edit sends back. In auto mode it does not ask (autopilot cannot show a confirmation): the edit is refused with the way on, and the run goes on. Reading the file or naming it in a note never asks; a script that opens the file itself is not seen.
 4. In a copy install, replace all of `migration-kit/` with the temporary install's. The plugin needs only an update.
 
 ## 0.35.0 (the autopilot handoff is right in every app)
