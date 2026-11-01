@@ -63,7 +63,7 @@ test('the Japanese template keeps the sections, markers and tags of the English 
   assert.deepEqual(sections(ja), sections(en));
   assert.match(ja, /[぀-ゟ]/);
   for (const literal of ['[source language]', '[target language]', 'TODO(port):', 'PERF(port):', 'BUG(port):', '// SAFETY:',
-    '// PORT STATUS: confidence=[high|medium|low] todos=[N]', 'DEV-001', '`allocation-guard`', '`precondition-guard`',
+    '// PORT STATUS: confidence=medium todos=2', 'DEV-001', '`allocation-guard`', '`precondition-guard`',
     '`todo-lines-v1`', 'migration/inventory.tsv', 'templates/inventory.tsv', 'docs/EXECUTION-SCOPES.md', '<!-- Copilot adaptation:'])
     assert.ok(en.includes(literal) && ja.includes(literal), literal);
 });
