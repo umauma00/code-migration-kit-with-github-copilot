@@ -266,6 +266,13 @@ an answer: choose nothing and ask the person to continue interactively (in
 auto mode, phase boundaries ask nothing; see the auto mode paragraph).
 After a phase, resolve the next step from the user's instruction and current
 evidence, not just a report/template's existence.
+Never edit a recorded phase's report (feasibility.md, judge-report.md,
+depmap/report.md, gap-report.md; stress-test/report.md once 03 is recorded) to
+note progress or a later result such as the formal judge outcome: write it in
+the current phase's report before that phase is recorded, or in chat. The record
+binds the file, so the edit makes that phase and every later one be recorded
+again (a report of 00 to 02 also ends a prepared pilot); undoing an added note
+byte for byte makes the record current again ([why](../../../docs/PHASE-HANDOFF.md#phase-routing-and-durable-evidence)).
 
 At start or resumption, follow the [ten-phase TODO tracking contract](../../../docs/PHASE-HANDOFF.md#track-the-ten-phases-in-the-host-todo-list).
 Create or reconcile the host TODO list before starting phase work; update it on

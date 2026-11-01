@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "code-migration-kit",
-  "version": "0.41.0",
+  "version": "0.41.1",
   "description": "Staged language migration with explicit approvals and independent reviews.",
   "author": { "name": "umauma00", "url": "https://github.com/umauma00" },
   "homepage": "https://github.com/umauma00/code-migration-kit-with-github-copilot",

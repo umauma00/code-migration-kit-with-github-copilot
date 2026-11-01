@@ -1431,7 +1431,7 @@
     },
     {
       "path": "lib/phases.mjs",
-      "sha256": "729e32ea993879afb5198e8dd234030b8e2fc8e12571c70daebf5da8c23c6fd5",
+      "sha256": "d06c9e94c114aaec703df476f7318e6bb43fa5ec7b233517482238db2e215093",
       "entries": [
         {
           "line": 60,
@@ -1532,7 +1532,7 @@
     },
     {
       "path": "lib/pilot.mjs",
-      "sha256": "f5a1c9f2f0bd3e25a93b37fac37e6d5655d58511d1e721ad5c63c1a6d28f343c",
+      "sha256": "be3eb9eb1e6064f50c13b0cc1a1845d668995a7b1c9ef81b65090165b76aedb2",
       "entries": [
         {
           "line": 23,
@@ -1555,97 +1555,102 @@
           "code": "grant.judgeHash !== fileHash(safePath(parent, 'migration/results/judge.json'))) throw new Error('Pilot parent preparation or judge changed; prepare a new isolated pilot');"
         },
         {
-          "line": 33,
+          "line": 36,
+          "kind": "error-or-exit-candidate",
+          "code": "if (!currentPhase(parent, parentConfig, '02')) throw new Error(`Pilot parent phase 02 is out of date since this pilot was prepared; phase next in ${parent} says why. If only a note was added to a report of phases 00 to 02 (such as the formal judge outcome), undo it exactly (byte for byte) and this pilot works again. Recording those phases again instead, as phase next says when undoing is not enough, ends this pilot (pilot prepare and pilot run again).`);"
+        },
+        {
+          "line": 37,
           "kind": "error-or-exit-candidate",
           "code": "if (!preparedJudge(parent, parentConfig, parentContext)) throw new Error('Pilot requires current parent judge validation and unchanged evidence');"
         },
         {
-          "line": 34,
+          "line": 38,
           "kind": "error-or-exit-candidate",
           "code": "if (grant.context !== contextHash(child, config) || JSON.stringify(grant.targets) !== JSON.stringify(readManifest(child, config).map(u => u.target))) throw new Error('Pilot scope or sealed inputs changed');"
         },
         {
-          "line": 35,
+          "line": 39,
           "kind": "error-or-exit-candidate",
           "code": "if (!['translation', 'build', 'smoke', 'parity'].includes(grant.through)) throw new Error('Invalid pilot execution boundary');"
         },
         {
-          "line": 42,
+          "line": 46,
           "kind": "error-or-exit-candidate",
           "code": "if (executionPurpose(config) !== 'production') throw new Error('A pilot cannot authorize another pilot');"
         },
         {
-          "line": 43,
+          "line": 47,
           "kind": "error-or-exit-candidate",
           "code": "if (config.mode !== 'preserve') throw new Error('The pilot file runner currently supports preserve mode only');"
         },
         {
-          "line": 44,
+          "line": 48,
           "kind": "error-or-exit-candidate",
           "code": "if (!Array.isArray(sources) || !sources.length || new Set(sources).size !== sources.length) throw new Error('Pilot needs explicit source selections (--sources)');"
         },
         {
-          "line": 45,
+          "line": 49,
           "kind": "error-or-exit-candidate",
           "code": "if (!['translation', 'build', 'smoke', 'parity'].includes(through) || (through === 'parity' && config.verificationMode === 'source-only')) throw new Error('Invalid pilot boundary for this verification mode');"
         },
         {
-          "line": 46,
+          "line": 50,
           "kind": "error-or-exit-candidate",
           "code": "if (!currentPhase(parent, config, '02')) throw new Error('Review parent phases 00 through 02 before authorizing a pilot');"
         },
         {
-          "line": 48,
+          "line": 52,
           "kind": "error-or-exit-candidate",
           "code": "if (!preparedJudge(parent, config, context)) throw new Error('Run parent judge successfully with unchanged evidence before preparing a pilot');"
         },
         {
-          "line": 50,
+          "line": 54,
           "kind": "error-or-exit-candidate",
           "code": "for (const source of sources) if (!bySource.has(source)) throw new Error(`Pilot source is not in the manifest: ${source}`);"
         },
         {
-          "line": 54,
+          "line": 58,
           "kind": "error-or-exit-candidate",
           "code": "for (const stage of stages.filter(s => s !== 'translation')) if (!config.commands?.[stage]) throw new Error(`Configure commands.${stage} before authorizing that pilot boundary`);"
         },
         {
-          "line": 57,
+          "line": 61,
           "kind": "error-or-exit-candidate",
           "code": "if ((path.isAbsolute(value) && within(value, parent)) || (i > 0 && /^\\.\\.([/\\\\]|$)/.test(value))) throw new Error('Pilot commands must use project-relative inputs, not parent paths');"
         },
         {
-          "line": 76,
+          "line": 80,
           "kind": "error-or-exit-candidate",
           "code": "if (!note?.trim() || !Array.isArray(sources) || !sources.length || new Set(sources).size !== sources.length) throw new Error('Pilot needs explicit source selections and an authorization --note');"
         },
         {
-          "line": 77,
+          "line": 81,
           "kind": "error-or-exit-candidate",
           "code": "if (!target) throw new Error('Pilot requires a new --target directory outside the production project');"
         },
         {
-          "line": 82,
+          "line": 86,
           "kind": "error-or-exit-candidate",
           "code": "if (within(destination, parent) || within(parent, destination)) throw new Error('Pilot target must be outside the production project');"
         },
         {
-          "line": 83,
+          "line": 87,
           "kind": "error-or-exit-candidate",
           "code": "if (fs.existsSync(destination)) throw new Error('Pilot target must be a new directory; never overwrite existing work');"
         },
         {
-          "line": 89,
+          "line": 93,
           "kind": "error-or-exit-candidate",
           "code": "if (expectTotal !== undefined && Number(expectTotal) !== scope.length) throw new Error(`Pilot scope is ${scope.length} files, not the ${expectTotal} approved; run pilot plan again and ask with the new count`);"
         },
         {
-          "line": 115,
+          "line": 119,
           "kind": "error-or-exit-candidate",
           "code": "if (contextHash(parent, config) !== context) throw new Error('Parent inputs changed while preparing the pilot');"
         },
         {
-          "line": 124,
+          "line": 128,
           "kind": "error-or-exit-candidate",
           "code": "throw e;"
         }
@@ -5164,5 +5169,5 @@
       ]
     }
   ],
-  "candidateLines": 939
+  "candidateLines": 940
 }

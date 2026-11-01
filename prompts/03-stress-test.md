@@ -19,6 +19,11 @@ never change sandbox settings yourself.
 
 Prerequisite: reviewed rulebook, map, inventory and judge. Produce
 `migration/stress-test/report.md`; the user reviews it before translation.
+State the formal judge result there. Never edit the reports of recorded phases
+(feasibility.md, judge-report.md, depmap/report.md, gap-report.md) to note
+progress or a result: each record binds its files, so the edit makes that phase
+and every later one be recorded again and ends a prepared pilot. Edit one only
+to correct an error, then follow `phase next`.
 
 Select 3–5 difficult files by risk and inventory coverage, with scored evidence.
 For preserve mode, run a dual translation experiment:

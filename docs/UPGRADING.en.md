@@ -1,6 +1,15 @@
-# Upgrading (0.41.0 and earlier releases)
+# Upgrading (0.41.1 and earlier releases)
 
 [日本語](UPGRADING.md) | English
+
+## 0.41.1 (no re-record for a note added to a recorded report)
+
+Right after phase 03 started, the agent added the formal judge result to judge-report.md, and phases 00b to 02 had to be recorded again (2026-11-01, Windows, kit 0.40.0). Phase 00b's prompt had it write "any deferred formal validation" in judge-report.md, so that text went out of date once the judge passed after 02. A phase record binds its reports byte for byte, so even an added note means recording again, and for a report of 00 to 02 after a pilot is prepared it also ends the pilot.
+
+1. Phase 00b's prompt no longer asks for a pending-judge status: the formal judge's receipt is `migration/results/judge.json`, and phase 03's report states its result. Phase 03's prompt and checklist, the skill, the phase handoff and the ordered workflow say never to edit a recorded phase's report (feasibility.md, judge-report.md, depmap/report.md, gap-report.md; stress-test/report.md once 03 is recorded) to note progress or a result.
+2. When only reports changed anyway, `phase next` says that undoing an added note byte for byte makes the records current again with nothing recorded again (if not, record again). If a pilot was prepared on phase 02's record, it names the pilot that recording again would end (undoing does not end it). The pilot's own error says the same instead of only asking for a new pilot.
+3. The records still bind their reports as before. Updating from 0.40.1 or later keeps phase records, approvals and completion records. Updating from 0.40.0 records phases 00b to 03 again once, as the 0.40.1 note says (after pilot prepare that ends the pilot too, so update before preparing one).
+4. In a copy install replace all of `migration-kit/` and the SKILL.md under `.github/skills/` with the staged copy. The plugin takes it with an update.
 
 ## 0.41.0 (the kit repairs slips of one translation answer itself)
 

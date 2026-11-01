@@ -1,3 +1,31 @@
+# 0.41.1 — 2026-11-01
+
+A note added to a recorded phase report no longer has to cost a re-record. On
+2026-11-01 (Windows, kit 0.40.0, auto mode) phase 03 had just started when the
+agent added the formal judge result to `judge-report.md`, which phase 00b's
+prompt had told it to fill with "any deferred formal validation". Phase 00b's
+record binds that file, so 00b to 02 had to be recorded again; after `pilot
+prepare` the same edit would also have ended the pilot.
+
+- Phase 00b's prompt no longer asks for a pending-judge status: the formal
+  judge's receipt is `migration/results/judge.json` and phase 03's report
+  states its result. Phase 03's prompt and checklist, the skill, the phase
+  handoff and the ordered workflow say never to edit a recorded phase's report
+  (`feasibility.md`, `judge-report.md`, `depmap/report.md`, `gap-report.md`;
+  `stress-test/report.md` once 03 is recorded) to note progress or a result.
+- When only a phase's own reports changed, `phase next` says that undoing an
+  added note byte for byte makes the records current again with nothing
+  recorded again, and to record again if it does not (`stale.reportsOnly`). It
+  names a pilot prepared on phase 02's record and the current judge receipt
+  that recording again would end (`stale.pilots`). The pilot's own error says
+  the same instead of only "prepare a new isolated pilot".
+- Records still bind their reports as before; this release changes prompts and
+  guidance only. Updating from 0.40.1 or later keeps every record.
+- Test: `tests/report-edit-rerecord-2026-11-01.test.mjs` (the note, its undo,
+  the pilot named, kept by an undo and ended by recording again, no hint for
+  non-report inputs, a predecessor recorded again, a removed pilot workspace
+  or a changed judge receipt, and the prompts).
+
 # 0.41.0 — 2026-11-01
 
 The translation run now repairs slips of one worker answer by itself, so the
