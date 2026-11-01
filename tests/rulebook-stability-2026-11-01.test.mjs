@@ -3,6 +3,7 @@
 // brackets, the arbiter example "reviewer-role:ID" was copied literally, and
 // nothing kept the RULEBOOK from being edited after translation started.
 import test from 'node:test';
+import { failureGuidance } from '../lib/guidance.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -204,4 +205,15 @@ test('in auto mode the edit is refused with the way on, since autopilot cannot s
   assert.equal(editRulebook(f, 'sed -i s/a/b/ migration/RULEBOOK.md').decision, 'deny');
   assert.equal(editRulebook(f, 'sed -n 1,5p migration/RULEBOOK.md'), null);
   assert.equal(history(f).length, 1);
+});
+
+test('a unit slip is guided to a rerun or repair, never to a RULEBOOK edit', () => {
+  for (const message of ['Unknown/duplicate arbitration finding', 'Arbiter omitted findings',
+    'PORT STATUS count mismatch or invalid trailer: TODO(port) lines=1, claimed=2. Return one final confidence/todos trailer matching the agreed marker policy.',
+    'Fixer returned the reviewed candidate unchanged; confirmed findings remain open (fixPolicy single-pass)']) {
+    const g = failureGuidance(message, { language: 'ja' });
+    assert.equal(g.id, 'unit-slip', message);
+    assert.deepEqual(g.options.map(o => o.id), ['rerun', 'repair', 'pause']);
+    assert.ok(g.options.every(o => !/RULEBOOK/.test(JSON.stringify(o))));
+  }
 });

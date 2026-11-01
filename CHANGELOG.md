@@ -43,10 +43,19 @@ The blocks themselves came from the kit:
   note never ask. A path kept in a script variable is not seen (best effort). Runner commands that write
   the RULEBOOK (`policy-record`) are unchanged. The skill and the orchestrator
   say the same: a unit blocked in translation is repaired.
+- On that Mac the 14 blocked units were reported as an unknown error whose
+  choices included "review the previous artifacts and settings", which led to
+  the RULEBOOK edit. A blocked unit's trailer, arbitration or unchanged-fix
+  error now gets its own guidance: rerun translate (only stopped units resume,
+  finished ones are kept), or repair the unit with the error as evidence; the
+  RULEBOOK is left alone. The fix-round-limit guidance, whose first choice is a
+  RULEBOOK amendment, now says the amendment sends finished units back to
+  review.
 
 tests/rulebook-stability-2026-11-01.test.mjs covers the bracketed trailer, the
-prompts, the arbiter's second chance and its block, and the hook before
-phase 01, after it and after translation started.
+prompts, the arbiter's second chance and its block, the hook before
+phase 01, after it and after translation started, and the guidance for a
+blocked unit.
 
 # 0.36.0 — 2026-10-31
 

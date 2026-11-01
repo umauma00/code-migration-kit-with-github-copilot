@@ -1152,7 +1152,7 @@
     },
     {
       "path": "lib/guidance.mjs",
-      "sha256": "a365d730ed707043c97731009d008e81642e023372af58ebd1d987a0b4283381",
+      "sha256": "eb41fe417aa11a27a04c72a877ab9afcea63ebfe8aa149e4db38ad42314e657a",
       "entries": [
         {
           "line": 74,
@@ -1180,42 +1180,42 @@
           "code": "{ id: 'raise-breaker', label: t('失敗どうしが無関係と確認できたら、連続失敗で止まるまでの回数を増やしてやり直す', 'If the failures are unrelated, raise maxConsecutiveFailures and rerun'),"
         },
         {
-          "line": 538,
+          "line": 551,
           "kind": "error-or-exit-candidate",
           "code": "{ id: 'raise-budget', label: t('AI を呼ぶ回数の上限をあなたと決めて、変換をやり直す（上限を設けるモードなら、その上限を増やす）', 'Run translate --max-calls N with an agreed number (in bounded mode, raise maxAgentCalls)'), command: k => `node ${k}/scripts/run_migration.mjs translate --max-calls N`,"
         },
         {
-          "line": 564,
+          "line": 577,
           "kind": "error-or-exit-candidate",
           "code": "{ id: 'lower-concurrency', label: t('同時に動かすAIの数を減らすか、やり直すまでの待ち時間を延ばす', 'Lower concurrency or raise transientRetryDelayMs'),"
         },
         {
-          "line": 571,
+          "line": 584,
           "kind": "error-or-exit-candidate",
           "code": "{ id: 'check-billing', label: t('GitHub の課金・予算の設定で残量を確認し、追加・引き上げ後に再実行する', 'Check credits and budget in GitHub billing, add or raise them, then rerun'),"
         },
         {
-          "line": 610,
+          "line": 623,
           "kind": "deadline-or-observation",
           "code": "// and a cancellation are final and stay with the timeout rule."
         },
         {
-          "line": 618,
+          "line": 631,
           "kind": "deadline-or-observation",
           "code": "{ id: 'timeout', match: /timed out|\\btimeout\\b(?!Seconds)/i,"
         },
         {
-          "line": 623,
+          "line": 636,
           "kind": "deadline-or-observation",
           "code": "{ id: 'raise-timeout', label: t('選択済みの時間制限を見直す', 'Review an explicitly selected deadline'), reason: t('利用者が継続実行を望んだ場合はcontinuousへ戻すか0（期限なし）を選びます。', 'When the person wants continuous work, use continuous mode or an explicitly unlimited deadline of 0.') },"
         },
         {
-          "line": 694,
+          "line": 707,
           "kind": "loop-exit-candidate",
           "code": "for (const r of rules) { m = message.match(r.match); if (m) { rule = r; break; } }"
         },
         {
-          "line": 805,
+          "line": 818,
           "kind": "deadline-or-observation",
           "code": "[/^hook responds before its timeout$/, c => `Hook check failed: ${c.command ?? 'no hook command'} took ${c.durationMs ?? '?'} ms (timeout ${c.timeoutSec ?? '?'} s)`],"
         }

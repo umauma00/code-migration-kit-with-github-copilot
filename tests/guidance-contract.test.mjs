@@ -38,6 +38,7 @@ const samples = {
   'input-root': 'Judge input root missing: tests (verificationRoots in migration/config.json must name the existing directory of the judge and its scenarios; "tests" is only the installer\'s default)',
   'no-dependencies': 'Review dependency map declares no dependencies between 3 manifest files',
   'template-rules': 'migration/RULEBOOK.md is still the installed template',
+  'unit-slip': 'Unknown/duplicate arbitration finding',
   'untrusted-folder': 'Repository hooks are not loaded: the Copilot CLI folder is untrusted',
   'models-unset': 'Set an available model ID for models.implementer',
   'cli-options': 'Copilot CLI is missing required options: --session-id',
