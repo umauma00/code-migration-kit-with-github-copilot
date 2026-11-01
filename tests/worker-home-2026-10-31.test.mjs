@@ -12,7 +12,7 @@ import path from 'node:path';
 import { prepare, result } from './helpers.mjs';
 import { safePath, atomicWrite, loadConfig } from '../lib/core.mjs';
 import { createCopilotAdapter, copilotEnv } from '../scripts/copilot_adapter.mjs';
-import { prepareWorkerHome, workerCopilotHome, userCopilotHome, resetPreparedWorkerHomes, sessionStateDirs, workerIndexLimitBytes, workerIndexIdleMs } from '../lib/worker-home.mjs';
+import { prepareWorkerHome, workerCopilotHome, userCopilotHome, resetPreparedWorkerHomes, sessionStateDirs, workerIndexLimitBytes, workerIndexIdleMs, workerHomeMarker } from '../lib/worker-home.mjs';
 import { sessionsStatus, pruneSessions, recordSession } from '../lib/sessions.mjs';
 import { isSignedOut, isSystemicFailure } from '../lib/failures.mjs';
 
@@ -42,7 +42,8 @@ test('the worker home carries the person\'s settings and plugins but none of the
   const worker = prepareWorkerHome(root, {});
   assert.equal(worker, `${home}-migration-kit-workers`);
   assert.equal(worker, workerCopilotHome(root, {}));
-  assert.deepEqual(fs.readdirSync(worker).sort(), ['agents', 'config.json', 'installed-plugins', 'mcp-config.json', 'settings.json']);
+  // 2026-11-01: the person's MCP servers (mcp-config.json) stay behind.
+  assert.deepEqual(fs.readdirSync(worker).filter(name => name !== workerHomeMarker).sort(), ['agents', 'config.json', 'installed-plugins', 'settings.json']);
   assert.equal(fs.readFileSync(path.join(worker, 'config.json'), 'utf8'), fs.readFileSync(path.join(home, 'config.json'), 'utf8'));
   // Folders are links, so plugins and agents stay exactly the person's.
   assert.ok(fs.lstatSync(path.join(worker, 'installed-plugins')).isSymbolicLink());
@@ -169,6 +170,9 @@ test('settings kept as symbolic links are followed, and a folder the CLI made is
   fs.symlinkSync(path.join(elsewhere, 'agents'), path.join(home, 'agents'), process.platform === 'win32' ? 'junction' : 'dir');
   for (const dir of ['skills/s', 'hooks/h']) fs.mkdirSync(path.join(home, dir), { recursive: true });
   const worker = workerCopilotHome(root, {});
+  // A worker home already in the current layout (see the 2026-11-01 test for an older one).
+  fs.mkdirSync(worker, { recursive: true });
+  fs.writeFileSync(path.join(worker, workerHomeMarker), '{"layout":2}');
   fs.mkdirSync(path.join(worker, 'skills'), { recursive: true });
   fs.mkdirSync(path.join(worker, 'hooks/kept'), { recursive: true });
   prepareWorkerHome(root, {});
@@ -191,9 +195,9 @@ test('settings kept as symbolic links are followed, and a folder the CLI made is
   assert.ok(!fs.existsSync(path.join(worker, 'skills')) && fs.existsSync(path.join(worker, 'cli-own.json')));
   if (process.platform !== 'win32') {
     resetPreparedWorkerHomes();
-    fs.writeFileSync(path.join(home, 'statusline.sh'), '#!/bin/sh\n', { mode: 0o755 });
+    fs.writeFileSync(path.join(home, 'settings.json'), '{}', { mode: 0o664 });
     prepareWorkerHome(root, {});
-    assert.equal(fs.statSync(path.join(worker, 'statusline.sh')).mode & 0o777, 0o700, 'executable for the person only');
+    assert.equal(fs.statSync(path.join(worker, 'settings.json')).mode & 0o777, 0o600, 'readable by the person only');
   }
 });
 

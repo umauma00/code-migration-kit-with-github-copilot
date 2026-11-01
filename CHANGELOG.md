@@ -1,3 +1,45 @@
+# 0.40.2 — 2026-11-01
+
+Worker CLIs no longer all fail while starting MCP servers in the kit's worker
+home. On 2026-11-01 (Windows, Copilot CLI 1.0.105) every phase 00b survey
+worker failed that way, before the prompt, in three runs in a row. The 0.34.0
+worker home copied every top-level file of `~/.copilot` except session
+records, which included the CLI's MCP ownership records
+(`mcp-installations.json`, `mcp-activations.json`) and a `-writer.binding`
+file bound to the person's home, and copied them again on every command.
+
+- The worker home takes only `config.json` (the signed-in account and trusted
+  folders) and `settings.json`, and links only `installed-plugins`,
+  `marketplaces`, `agents`, `skills`, `hooks` and `extensions`. The person's
+  MCP servers (`mcp-config.json`) and the CLI's own state stay behind. Workers
+  were already limited to `--available-tools view,grep,glob`, so no MCP tool
+  reached them; MCP servers that come with a plugin still start.
+- A worker home made by 0.34.0 to 0.40.1 (no `.migration-kit-worker-home.json`
+  marker) is emptied once, keeping `session-state`, `session-store.db`, `logs`
+  and `pkg` (locks go too, so no lock outlives its binding). Links are removed
+  as links, never followed. One kit process empties it at a time; another
+  waits up to 30 seconds, then runs the rest of that command in the person's
+  home with a warning. A lock whose process has ended is taken over at once,
+  any other after 10 minutes untouched. The marker is written once nothing
+  tied to the person's home is left (until then each command uses the
+  person's home, with a warning); anything else Windows kept open is only
+  warned about. A worker home that is a link,
+  or resolves to the person's home, is refused (workers use the person's home
+  for that command, with a warning).
+- A worker that cannot start its MCP servers or its storage in the worker home
+  (CLI 1.0.105's MCP host, MCP ownership storage and protected storage
+  messages; lock contention does not count) before the model answered is
+  repeated in the person's home, like a missing sign-in, and the rest of that
+  command stays there, with a warning in the run report instead of a failure.
+  `doctor --check-cli` follows workers there when it checks the agents. A
+  failure in both homes fails that unit as before (each unit then starts the
+  CLI twice) and does not stop the run.
+- Test: `tests/worker-home-state-2026-11-01.test.mjs` (what the worker home
+  takes and leaves, the one-time emptying that keeps records and never follows
+  links, the upgrade lock and its takeover, a worker home that is a link, the
+  failure patterns, the fallback, no repeat after the model answered, a
+  failure in both homes, and doctor's agent check).
+
 # 0.40.1 — 2026-11-01
 
 A kit update now keeps phase 00b and the phases after it, as 0.40.0 said.

@@ -13,7 +13,7 @@ import { runtimeLayout } from '../lib/runtime.mjs';
 import { sessionIdPattern } from '../lib/sessions.mjs';
 import { recordCallUsage } from '../lib/usage.mjs';
 import { prepareWorkerHome, workerCopilotHome as workerHomeOf } from '../lib/worker-home.mjs';
-import { isSignedOut } from '../lib/failures.mjs';
+import { isSignedOut, isHomeStateFailure } from '../lib/failures.mjs';
 
 // Worker sessions hold source code and prompts. They carry a runner-chosen
 // ID and name, so receipts point at their transcript and
@@ -101,15 +101,22 @@ export const probeAgentName = '__migration_kit_probe_missing_agent__';
 export async function probeWorkerAgents(command = 'copilot', prefixArgs = [], { cwd, layout, signal, timeoutMs = 0, home } = {}) {
   const args = copilotArgs('reviewer-rules', 'diagnostic-model', undefined, layout);
   args[args.indexOf('--agent') + 1] = probeAgentName;
-  const result = await runProcess(command, [...prefixArgs, ...args], { cwd, signal, timeoutMs,
-    input: 'Agent resolution probe. No model request is expected.', env: copilotEnv('reviewer-rules', home) });
+  const probe = env => runProcess(command, [...prefixArgs, ...args], { cwd, signal, timeoutMs,
+    input: 'Agent resolution probe. No model request is expected.', env });
+  let result = await probe(copilotEnv('reviewer-rules', home)), homeFallback;
+  // As in a run: a worker home where the CLI cannot start its MCP servers or
+  // storage sends workers to the person's home, so the probe follows them.
+  if (home && result.code !== 0 && isHomeStateFailure(`${result.stdout}\n${result.stderr}`)) {
+    homeFallback = `The CLI could not start its MCP servers or its storage in the kit's worker home ${home}; workers will use the person's Copilot CLI home`;
+    result = await probe(copilotEnv('reviewer-rules'));
+  }
   const listed = `${result.stdout}\n${result.stderr}`.match(new RegExp(`No such agent: ${probeAgentName}, available:([^\\r\\n]*)`));
   const required = [...roles, ...assistedReviewerRoles, 'surveyor', 'preparation-auditor'].map(role => layout?.agentId(role) ?? `migration-${role}`);
-  if (!listed) return { ok: false, required, missing: required,
+  if (!listed) return { ok: false, required, missing: required, ...(homeFallback ? { warning: homeFallback } : {}),
     detail: `The CLI did not report its agent list (exit ${result.code}); check sign-in and the CLI version. ${(result.stderr || result.stdout).slice(-500)}` };
   const available = listed[1].split(',').map(name => name.trim()).filter(Boolean);
   const missing = required.filter(id => !available.includes(id));
-  return { ok: missing.length === 0, required, missing };
+  return { ok: missing.length === 0, required, missing, ...(homeFallback ? { warning: homeFallback } : {}) };
 }
 // Tool-assisted reviewers are kept out of other workers' records only by the
 // repository/plugin hook, which prompt mode loads in an untrusted folder only
@@ -354,6 +361,8 @@ Set target to ${JSON.stringify(unit.target)}.`;
 // The model the CLI reported for the call, for the usage log's by-model
 // totals; with several (a fallback mid-call) the requested model stays the key.
 const reportedModel = models => models.length === 1 ? models[0] : undefined;
+// Whether the JSONL stream shows the model at work (an assistant event).
+const modelAnswered = result => { try { for (const line of processOutputLines(result)) if (/"type"\s*:\s*"assistant\./.test(line)) return true; } catch {} return false; };
 const reportedModelOf = result => { try { return reportedModel(copilotStreamFacts(processOutputLines(result)).observedModels); } catch { return undefined; } };
 // A failed call still spent tokens; its usage, when the CLI wrote it, travels
 // with the error so run totals stay complete (or are marked unknown).
@@ -371,14 +380,15 @@ export function createCopilotAdapter({ command = 'copilot', prefixArgs = [], ver
     return check.result;
   };
   // Workers run in the kit's own CLI home (lib/worker-home.mjs). If the CLI is
-  // not signed in there, the call is repeated in the person's home and, once
-  // that works, every later call of this command stays there; the run
-  // continues and says so.
+  // not signed in there, or cannot start its MCP servers or its own storage
+  // there, the call is repeated in the person's home and, once that works,
+  // every later call of this command stays there; the run continues and says
+  // so.
   let sharedHome = false, homeWarning;
   const workerHome = (root, config) => {
     if (sharedHome) return null;
     try { return prepareWorkerHome(root, config); }
-    catch (e) { sharedHome = true; homeWarning = `Workers use the person's Copilot CLI home: the kit's worker home could not be prepared (${e.message.slice(0, 200)})`; console.error(`WARNING: ${homeWarning}`); return null; }
+    catch (e) { sharedHome = true; homeWarning = `Workers use the person's Copilot CLI home: the kit's worker home could not be prepared (${e.message.slice(0, 600)})`; console.error(`WARNING: ${homeWarning}`); return null; }
   };
   return async ({ root, config, role, unit, extra, signal, reviewInput, reviewMode = 'frozen', workInput, workMode, runId, sessionId, model: modelOverride }) => {
     // Oversized reviews run on the read-only twin profile of the same reviewer.
@@ -428,18 +438,23 @@ export function createCopilotAdapter({ command = 'copilot', prefixArgs = [], ver
     } catch (e) { fs.rmSync(usageDir, { recursive: true, force: true }); throw e; }
     try {
       result = await runProcess(command, argv, options);
-      if (home && result.code !== 0 && isSignedOut(`${copilotStreamError(processOutputLines(result)) ?? ''}\n${result.stderr}`)) {
-        // Not signed in in the worker home: no model request was made. The
-        // call is repeated in the person's home; once that works, the rest of
-        // this command stays there. A CLI signed out in both homes stops the
-        // run as a sign-in problem, as before.
+      const homeFailure = home && result.code !== 0 ? `${copilotStreamError(processOutputLines(result)) ?? ''}\n${result.stderr}` : '';
+      // MCP or storage: only a CLI that stopped before the model answered, so
+      // a call that already reached the model is never paid for twice.
+      const signedOut = homeFailure && isSignedOut(homeFailure), homeState = homeFailure && !signedOut && isHomeStateFailure(homeFailure) && !modelAnswered(result);
+      if (signedOut || homeState) {
+        // Not signed in in the worker home, or the CLI could not start its MCP
+        // servers or storage there, before the model answered. The call is repeated
+        // in the person's home; once that works, the rest of this command
+        // stays there. A CLI that fails in both homes stops or fails as it
+        // would have in the person's home.
         fs.rmSync(usageFile, { force: true });
         result = await runProcess(command, argv, { ...options, env: copilotEnv(worker) });
         home = null;
         if (result.code === 0) {
           if (!sharedHome) {
             sharedHome = true;
-            homeWarning = `Workers use the person's Copilot CLI home for the rest of this command: the CLI was not signed in in the kit's worker home ${workerHomeOf(root, config)}`;
+            homeWarning = `Workers use the person's Copilot CLI home for the rest of this command: ${signedOut ? 'the CLI was not signed in' : 'the CLI could not start its MCP servers or its storage'} in the kit's worker home ${workerHomeOf(root, config)}`;
             console.error(`WARNING: ${homeWarning}`);
           }
           versionFields.cliHomeWarning = homeWarning;
