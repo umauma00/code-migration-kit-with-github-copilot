@@ -204,14 +204,14 @@ that; a unit still at stage `implement` keeps its record and is implemented
 again, and a unit whose record cannot be written back is named in the run's
 errors. A check that cannot read an input that is there (a system error code
 other than a missing file or a folder in its place) stops the run without
-sending units back; the last check reads again after 0.3, 1 and 3 s and sends
-back those it still cannot confirm. An input a check cannot find, and an
-error without a system error code, is a change. Such a change undone before
-the next full check, and before a worker is given that file's text, is not
-found. A run that ends without its last check (killed, a second Ctrl+C, its
-terminal closed) keeps what its workers answered or finished since its last
-full check. Gates,
-phase commands, status and the next run always hash the files' content.
+sending units back; the last check reads again, with pauses of 0.3, 1 and
+3 s, and sends back those it still cannot confirm. An input a check cannot
+find, and an error without a system error code, are changes. Such a change
+undone before the next full check, and before a worker is given that file's
+text, is not found. A run that ends without its last check (killed, a second
+Ctrl+C, its terminal closed) keeps what its workers answered or finished
+since its last full check. Gates, phase commands, status and the next run
+always hash the files' content.
 
 Optional `buildArtifactRoots` (default `[]`) declares repository-relative
 directories containing generated objects, binaries and reports. Command paths

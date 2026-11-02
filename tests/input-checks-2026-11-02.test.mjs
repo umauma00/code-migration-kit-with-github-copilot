@@ -536,19 +536,27 @@ test('with settled inputs a run reads each source a few times only, and still st
   });
 
   // Once the given number of units are done, an input cannot be read
-  // (antivirus, an indexer) or looked up the given number of times.
+  // (antivirus, an indexer) or looked up the given number of times. Each
+  // call for it from then on is in seen (when, and whether it failed).
   const busyInput = async (f, after, { name = 'migration/manifest.tsv', call = 'readFileSync', times = 1 } = {}) => {
-    const file = safePath(f.root, name), original = fs[call];
+    const file = safePath(f.root, name), original = fs[call], seen = [];
     let finished = 0, thrown = 0;
     fs[call] = function (p, ...rest) {
-      if (finished >= after && thrown < times && p === file) { thrown++; throw Object.assign(new Error(`EBUSY: resource busy or locked, ${call === 'statSync' ? 'stat' : 'open'} '${p}'`), { code: 'EBUSY' }); }
+      if (finished >= after && p === file) {
+        const busy = thrown < times;
+        seen.push({ at: performance.now(), busy });
+        if (busy) { thrown++; throw Object.assign(new Error(`EBUSY: resource busy or locked, ${call === 'statSync' ? 'stat' : 'open'} '${p}'`), { code: 'EBUSY' }); }
+      }
       return original.call(this, p, ...rest);
     };
     try {
       const failure = await translate(f.root, f.config, fake, { onProgress: event => { if (event.stage === 'done') finished++; } }).then(() => null, e => e);
-      return { failure, thrown };
+      return { failure, thrown, seen };
     } finally { fs[call] = original; }
   };
+  // The time between one call for the busy input and the next (timers may
+  // fire a millisecond early by the high-resolution clock).
+  const gaps = seen => seen.slice(1).map((s, i) => s.at - seen[i].at);
   const record = (f, unit) => readJSON(safePath(f.root, `migration/state/units/${unit.id}.json`));
 
   await t.test('a check that cannot read an input stops the run, and the last check keeps the unit it confirms', async () => {
@@ -562,8 +570,11 @@ test('with settled inputs a run reads each source a few times only, and still st
 
   await t.test('a last check that can read an input again within a few seconds keeps the unit it confirms', async () => {
     // Busy at the check before the second unit and at the last check's first read.
-    const f = busyShort, { failure, thrown } = await busyInput(f, 1, { times: 2 });
+    const f = busyShort, { failure, thrown, seen } = await busyInput(f, 1, { times: 2 });
     assert.equal(thrown, 2);
+    // It read again 0.3 s later, not at once: a lock of a few hundred ms is gone by then.
+    assert.deepEqual(seen.slice(0, 3).map(s => s.busy), [true, true, false]);
+    assert.ok(gaps(seen)[1] >= 290, `read again after ${gaps(seen)[1]} ms`);
     assert.match(failure?.message ?? 'completed', /EBUSY/);
     assert.doesNotMatch(failure.message, /its reviews are made again/);
     assert.equal(record(f, f.units[0]).status, 'done');
@@ -571,8 +582,10 @@ test('with settled inputs a run reads each source a few times only, and still st
   });
 
   await t.test('a last check that still cannot read an input after reading it again sends back the units it cannot confirm', async () => {
-    const f = busyLast, { failure, thrown } = await busyInput(f, 2, { times: 4 });
+    const f = busyLast, { failure, thrown, seen } = await busyInput(f, 2, { times: 4 });
     assert.equal(thrown, 4, 'read once and again after 0.3, 1 and 3 s');
+    const waits = gaps(seen.slice(0, 4));
+    assert.ok(waits[0] >= 290 && waits[1] >= 990 && waits[2] >= 2990, `waits ${waits.map(Math.round).join(', ')} ms`);
     assert.match(failure?.message ?? 'completed', /EBUSY/);
     for (const unit of f.units) assert.match(record(f, unit).error ?? '', /EBUSY.*its reviews are made again by the next run$/);
     assert.equal(failure.report.done, 0);

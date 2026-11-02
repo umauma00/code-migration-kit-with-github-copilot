@@ -1683,7 +1683,7 @@
     },
     {
       "path": "lib/pipeline.mjs",
-      "sha256": "74f7fb421c1b72990f9934ec295da92b6998062ba8b43a561f51f50bb0321346",
+      "sha256": "be4100c0e7fc1125331b1c92fa994b9ad9d6429a3e2e571c3d8a2e45101db1d7",
       "entries": [
         {
           "line": 20,
@@ -2206,27 +2206,27 @@
           "code": "break;"
         },
         {
-          "line": 1009,
+          "line": 1011,
           "kind": "loop-exit-candidate",
           "code": "try { checkInputs('Migration inputs changed during the run; fresh approval required', { full: true, final: true, readAgain: wait !== null }); break; }"
         },
         {
-          "line": 1013,
+          "line": 1015,
           "kind": "loop-exit-candidate",
           "code": "break;"
         },
         {
-          "line": 1040,
+          "line": 1042,
           "kind": "error-or-exit-candidate",
           "code": "executionMode: config.executionMode ?? 'continuous', ...(ignoredLimits(config).length ? { ignoredLimits: ignoredLimits(config) } : {}), ...(Number.isFinite(maxInputBytes) ? { maxRunInputBytes: maxInputBytes } : {}) };"
         },
         {
-          "line": 1048,
+          "line": 1050,
           "kind": "error-or-exit-candidate",
           "code": "if (errors.length || signal?.aborted || required.some(u => !completed.has(u))) throw Object.assign(new Error(`Translation stopped: ${errors.map(e => `${e.target}: ${e.error}`).join('; ') || (signal?.aborted ? 'Interrupted' : 'Reviewed receipts incomplete')}`), { report, budgetStop: budgetExhausted && !dispatchError });"
         },
         {
-          "line": 1057,
+          "line": 1059,
           "kind": "error-or-exit-candidate",
           "code": "if (!grant) throw new Error('pilot run requires an authorized isolated pilot project');"
         }

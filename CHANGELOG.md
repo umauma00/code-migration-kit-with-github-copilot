@@ -55,9 +55,9 @@ unit in flight.
 
   A check that cannot read an input that is there (busy, locked, too many
   open files) stops the run, as before, but sends no unit back: the run's
-  last check reads it again, after 0.3, 1 and 3 s if it must, and the units
-  it still cannot confirm go back to review. An input a check cannot find
-  is a change. Gates, phase commands, `status` and the next run always read
+  last check reads it again, with pauses of 0.3, 1 and 3 s if it must, and
+  the units it still cannot confirm go back to review. An input a check
+  cannot find is a change. Gates, phase commands, `status` and the next run always read
   the files themselves. Two limits remain:
   - Such a change that is undone before the next full check, and before a
     worker is given that file's text, is not found, and what a worker made
