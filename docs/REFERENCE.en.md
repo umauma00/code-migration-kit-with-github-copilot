@@ -70,7 +70,7 @@ The minimum settings in `migration/config.json`:
 |---|---|
 | `sourceRoots` | Protected original sources, e.g. `["src"]` |
 | `outputRoots` | Translated **sources**, e.g. `["ported"]`. Put build products elsewhere |
-| `verificationRoots` | Comparators, tests and test data, e.g. `["tests"]` |
+| `verificationRoots` | Comparators, tests and test data, e.g. `["tests"]`. Not the whole `migration` folder, `.git` or a place of the kit's phase and run records (`phases`, `results`, `gates`, `runs`, `state`, `run.lock`, `cost-log.tsv`, `inventory-merge.json`, `rulebook-history` and `pilots` under `migration/`); the same holds for `verificationInputs` and `designInputs` |
 | `verificationInputs` | Extra build/dependency settings whose changes are tracked, e.g. `["build/config.json", "packages/api/tsconfig.json"]` |
 | `buildArtifactRoots` | Directories where commands write binaries, objects and reports, e.g. `["artifacts", "dist"]`. Defaults to an empty array |
 | `maxReviewInputBytes` | JSON size limit of the frozen review input; new installs use 1048576 bytes (1 MiB, roughly 260k–360k tokens). The implementer and fixer get the same input (0.29.0). When the reviewer, implementer or fixer model's "Context (prompt limit)" in `models list` is smaller, lower it to fit that limit (for example 655360 or less for 272K), older configs keep their value and an omitted key means 65536. An oversized unit switches automatically to tool-assisted review (below) |
