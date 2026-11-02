@@ -246,8 +246,8 @@ const unitRecord = f => readJSON(safePath(f.root, `migration/state/units/${f.uni
 
 test('with settled inputs a run reads each source a few times only, and still stops on every change of a source during a worker call', async t => {
   // Every project first, then one wait until all their files have settled.
-  const [counted, appended, rewritten, hidden, pinned, assisted, listed, answered, late, confirmed, unwritable, busy, busyLast, amended, interrupted, periodic, budget, removed] = await Promise.all([
-    production(t, 2), ready(t), ready(t), ready(t), ready(t), toolAssisted(t), toolAssisted(t), ready(t), ready(t, { count: 2 }), oneAtATime(t), oneAtATime(t), oneAtATime(t), oneAtATime(t), amendedRulebook(t),
+  const [counted, appended, rewritten, hidden, pinned, assisted, listed, answered, fixedOnce, unfinished, late, confirmed, unwritable, busy, busyShort, busyLast, statBusy, reread, amended, interrupted, periodic, budget, removed] = await Promise.all([
+    production(t, 2), ready(t), ready(t), ready(t), ready(t), toolAssisted(t), toolAssisted(t), ready(t), production(t, 1), production(t, 1), ready(t, { count: 2 }), oneAtATime(t), oneAtATime(t), oneAtATime(t), oneAtATime(t), oneAtATime(t), oneAtATime(t), oneAtATime(t), amendedRulebook(t),
     ready(t, { count: 2 }), ready(t), ready(t), ready(t, { count: 2 })]);
   // main.py is no unit of these projects: only the input checks read it.
   const other = f => safePath(f.root, 'src/main.py'), whole = wholeSecond();
@@ -428,6 +428,54 @@ test('with settled inputs a run reads each source a few times only, and still st
     assert.deepEqual([...again].sort(), ['reviewer-rules', 'reviewer-semantics']);
   });
 
+  await t.test('a unit finished with an arbitration and a single-pass fix while such a change was made is reviewed again once it is undone', async () => {
+    const f = fixedOnce, original = fs.readFileSync(other(f));
+    let undo = () => {};
+    let failure;
+    try {
+      failure = await translate(f.root, f.config, async call => {
+        if (call.role === 'fixer') { undo = freezeStat(other(f)); rewriteSameSize(other(f)); }
+        return call.role === 'reviewer-rules' ? withFinding(call) : answer(call);
+      }).then(() => null, e => e);
+    } finally { undo(); }
+    assert.match(failure?.message ?? 'completed', /Migration inputs changed during the run/);
+    // Neither the arbitration nor the single-pass fix made from the dropped
+    // reviews is kept: the fixed file is reviewed again.
+    const state = unitRecord(f);
+    assert.equal(state.status, 'blocked'); assert.equal(state.stage, 'review');
+    assert.deepEqual([state.reviewEvidence, state.arbitration, state.singlePass], [[], undefined, undefined]);
+    fs.writeFileSync(other(f), original);
+    const again = [];
+    const summary = await translate(f.root, f.config, async call => { again.push(call.role); return answer(call); });
+    assert.equal(summary.done, 1);
+    assert.deepEqual([...again].sort(), ['reviewer-rules', 'reviewer-semantics']);
+  });
+
+  await t.test('a unit stopped before its candidate was written keeps its own reason and is implemented again once such a change is undone', async () => {
+    const f = unfinished, original = fs.readFileSync(other(f));
+    let undo = () => {}, implementer = 0;
+    let failure;
+    try {
+      failure = await translate(f.root, f.config, async call => {
+        if (call.role !== 'implementer') return answer(call);
+        // Its first answer is taken, but its trailer is missing: it is asked again.
+        if (++implementer === 1) { undo = freezeStat(other(f)); rewriteSameSize(other(f)); return fake(call); }
+        throw new Error('the implementer could not answer again');
+      }).then(() => null, e => e);
+    } finally { undo(); }
+    assert.equal(implementer, 2);
+    assert.match(failure?.message ?? 'completed', /Migration inputs changed during the run/);
+    // It has no reviews to drop: its record is the one it stopped with.
+    const state = unitRecord(f);
+    assert.deepEqual([state.status, state.stage, state.error], ['blocked', 'implement', 'the implementer could not answer again']);
+    assert.equal(fs.existsSync(safePath(f.root, f.units[0].target)), false, 'no candidate');
+    fs.writeFileSync(other(f), original);
+    const again = [];
+    const summary = await translate(f.root, f.config, async call => { again.push(call.role); return answer(call); });
+    assert.equal(summary.done, 1);
+    assert.equal(again[0], 'implementer');
+  });
+
   // A run that finds its inputs changed stops its workers, and an answer
   // that comes back after that is not taken (the interrupt check after each
   // call), although the check after the call does not see such a change.
@@ -487,36 +535,76 @@ test('with settled inputs a run reads each source a few times only, and still st
     assert.ok(failure.report.errors.some(e => e.target === first.target && /^Could not send it back to review \(.+\); delete migration\/state\/units\/.+\.json before the next run/.test(e.error)), JSON.stringify(failure.report.errors));
   });
 
-  // The manifest cannot be read once (antivirus, an indexer), after the
-  // given number of units are done.
-  const busyManifest = async (f, after) => {
-    const manifest = safePath(f.root, 'migration/manifest.tsv'), { readFileSync } = fs;
-    let finished = 0, thrown = false;
-    fs.readFileSync = function (p, ...rest) {
-      if (finished >= after && !thrown && p === manifest) { thrown = true; throw Object.assign(new Error(`EBUSY: resource busy or locked, open '${p}'`), { code: 'EBUSY' }); }
-      return readFileSync.call(this, p, ...rest);
+  // Once the given number of units are done, an input cannot be read
+  // (antivirus, an indexer) or looked up the given number of times.
+  const busyInput = async (f, after, { name = 'migration/manifest.tsv', call = 'readFileSync', times = 1 } = {}) => {
+    const file = safePath(f.root, name), original = fs[call];
+    let finished = 0, thrown = 0;
+    fs[call] = function (p, ...rest) {
+      if (finished >= after && thrown < times && p === file) { thrown++; throw Object.assign(new Error(`EBUSY: resource busy or locked, ${call === 'statSync' ? 'stat' : 'open'} '${p}'`), { code: 'EBUSY' }); }
+      return original.call(this, p, ...rest);
     };
     try {
       const failure = await translate(f.root, f.config, fake, { onProgress: event => { if (event.stage === 'done') finished++; } }).then(() => null, e => e);
-      assert.ok(thrown, 'a check could not read the manifest once');
-      return failure;
-    } finally { fs.readFileSync = readFileSync; }
+      return { failure, thrown };
+    } finally { fs[call] = original; }
   };
   const record = (f, unit) => readJSON(safePath(f.root, `migration/state/units/${unit.id}.json`));
 
   await t.test('a check that cannot read an input stops the run, and the last check keeps the unit it confirms', async () => {
-    const f = busy, failure = await busyManifest(f, 1);
+    const f = busy, { failure, thrown } = await busyInput(f, 1);
+    assert.equal(thrown, 1);
     assert.match(failure?.message ?? 'completed', /EBUSY/);
     assert.doesNotMatch(failure.message, /its reviews are made again/);
     assert.equal(record(f, f.units[0]).status, 'done');
     assert.equal(failure.report.done, 1);
   });
 
-  await t.test('a last check that cannot read an input sends back the units it cannot confirm', async () => {
-    const f = busyLast, failure = await busyManifest(f, 2);
+  await t.test('a last check that can read an input again within a few seconds keeps the unit it confirms', async () => {
+    // Busy at the check before the second unit and at the last check's first read.
+    const f = busyShort, { failure, thrown } = await busyInput(f, 1, { times: 2 });
+    assert.equal(thrown, 2);
+    assert.match(failure?.message ?? 'completed', /EBUSY/);
+    assert.doesNotMatch(failure.message, /its reviews are made again/);
+    assert.equal(record(f, f.units[0]).status, 'done');
+    assert.equal(failure.report.done, 1);
+  });
+
+  await t.test('a last check that still cannot read an input after reading it again sends back the units it cannot confirm', async () => {
+    const f = busyLast, { failure, thrown } = await busyInput(f, 2, { times: 4 });
+    assert.equal(thrown, 4, 'read once and again after 0.3, 1 and 3 s');
     assert.match(failure?.message ?? 'completed', /EBUSY/);
     for (const unit of f.units) assert.match(record(f, unit).error ?? '', /EBUSY.*its reviews are made again by the next run$/);
     assert.equal(failure.report.done, 0);
+  });
+
+  await t.test('a file a check cannot look up for a moment is not taken for a removed one', async () => {
+    const f = statBusy, { failure, thrown } = await busyInput(f, 1, { name: 'migration/inventory.tsv', call: 'statSync' });
+    assert.equal(thrown, 1);
+    assert.match(failure?.message ?? 'completed', /EBUSY/);
+    assert.doesNotMatch(failure.message, /missing|its reviews are made again/);
+    assert.equal(record(f, f.units[0]).status, 'done');
+    assert.equal(failure.report.done, 1);
+  });
+
+  await t.test('a change a check finds is named as a change although reading every input again then fails', async () => {
+    const f = reread, [first, second] = f.units, held = safePath(f.root, first.source), { readFileSync } = fs;
+    let armed = false, thrown = 0;
+    fs.readFileSync = function (p, ...rest) {
+      if (armed && p === held) { armed = false; thrown++; throw Object.assign(new Error(`EBUSY: resource busy or locked, open '${p}'`), { code: 'EBUSY' }); }
+      return readFileSync.call(this, p, ...rest);
+    };
+    let failure;
+    try {
+      failure = await translate(f.root, f.config, async call => {
+        if (call.role === 'implementer' && call.unit.target === second.target) { fs.appendFileSync(other(f), '\n# edited during the run\n'); armed = true; }
+        return fake(call);
+      }).then(() => null, e => e);
+    } finally { fs.readFileSync = readFileSync; }
+    assert.equal(thrown, 1, 'the read of every input after the change found it');
+    assert.match(failure?.message ?? 'completed', /Migration inputs changed during worker invocation/);
+    assert.doesNotMatch(failure.message, /EBUSY/);
+    assert.match(record(f, first).error ?? '', /its reviews are made again by the next run$/);
   });
 
   await t.test('an accepted RULEBOOK wording given to a worker during the run passes, as in the inputs\' fingerprint', async () => {

@@ -37,9 +37,10 @@ unit in flight.
     every input once more"), a check reads and checks every input again (at
     the end: "Migration inputs changed during the run; fresh approval
     required").
-  - Workers that read files with their tools (the implementer, the fixer
-    and the arbiter can at any input size; a tool-assisted reviewer does)
-    may have seen such a change before a check found it. So when a run
+  - Workers that read files with their tools (the arbiter at any input
+    size; the implementer, the fixer and the reviewers only when their
+    evidence is over `maxReviewInputBytes`, as frozen they have no file
+    tools) may have seen such a change before a check found it. So when a run
     finds its inputs changed, at any check, every unit it took a worker's
     answer for or finished since its last full check (at most about ten
     minutes of work) goes back to review ("…; its reviews are made again by
@@ -52,18 +53,19 @@ unit in flight.
     it ran out of calls. A unit whose record cannot be written back is
     named in the run's errors, with the file to delete.
 
-  A check that cannot read an input (busy, locked, too many open files)
-  stops the run, as before, but sends no unit back: the run's last check
-  tries again, and the units it cannot confirm go back to review. Gates,
-  phase commands, `status` and the next run always read the files
-  themselves. Two limits remain:
+  A check that cannot read an input that is there (busy, locked, too many
+  open files) stops the run, as before, but sends no unit back: the run's
+  last check reads it again, after 0.3, 1 and 3 s if it must, and the units
+  it still cannot confirm go back to review. An input a check cannot find
+  is a change. Gates, phase commands, `status` and the next run always read
+  the files themselves. Two limits remain:
   - Such a change that is undone before the next full check, and before a
     worker is given that file's text, is not found, and what a worker made
     meanwhile from the file with its tools is kept. Before, the check after
     that worker's call found it.
   - A run that ends without its last check (killed, stopped with a second
-    Ctrl+C, or its terminal closed) keeps its last finished units as they
-    are.
+    Ctrl+C, or its terminal closed) keeps what its workers answered or
+    finished since its last full check as it is.
 - The evidence for each worker call uses the review dependency map from
   the run's first read of its inputs; each call read the map again and
   checked every file it names.

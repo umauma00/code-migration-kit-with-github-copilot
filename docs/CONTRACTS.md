@@ -197,15 +197,20 @@ its inputs changed, at any check, every unit it took a worker's answer for or
 marked done since its last passing full check goes back to review (`blocked`
 at stage `review`, without its reviews, arbitration or single-pass fix: "…;
 its reviews are made again by the next run") even if the change is undone,
-because a worker that reads files with its tools (the implementer, fixer and
-arbiter at any input size, a tool-assisted reviewer) may have seen it, and no
-unit is marked done after that; a unit whose record cannot be written back is
-named in the run's errors. A check that cannot read an input (an error code
+because a worker that reads files with its tools (the arbiter at any input
+size; the implementer, fixer and reviewers only when their evidence is over
+`maxReviewInputBytes`) may have seen it, and no unit is marked done after
+that; a unit still at stage `implement` keeps its record and is implemented
+again, and a unit whose record cannot be written back is named in the run's
+errors. A check that cannot read an input that is there (a system error code
 other than a missing file or a folder in its place) stops the run without
-sending units back; the last check sends back those it cannot confirm. Such a
-change undone before the next full check, and before a worker is given that
-file's text, is not found. A run that ends without its last check (killed, a
-second Ctrl+C, its terminal closed) keeps its last finished units. Gates,
+sending units back; the last check reads again after 0.3, 1 and 3 s and sends
+back those it still cannot confirm. An input a check cannot find, and an
+error without a system error code, is a change. Such a change undone before
+the next full check, and before a worker is given that file's text, is not
+found. A run that ends without its last check (killed, a second Ctrl+C, its
+terminal closed) keeps what its workers answered or finished since its last
+full check. Gates,
 phase commands, status and the next run always hash the files' content.
 
 Optional `buildArtifactRoots` (default `[]`) declares repository-relative
