@@ -7,9 +7,9 @@
 // source file 20 times each, phase check 00b,01,02 43 times, phase complete
 // 00b,01,02 61 times and phase complete 03 26 times. After parity, one status
 // read each translated file 33 times. Each command now reads each source file
-// once and each output twice (its hash and its markers); a report, the
-// RULEBOOK or the manifest may still be read again for its text. Nothing is
-// kept between commands.
+// once and each output twice (its hash and its markers); a small file read
+// for its text (a report, the RULEBOOK, the manifest, the judge plan) may
+// still be read again. Nothing is kept between commands.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -42,10 +42,11 @@ function readsOf(files, fn) {
   try { value = fn(); } finally { fs.readFileSync = original; }
   return { counts, value };
 }
-// fn reads each given file at most once; returns what fn returned.
-function once(files, label, fn) {
+// fn reads each given file exactly once (at most once with atMost, for a
+// command that may not need it); returns what fn returned.
+function once(files, label, fn, { atMost = false } = {}) {
   const { counts, value } = readsOf(files, fn);
-  counts.forEach((n, i) => assert.ok(n <= 1, `${label}: ${path.basename(files[i])} read ${n} times`));
+  counts.forEach((n, i) => assert.ok(atMost ? n <= 1 : n === 1, `${label}: ${path.basename(files[i])} read ${n} times`));
   return value;
 }
 
@@ -165,8 +166,8 @@ test('status after parity reads each source once and each translated file once f
   assert.equal((await translate(f.root, f.config, marked)).unitsCompleted, 3);
   for (const stage of ['build', 'smoke', 'parity']) { approve(f.root, f.config, stage, 'Test fixture approval'); assert.equal((await runStage(f.root, f.config, stage)).success, true); }
   const outputs = f.units.map(u => safePath(f.root, u.target)), sources = f.units.map(u => safePath(f.root, u.source));
-  const { counts, value: report } = readsOf([...outputs, ...sources], () => migrationStatus(f.root));
-  assert.deepEqual(counts, [2, 2, 2, 1, 1, 1], 'outputs: hash and markers; sources: once');
+  const { counts, value: report } = readsOf([...outputs, ...sources, safePath(f.root, 'migration/manifest.tsv')], () => migrationStatus(f.root));
+  assert.deepEqual(counts, [2, 2, 2, 1, 1, 1, 2], 'outputs: hash and markers; sources: once; the manifest: hash and one parse');
   assert.equal(report.done, 3);
   assert.deepEqual(report.phases.filter(p => ['05', '05b', '05c'].includes(p.id)).map(p => p.status), ['validated', 'validated', 'validated']);
   // An output edited after that status: the next one sees it.
@@ -207,11 +208,11 @@ test('in a strict project a translation approval for more named files does not r
   };
   const one = reads(targets.slice(0, 1)), all = reads(targets);
   assert.equal(all, one, `manifest read ${one} times for one named file and ${all} times for ${targets.length}`);
-  // In one read (a status or phase command) whose context is known, the gate
-  // and its chain of phase records add one read of the manifest: the check
-  // of the named files.
+  // In one read (a status or phase command) whose context is known, the
+  // manifest was hashed and parsed with the context: the gate, its chain of
+  // phase records and the check of the named files read it no more.
   const read = inputRead(), context = readContext(f.root, f.config, read);
-  assert.equal(readsOf([manifest], () => requireGate(f.root, f.config, 'translation', context, read)).counts[0], 1);
+  assert.equal(readsOf([manifest], () => requireGate(f.root, f.config, 'translation', context, read)).counts[0], 0);
 });
 
 // Phases 00 to 02 of a strict runtime project recorded, judge run.
@@ -274,14 +275,16 @@ test('a verification root or input over the records the kit writes is refused wh
   const f = prepare(t, { count: 1 }), file = safePath(f.root, 'migration/config.json'), raw = readJSON(file);
   const load = change => { writeJSON(file, { ...raw, ...change }); return loadConfig(f.root); };
   for (const roots of [['migration'], ['migration/phases'], ['migration/results/judge'], ['migration/rulebook-history'], ['migration/pilots'], ['tests', 'migration']]) {
-    assert.throws(() => load({ verificationRoots: roots }), /^Error: verificationRoots overlaps the records the kit writes: migration/, JSON.stringify(roots));
+    assert.throws(() => load({ verificationRoots: roots }), /^Error: verificationRoots overlaps the kit's phase and run records: migration/, JSON.stringify(roots));
   }
+  assert.throws(() => load({ verificationRoots: ['.git'] }), /^Error: verificationRoots overlaps the kit's phase and run records: \.git/);
   assert.throws(() => load({ verificationInputs: ['migration/rulebook-history/RULEBOOK-1.md'] }), /verificationInputs\/designInputs overlaps outputs or runtime state/);
+  assert.throws(() => load({ designInputs: ['migration/pilots/design.md'] }), /verificationInputs\/designInputs overlaps outputs or runtime state/);
   // status names the entry to correct.
   writeJSON(file, { ...raw, verificationRoots: ['migration'] });
   const report = migrationStatus(f.root);
   assert.equal(report.ok, false);
-  assert.match(report.blockers.map(b => b.reason).join('\n'), /verificationRoots overlaps the records the kit writes: migration \(/);
+  assert.match(report.blockers.map(b => b.reason).join('\n'), /verificationRoots overlaps the kit's phase and run records: migration \(/);
   // The source-as-spec folder and a folder of the project's own under migration are kept.
   assert.deepEqual(load({ verificationRoots: ['migration/source-spec'] }).verificationRoots, ['migration/source-spec']);
   assert.deepEqual(load({ verificationRoots: ['tests', 'migration/judge'] }).verificationRoots, ['tests', 'migration/judge']);

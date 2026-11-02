@@ -70,7 +70,7 @@ node migration-kit/scripts/run_migration.mjs doctor --check-cli
 |---|---|
 | `sourceRoots` | 保護する元ソース。例：`["src"]` |
 | `outputRoots` | 変換後の**ソース**。例：`["ported"]`。ビルド生成物は別ディレクトリへ |
-| `verificationRoots` | 比較器・テスト・テストデータ。例：`["tests"]`。`migration` フォルダー全体や、キットが記録を書く場所（`migration/phases`・`migration/results` など）は入れられません |
+| `verificationRoots` | 比較器・テスト・テストデータ。例：`["tests"]`。`migration` フォルダー全体、`.git`、キットが工程と実行の記録を書く場所（`migration/` の `phases`・`results`・`gates`・`runs`・`state`・`run.lock`・`cost-log.tsv`・`inventory-merge.json`・`rulebook-history`・`pilots`）は入れられません（`verificationInputs`・`designInputs` も同じ） |
 | `verificationInputs` | 追加で変更を追跡するビルド設定・依存設定等のファイル。例：`["build/config.json", "packages/api/tsconfig.json"]` |
 | `buildArtifactRoots` | コマンドが生成するバイナリ・オブジェクト・レポートのディレクトリ。例：`["artifacts", "dist"]`。既定は空配列 |
 | `maxReviewInputBytes` | 固定レビュー入力のJSONサイズ上限。新規導入は1048576 bytes（1 MiB、目安で約26万〜36万トークン）。実装・修正担当も同じ入力を受け取る（0.29.0）。レビュアー・実装・修正担当のモデルの `models list` の「コンテキスト（入力上限）」がこれより小さいときは、その上限に収まる値まで下げる（例：272K なら 655360 以下）。既存の設定は値を保ち、項目がなければ65536。超過した単位は、自動でツール付きレビュー（下記）に切り替わる |

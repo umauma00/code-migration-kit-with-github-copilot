@@ -6,7 +6,7 @@
 
 2026-11-02、Windows（source-as-spec、自動モード）で 0.40.0 から更新した後、工程 00b〜03 の記録し直しに長い時間がかかりました。記録し直しそのものは 0.40.1 の項のとおり一度だけ要るものですが、キットのコマンドが確認のたびにソース全体を読み直していました（その PC では、読み直し1回に約6秒）。
 
-1. `status`・`phase next`・`phase check`・`phase start`・`phase complete`・`phase waive` は、1回のコマンドの中で各ソースを1回だけ読むようになりました。テスト用の source-as-spec のプロジェクトで、ソースの1ファイルを読む回数を測ると次のとおりです。記録し直しを `phase next`・`status`・`phase check 00b,01,02`・`phase complete 00b,01,02`・`phase next`・`phase complete 03`・`phase next` の順に流すと、合わせて 204回が7回になります。報告・RULEBOOK・manifest は、中身を確かめるためにもう一度読むことがあります（形の確認や、テンプレートのままでないかの確認）。
+1. `status`・`phase next`・`phase check`・`phase start`・`phase complete`・`phase waive` は、1回のコマンドの中で各ソースを1回だけ読むようになりました。テスト用の source-as-spec のプロジェクトで、ソースの1ファイルを読む回数を測ると次のとおりです。記録し直しを `phase next`・`status`・`phase check 00b,01,02`・`phase complete 00b,01,02`・`phase next`・`phase complete 03`・`phase next` の順に流すと、合わせて 204回が7回になります。報告・RULEBOOK・manifest・判定の計画・依存の地図など、中身を読む小さなファイルは、もう一度読むことがあります（形の確認や、テンプレートのままでないかの確認）。
 
    | コマンド | 0.42.0 | 0.42.1 |
    |---|---|---|
@@ -16,10 +16,10 @@
    | `phase complete 03` | 26 | 1 |
 
 2. `phase complete 00b,01,02` は、コマンドの途中で工程の記録を書きます（00b を書いてから 01 を確かめます）。書いた記録は毎回ファイルから読み直します。コマンドが書くもの（工程の記録、`migration/rulebook-history/` に残す RULEBOOK、`waivers/retired/` へ移す見送り、cost-log.tsv）は、使い回す読み込みに入りません。コマンドをまたいでは何も使い回さないので、コマンドの後に変わったファイルは次のコマンドで見つかります。
-3. 新旧比較（parity）の後の `status` は、1回の表示で訳したファイルを33回ずつ読んでいました。今は2回です（ハッシュに1回、末尾行などの印の確認に1回）。
+3. 新旧比較（parity）の後の `status` は、1回の表示で訳したファイルを33回ずつ読んでいました（テスト用のプロジェクト、導入時の印の設定で計測）。今は2回です（ハッシュに1回、末尾行などの印の確認に1回）。manifest の読み取りと確認も、1回のコマンドで1回だけになりました（3000行の manifest では1回に約1.8秒かかっていました）。
 4. 試運転のコピーでの `status` は、試運転の許可（とその元プロジェクト）を、承認ごとではなく1回だけ確かめます。
 5. `judge`・`approve`・`translate` などが工程の記録を確かめるときも、記録のつながり全体で各ソースを1回だけ読みます。ファイルを指定した変換の承認は、指定したファイルを manifest の1回の読み込みと照らし合わせます（ファイルの数だけ読み直しません）。
-6. `migration/config.json` の `verificationRoots`（または `verificationInputs`・`designInputs`）に、`migration` フォルダー全体や、キットが記録を書く場所（`migration/phases`・`migration/results`・`migration/rulebook-history`・`migration/pilots` など）が入っていると、設定を読むときに止めて、直す項目を示すようになりました。こうした設定では、工程の記録が書いた直後に古くなり、記録し直しが終わりませんでした。`migration/source-spec` や、`migration` の中に自分で作ったフォルダーはそのまま使えます。
+6. `migration/config.json` の `verificationRoots`（または `verificationInputs`・`designInputs`）に、`migration` フォルダー全体、`.git`、キットが工程と実行の記録を書く場所（`migration/` の `phases`・`results`・`gates`・`runs`・`state`・`run.lock`・`cost-log.tsv`・`inventory-merge.json`・`rulebook-history`・`pilots`）が入っていると、設定を読むときに止めて、直す項目を示すようになりました。こうした設定では、工程の記録が書いた直後に古くなり、記録し直しが終わりませんでした。`migration/source-spec` や、`migration` の中に自分で作ったフォルダーはそのまま使えます。
 7. それ以外に、確かめる内容と記録する内容は変わりません。0.40.1 以降からの更新では、承認・完了記録・工程の記録・準備済みの試運転は失効しません。0.40.0 から上げる場合の記録し直し（0.40.1 の項）は残りますが、各コマンドの読み込みが1回で済むぶん短くなります。1つだけ、案内が正確になります。`phase check` や他のコマンドの工程の確認は、02 以降の記録を確かめたあとは `phase next` と同じように、元プロジェクトの入力が変わってすでに終わった試運転を「02 を記録し直すと終わる」とは言わなくなります。
 8. コピー導入では `migration-kit/` 全体を一時導入先の内容に置き換えます。プラグインは更新だけで入ります。
 

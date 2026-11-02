@@ -17,17 +17,22 @@ source tree again, at about 6 s per pass on that PC.
   times by `phase complete 03`; each now reads it once. Recording again in
   the order phase next, status, phase check 00b,01,02, phase complete
   00b,01,02, phase next, phase complete 03, phase next read it 204 times,
-  now 7. A report, the RULEBOOK or the manifest may still be read again for
-  its text (to parse it or to check it is not the template).
+  now 7. Small files read for their text (the reports, the RULEBOOK, the
+  manifest, the judge plan, the review dependency map) may still be read
+  again, to parse them or to check they are not the template.
 - A phase command writes records in the middle (`phase complete 00b,01,02`
   records 00b before checking 01). Receipts are always read from disk again,
   and none of the command's writes (receipts, the RULEBOOK copy, a retired
   waiver, the cost log) is part of the shared read. Nothing is kept between
   commands: a file changed after one command is seen by the next.
-- After parity one `status` read each translated file 33 times (every stage
-  record and gate, and their predecessors, asked for the output fingerprint
-  and whether every unit is done); now twice, once for its hash and once for
-  its markers (`done` checks each unit once per read).
+- After parity one `status` read each translated file 33 times in a test
+  fixture with the installed marker policy (every stage record and gate, and
+  their predecessors, asked for the output fingerprint and whether every unit
+  is done); now twice, once for its hash and once for its markers (`done`
+  checks each unit once per read).
+- With a read, the manifest is parsed and checked once (each caller gets a
+  copy of the units): every row is checked against the file system, and a
+  3000-row manifest took about 1.8 s per parse.
 - In a pilot workspace, `status` checks the pilot grant, and with it the
   production project, once for all its gates instead of once per gate
   (`readPilot` in `lib/pipeline.mjs`; `requirePilot` takes the caller's
@@ -38,9 +43,11 @@ source tree again, at about 6 s per pass on that PC.
   named files checks them against one read of the manifest instead of one
   read per file.
 - `verificationRoots`, `verificationInputs` and `designInputs` may no longer
-  overlap what the kit writes as it works (`migration/phases`,
-  `migration/results`, `migration/rulebook-history`, `migration/pilots` and
-  the other runtime state); `loadConfig` names the entry to correct. With
+  overlap `.git` or the kit's phase and run records (`migration/phases`,
+  `migration/results`, `migration/gates`, `migration/runs`,
+  `migration/state`, `migration/run.lock`, `migration/cost-log.tsv`,
+  `migration/inventory-merge.json`, `migration/rulebook-history`,
+  `migration/pilots`); `loadConfig` names the entry to correct. With
   `"verificationRoots": ["migration"]` a phase record went out of date as
   soon as it was written: 0.42.0 refused the next phase of a package and
   `phase next` sent 00b back for ever, and with one read per command the
