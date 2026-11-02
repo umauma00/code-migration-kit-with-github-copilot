@@ -28,10 +28,15 @@ it, so the run waited on that one call for good.
   before a call is watched with the same wait: a `--version` that hangs
   without a word is stopped and the call goes on with the warning "Copilot
   CLI version unknown before this call" (before, every call waited on it).
+  A process outside the killed tree (one that left the process group) that
+  keeps the call's pipes open no longer keeps the call from ending: 5 s after
+  the kill the runner lets the pipes go.
 - A silent call is retried at most 5 times (about 190 minutes in all by
   default), counted with the CLI's event stall, its lock wait, a network
-  error next to the sign-in help, a connection taken over and a call the CLI
-  gave up on (below); in bounded mode `transientRetries` caps the total, as
+  error next to the sign-in help, a connection taken over, a call the CLI
+  gave up on for a reason other than the network and a token check it could
+  not make without a network error (below); in bounded mode
+  `transientRetries` caps the total, as
   before. A file whose call stays silent through them is blocked with the
   files that use it, and the others go on. Surveys retry each part the same
   way. The review benchmark has no retry: a silent call ends there with the
@@ -43,7 +48,9 @@ it, so the run waited on that one call for good.
   the run, as to a file blocked by a slip in an answer ("one more pass for N
   unit(s) blocked by a call that showed no sign of progress", "... by a
   temporary failure"): a network that came back meanwhile finishes it
-  without a person. A repair run does not add it.
+  without a person. A repair run does not add it, nor a run whose call
+  budget ran out (`maxAgentCalls`, `--max-calls`), also while a call waited
+  to be retried.
 - Preparation audits (`audit_inputs.mjs run` and `run-pending`) retry a
   transient failure as translation does: a silent call, a rate limit, a 5xx
   or a network error retries the same request after a short wait, in a new
@@ -75,12 +82,20 @@ it, so the run waited on that one call for good.
   answer cut off in the middle ("error reading a body from connection",
   "error writing a body to connection", "end of file before message length
   reached", "connection closed before message completed") and undici's
-  socket and timeout codes. They are what a VPN that reconnects or rechecks
+  socket and timeout codes. So are the CLI's native connect-stage timeouts
+  ("connect-stage timed out", "deadline has elapsed"), a TLS connection
+  closed without close_notify or during its handshake ("tls handshake eof"),
+  an I/O error or a timeout on the proxy's tunnel ("proxy CONNECT I/O
+  error", "tunnel I/O error", "proxy CONNECT did not complete within"), and
+  an organization's IP allow list refusing this computer ("IP allow list
+  enabled", "IP address is not permitted": off the company network until the
+  VPN is back). They are what a VPN that reconnects or rechecks
   the computer, or a network that slept, leaves behind. Like ETIMEDOUT they
   are retried with no count limit in continuous mode; next to the CLI's
   sign-in help, 5 times at most, as before. The CLI's own wrapper "error
   sending request" is not one of them: a certificate, a proxy that refuses
-  the tunnel or a wrong address comes in it too.
+  the tunnel or a wrong address comes in it too (on a model call, a tunnel
+  the proxy refuses comes as a call the CLI gave up on, below).
 - A call the CLI gave up on after its own retries ("Failed to get response
   from the AI model; retried N times ... Last error: ...", or "... because
   the slow-stream retry limit was reached") is retried: with no count limit
@@ -90,20 +105,35 @@ it, so the run waited on that one call for good.
   reports a connection cut in the middle of an answer this way ("error
   reading a body from connection: unexpected EOF during chunk size line").
 - A connection taken over on the way (a certificate the computer does not
-  trust, or "does not appear to originate from GitHub") is retried 5 times at
-  most, never with no limit: a proxy, VPN or security software that inspects
-  HTTPS lets nothing through until a setting changes, while a VPN rechecking
-  the computer can cause it for a while. Guidance `cli-intercepted`
-  (`NODE_EXTRA_CA_CERTS` for a company certificate).
+  trust, "does not appear to originate from GitHub", or, where the CLI checks
+  its token, a 4xx page that is not GitHub's error body: "Failed to fetch PAT
+  user login (403): Failed to fetch Copilot user info: 403 Forbidden:
+  <html>...") is retried 5 times at most, never with no limit: a proxy, VPN
+  or security software that inspects HTTPS lets nothing through until a
+  setting changes, while a VPN rechecking the computer can cause it for a
+  while. Guidance `cli-intercepted` (`NODE_EXTRA_CA_CERTS` for a company
+  certificate). Where the CLI checks its token it otherwise hides the cause:
+  an untrusted certificate, a refused proxy and a proxy name that does not
+  resolve all read "network fetch failed: request failed: error sending
+  request for url (...)", which cannot be told from a network that is down,
+  so there they are retried as a network error, with no count limit.
 - "Authentication token found but could not be validated ... Your token may
   still be valid. Check your network connection" is the network, not a
   sign-in in doubt: with a network error it is retried with no count limit
-  (before, 5 times), otherwise 5 times at most; it never stops the run as a
-  failed sign-in and never moves workers to the person's CLI home.
+  (before, 5 times), otherwise 5 times at most, and it never moves workers to
+  the person's CLI home. When GitHub answered the check with a refusal in
+  its own error form ("Failed to fetch PAT user login (403): GitHub
+  returned: ...", any 4xx but a rate limit: a token without access, no SAML
+  authorization, Copilot not enabled), it is a sign-in problem and stops the
+  run, as up to 0.43.1 (after one more try in the person's CLI home). A rate
+  limit (a 429, or a 403 that says "rate limit") is retried with no count
+  limit, an organization's IP allow list is a network error (above), and a
+  4xx page in another form is a connection taken over (above).
 - `status` names a call being retried after silence ("a call that showed no
   sign of progress, most likely a connection lost without an error") and
   asks to keep the computer connected, never to stop the runner. After a
-  network error it advises checking the VPN and proxy settings, and after 30
+  network error it advises checking the VPN, the proxy settings and a
+  company certificate (`NODE_EXTRA_CA_CERTS`), and after 30
   minutes says how long the longest retry has lasted. The failure guidance
   `cli-silent` offers a rerun, a connection check, a longer wait (or 0 to
   turn the check off) and a pause.

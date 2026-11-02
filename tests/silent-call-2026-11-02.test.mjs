@@ -175,12 +175,36 @@ out('{"type":"assistant.mess'); setTimeout(() => { out('age","data":{"content":"
   assert.deepEqual([last.stdout, last.droppedLines], ['', 1]);
   const kept = await node(`process.stdout.write('a\\nb\\n')`, { dropLine: () => { throw new Error('x'); } });
   assert.deepEqual([kept.stdout, kept.droppedLines], ['a\nb\n', undefined]);
+  // However the predicate answers, a line over 64 KiB is never dropped, in one write or in two.
+  for (const code of [`process.stdout.write('x'.repeat(100000) + '\\n')`, `process.stdout.write('x'.repeat(60000)); setTimeout(() => process.stdout.write('x'.repeat(40000) + '\\n'), 50)`, `process.stdout.write('x'.repeat(100000))`]) {
+    const long = await node(code, { dropLine: () => true });
+    assert.deepEqual([long.stdout.replace(/\n$/, '').length, long.droppedLines], [100000, undefined], code);
+  }
   // Only the two delta types, and only short lines that are JSON.
   for (const line of ['{"type":"assistant.message","data":{"content":"see assistant.message_delta"}}', 'not json _delta"', `{"type":"assistant.message_delta","pad":"${'z'.repeat(70000)}"}`])
     assert.equal(isStreamedDelta(Buffer.from(line)), false, line.slice(0, 60));
   // Pieces keep a silent watch at bay, though none is kept.
   const busy = await node(`let n = 0; const t = setInterval(() => { process.stdout.write('{"type":"assistant.reasoning_delta","data":{}}\\n'); if (++n === 25) clearInterval(t); }, 100);`, { silenceMs: 1000, dropLine: isStreamedDelta });
   assert.deepEqual([busy.code, busy.stdout, busy.droppedLines], [0, '', 25]);
+});
+
+test('a stopped call ends even while a process outside its tree holds its pipes open', { skip: process.platform === 'win32' && 'a POSIX session of its own' }, async t => {
+  // The child starts a grandchild in a session of its own, outside the process
+  // group the runner kills, that keeps stdout and stderr open for a minute.
+  let grandchild;
+  t.after(() => { if (grandchild) try { process.kill(grandchild, 'SIGKILL'); } catch {} });
+  const started = performance.now();
+  const run = node(`const { spawn } = require('node:child_process');
+const g = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 60000)'], { detached: true, stdio: ['ignore', 'inherit', 'inherit'] });
+process.stderr.write('grandchild ' + g.pid + '\\n'); g.unref(); setInterval(() => {}, 1000);`, { silenceMs: 1000 }).then(() => null, e => e);
+  const failure = await Promise.race([run, new Promise(resolve => setTimeout(() => resolve('never settled'), 30000))]);
+  assert.notEqual(failure, 'never settled');
+  grandchild = Number(failure.result.stderr.match(/grandchild (\d+)/)?.[1]) || undefined;
+  assert.ok(grandchild && !gone(grandchild), 'the grandchild was outside the tree and still runs');
+  assert.equal(failure.silent, true);
+  assert.match(failure.message, /no sign of progress/);
+  // About 1 s of silence, 1.5 s from SIGTERM to SIGKILL, then 5 s for the pipes.
+  assert.ok(performance.now() - started < 20000, `${Math.round(performance.now() - started)} ms`);
 });
 
 test('on Windows a silent child is stopped with taskkill, and still stopped if taskkill cannot run', async () => {
@@ -263,7 +287,17 @@ test('a name that does not resolve, an unreachable network and the CLI\'s Window
     'Copilot implementer failed (exit 1): Connection reset by peer (os error 104)',
     'Copilot implementer failed (exit 1): TypeError: fetch failed (cause: UND_ERR_SOCKET other side closed)',
     'Copilot implementer failed (exit 1): Body Timeout Error (UND_ERR_BODY_TIMEOUT)',
-    'Copilot implementer failed (exit 1): Headers Timeout Error'];
+    'Copilot implementer failed (exit 1): Headers Timeout Error',
+    // CLI 1.0.105's native HTTP code.
+    'Copilot implementer failed (exit 1): Failed native model HTTP request: Native model HTTP connect-stage timed out: 30s',
+    'Copilot implementer failed (exit 1): error sending request for url (https://api.githubcopilot.com/chat/completions): client error (Connect): tcp connect error: deadline has elapsed',
+    'Copilot implementer failed (exit 1): error decoding response body: peer closed connection without sending TLS close_notify: https://docs.rs/rustls/latest/rustls/manual/_03_howto/index.html#unexpected-eof',
+    'Copilot implementer failed (exit 1): error sending request for url (https://api.githubcopilot.com/chat/completions): client error (Connect): tls handshake eof',
+    'Copilot implementer failed (exit 1): proxy CONNECT I/O error: unexpected end of file',
+    'Copilot implementer failed (exit 1): tunnel I/O error: unexpected end of file',
+    'Copilot implementer failed (exit 1): proxy CONNECT did not complete within 30s',
+    // GitHub's refusal for an organization's IP allow list: off the company network.
+    'Copilot implementer failed (exit 1): 403 Forbidden: Although you appear to have the correct authorization credentials, the `acme` organization has an IP allow list enabled, and your IP address is not permitted to access this resource.'];
   for (const message of messages) {
     const e = new Error(message);
     assert.equal(networkFailurePattern.test(message), true, message);
@@ -321,11 +355,17 @@ test('a connection taken over (a certificate the computer does not trust, an ans
     for (const language of ['ja', 'en']) assert.equal(failureGuidance(message, { language }).id, 'cli-intercepted', `${message} (${language})`);
   }
   assert.match(failureGuidance('invalid peer certificate: UnknownIssuer', { language: 'en' }).options.find(o => o.id === 'company-certificate').reason, /NODE_EXTRA_CA_CERTS/);
+  // Node's certificate codes, each by name; a name that only starts like one is not.
+  for (const code of ['CERT_HAS_EXPIRED', 'CERT_NOT_YET_VALID', 'SELF_SIGNED_CERT_IN_CHAIN', 'UNABLE_TO_GET_ISSUER_CERT_LOCALLY', 'UNABLE_TO_VERIFY_LEAF_SIGNATURE', 'DEPTH_ZERO_SELF_SIGNED_CERT', 'ERR_TLS_CERT_ALTNAME_INVALID'])
+    assert.equal(isLimitedRetry(new Error(`Copilot implementer failed (exit 1): TypeError: fetch failed (cause: ${code})`)), true, code);
+  for (const message of ["Copilot implementer failed (exit 1): src/a.ts(3,1): error TS2304: Cannot find name 'cert_utils' in src/cert_manager.ts", 'Copilot implementer failed (exit 1): CERT_STORE_PATH is not set'])
+    assert.equal(isTransientFailure(new Error(message)), false, message);
 });
 
 test('a token check the CLI could not make for the network is the network: retried as long as it lasts, never a stop, never a move to the person\'s home', () => {
   const check = errors => new Error(`Copilot implementer failed (exit 1): Error: Authentication token found but could not be validated.\n\n  ${errors}\n\nYour token may still be valid. Check your network connection and try again.${helpText}`);
-  const lost = check('network fetch failed: error sending request for url (https://api.github.com/copilot_internal/user): client error (Connect): dns error: failed to lookup address information: No such host is known. (os error 11001)');
+  // CLI 1.0.105 prints the same for a refused or unknown proxy, a reset and an untrusted certificate.
+  const lost = check('Failed to fetch PAT user login: network fetch failed: request failed: error sending request for url (https://api.github.com/copilot_internal/user)\n  Failed to fetch GitHub CLI user login: network fetch failed: request failed: error sending request for url (https://api.github.com/copilot_internal/user)');
   assert.equal(isTransientFailure(lost), true);
   assert.equal(isLimitedRetry(lost), false, 'not a sign-in in doubt: no retry limit in continuous mode');
   assert.equal(isSignInDoubt(lost), false);
@@ -333,15 +373,63 @@ test('a token check the CLI could not make for the network is the network: retri
   assert.equal(isSignedOut(lost), false);
   assert.equal(failureGuidance(lost, { language: 'en' }).id, 'cli-network');
   // With an error it does not know as a network error: a few times only, still no stop.
-  const refused = check('error sending request for url (https://api.github.com/copilot_internal/user): client error (Connect): unsuccessful tunnel');
-  assert.deepEqual([isTransientFailure(refused), isLimitedRetry(refused), isSystemicFailure(refused), isSignedOut(refused)], [true, true, false, false]);
-  assert.equal(failureGuidance(refused, { language: 'en' }).id, 'cli-network');
+  const unknown = check('Failed to fetch PAT user login: response validation failed: missing login');
+  assert.deepEqual([isTransientFailure(unknown), isLimitedRetry(unknown), isSystemicFailure(unknown), isSignedOut(unknown)], [true, true, false, false]);
+  assert.equal(failureGuidance(unknown, { language: 'en' }).id, 'cli-network');
   // The generic sign-in help next to a network error stays a doubt, a few times only.
   const doubt = new Error(`Copilot implementer failed (exit 1): connect ETIMEDOUT 140.82.112.21:443${helpText}`);
   assert.deepEqual([isTransientFailure(doubt), isLimitedRetry(doubt), isSignInDoubt(doubt), isSystemicFailure(doubt)], [true, true, true, false]);
   // A token GitHub refused stops the run, as before.
   assert.equal(isSystemicFailure(new Error(`${lost.message}\n401 Unauthorized`)), true);
   assert.equal(isSystemicFailure(new Error(`Copilot implementer failed (exit 1): Error: No authentication information found.${helpText}`)), true);
+});
+
+const tokenCheck = errors => new Error(`Copilot implementer failed (exit 1): Error: Authentication token found but could not be validated.\n\n  ${errors}\n\nYour token may still be valid. Check your network connection and try again.${helpText}`);
+test('a token check GitHub answered with a refusal stops the run as before; a rate limit or a 5xx in it is retried, an IP allow list is the network, and a page not from GitHub is a connection taken over', async t => {
+  // CLI 1.0.105 when GitHub answers the check with its own error body (JSON
+  // with a message): "GitHub returned: <message>" (checked through an
+  // inspecting proxy with a test CA).
+  const both = (status, rest) => `Failed to fetch PAT user login (${status}): ${rest}\n  Failed to fetch GitHub CLI user login (${status}): ${rest}`;
+  for (const [status, body] of [[401, 'Bad credentials'], [403, 'Resource not accessible by integration'], [403, 'This GitHub API path is not available: sessions are bound to their configured repositories.'], [404, 'Not Found']]) {
+    const refused = tokenCheck(both(status, `GitHub returned: ${body}`));
+    assert.deepEqual([isSystemicFailure(refused), isTransientFailure(refused)], [true, false], `${status} ${body}`);
+    assert.equal(isSignedOut(refused), true, `${status}: another CLI home may hold a token GitHub accepts`);
+    for (const language of ['ja', 'en']) assert.equal(failureGuidance(refused, { language }).id, 'copilot-auth', `${status} ${language}`);
+  }
+  // GitHub sends a rate limit as a 429 or as a 403 that says so; any other
+  // body comes as "Failed to fetch Copilot user info: <status line>: <body>".
+  for (const [status, rest] of [[429, 'GitHub returned: API rate limit exceeded'],
+    [403, 'GitHub returned: API rate limit exceeded for user ID 1. If you reach out to GitHub Support for help, please include the request ID ABCD:1234:5678:9ABC:0000.'],
+    [403, 'GitHub returned: You have exceeded a secondary rate limit. Please wait a few minutes before you try again.'],
+    [429, 'Failed to fetch Copilot user info: 429 Too Many Requests: slow down'],
+    [502, 'Failed to fetch Copilot user info: 502 Bad Gateway: <html><body>Bad gateway</body></html>'],
+    [502, 'GitHub returned: Bad Gateway']]) {
+    const passing = tokenCheck(both(status, rest));
+    assert.deepEqual([isTransientFailure(passing), isLimitedRetry(passing), isSystemicFailure(passing), isSignedOut(passing)], [true, false, false, false], `${status} ${rest}`);
+  }
+  // A 4xx page that is not GitHub's error body: a proxy in between (CLI 1.0.105, exact text).
+  const page = tokenCheck(both(403, 'Failed to fetch Copilot user info: 403 Forbidden: <html><body>Access denied by policy</body></html>'));
+  assert.deepEqual([isTransientFailure(page), isLimitedRetry(page), isSystemicFailure(page), isSignedOut(page), isSignInDoubt(page)], [true, true, false, false, false]);
+  for (const language of ['ja', 'en']) assert.equal(failureGuidance(page, { language }).id, 'cli-intercepted', `a proxy's page (${language})`);
+  const allowList = tokenCheck('Failed to fetch PAT user login (403): GitHub returned: Although you appear to have the correct authorization credentials, the `acme` organization has an IP allow list enabled, and your IP address is not permitted to access this resource.');
+  assert.deepEqual([isTransientFailure(allowList), isLimitedRetry(allowList), isSystemicFailure(allowList), isSignedOut(allowList)], [true, false, false, false]);
+  for (const language of ['ja', 'en']) assert.equal(failureGuidance(allowList, { language }).id, 'cli-network', `the CLI's sentence is no credential finding (${language})`);
+  // In a run: the first refusal stops it, with no retry and no last pass.
+  const f = await continuous(t);
+  let count = 0;
+  const failure = await translate(f.root, f.config, async () => { count++; throw tokenCheck('Failed to fetch PAT user login (403): GitHub returned: Resource not accessible by integration'); }).then(() => null, e => e);
+  assert.ok(failure);
+  assert.equal(count, 1);
+  assert.equal(failure.report.selfRepairs?.repass, undefined);
+  assert.equal(failureGuidance(failure, { language: 'en' }).id, 'copilot-auth');
+  // A proxy's page: a few retries, the last pass, then the file is unfinished; the run is not stopped as a sign-in.
+  const g = await continuous(t);
+  let pages = 0;
+  const blocked = await translate(g.root, g.config, async () => { pages++; throw page; }).then(() => null, e => e);
+  assert.ok(blocked);
+  assert.equal(pages, 2 * (hostStallRetries + 1), 'two passes of the few retries');
+  assert.deepEqual(blocked.report.selfRepairs?.repass, { units: 1, done: 0 });
+  assert.equal(failureGuidance(blocked, { language: 'en' }).id, 'cli-intercepted');
 });
 
 const continuous = async t => {
@@ -387,6 +475,31 @@ for (const [mode, calls] of [['continuous', hostStallRetries + 1], ['bounded', 3
   assert.ok(stages.includes('one more pass for 1 unit(s) blocked by a call that showed no sign of progress'), stages.join('\n'));
   assert.ok(stages.some(s => /^implementer retry 1 after a call that showed no sign of progress$/.test(s)), stages.join('\n'));
   assert.equal(failureGuidance(failure, { language: 'ja' }).id, 'cli-silent');
+});
+
+test('status names a network error being retried, a company certificate among the checks, and after half an hour how long it has lasted', async t => {
+  const f = await continuous(t);
+  let implementer = 0, fresh, late;
+  const report = await translate(f.root, f.config, async args => {
+    if (args.role === 'implementer' && ++implementer === 1) throw new Error('Copilot implementer failed (exit 1): connect ETIMEDOUT 140.82.112.21:443');
+    if (args.role === 'implementer') {
+      fresh = migrationStatus(f.root);
+      // As if the first retry came 45 minutes ago.
+      const dir = safePath(f.root, `migration/runs/${args.runId}`);
+      for (const name of fs.readdirSync(dir).filter(n => n.endsWith('.json') && n !== 'summary.json')) {
+        const file = path.join(dir, name), attempt = readJSON(file);
+        if (attempt.role === 'implementer' && attempt.retries?.length) { attempt.retries[0].at = new Date(Date.now() - 45 * 60000).toISOString(); writeJSON(file, attempt); }
+      }
+      late = migrationStatus(f.root);
+    }
+    return fake(args);
+  });
+  assert.equal(report.done, 1);
+  const action = s => s.nextActions.find(a => /being retried after a transient failure/.test(a)) ?? '';
+  assert.match(action(fresh), /\(network error\); the runner waits/);
+  assert.match(action(fresh), /NODE_EXTRA_CA_CERTS/);
+  assert.match(action(fresh), /never stop it for this/);
+  assert.match(action(late), /\(network error\), the longest for about 4[45] minutes; /);
 });
 
 test('a network that came back late: the last pass finishes the file that stayed silent', async t => {
@@ -441,6 +554,21 @@ for (const [name, error, mode] of [
     assert.ok(stages.includes('one more pass for 1 unit(s) blocked by a temporary failure'), stages.join('\n'));
   });
 
+for (const mode of ['continuous', 'bounded']) test(`a retry with no call left in the budget ends the run there, with no last pass (${mode})`, async t => {
+  const f = mode === 'continuous' ? await continuous(t) : await ready(t);
+  if (mode === 'bounded') { f.config.transientRetryDelayMs = 1; f.config.maxAgentCalls = 1; writeJSON(safePath(f.root, 'migration/config.json'), f.config); }
+  let count = 0;
+  const stages = [];
+  const failure = await translate(f.root, f.config, async () => { count++; throw new Error(lockError); },
+    { onProgress: e => stages.push(e.stage), ...(mode === 'continuous' ? { maxCalls: 1 } : {}) }).then(() => null, e => e);
+  assert.ok(failure);
+  assert.equal(count, 1);
+  assert.equal(failure.budgetStop, true);
+  assert.equal(failure.report.selfRepairs?.repass, undefined);
+  assert.ok(!stages.some(s => /one more pass/.test(s)), stages.join('\n'));
+  assert.match(failure.message, /The shared writer lock timed out/, 'the unit keeps its own error');
+});
+
 test('a file blocked by a failure that is not temporary gets no last pass', async t => {
   const f = await continuous(t);
   let count = 0;
@@ -462,6 +590,7 @@ test('a call stopped for silence just as the person stops the run ends as interr
   const state = fs.readdirSync(safePath(f.root, 'migration/state/units')).map(n => readJSON(safePath(f.root, `migration/state/units/${n}`)))[0];
   assert.match(state.error, /^Interrupted; Process showed no sign of progress/);
   assert.notEqual(failureGuidance(state.error, { language: 'en' }).id, 'cli-silent');
+  assert.equal(failureGuidance(state.error, { language: 'en' }).id, failureGuidance('Interrupted', { language: 'en' }).id, 'the same guidance as any interruption');
   // Only with the run stopped, and only a silent call.
   const e = silentError();
   assert.equal(stoppedWithRun(e, new AbortController().signal).message, silentError().message);
