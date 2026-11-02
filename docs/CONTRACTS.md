@@ -178,6 +178,18 @@ those inputs outside runtime state. Transitive/custom inputs must be declared
 by the project. Missing declared files fail closed. External tools,
 environment variables and network state are not fingerprinted automatically.
 
+A translation run checks its input context before and after every worker call.
+Within one run those checks walk the inputs again each time but keep a file's
+content hash while its identity, size, modification time and change time stay
+those it was hashed with (a file changed less than 3 s before it was read is
+read again until it settles), and check the manifest rows and the review
+dependency map again only when their text changed. A change those do not show
+(a write through a memory map or a handle still open, a FAT or exFAT file with
+its modification time put back, a network share answering from its attribute
+cache or with a clock 3 s or more behind) is found by the full check the run
+makes every ten minutes and when it ends. Gates, phase commands, status and
+the next run always hash the files' content.
+
 Optional `buildArtifactRoots` (default `[]`) declares repository-relative
 directories containing generated objects, binaries and reports. Command paths
 inside these directories are excluded from input fingerprints, whether or not

@@ -4,43 +4,66 @@ Phase 04 no longer reads every source file again before and after each worker
 call. On 2026-11-02 (Windows, kit 0.42.0, source-only, 554 source files, two
 workers at a time) translation had finished 25 units in 2 h 37 min. The
 runner checks before and after every worker call that its inputs have not
-changed (about 8 checks per unit, 12 with findings), and each check read
-every source file again, about 6 s a pass on that PC (estimated from its
-phase 03 pilot). The checks run one at a time, so they also held back the
-other unit in flight.
+changed (about 8 checks per unit, 12 with findings). Each check read every
+source file again (about 6 s a pass on that PC, estimated from its phase 03
+pilot) and checked every manifest row and every file the review dependency
+map names. The checks run one at a time, so they also held back the other
+unit in flight.
 
-- A translation run keeps each input file's content hash with the file's
-  identity (device and file number), size, modification time and change
-  time, and reads a file again only when one of them changed (`hashCache`
-  in `lib/core.mjs`). Each check still lists the folders and looks at every
-  file, so an added, removed, renamed or rewritten file is seen at the next
-  check as before. A file changed less than 3 s before it was read is read
-  again at every check until it has settled: a coarse clock, FAT's 2 s
-  times or a network share's own clock could hide a second change. The
-  cache lasts for one run. Gates, phase commands, `status` and the next run
-  hash the files themselves, so a rewrite that put back a file's size and
-  both its times (which a check of the times cannot see) still makes the
-  records out of date there. In a test fixture with the installed policies
-  (two units, one with a finding) a run read a source outside the units 21
-  times, now once, and a unit's source 23 times, now 3 (the text sent to
-  its workers). In a pilot the production project's files are kept the same
-  way.
-- The evidence for each worker call uses the review dependency map the run
-  read at its start; each call read it again and checked every file it
-  names. Every input check still reads the map, so a change to it during the
-  run still stops the run. In the fixture above the map was read 48 times,
-  now 23.
+- The input checks of one translation run share a cache (`runCache` in
+  `lib/core.mjs`). Each check still walks the input folders and looks at
+  every file, so a file added, removed, renamed or replaced is seen at the
+  next check as before. A file whose identity (device and file number),
+  size, modification time and change time are those it was hashed with
+  keeps its hash instead of being read again. A file changed less than 3 s
+  before it was read is read again at every check until it has settled
+  (coarse kernel clocks and FAT's 2 s times may not show a second change).
+  The manifest and the dependency map are still read at every check, but
+  their rows are checked again only when their text changed (a file the map
+  names under `node_modules`, `__pycache__` or `.git`, which the source walk
+  does not enter, is still looked at every check).
+- A change that leaves a file's size and times as this computer sees them
+  is not seen by those checks: a write through a memory map or a handle
+  still open (Windows updates the times when it is closed), a file system
+  without a change time (FAT, exFAT) with the modification time put back,
+  or a network share that answers from its attribute cache or whose clock
+  runs 3 s or more behind. So every ten minutes, and once when the run
+  ends, a check reads and checks every input again; a change found there
+  stops the run as before (at the end: "Migration inputs changed during the
+  run; fresh approval required"). Gates, phase commands, `status` and the
+  next run always read the files themselves.
+- The evidence for each worker call uses the review dependency map from
+  the run's first read of its inputs; each call read the map again and
+  checked every file it names.
+- In a test fixture with the installed policies (two units, one with a
+  finding, 8 worker calls) a source outside the units was read 21 times,
+  now twice (the first check and the last); the two units' sources 23 and
+  25 times, now 4 and 6 (the others are the text sent to their workers);
+  the dependency map 48 times, now 24, and the manifest 43 times, now 25.
+  In the same fixture's pilot a production source was read 30 times, now 8.
+  On Linux, one check of a 554-file project after the first took about 210
+  to 300 ms, now about 40 to 60 ms: it reads no source file (575 file
+  reads, now 4 small records) and about 49,000 file system lookups are now
+  about 12,300. The gain on Windows has not been measured; the time per
+  unit in `status` shows it after the update.
 - `status --wait` watches the recorded progress (as `status --fast`) while
   it waits and builds the status asked for once, when it returns. Without
-  `--fast` it built the full status every 5 s, reading every source file
-  each time while the runner read them too: in a one-second test wait with
-  no progress, 39 reads of a source file, now one. The orchestrator's
-  `status --root ROOT --wait 600` is now as light while it waits as
-  `status --fast --wait 600`.
-- `status --fast` and `status --wait` no longer show a lock written on
-  another host as running, and name it in `foreignLock`, as the full status
-  already did: with a process of the same number on this host, `--fast`
-  showed it running and `--wait` waited out its whole time.
+  `--fast` it built the full status at every poll (every 5 s), reading
+  every source file each time while the runner read them too: in a
+  one-second test wait polling every 20 ms, about 36 reads of a source
+  file, now one. The orchestrator's `status --root ROOT --wait 600` is now
+  as light while it waits as `status --fast --wait 600`. A manifest that
+  cannot be read (a folder in its place) is a blocker of `status --fast`
+  and `status --fast --wait`, as of the full status, instead of a failure;
+  if the recorded progress cannot be read at all, `status --wait` returns
+  the full status.
+- `status --fast` (and so `status --wait` while it waits) treats a lock
+  written on another host as the full status does: not running, named in
+  `foreignLock`, and the next actions say to run `unlock --pid` once that
+  run has stopped. A lock whose process this user may not signal counts as
+  running, as in the full status. Before, with a process of the same number
+  on this host, `--fast` showed it running and `--fast --wait` waited out
+  its whole time.
 - What is checked and recorded does not change, and the kit's code is not
   an input: from 0.40.1 or later, approvals, completion records, phase
   records, prepared pilots and finished units are kept. The update can go

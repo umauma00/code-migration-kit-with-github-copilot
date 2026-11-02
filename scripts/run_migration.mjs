@@ -295,18 +295,23 @@ export async function doctor(root, config, { checkCLI = false, command = 'copilo
 // It watches the recorded progress only (statusSnapshot: no source walk or
 // hash) and reads the status asked for once, when it answers. A full status
 // every five seconds read every source file again, at about 6 s a pass on a
-// Windows PC on 2026-11-02, while the runner was reading them too.
+// Windows PC on 2026-11-02, while the runner was reading them too. Without
+// --fast, a recorded view that cannot be read answers with the full status at
+// once, which reports why (as it did when it was polled itself).
 const progressKey = report => JSON.stringify([report.ok, report.running, report.lock?.runId, report.done, report.total,
   report.units?.filter(u => u.status === 'blocked').length, report.buildLoop && [report.buildLoop.stage, report.buildLoop.rounds, report.buildLoop.agentCalls],
   report.survey && [report.survey.runId, report.survey.done, report.survey.activeScopes, report.survey.agentCalls, report.survey.parts, report.survey.state]]);
 export async function waitForProgress(root, seconds, { intervalMs = 5000, fast = false } = {}) {
   if (!Number.isInteger(seconds) || seconds < 1 || seconds > 1800) throw new Error('--wait must be a number of seconds from 1 to 1800');
   const deadline = Date.now() + seconds * 1000;
-  let report = statusSnapshot(root);
+  const snapshot = () => { try { return statusSnapshot(root); } catch (e) { if (fast) throw e; return null; } };
+  let report = snapshot();
+  if (!report) return migrationStatus(root);
   const start = progressKey(report);
   while ((report.running || report.buildLoop) && Date.now() < deadline) {
     await new Promise(resolve => setTimeout(resolve, Math.min(intervalMs, Math.max(0, deadline - Date.now()))));
-    report = statusSnapshot(root);
+    report = snapshot();
+    if (!report) return migrationStatus(root);
     if (progressKey(report) !== start) break;
   }
   return fast ? report : migrationStatus(root);
