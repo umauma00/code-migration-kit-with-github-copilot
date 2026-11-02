@@ -12,26 +12,21 @@ input checks of a pilot's copy. A source-as-spec plan keeps its scenarios in
 `verificationRoots` names it), so the copy's inputs could not be checked and
 `pilot prepare` removed the copy again.
 
-- A source-only pilot's copy now holds the plan and every file it names
-  (`lib/pilot.mjs`). The files `verificationInputs` names were copied
-  before, and so were the files in the copied folders (`sourceRoots`,
-  `verificationRoots`), except those inside `node_modules`, `__pycache__`
-  or `.git` folders, which the folder walk skips; a plan file inside
-  `node_modules` or `__pycache__` is now copied too. The list comes from the
-  read that checked the project's own inputs (`pilotScope`): the plan is
-  read again and each file it names looked up, but no source is read again.
-- A plan naming a file inside a `.git` folder (a nested clone or a
-  submodule's `.git` file) now stops `pilot plan` and `pilot prepare` with
-  that file and what to change: the folder walk never copies a `.git`
-  folder, and a plan must not make the copy hold one either. Such a plan
-  stopped `pilot prepare` before as an input missing from the copy, unless
-  `verificationInputs`, the manifest or the review dependency map also
-  named that file, which then went into the copy; that case stops now too.
-- An input of the project changed while the copy was made now stops `pilot
-  prepare` with "Parent inputs changed while preparing the pilot": the
-  project is checked before the copy's own inputs. A plan changed in that
-  moment stopped it as an input missing from the copy, whose guidance said
-  the plan was invalid.
+- A source-only pilot's copy now holds the plan and every file it names,
+  wherever it is (`lib/pilot.mjs`), as it holds the files
+  `verificationInputs` names. The files in the copied folders
+  (`sourceRoots`, `verificationRoots`) were copied before, except those
+  inside `node_modules`, `__pycache__` or `.git` folders, which the folder
+  walk skips; such a file is now copied too when the plan names it (the
+  project holds it anyway). The list comes from the read that checked the
+  project's own inputs (`pilotScope`): the plan is read again and each file
+  it names looked up, but no source is read again.
+- `pilot prepare` checks the project before the copy's own inputs. A plan
+  changed while the copy was made, so that it named a file the copy did not
+  hold, stopped `pilot prepare` as an input missing from the copy, with the
+  guidance of an invalid plan; it now stops with "Parent inputs changed
+  while preparing the pilot". An input removed meanwhile still stops with
+  its own error, now from the project's check.
 - A `pilot prepare` that stopped removed its copy and wrote no grant, so
   run `pilot plan` and `pilot prepare` again (the same `--target` works).
   Records, approvals and pilots prepared before are kept.
@@ -39,12 +34,11 @@ input checks of a pilot's copy. A source-as-spec plan keeps its scenarios in
   pilot with the files it uses, prepared and run to the end with every other
   file of the project unchanged; in auto mode a pilot of the chosen file of
   a plan made before 0.10.0, which names only its contract memo; a pilot
-  through smoke with a unit typecheck; a plan file inside `node_modules`
-  copied and one inside a `.git` folder refused by `pilot plan` and `pilot
-  prepare`; an edit of a copied scenario in the copy or in the project
-  stops the pilot; a plan changed while the copy is made; each source read
-  4 times, as 0.43.0 reads it where the scenarios were already copied). All
-  seven fail on 0.43.0.
+  through smoke whose unit typecheck runs for each file; plan files inside
+  `node_modules` and `.git` folders copied; an edit of a copied scenario in
+  the copy or in the project stops the pilot; a plan changed while the copy
+  is made; each source read 4 times, as 0.43.0 reads it where the scenarios
+  were already copied). All seven fail on 0.43.0.
 
 # 0.43.0 — 2026-11-02
 

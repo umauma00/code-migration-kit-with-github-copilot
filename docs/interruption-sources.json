@@ -1557,7 +1557,7 @@
     },
     {
       "path": "lib/pilot.mjs",
-      "sha256": "bc1093f55d12726e00f01382deed68206711c34ebece4e2729e1c4f0e7da4fb8",
+      "sha256": "a350f746d18bbaf900ed6f83d4c62e45d0fd6ce0a13cf9a1b6dacb69a1e4746c",
       "entries": [
         {
           "line": 40,
@@ -1630,57 +1630,52 @@
           "code": "if (!preparedJudge(parent, config, context)) throw new Error('Run parent judge successfully with unchanged evidence before preparing a pilot');"
         },
         {
-          "line": 98,
-          "kind": "error-or-exit-candidate",
-          "code": "if (inGit) throw new Error(`Pilot cannot copy ${inGit}: the source-only judge plan names it, and a pilot never copies a file inside a .git folder. Remove it from the plan's sources or scenarios; phase next then says what to record again`);"
-        },
-        {
-          "line": 100,
+          "line": 96,
           "kind": "error-or-exit-candidate",
           "code": "for (const source of sources) if (!bySource.has(source)) throw new Error(`Pilot source is not in the manifest: ${source}`);"
         },
         {
-          "line": 108,
+          "line": 104,
           "kind": "error-or-exit-candidate",
           "code": "for (const stage of stages.filter(s => s !== 'translation')) if (!config.commands?.[stage]) throw new Error(`Configure commands.${stage} before authorizing that pilot boundary`);"
         },
         {
-          "line": 111,
+          "line": 107,
           "kind": "error-or-exit-candidate",
           "code": "if ((path.isAbsolute(value) && within(value, parent)) || (i > 0 && /^\\.\\.([/\\\\]|$)/.test(value))) throw new Error('Pilot commands must use project-relative inputs, not parent paths');"
         },
         {
-          "line": 143,
+          "line": 139,
           "kind": "error-or-exit-candidate",
           "code": "if (!note?.trim() || !Array.isArray(sources) || !sources.length || new Set(sources).size !== sources.length) throw new Error('Pilot needs explicit source selections and an authorization --note');"
         },
         {
-          "line": 144,
+          "line": 140,
           "kind": "error-or-exit-candidate",
           "code": "if (!target) throw new Error('Pilot requires a new --target directory outside the production project');"
         },
         {
-          "line": 149,
+          "line": 145,
           "kind": "error-or-exit-candidate",
           "code": "if (within(destination, parent) || within(parent, destination)) throw new Error('Pilot target must be outside the production project');"
         },
         {
-          "line": 150,
+          "line": 146,
           "kind": "error-or-exit-candidate",
           "code": "if (fs.existsSync(destination)) throw new Error('Pilot target must be a new directory; never overwrite existing work');"
         },
         {
-          "line": 156,
+          "line": 152,
           "kind": "error-or-exit-candidate",
           "code": "if (expectTotal !== undefined && Number(expectTotal) !== scope.length) throw new Error(`Pilot scope is ${scope.length} files, not the ${expectTotal} approved; run pilot plan again and ask with the new count`);"
         },
         {
-          "line": 186,
+          "line": 183,
           "kind": "error-or-exit-candidate",
           "code": "if (contextHash(parent, config) !== context) throw new Error('Parent inputs changed while preparing the pilot');"
         },
         {
-          "line": 198,
+          "line": 195,
           "kind": "error-or-exit-candidate",
           "code": "throw e;"
         }
@@ -5233,5 +5228,5 @@
       ]
     }
   ],
-  "candidateLines": 953
+  "candidateLines": 952
 }

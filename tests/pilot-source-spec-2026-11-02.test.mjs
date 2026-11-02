@@ -139,35 +139,38 @@ test('in auto mode a pilot of the chosen file in a plan made before 0.10.0 holds
   assert.deepEqual([translation.done, translation.total, translation.errors], [1, 1, []]);
 });
 
-test('a source-as-spec pilot through smoke type-checks, builds and runs the copy', async t => {
+test('a source-as-spec pilot through smoke type-checks each file, builds and runs the copy', async t => {
   const ok = [process.execPath, '-e', 'console.log("ok")'];
-  const f = await specProject(t, { before: root => editConfig(root, c => { c.commands.build = ok; c.commands.smoke = ok; c.commands.typecheck = [process.execPath, '--check', '{target}']; }) });
+  // The unit typecheck notes each file it checks, outside both projects.
+  const log = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'pilot-typecheck-')), 'checked.txt');
+  t.after(() => fs.rmSync(path.dirname(log), { recursive: true, force: true }));
+  const typecheck = [process.execPath, '-e', `require('fs').appendFileSync(${JSON.stringify(log)}, process.argv[1] + '\\n')`, '{target}'];
+  const f = await specProject(t, { before: root => editConfig(root, c => { c.commands.build = ok; c.commands.smoke = ok; c.commands.typecheck = typecheck; }) });
   const child = childPath(t, f);
   preparePilot(f.root, f.config, { target: child, sources: ['src/main.py'], through: 'smoke', note: 'Disposable source-as-spec pilot through smoke' });
   const run = await runPilot(child, loadConfig(child), worker);
   assert.deepEqual(run.results.map(r => r.stage), ['judge', 'translation', 'build', 'smoke']);
   for (const { stage, result } of run.results) assert.notEqual(result.success, false, stage);
   assert.equal(run.results.find(r => r.stage === 'translation').result.done, 3);
+  assert.deepEqual(fs.readFileSync(log, 'utf8').trim().split('\n').map(line => line.trim().split(path.sep).join('/')).sort(), ['ported/main.mjs', 'ported/math_ops.mjs', 'ported/text_ops.mjs']);
   assert.deepEqual(migrationStatus(child).blockers, []);
 });
 
-test('plan files the folder walk skips are copied, but a file inside a .git folder stops pilot plan and prepare', async t => {
-  // node_modules and __pycache__ folders are skipped by the walk of the copied roots.
-  const skipped = 'tests/node_modules/contract.md';
-  const f = await specProject(t, { before: root => addScenario(root, skipped, 'Contracts inferred from src/math_ops.py:4.\n') }), child = childPath(t, f);
+test('every file the plan names is copied, also inside folders the walk skips', async t => {
+  // The walk of the copied folders skips node_modules, __pycache__ and .git
+  // folders; a file the plan names is copied wherever it is, as the files
+  // verificationInputs names are (the project holds it anyway).
+  const skipped = ['tests/node_modules/contract.md', 'tests/fixture/.git/HEAD'];
+  const f = await specProject(t, { before: root => {
+    addScenario(root, skipped[0], 'Contracts inferred from src/math_ops.py:4.\n');
+    addScenario(root, skipped[1], 'ref: refs/heads/main\n');
+  } }), child = childPath(t, f);
+  assert.deepEqual(scenarios(f.root), [sourcesFile, ...skipped]);
   preparePilot(f.root, f.config, { target: child, sources: ['src/math_ops.py'], note: 'Disposable source-as-spec pilot' });
-  assert.equal(fileHash(safePath(child, skipped)), fileHash(safePath(f.root, skipped)));
-  assert.ok(requirePilot(child, loadConfig(child)));
-
-  // A pilot never copies a .git folder: the plan names one of its files.
-  const inGit = 'tests/fixture/.git/config';
-  const g = await specProject(t, { before: root => addScenario(root, inGit, '[remote "origin"]\n\turl = https://example.invalid/repo.git\n') }), other = childPath(t, g);
-  const refusal = new RegExp(`^Error: Pilot cannot copy ${inGit.replace(/[.]/g, '\\.')}: the source-only judge plan names it, and a pilot never copies a file inside a \\.git folder\\. Remove it from the plan's sources or scenarios; phase next then says what to record again$`);
-  assert.throws(() => planPilot(g.root, g.config, { sources: ['src/math_ops.py'] }), refusal);
-  const before = tree(g.root);
-  assert.throws(() => preparePilot(g.root, g.config, { target: other, sources: ['src/math_ops.py'], note: 'Disposable source-as-spec pilot' }), refusal);
-  assert.equal(fs.existsSync(other), false);
-  assert.deepEqual([tree(g.root), grants(g.root)], [before, []]);
+  for (const name of skipped) assert.equal(fileHash(safePath(child, name)), fileHash(safePath(f.root, name)), name);
+  const config = loadConfig(child);
+  assert.ok(requirePilot(child, config));
+  assert.equal((await runStage(child, config, 'judge')).success, true);
 });
 
 test('the copied scenarios are sealed like the other inputs of a pilot', async t => {
