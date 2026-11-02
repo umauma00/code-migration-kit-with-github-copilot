@@ -49,8 +49,8 @@ node migration-kit/scripts/run_migration.mjs settings apply
 | 変えたもの | やり直しになるもの |
 |---|---|
 | 移行の中身：移行元のファイル、ルールブック、移行元・移行先の言語、`preserve`／`redesign`、フォルダー、パッケージ対応表、文字コードなど | 完了済みの単位は次の実行で再レビュー。承認と工程の記録も取り直し（どの工程からかは `phase next` が案内） |
-| テストの設定（`verificationMode`・`verificationRoots`・`verificationInputs`・`buildArtifactRoots`）とテストのファイル | 比較器（judge）とその後の build・smoke・parity。工程を確かめて記録し直し（`verificationMode`・`verificationRoots` は工程00から、ほかは00bの判定材料から）、翻訳を承認し直す。完了済みの単位は残る |
-| 段階のコマンド（`original`・`mutation`・`build`・`smoke`・`parity`） | そのコマンドを使う実行と、その後の実行だけ。例：build のコマンドなら build を実行し直し、smoke・parity は承認から。比較器が使うコマンド（`original`・`mutation`・`parity`）なら工程00bの判定材料も確かめ、00b から後の工程を記録し直し、`original`・`mutation` なら judge を実行し直して翻訳を承認し直す。完了済みの単位は残る |
+| テストの設定（`verificationMode`・`verificationRoots`・`verificationInputs`・`buildArtifactRoots`）とテストのファイル | 比較器（judge）とその後の build・smoke・parity。工程を確かめて記録し直し（`verificationMode`・`verificationRoots` は工程00から、`verificationInputs` とテストのファイルは00bの判定材料から。`buildArtifactRoots` では00〜02の記録はそのままで、03をjudgeの後に記録し直し）、翻訳を承認し直す。完了済みの単位は残る |
+| 段階のコマンド（`original`・`mutation`・`build`・`smoke`・`parity`） | そのコマンドを使う実行と、その後の実行だけ（どれも承認から）。例：build のコマンドなら build・smoke・parity を承認し直して実行し直す。比較器が使うコマンド（`original`・`mutation`・`parity`）なら工程00bの判定材料も確かめ、00b から後の工程を記録し直し、`original`・`mutation` なら judge を実行し直して翻訳を承認し直す。source-only の案件は `original`・`mutation`・`parity` を実行しないので、変えても何もやり直さない。コマンドに書いたファイル（ビルドのスクリプトなど）を変えたときも、そのコマンドを変えたのと同じ。完了済みの単位は残る |
 | モデル・エフォート・コンテキスト、レビューの進め方（`fixPolicy`・`reviewFocus`・`dependencyOrder`・`maxReviewInputBytes`）、単位ごとの `typecheck`、実行の上限（`concurrency` など）、報告の言語、工程の進め方 | なし。これからの作業に使われる |
 
 移行元のファイルは全体で1つとして扱うため、1ファイルを変えても完了済みの単位はすべて再レビューになります（0.44.x と同じ）。

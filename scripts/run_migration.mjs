@@ -29,9 +29,10 @@ import { buildLoop } from '../lib/build-loop.mjs';
 import { readPreferences, setPreferences, preferencesReport } from '../lib/preferences.mjs';
 import { autoModeOn } from '../lib/auto-mode.mjs';
 import { readGuardrails, cliFolderTrust, guardrailsProposal, installGuardrails } from '../lib/guardrails.mjs';
-import { listAvailableModels, modelsMarkdown, setRoleModels, readConfigIfPresent, currentAssignments } from '../lib/models.mjs';
+import { listAvailableModels, listAtStart, modelsMarkdown, setRoleModels, readConfigIfPresent, currentAssignments } from '../lib/models.mjs';
 import { initSettings, checkSettings, applySettings, syncSettings, settingsFile, legacySettingsFile, settingsState, settingsConfirmed, setupEnd, phase00Started, settingsAtStart, settingsNotice } from '../lib/settings.mjs';
 import { ignoredLimits, processTimeout } from '../lib/execution-policy.mjs';
+import { recordContextUpgrade } from '../lib/context-upgrade.mjs';
 import { localSandboxProbe, sandboxCheck, sandboxQuestion, sandboxNext } from '../lib/sandbox.mjs';
 
 export const usage = `Usage: node migration-kit/scripts/run_migration.mjs COMMAND [options]
@@ -326,7 +327,7 @@ const readOnlyCommand = (cmd, sub) => (cmd === 'sessions' && sub === 'status') |
 // stderr at once (a long run shows its result only at the end), and the
 // whole of it in the result.
 async function startSettings(root, args) {
-  const started = await settingsAtStart(root, () => listAvailableModels({ command: args.copilot ?? 'copilot', cwd: root }));
+  const started = await settingsAtStart(root, listAtStart(args.copilot ?? 'copilot', root));
   const notice = settingsNotice(started);
   if (notice) console.error(notice);
   return started;
@@ -358,6 +359,10 @@ export async function main(argv = process.argv.slice(2)) {
   }
   if (cmd === 'preferences') {
     const setting = args.language || args['original-runtime'] || args['phase-mode'] || args.specification;
+    // Before anything changes the settings: what the records of an older kit
+    // stand for (lib/context-upgrade.mjs), as at the start of every command
+    // that does work. models set and settings do the same.
+    if (setting) recordContextUpgrade(root);
     // In effect, not just chosen: a hand-edited auto (no record) chosen properly
     // now is a new choice and hands over.
     const wasAuto = setting ? autoModeOn(root) : false;
@@ -388,6 +393,7 @@ export async function main(argv = process.argv.slice(2)) {
     const models = await listAvailableModels({ command: args.copilot ?? 'copilot', cwd: root });
     if (args._[1] === 'set') {
       if (!readConfigIfPresent(root)) throw new Error(`The project is not initialized (${configFile} is missing): run install.mjs before recording model choices`);
+      recordContextUpgrade(root);
       const release = lockRun(root, 'models-set');
       try {
         const result = setRoleModels(root, models, { role: args.role, model: args.model, effort: args.effort, context: args.context, assign: args.assign });
@@ -408,6 +414,7 @@ export async function main(argv = process.argv.slice(2)) {
     if (!readConfigIfPresent(root)) throw new Error(`The project is not initialized (${configFile} is missing): run install.mjs before settings`);
     // A file that cannot be read still gets written (init) or checked (the
     // other fields); the model entries then report why.
+    if (action !== 'check') recordContextUpgrade(root);
     let models;
     try { models = await listAvailableModels({ command: args.copilot ?? 'copilot', cwd: root }); } catch (e) { models = e.message; }
     if (action === 'init') { console.log(JSON.stringify(initSettings(root, models, { source: args.source, target: args.target, sourceRoots: args['source-roots'] }), null, 2)); return; }

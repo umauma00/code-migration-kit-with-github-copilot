@@ -12,17 +12,17 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { prepare, throughSmoke, holding, allHolding, scopesOf, python } from './helpers.mjs';
+import { prepare, throughSmoke, holding, allHolding, scopesOf, python, nodeCli } from './helpers.mjs';
 import { install, kitRoot } from '../scripts/install.mjs';
-import { safePath, readJSON, writeJSON, atomicWrite, loadConfig, lockRun, configFile, legacyConfigFile, legacyContextHash, readConfigFile } from '../lib/core.mjs';
+import { safePath, readJSON, writeJSON, atomicWrite, loadConfig, lockRun, configFile, legacyConfigFile, legacyContextHash, readConfigFile, contextUpgradeFile } from '../lib/core.mjs';
 import { settingsAtStart, settingsNotice, settingsState, settingsFile, settingsHelpFile, legacySettingsFile, legacySettingsHelpFile, settingsBaseFile,
-  initSettings, applySettings, syncSettings } from '../lib/settings.mjs';
+  initSettings, applySettings, syncSettings, migrateLegacySettings } from '../lib/settings.mjs';
 import { readPreferences, setPreferences, preferencesFile, legacyPreferencesFile, autoModeFile } from '../lib/preferences.mjs';
 import { autoModeOn } from '../lib/auto-mode.mjs';
 import { migrationStatus, statusMarkdown } from '../lib/status.mjs';
 import { statusSnapshot } from '../lib/status-snapshot.mjs';
-import { interactiveDecision, guardrailDecision } from '../lib/guardrails.mjs';
-import { normalizeModels } from '../lib/models.mjs';
+import { interactiveDecision, guardrailDecision, contextUpgradeRecord } from '../lib/guardrails.mjs';
+import { normalizeModels, listAvailableModels, listAtStart, startListTimeoutMs, setRoleModels } from '../lib/models.mjs';
 import { preparePilot, requirePilot } from '../lib/pilot.mjs';
 import { runStage } from '../lib/pipeline.mjs';
 import { phaseCommand } from '../scripts/phase_cli.mjs';
@@ -107,7 +107,9 @@ test('the settings file\'s old name becomes the new one with its help, and help 
   assert.equal(before.file, legacySettingsFile);
   assert.equal(before.renameTo, settingsFile);
   assert.equal(before.state, 'applied', 'the old name holds the same settings');
-  const started = await settingsAtStart(f.root, list);
+  let listed = 0;
+  const counted = async () => { listed++; return models; };
+  const started = await settingsAtStart(f.root, counted);
   assert.deepEqual(started.renamed, renamed);
   assert.match(settingsNotice(started), /renamed migration\/run-settings\.json -> migration\/settings\.json, migration\/run-settings\.help\.md -> migration\/settings\.help\.md/);
   assert.equal(started.applied, undefined, 'nothing to apply: only names changed');
@@ -115,8 +117,11 @@ test('the settings file\'s old name becomes the new one with its help, and help 
   assert.doesNotMatch(JSON.stringify(file), /run-settings/);
   assert.deepEqual({ ...file, _about: null }, { ...values, _about: null }, 'the person\'s values are kept as written');
   assert.doesNotMatch(help, /run-settings/);
-  assert.match(help, /`test-double`/, 'the help is written again with the account\'s models');
-  assert.deepEqual(await settingsAtStart(f.root, list), {}, 'once');
+  // The Copilot CLI is not started for the help alone: it says where the list is.
+  assert.equal(listed, 0);
+  assert.doesNotMatch(help, /`test-double`/);
+  assert.match(help, /This file was written again at the start of a command, which does not read the model list\. `run_migration\.mjs models` lists your models, and `settings init` writes this file again with them\./);
+  assert.deepEqual(await settingsAtStart(f.root, counted), {}, 'once');
 });
 
 test('an old file an older kit writes again beside its replacement is named and never used', async t => {
@@ -303,7 +308,8 @@ test('an edit of the settings file is applied when a command starts, and a chang
   editSettings(f.root, s => { s.models.fixer = { model: 'another-model', effort: 'default', context: 'default' }; });
   started = await settingsAtStart(f.root, async () => { throw new Error('not signed in'); });
   assert.match(started.errors.join('\n'), /models: cannot check the model choices \(not signed in\)/);
-  assert.match(started.next, /^Nothing was applied: migration\/settings\.json has entries that cannot be used/);
+  // The file is not wrong: the change waits, and the command goes on.
+  assert.match(started.next, /^Nothing was applied: the kit could not read your model list to check the model choices in migration\/settings\.json \(the error says why\), so the configuration stays as it was and the next command tries again\. This command goes on with the settings as they were\./);
   assert.equal(loadConfig(f.root).models.fixer, 'test-double');
   started = await settingsAtStart(f.root, counted);
   assert.deepEqual(started.applied, ['models.fixer']);
@@ -443,7 +449,103 @@ test('status names the records the next command moves while there is no settings
   assert.match(statusMarkdown(status, 'ja'), /設定 \(migration\/settings\.json\): まだありません。/);
   // Before phase 00 the next command moves the record and writes no file.
   const started = await settingsAtStart(f.root, list);
-  assert.deepEqual(started, { moved: [`${legacyConfigFile} -> ${configFile}`] });
+  assert.deepEqual(Object.keys(started), ['moved', 'moveNote']);
+  assert.deepEqual(started.moved, [`${legacyConfigFile} -> ${configFile}`]);
+  // Said once, as the records move: an older kit no longer finds them.
+  assert.match(settingsNotice(started), /every Copilot host that works on this project \(VS Code, the CLI, another PC\) must run this kit release or a later one from now on: an older kit does not find the moved records, so its hooks check nothing/);
+  assert.deepEqual(await settingsAtStart(f.root, list), {}, 'once');
   assert.equal(exists(f.root, settingsFile), false);
   assert.equal(migrationStatus(f.root).settings, null);
+});
+
+test('two commands that start together rename the file once: the one that finds it renamed leaves it to the other', t => {
+  const f = filledProject(t);
+  oldLayout(f.root);
+  const oldFile = safePath(f.root, legacySettingsFile), realRename = fs.renameSync;
+  let raced = 0;
+  // The other command renames it between this one's look and its rename.
+  t.mock.method(fs, 'renameSync', (from, to) => {
+    if (from === oldFile && !raced++) { realRename(from, to); throw Object.assign(new Error(`ENOENT: no such file or directory, rename '${from}'`), { code: 'ENOENT' }); }
+    return realRename(from, to);
+  });
+  let renamedHere;
+  try { renamedHere = migrateLegacySettings(f.root); } finally { t.mock.restoreAll(); }
+  assert.equal(raced, 1);
+  assert.deepEqual(renamedHere, [`${legacySettingsHelpFile} -> ${settingsHelpFile}`], 'the other command renamed the file, this one the help');
+  assert.ok(exists(f.root, settingsFile) && !exists(f.root, legacySettingsFile));
+  // Any other failure is no race: it is reported.
+  oldLayout(f.root);
+  t.mock.method(fs, 'renameSync', (from, to) => { if (from === oldFile) throw Object.assign(new Error('EACCES: permission denied'), { code: 'EACCES' }); return realRename(from, to); });
+  try { assert.throws(() => migrateLegacySettings(f.root), /EACCES/); } finally { t.mock.restoreAll(); }
+});
+
+test('a change another command makes while one starts is not undone: the start plans again under the lock', async t => {
+  const f = filledProject(t);
+  editSettings(f.root, s => { s.concurrency = 3; });
+  const help = safePath(f.root, settingsHelpFile), realRead = fs.readFileSync;
+  let raced = 0;
+  // models set, in another process, finishes after this start planned and
+  // before it takes the lock (it reads the help file in between).
+  t.mock.method(fs, 'readFileSync', (file, ...rest) => {
+    if (file === help && !raced++) {
+      setRoleModels(f.root, models, { role: 'implementer', model: 'another-model' });
+      syncSettings(f.root, { roles: ['implementer'] });
+    }
+    return realRead(file, ...rest);
+  });
+  let started;
+  try { started = await settingsAtStart(f.root, list); } finally { t.mock.restoreAll(); }
+  assert.equal(raced, 1);
+  assert.deepEqual(started.applied, ['concurrency']);
+  const config = loadConfig(f.root);
+  assert.equal(config.concurrency, 3, 'the edit is applied');
+  assert.equal(config.models.implementer, 'another-model', 'the other command\'s change is kept');
+  assert.equal(readJSON(safePath(f.root, settingsFile)).models.implementer.model, 'another-model');
+});
+
+test('the model list at a command start has a deadline, a Copilot CLI that exits at once does not crash it, and the help file alone never starts it', async t => {
+  const f = filledProject(t);
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'start-list-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  assert.equal(startListTimeoutMs, 60000);
+  // The help file of the old name is written again without the Copilot CLI.
+  atomicWrite(safePath(f.root, settingsHelpFile), '# Run settings\nEdit migration/run-settings.json.\n');
+  const never = async () => { throw new Error('the Copilot CLI must not be started'); };
+  const rewritten = await settingsAtStart(f.root, never);
+  assert.equal(rewritten.errors, undefined, JSON.stringify(rewritten));
+  assert.match(fs.readFileSync(safePath(f.root, settingsHelpFile), 'utf8'), /`run_migration\.mjs models` lists your models/);
+  // A changed model needs the list: a CLI that never answers is given up.
+  editSettings(f.root, s => { s.models.fixer = { ...s.models.fixer, model: 'another-model' }; });
+  const silent = nodeCli(path.join(dir, 'silent.mjs'), 'process.stdin.resume(); setInterval(() => {}, 1000);');
+  const begun = Date.now();
+  let started = await settingsAtStart(f.root, listAtStart(silent, f.root, 300));
+  assert.ok(Date.now() - begun < 15000, 'given up at the deadline');
+  assert.match(started.errors.join('\n'), /models: cannot check the model choices \(Copilot CLI model list timed out after 0\.3 s/);
+  assert.match(started.next, /^Nothing was applied: the kit could not read your model list/);
+  assert.equal(loadConfig(f.root).models.fixer, 'test-double', 'the change waits');
+  // A CLI that answers the first request, then closes its input: the next
+  // request's write fails (EPIPE), which is an error, not a crash.
+  if (process.platform !== 'win32') {
+    const closing = path.join(dir, 'closing.sh');
+    fs.writeFileSync(closing, `#!/bin/sh\nsleep 0.2\nexec 0<&-\nbody='{"jsonrpc":"2.0","id":1,"result":{}}'\nprintf 'Content-Length: %d\\r\\n\\r\\n%s' "\${#body}" "$body"\nsleep 1\n`, { mode: 0o755 });
+    await assert.rejects(listAvailableModels({ command: closing, cwd: f.root }), /Copilot CLI closed its input before answering \(EPIPE\)/);
+  }
+  const exiting = nodeCli(path.join(dir, 'exiting.mjs'), 'process.exit(3);');
+  started = await settingsAtStart(f.root, listAtStart(exiting, f.root));
+  assert.match(started.errors.join('\n'), /models: cannot check the model choices \(Copilot CLI (closed its input before answering|exited \(code 3\) before answering)/);
+  // With the list, the change applies.
+  assert.deepEqual((await settingsAtStart(f.root, list)).applied, ['models.fixer']);
+});
+
+test('the hooks keep agents off the record of what the old records stand for', t => {
+  const f = filledProject(t);
+  assert.equal(contextUpgradeRecord, contextUpgradeFile);
+  const shell = command => interactiveDecision({ toolName: 'bash', toolArgs: { command }, cwd: f.root }, f.root);
+  for (const command of [`echo '{}' > ${contextUpgradeFile}`, `rm ${contextUpgradeFile}`, `cp other.json ${contextUpgradeFile}`])
+    assert.equal(shell(command)?.decision, 'deny', command);
+  assert.match(shell(`echo '{}' > ${contextUpgradeFile}`).reason, /only the kit writes it/);
+  assert.equal(interactiveDecision({ toolName: 'apply_patch', toolArgs: `*** Begin Patch\n*** Add File: ${contextUpgradeFile}\n+{}\n*** End Patch\n`, cwd: f.root }, f.root)?.decision, 'deny');
+  assert.equal(interactiveDecision({ toolName: 'create', toolArgs: { path: contextUpgradeFile, file_text: '{}' }, cwd: f.root }, f.root)?.decision, 'deny');
+  assert.equal(shell(`cat ${contextUpgradeFile}`), null, 'reading it is fine');
+  assert.equal(shell(`${kit} doctor`), null, 'the kit writes it itself');
 });

@@ -48,9 +48,10 @@ Since 0.10.0 no per-file contract memo (`contracts.md`) is drafted. The source i
 the specification, so surveying a memo and then checking the memo only added
 time; reviewers read the cited source lines directly.
 
-Switching the profile sends back the phase records (from 00; from 00b for a
-project already on source-only), the judge and the runs after it, and the
-translation approval. Since 0.45.0 finished units are kept.
+Switching the profile sends back the judge and the runs after it with their
+approvals (the translation approval too), and the phase records: from 00, or,
+for a project already on source-only, phase 03 once the judge has run again.
+Since 0.45.0 finished units are kept.
 
 A project installed with source-as-spec keeps its configuration, so plain
 `source-spec init` (no `--apply`) writes the drafts at once: the kit never asks

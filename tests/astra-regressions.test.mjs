@@ -40,12 +40,14 @@ test('A1: node -c input changes send the build back and block downstream approva
   assert.ok(done(f.root, f.units[0], inputContext(f.root, f.config)));
   write(f, 'native/check.mjs', 'export const value = ;\n');
   assert.notEqual(scopesOf(f.root, f.config), before);
-  // An input of the build only (0.45.0): the reviewed unit and the build
-  // approval hold, the build record does not.
+  // An input of the build only (0.45.0): the reviewed unit holds; the build
+  // record and the build approval (bound to what the build runs) do not.
   const context = inputContext(f.root, f.config);
   assert.equal(done(f.root, f.units[0], context), true);
   assert.equal(currentRecord(f.root, f.config, 'build', context), false);
   assert.throws(() => approve(f.root, f.config, 'smoke', 'Stale build must not be reused'), /Run build successfully for the current inputs first/);
+  await assert.rejects(runStage(f.root, f.config, 'build'), /build approval is stale/);
+  approve(f.root, f.config, 'build', 'The changed build input was reviewed');
   await assert.rejects(runStage(f.root, f.config, 'build'), /build failed \(exit/);
 });
 

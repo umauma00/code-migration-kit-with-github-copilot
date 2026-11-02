@@ -9,7 +9,7 @@ import { previewInventory, mergeInventory, packageCycles, dependencySamples, dep
 import { generatedFilesCommand } from '../lib/generated.mjs';
 import { policyQuestions, recordPolicy, rulebookCoverage } from '../lib/policy.mjs';
 import { settingsAtStart, settingsNotice } from '../lib/settings.mjs';
-import { listAvailableModels } from '../lib/models.mjs';
+import { listAtStart } from '../lib/models.mjs';
 export function preparationCommand(root, config, action, options = {}) {
   if (action === 'inventory-preview') return previewInventory(root, config, { shards: options.shards?.split(','), sites: options.sites, out: options.out });
   if (action === 'inventory-merge') return mergeInventory(root, config, { shards: options.shards?.split(','), sites: options.sites, expectedHash: options['expected-hash'] });
@@ -39,7 +39,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     else {
       const root = fs.realpathSync(path.resolve(args.root ?? '.'));
       // An edit of the settings file is applied first, as by the runner's commands.
-      const notice = settingsNotice(await settingsAtStart(root, () => listAvailableModels({ command: 'copilot', cwd: root })));
+      const notice = settingsNotice(await settingsAtStart(root, listAtStart('copilot', root)));
       if (notice) console.error(notice);
       console.log(JSON.stringify(preparationCommand(root, loadConfig(root), args._[0], args), null, 2));
     }

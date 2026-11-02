@@ -19,7 +19,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import { createCopilotAdapter } from './copilot_adapter.mjs';
 import { readReviewText, readReviewSource, validatePreparationProfile } from '../lib/review.mjs';
 import { settingsAtStart, settingsNotice } from '../lib/settings.mjs';
-import { listAvailableModels } from '../lib/models.mjs';
+import { listAtStart } from '../lib/models.mjs';
 const models = { judge: 'judgeAudit', dependencies: 'dependencyAudit', inventory: 'inventoryAudit', design: 'designAudit' };
 // The person's phaseModels entry when they set one; otherwise the model they
 // chose for the semantic reviewer, an auditor's closest role. No kit setter
@@ -168,7 +168,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     if (args.help) { console.log(usageText(specs.audit_inputs)); process.exit(0); }
     const root = fs.realpathSync(path.resolve(args.root ?? '.'));
     // An edit of the settings file is applied first, as by the runner's commands.
-    const notice = settingsNotice(await settingsAtStart(root, () => listAvailableModels({ command: args.copilot ?? 'copilot', cwd: root })));
+    const notice = settingsNotice(await settingsAtStart(root, listAtStart(args.copilot ?? 'copilot', root)));
     if (notice) console.error(notice);
     const config = loadConfig(root);
     const result = args._[0] === 'freeze' ? freezeAudit(root, config, { type: args.type, files: args.files?.split(','), out: args.out })

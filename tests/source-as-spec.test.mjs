@@ -59,7 +59,7 @@ test('source-spec init previews, then switches an existing runtime project and d
   assert.deepEqual(preview.changes.map(c => c.path), ['migration/state/config.json', 'migration/judge-plan.json', sourcesFile]);
   assert.equal(fs.readFileSync(safePath(root, 'migration/state/config.json'), 'utf8'), before, 'preview never writes');
   const applied = initSourceSpec(root, config, { apply: true });
-  assert.match(applied.warning, /verification mode invalidates every phase record from 00/);
+  assert.match(applied.warning, /^Changing the verification mode sends back every phase record from 00 \(those phases are reviewed again\), the judge and every run after it, and every approval\. The finished units are kept\.$/);
   const saved = loadConfig(root);
   assert.equal(saved.preparationProfile, 'source-as-spec');
   const plan = readJSON(safePath(root, 'migration/judge-plan.json'));
@@ -249,7 +249,7 @@ test('review fixes: TODO(spec) only blocks source-as-spec; a profile-only switch
   atomicWrite(safePath(root, 'migration/judge-report.md'), 'Judge plan reviewed.\n');
   phaseCommand(root, config, 'complete', '00b', { note: 'Reviewed plan' });
   const preview = initSourceSpec(root, config);
-  assert.match(preview.warning, /phase 02 onward/);
+  assert.match(preview.warning, /phase 03 is recorded again once the judge has run\. The records of phases 00 to 02 and the finished units are kept\./);
   initSourceSpec(root, config, { apply: true });
   const after = migrationStatus(root).workflow;
   assert.equal(after.phases.find(p => p.id === '00b').complete, true, 'profile switch keeps 00b');

@@ -30,13 +30,16 @@ test('RR1: changing a command script under migration sends that run back and blo
   assert.ok(done(f.root, unit, inputContext(f.root, f.config)));
   write(f.root, 'migration/build.mjs', 'process.exit(9);\n');
   assert.notEqual(scopesOf(f.root, f.config), before);
-  // A file of the build command only (0.45.0): the reviewed unit and the
-  // build approval hold; the build record does not, and nothing after it.
+  // A file of the build command only (0.45.0): the reviewed unit holds; the
+  // build record and the build approval (bound to what the build runs) do
+  // not, and nothing after them.
   const context = inputContext(f.root, f.config);
   assert.equal(done(f.root, unit, context), true);
   assert.equal(currentRecord(f.root, f.config, 'build', context), false);
   assert.ok(currentRecord(f.root, f.config, 'judge', context, false), 'the judge does not run the build script');
   assert.throws(() => approve(f.root, f.config, 'smoke', 'Old build must be rejected'), /Run build successfully for the current inputs first/);
+  await assert.rejects(runStage(f.root, f.config, 'build'), /build approval is stale/);
+  approve(f.root, f.config, 'build', 'The changed build script was reviewed');
   await assert.rejects(runStage(f.root, f.config, 'build'), /build failed \(exit/);
 });
 
