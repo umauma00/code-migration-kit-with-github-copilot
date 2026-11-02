@@ -31,7 +31,8 @@ it, so the run waited on that one call for good.
   on it). A process outside the call's tree (one that left the process
   group) that keeps the call's pipes open no longer keeps the call from
   ending: 5 s after the CLI is gone, killed or ended by itself, the runner
-  lets the pipes go (a call that ended by itself keeps its answer). On
+  lets the pipes go (a call that ended by itself keeps its answer, and is
+  not taken for a silent call or one past its deadline meanwhile). On
   Windows a taskkill that has not finished after 10 s no longer holds the
   call: the runner stops the CLI itself.
 - A silent call is retried at most 5 times (about 190 minutes in all by
@@ -112,17 +113,28 @@ it, so the run waited on that one call for good.
   checks its token, a 4xx page that is not GitHub's error body: "Failed to
   fetch PAT user login (403): Failed to fetch Copilot user info: 403
   Forbidden: <html>...", or a page that came with a 200: "Invalid Copilot
-  user response"), or a proxy asking for its own sign-in inside the tunnel
-  ("407 Proxy Authentication Required") is retried 5 times at most, never
-  with no limit: a proxy, VPN or security software that inspects HTTPS lets
-  nothing through until a setting changes, while a VPN rechecking the
-  computer can cause it for a while. Guidance `cli-intercepted`
-  (`NODE_EXTRA_CA_CERTS` for a company certificate). Where the CLI checks
-  its token it otherwise hides the cause: an untrusted certificate, a
-  refused proxy and a proxy name that does not resolve all read "network
-  fetch failed: request failed: error sending request for url (...)", which
-  cannot be told from a network that is down, so there they are retried as a
-  network error, with no count limit.
+  user response"; where it loads the models, a page without GitHub's request
+  ID: "Access denied by policy settings" with no "(Request ID: ...)", or a
+  page that came with a 200: "Error: expected value at line 1 column 1"), a
+  proxy asking for its own sign-in inside the tunnel ("407 Proxy
+  Authentication Required", or "Error: 407" where the CLI loads the models)
+  or one the CLI could not give ("proxy Negotiate authentication failed:
+  failed to acquire proxy credentials: ..." for Kerberos, "tunnel error:
+  proxy authorization required"), or a network that asks for a sign-in on
+  its own page (a captive portal: "511 Network Authentication Required", or
+  "Error: 511" where the CLI loads the models) is retried 5 times at most,
+  never with no limit: a proxy, VPN or security software that inspects HTTPS
+  lets nothing through until a setting changes, while a VPN rechecking the
+  computer can cause it for a while. Until 0.43.1 the Negotiate failure and
+  the 511 page stopped the run as a sign-in problem. Guidance
+  `cli-intercepted` (for a proxy's sign-in, an unlocked computer and the
+  VPN, since `copilot login` cannot fix it, then the proxy settings with an
+  administrator; `NODE_EXTRA_CA_CERTS` for a company certificate). Where the
+  CLI checks its token it otherwise hides the cause: an untrusted
+  certificate, a refused proxy and a proxy name that does not resolve all
+  read "network fetch failed: request failed: error sending request for url
+  (...)", which cannot be told from a network that is down, so there they
+  are retried as a network error, with no count limit.
 - "Authentication token found but could not be validated ... Your token may
   still be valid. Check your network connection" is the network, not a
   sign-in in doubt: with a network error, a rate limit (a 429, or a 403 that
@@ -136,8 +148,8 @@ it, so the run waited on that one call for good.
   `workerCopilotHome` "separate", after one more try in the person's CLI
   home). An organization's IP allow list is a network error (above), and a
   4xx page in another form is a connection taken over (above), unless it is
-  a 401 page or says "Authentication Required" without "Proxy": that still
-  stops the run as a sign-in problem.
+  a 401 page or says "Authentication Required" without "Proxy" or "Network"
+  before it: that still stops the run as a sign-in problem.
 - A list of models the CLI could not load as it started ("Error: Failed to
   load models ... Copilot could not retrieve the list of available models.",
   then its sign-in help) is read the same way. Up to 0.43.1 it stopped the
@@ -151,20 +163,26 @@ it, so the run waited on that one call for good.
   5 times at most (guidance `cli-network`), and it never moves workers to
   the person's CLI home. GitHub's refusals there come in other words and
   keep their rules: a 401 ("Authentication failed") stops the run, a 403
-  ("Access denied by policy settings") blocks the file, as before. Checked
-  with the real CLI through an inspecting proxy with a test CA.
+  ("Access denied by policy settings (Request ID: ...)") blocks the file, as
+  before. The same words without GitHub's request ID are a proxy's page, a
+  407 there is a proxy's sign-in, and a 511 or a page that came with a 200
+  ("expected value at line 1 column 1") is a portal's: a connection taken
+  over (above). Checked with the real CLI through an inspecting proxy with a
+  test CA.
 - `status` names a call being retried after silence ("a call that showed no
   sign of progress, most likely a connection lost without an error") and
   asks to keep the computer connected, never to stop the runner. After a
   network error it advises checking the VPN, the proxy settings and a
   company certificate (`NODE_EXTRA_CA_CERTS`), and after 30 minutes says how
-  long the longest retry has lasted. A connection taken over gets the VPN
-  and the company certificate to check, and the last pass, and a list of
-  models the CLI could not load is named as such, with the advice for a
-  network error, instead of "consider lowering concurrency"; status reads
-  the kind of failure from the whole last error, not from its first 300
-  characters. The failure guidance `cli-silent` offers a rerun, a connection
-  check, a longer wait (or 0 to turn the check off) and a pause.
+  long the longest retry has lasted. A connection taken over gets the VPN,
+  the company certificate and, for a proxy's own sign-in, an unlocked
+  computer to check, and the last pass, and a list of models the CLI could
+  not load is named as such, with the advice for a network error, instead of
+  "consider lowering concurrency"; status reads the kind of failure the run
+  recorded with each retry from the whole error, the CLI's stderr included,
+  not from the 300 characters it shows. The failure guidance `cli-silent`
+  offers a rerun, a connection check, a longer wait (or 0 to turn the check
+  off) and a pause.
 - A call stopped for silence just as Ctrl+C stops the run is recorded as
   "Interrupted; ...": no retry, no last pass, no network advice.
 - Streamed pieces are kept nowhere (runProcess `dropLine`: not in memory, a

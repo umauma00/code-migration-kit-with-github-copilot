@@ -240,12 +240,25 @@ process.stderr.write('grandchild ' + g.pid + '\\n'); g.unref(); process.stdout.w
   const quick = performance.now();
   assert.equal((await node('process.stdout.write("ok")')).stdout, 'ok');
   assert.ok(performance.now() - quick < 4000, `${Math.round(performance.now() - quick)} ms`);
+  // A child that was quiet before it exited is neither a silent call nor one
+  // past its deadline while its pipes wait (here the wait outlasts both).
+  const others = [];
+  t.after(() => { for (const pid of others) try { process.kill(pid, 'SIGKILL'); } catch {} });
+  for (const options of [{ silenceMs: 1500 }, { timeoutMs: 1500 }]) {
+    const quiet = await node(`const { spawn } = require('node:child_process');
+const g = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 60000)'], { detached: true, stdio: ['ignore', 'inherit', 'inherit'] });
+process.stderr.write('grandchild ' + g.pid + '\\n'); g.unref(); setTimeout(() => process.exit(0), 300);`, options).then(r => r, e => e);
+    const pid = Number(String(quiet.stderr ?? quiet.result?.stderr).match(/grandchild (\d+)/)?.[1]);
+    if (pid) others.push(pid);
+    assert.ok(!(quiet instanceof Error), `the exited child was stopped (${JSON.stringify(options)}): ${quiet.message}`);
+    assert.equal(quiet.code, 0);
+  }
 });
 
 test('on Windows a taskkill that never finishes does not hold the call: the child is stopped and the call ends', { skip: process.platform === 'win32' && 'a stand-in taskkill on PATH' }, async t => {
   const dir = fs.mkdtempSync(path.join(fs.realpathSync(process.env.TMPDIR ?? '/tmp'), 'taskkill-'));
   const pidFile = path.join(dir, 'pid');
-  fs.writeFileSync(path.join(dir, 'taskkill'), `#!/bin/sh\necho $$ > '${pidFile}'\nexec sleep 60\n`, { mode: 0o755 });
+  fs.writeFileSync(path.join(dir, 'taskkill'), `#!/bin/sh\necho $$ > '${pidFile}'\nsleep 12\nexit 1\n`, { mode: 0o755 });
   t.after(() => { try { process.kill(Number(fs.readFileSync(pidFile, 'utf8')), 'SIGKILL'); } catch {} fs.rmSync(dir, { recursive: true, force: true }); });
   const platform = Object.getOwnPropertyDescriptor(process, 'platform'), PATH = process.env.PATH;
   Object.defineProperty(process, 'platform', { value: 'win32' }); process.env.PATH = `${dir}${path.delimiter}${PATH}`;
@@ -260,6 +273,11 @@ test('on Windows a taskkill that never finishes does not hold the call: the chil
   assert.equal(isSilentCall(failure), true);
   // About 1 s of silence, then 10 s for taskkill.
   assert.ok(performance.now() - started < 25000, `${Math.round(performance.now() - started)} ms`);
+  // The stand-in taskkill ends later, with an error: the settled call is left as it was.
+  const settledMessage = failure.message, pid = Number(fs.readFileSync(pidFile, 'utf8'));
+  while (!gone(pid)) await new Promise(resolve => setTimeout(resolve, 200));
+  await new Promise(resolve => setTimeout(resolve, 300));
+  assert.equal(failure.message, settledMessage);
 });
 
 test('each silent retry of the same call waits twice as long, up to four times the setting; 0 turns the check off', () => {
@@ -509,15 +527,21 @@ test('a list of models the CLI could not load as it started is retried, never a 
   // A tunnel the proxy refused or closed, a proxy's own sign-in, a page or an answer not in the form the CLI reads, a 404: a few times only.
   for (const limited of [modelsLoad('error sending request for url (https://api.githubcopilot.com/models): client error (Connect): tunnel error: unsuccessful', false),
     modelsLoad('error sending request for url (https://api.githubcopilot.com/models): client error (Connect): tunnel error: unexpected end of file', false),
-    modelsLoad('407 " [HTML error page omitted]'), modelsLoad('expected value at line 1 column 1', false), modelsLoad('missing field `data` at line 1 column 2', false), modelsLoad('404 Not Found')]) {
+    modelsLoad('missing field `data` at line 1 column 2', false), modelsLoad('404 Not Found')]) {
     assert.deepEqual(kind(limited), [true, true, false, false, false], limited.message);
     for (const language of ['ja', 'en']) assert.equal(failureGuidance(limited, { language }).id, 'cli-network', `${limited.message} (${language})`);
+  }
+  // A proxy's own sign-in, a page that came with a 200 (a portal), and a proxy's 403 page: it has no GitHub request ID (exact text, any body). A connection taken over.
+  const proxyPage = new Error('Copilot implementer failed (exit 1): Error: Access denied by policy settings\n\nYour Copilot CLI policy setting may be preventing access. This can happen when:\n  • Your organization has restricted Copilot access\n  • Your Copilot subscription does not include this feature\n  • Required policies have not been enabled by your administrator\n\nTo resolve this, visit your Copilot settings: https://github.com/settings/copilot\n');
+  for (const taken of [modelsLoad('407 " [HTML error page omitted]'), modelsLoad('407 " [HTML error page omitted]', false), modelsLoad('expected value at line 1 column 1', false), proxyPage]) {
+    assert.deepEqual(kind(taken), [true, true, false, false, false], taken.message);
+    for (const language of ['ja', 'en']) assert.equal(failureGuidance(taken, { language }).id, 'cli-intercepted', `${taken.message} (${language})`);
   }
   // GitHub's refusals there come in other words (exact text): a 401 stops the run as a sign-in, as before.
   const refused = new Error("Copilot implementer failed (exit 1): Error: Authentication failed (Request ID: ABCD:1234:5678:9ABC:0000)\n\nYour GitHub token may be invalid, expired, or lacking the required permissions.\n\nTo resolve this, try the following:\n  • Start 'copilot' and run the '/login' command to re-authenticate\n  • If using a Fine-Grained PAT, ensure it has the 'Copilot Requests' permission enabled\n  • If using COPILOT_GITHUB_TOKEN, GH_TOKEN or GITHUB_TOKEN environment variable, verify the token is valid and not expired\n  • Run 'gh auth status' to check your current authentication status\n");
   assert.deepEqual(kind(refused).slice(0, 4), [false, false, true, true]);
   for (const language of ['ja', 'en']) assert.equal(failureGuidance(refused, { language }).id, 'copilot-auth');
-  // A 403 there (an organization's policy, or a proxy's page) reads "Access denied by policy settings" and blocks the file, as up to 0.43.1.
+  // GitHub's 403 there (an organization's policy) reads "Access denied by policy settings (Request ID: ...)" and blocks the file, as up to 0.43.1.
   const policy = new Error('Copilot implementer failed (exit 1): Error: Access denied by policy settings (Request ID: ABCD:1234:5678:9ABC:0000)\n\nYour Copilot CLI policy setting may be preventing access. This can happen when:\n  • Your organization has restricted Copilot access\n  • Your Copilot subscription does not include this feature\n  • Required policies have not been enabled by your administrator\n\nTo resolve this, visit your Copilot settings: https://github.com/settings/copilot\n');
   assert.deepEqual(kind(policy).slice(0, 3), [false, false, false]);
   // The same words from a worker's own answer are not the CLI's start: a 500 needs the CLI's "Failed to load models" before it.
@@ -550,6 +574,61 @@ test('a list of models the CLI could not load as it started is retried, never a 
   assert.match(action, /never stop it for this/);
   assert.doesNotMatch(action, /lowering concurrency/);
   assert.equal(during.retrying[0].modelsLoad, true);
+});
+
+// CLI 1.0.105 when a proxy asks for its own sign-in and the CLI cannot give
+// it (exact text, checked through an inspecting proxy that answered the
+// tunnel with a 407): with Negotiate offered, the CLI tries Kerberos and
+// reports that; with only Basic or NTLM offered, it reports the tunnel's
+// refusal. A captive portal's 511 reads the same way.
+const negotiateFailed = 'proxy Negotiate authentication failed: failed to acquire proxy credentials: gss_init_sec_context failed: No credentials were supplied, or the credentials were unavailable or inaccessible; SPNEGO cannot find mechanisms to negotiate ';
+test('a proxy or a network that asks for its own sign-in (Negotiate, Basic, a captive portal) is a connection taken over: a few retries, never a stop or a move to the person\'s home', async t => {
+  const kind = e => [isTransientFailure(e), isLimitedRetry(e), isSystemicFailure(e), isSignedOut(e), isSignInDoubt(e)];
+  const both = rest => `Failed to fetch PAT user login${rest}\n  Failed to fetch GitHub CLI user login${rest}`;
+  const portalPage = '<html><a href="https://portal.example/">Sign in to the network</a></html>';
+  for (const taken of [
+    modelsLoad(negotiateFailed, false),
+    // Where the CLI checks its token, the cause shows after "network fetch failed".
+    tokenCheck(both(`: network fetch failed: ${negotiateFailed}`)),
+    modelsLoad('error sending request for url (https://api.githubcopilot.com/models): client error (Connect): tunnel error: proxy authorization required', false),
+    modelsLoad('511 " [HTML error page omitted]', false),
+    tokenCheck(both(` (511): Failed to fetch Copilot user info: 511 Network Authentication Required: ${portalPage}`)),
+    // On a model call, after the CLI's own retries (the stream's error, as the adapter writes it).
+    new Error(`Copilot implementer failed (exit 1): session.error query: Failed to get response from the AI model; retried 5 times (total retry wait time: 5.00 seconds) Last error: Failed native model HTTP request: ${negotiateFailed.trimEnd()}\u0000`),
+    new Error('Copilot implementer failed (exit 1): session.error query: Failed to get response from the AI model; retried 5 times (total retry wait time: 23.00 seconds) Last error: Failed native model HTTP request: error sending request for url (https://api.githubcopilot.com/v1/chat/completions): client error (Connect): tunnel error: proxy authorization required')]) {
+    assert.deepEqual(kind(taken), [true, true, false, false, false], taken.message);
+    for (const language of ['ja', 'en']) assert.equal(failureGuidance(taken, { language }).id, 'cli-intercepted', `${taken.message} (${language})`);
+  }
+  // The CLI's other phrases for it (from its own code; the text around them was not seen), where it loads the models and on a model call.
+  for (const phrase of ['proxy authentication failed with status 407', 'failed to advance proxy authentication: no more legs', 'proxy Negotiate tunnel timed out', 'proxy required authentication that this request cannot provide'])
+    for (const taken of [modelsLoad(phrase, false), new Error(gaveUp(phrase))]) {
+      assert.deepEqual(kind(taken), [true, true, false, false, false], taken.message);
+      assert.equal(failureGuidance(taken, { language: 'en' }).id, 'cli-intercepted', taken.message);
+    }
+  // A captive portal's 511 on a model call, as the 407 there reads: no reason to move workers to the person's home.
+  const portalCall = new Error('Copilot implementer failed (exit 1): session.error query 511: 511 Network Authentication Required');
+  assert.deepEqual(kind(portalCall), [true, true, false, false, false]);
+  assert.equal(failureGuidance(portalCall, { language: 'en' }).id, 'cli-intercepted');
+  // The advice: unlock the computer and check the VPN, then the proxy settings; not copilot login.
+  const advice = failureGuidance(modelsLoad(negotiateFailed, false), { language: 'en' });
+  assert.match(advice.cause, /asked for its own sign-in/);
+  assert.match(advice.cause, /copilot login does not fix it/);
+  assert.match(advice.options.find(o => o.id === 'rerun').reason, /unlock the computer and check that the VPN is connected/);
+  assert.ok(advice.options.some(o => o.id === 'proxy-sign-in'));
+  assert.match(failureGuidance(modelsLoad(negotiateFailed, false), { language: 'ja' }).cause, /copilot login でも直りません/);
+  // GitHub's and the CLI's own words for a sign-in still stop the run.
+  for (const message of ['Copilot implementer failed (exit 1): Error: Authentication failed (Request ID: ABCD:1234:5678:9ABC:0000)', 'Copilot implementer failed (exit 1): Error: authentication required', 'Copilot implementer failed (exit 1): session.error authentication 401: Authentication failed'])
+    assert.deepEqual([isSystemicFailure(new Error(message)), failureGuidance(message, { language: 'en' }).id], [true, 'copilot-auth'], message);
+  assert.equal(isSignedOut(new Error('Copilot implementer failed (exit 1): Error: authentication required')), true);
+  // In a run: a proxy whose sign-in lapsed while the screen was locked; once it is back, the file completes.
+  const f = await continuous(t);
+  let implementer = 0;
+  const report = await translate(f.root, f.config, async args => {
+    if (args.role === 'implementer' && ++implementer <= 2) throw modelsLoad(negotiateFailed, false);
+    return fake(args);
+  });
+  assert.equal(report.done, 1);
+  assert.equal(implementer, 3);
 });
 
 const continuous = async t => {
@@ -639,6 +718,53 @@ test('status names a connection taken over as such, also when its cause comes af
   assert.match(action, /one more pass at the end of the run, so never stop the runner/);
   assert.doesNotMatch(action, /lowering concurrency/);
   assert.equal(seen.retrying[0].intercepted, true);
+});
+
+test('status names a rate limit being retried, also when it comes after a long give-up wrapper', async t => {
+  const f = await continuous(t);
+  let implementer = 0, seen;
+  const limited = gaveUp(`Failed native model HTTP request: the answer for https://api.githubcopilot.com/chat/completions?${'a'.repeat(200)} was 429 Too Many Requests`);
+  assert.ok(limited.indexOf('429') > 300, 'the cause is past what status keeps of the message');
+  const report = await translate(f.root, f.config, async args => {
+    if (args.role === 'implementer' && ++implementer === 1) throw new Error(limited);
+    if (args.role === 'implementer') seen = migrationStatus(f.root);
+    return fake(args);
+  });
+  assert.equal(report.done, 1);
+  assert.match(seen.nextActions.find(a => /being retried after a transient failure/.test(a)) ?? '', /\(rate limit\); the runner waits/);
+  assert.equal(seen.retrying[0].rateLimit, true);
+});
+
+test('status names the kind of failure recorded with the retry, also past the 500 characters the record keeps; a record without it is read from its text', async t => {
+  const records = root => { const dir = safePath(root, 'migration/runs'); return fs.readdirSync(dir).flatMap(run => fs.statSync(path.join(dir, run)).isDirectory() ? fs.readdirSync(path.join(dir, run)).filter(n => n.endsWith('.json') && n !== 'summary.json').map(n => path.join(dir, run, n)) : []).filter(file => readJSON(file).retries?.length); };
+  const strip = root => { for (const file of records(root)) { const attempt = readJSON(file); for (const r of attempt.retries) for (const k of ['rateLimit', 'intercepted', 'networkError', 'modelsLoad']) delete r[k]; writeJSON(file, attempt); } };
+  const action = s => s.nextActions.find(a => /being retried after a transient failure/.test(a)) ?? '';
+  // The CLI's cause past the 500 characters: only the recorded kind names it.
+  const f = await continuous(t);
+  let implementer = 0, recorded, stripped, record;
+  const signIn = gaveUp(`Failed native model HTTP request: error sending request for url (https://api.githubcopilot.com/chat/completions?${'a'.repeat(450)}): client error (Connect): tunnel error: proxy authorization required`);
+  assert.ok(signIn.indexOf('proxy authorization') > 500, 'the cause is past what the record keeps of the message');
+  await translate(f.root, f.config, async args => {
+    if (args.role === 'implementer' && ++implementer === 1) throw new Error(signIn);
+    if (args.role === 'implementer') { record = readJSON(records(f.root)[0]); recorded = migrationStatus(f.root); strip(f.root); stripped = migrationStatus(f.root); }
+    return fake(args);
+  });
+  assert.equal(record.retries[0].intercepted, true);
+  assert.equal(record.retries[0].error.length, 500);
+  assert.match(action(recorded), /\(a connection taken over on the way: [^)]*a proxy or network asking for its own sign-in/);
+  assert.match(action(recorded), /that the computer is unlocked \(copilot login cannot fix that\)/);
+  assert.equal(recorded.retrying[0].intercepted, true);
+  assert.match(action(stripped), /\(service or network error\)/, 'without the recorded kind, the text kept does not say');
+  // A record without the kind, with the cause in its text: read from the text, as before.
+  const g = await continuous(t);
+  let second = 0, earlier;
+  await translate(g.root, g.config, async args => {
+    if (args.role === 'implementer' && ++second === 1) throw new Error('Copilot implementer failed (exit 1): connect ETIMEDOUT 140.82.112.21:443');
+    if (args.role === 'implementer') { strip(g.root); earlier = migrationStatus(g.root); }
+    return fake(args);
+  });
+  assert.match(action(earlier), /\(network error\); the runner waits/);
+  assert.equal(earlier.retrying[0].networkError, true);
 });
 
 test('a network that came back late: the last pass finishes the file that stayed silent', async t => {
