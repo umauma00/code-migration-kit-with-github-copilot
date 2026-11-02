@@ -1,30 +1,50 @@
 # 0.43.1 — 2026-11-02
 
 `pilot prepare` works in a source-as-spec project. It stopped with "Missing
-scenario input: migration/source-spec/sources.md" (found on 2026-11-02 while
-reviewing 0.42.1; 0.42.0 and 0.43.0 stop the same way). A source-only judge
-reads its plan (`migration/judge-plan.json`) and every file the plan names, and
-the copy's inputs include them. A source-as-spec plan keeps its scenarios in
-`migration/source-spec/` (`sources.md`, or the contract memo `contracts.md` of
-plans made before 0.10.0). The copy held the source roots, the verification
-roots, the verification inputs and named records, but not that folder, so the
-copy's inputs could not be read and `pilot prepare` removed the copy again.
-A source-only plan whose scenarios are under `verificationRoots` or
-`verificationInputs` was already copied.
+scenario input: migration/source-spec/sources.md" (`contracts.md` for a plan
+made before 0.10.0; "Missing or empty scenario input" before 0.10.1). Found on
+2026-11-02 while reviewing 0.42.1; every release since 0.3.0, which added
+source-as-spec, stops the same way (reproduced on 0.3.2, 0.9.0, 0.19.0,
+0.27.0, 0.40.0, 0.41.1, 0.42.0 and 0.43.0). A source-only judge reads its plan
+(`migration/judge-plan.json`) and every file the plan names, and so do the
+input checks of a pilot's copy. A source-as-spec plan keeps its scenarios in
+`migration/source-spec/`. The copy did not include that folder (unless
+`verificationRoots` names it), so the copy's inputs could not be checked and
+`pilot prepare` removed the copy again.
 
 - A source-only pilot's copy now holds the plan and every file it names
-  (`lib/pilot.mjs`). The list comes from the read that computed the
-  project's own inputs for the same command, so no source is read again
-  for it.
-- Nothing else changes. A failed `pilot prepare` left no copy and no grant,
-  so there is nothing to clean up: run `pilot plan` and `pilot prepare`
-  again. Records, approvals and pilots prepared before are kept.
+  (`lib/pilot.mjs`). The files `verificationInputs` names were copied
+  before, and so were the files in the copied folders (`sourceRoots`,
+  `verificationRoots`), except those inside `node_modules`, `__pycache__`
+  or `.git` folders, which the folder walk skips; a plan file inside
+  `node_modules` or `__pycache__` is now copied too. The list comes from the
+  read that checked the project's own inputs (`pilotScope`): the plan is
+  read again and each file it names looked up, but no source is read again.
+- A plan naming a file inside a `.git` folder (a nested clone or a
+  submodule's `.git` file) now stops `pilot plan` and `pilot prepare` with
+  that file and what to change: the folder walk never copies a `.git`
+  folder, and a plan must not make the copy hold one either. Such a plan
+  stopped `pilot prepare` before as an input missing from the copy, unless
+  `verificationInputs`, the manifest or the review dependency map also
+  named that file, which then went into the copy; that case stops now too.
+- An input of the project changed while the copy was made now stops `pilot
+  prepare` with "Parent inputs changed while preparing the pilot": the
+  project is checked before the copy's own inputs. A plan changed in that
+  moment stopped it as an input missing from the copy, whose guidance said
+  the plan was invalid.
+- A `pilot prepare` that stopped removed its copy and wrote no grant, so
+  run `pilot plan` and `pilot prepare` again (the same `--target` works).
+  Records, approvals and pilots prepared before are kept.
 - Test: `tests/pilot-source-spec-2026-11-02.test.mjs` (a source-as-spec
-  pilot with the files it uses, prepared and run to the end with the
-  project unchanged; in auto mode a pilot of the chosen file whose plan
-  also names a contract memo; an edit of a copied scenario in the copy or
-  in the project stops the pilot as other inputs do). All three fail on
-  0.43.0.
+  pilot with the files it uses, prepared and run to the end with every other
+  file of the project unchanged; in auto mode a pilot of the chosen file of
+  a plan made before 0.10.0, which names only its contract memo; a pilot
+  through smoke with a unit typecheck; a plan file inside `node_modules`
+  copied and one inside a `.git` folder refused by `pilot plan` and `pilot
+  prepare`; an edit of a copied scenario in the copy or in the project
+  stops the pilot; a plan changed while the copy is made; each source read
+  4 times, as 0.43.0 reads it where the scenarios were already copied). All
+  seven fail on 0.43.0.
 
 # 0.43.0 — 2026-11-02
 
