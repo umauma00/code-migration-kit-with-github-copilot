@@ -2467,7 +2467,7 @@
     },
     {
       "path": "lib/process.mjs",
-      "sha256": "a3a6967fbb982c9b6e3fb0a3f00e2eb28755de5519cb6a9a36eeab8d0bb197df",
+      "sha256": "1e8787ba516506aa75fafeca2412596ebef1f9b52bf3aac8dbfb4c5b4ab8a672",
       "entries": [
         {
           "line": 90,

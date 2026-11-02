@@ -33,15 +33,15 @@ it, so the run waited on that one call for good.
   ending: 5 s after the CLI is gone, killed or ended by itself, the runner
   lets the pipes go (a call that ended by itself keeps its answer, and is
   not taken for a silent call or one past its deadline meanwhile). This
-  holds for build and comparison commands too; on macOS and Linux, what a
-  command that ended by itself left running in its own process group and
-  that still holds its output (a server a smoke command started in the
-  background and did not stop) is stopped first, SIGTERM then SIGKILL, as a
-  deadline stops it, so it cannot answer the next run's checks in place of
-  the new build. One started with its output sent elsewhere, and on Windows
-  any, keeps running: a command should stop what it starts. On Windows a
-  taskkill that has not finished after 10 s no longer holds the call: the
-  runner stops the CLI itself.
+  holds for build and comparison commands too; on macOS and Linux, when
+  something a command that ended by itself left still holds its output (a
+  server a smoke command started in the background and did not stop), what
+  is left of the command's process group is stopped first, SIGTERM then
+  SIGKILL, as a deadline stops it, so it cannot answer the next run's checks
+  in place of the new build. When nothing holds its output, what it left
+  keeps running, and on Windows it always does: a command should stop what
+  it starts. On Windows a taskkill that has not finished after 10 s no
+  longer holds the call: the runner stops the CLI itself.
 - A silent call is retried at most 5 times (about 190 minutes in all by
   default), counted with the CLI's event stall, its lock wait, a network
   error next to the sign-in help, a connection taken over, and a call the
