@@ -577,8 +577,10 @@ saying what was wrong (not one JSON object or the wrong shape, an answer that
 ended without a final message, arbitration references, a PORT STATUS trailer in
 the wrong place or with the wrong count, a single-pass fix that changed
 nothing), sends a wrong trailer left on a written file back to the fixer (twice
-per run, not counted as fix rounds), and gives units still blocked by a slip
-one more pass before the run ends. The run summary's `selfRepairs` counts them:
+per run, not counted as fix rounds), and gives units still blocked by a slip,
+or by a temporary failure that used up its retries (silence, the CLI's stall or
+lock wait, a dropped or intercepted connection), one more pass before the run
+ends. The run summary's `selfRepairs` counts them:
 mention the counts in the report. `selfRepairs.flagged` lists the findings a
 single-pass fix left unfixed, as `TODO(port)` lines no review checked: name them
 in the report as open items for the person, not as a stop. A unit still blocked after translation

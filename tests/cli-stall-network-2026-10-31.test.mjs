@@ -119,12 +119,14 @@ test('a reviewer whose connection times out once, with sign-in help, is retried 
   assert.equal(attempt.retries[0].hostStall, undefined);
 });
 
-test('network errors with sign-in help that never clear block the unit after the capped retries, without stopping as a sign-in failure', async t => {
+test('network errors with sign-in help that never clear block the unit after the capped retries, and again on the last pass, without stopping as a sign-in failure', async t => {
   // Continuous mode retries other transient failures without a count limit; a
-  // CLI that is really signed out must not be retried forever.
+  // CLI that is really signed out must not be retried forever. Since 0.44.0
+  // the unit gets the run's last pass, with a cap of its own.
   const { failure, failed } = await run(t, 'Error: Failed to fetch models: connect ETIMEDOUT 140.82.112.21:443\nTo authenticate, you can use any of the following methods', 'reviewer-rules', Infinity);
   assert.ok(failure, 'the run reports the blocked unit');
-  assert.equal(failed, hostStallRetries + 1);
+  assert.equal(failed, 2 * (hostStallRetries + 1));
+  assert.deepEqual(failure.report.selfRepairs.repass, { units: 1, done: 0 });
   assert.equal(isSystemicFailure(failure), false);
   assert.equal(failureGuidance(failure, { language: 'ja' }).id, 'cli-network');
 });

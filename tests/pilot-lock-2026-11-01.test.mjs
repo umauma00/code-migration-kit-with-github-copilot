@@ -87,15 +87,17 @@ test('a worker whose CLI waits on its lock is retried, the unit completes, and s
   assert.ok(!seen.nextActions.some(a => /lowering concurrency/.test(a)), 'fewer workers is not the answer to a lock');
 });
 
-for (const [mode, calls] of [['continuous', hostStallRetries + 1], ['bounded', 3]]) test(`a lock that never comes free blocks the unit after ${calls} calls in ${mode} mode`, async t => {
+for (const [mode, calls] of [['continuous', hostStallRetries + 1], ['bounded', 3]]) test(`a lock that never comes free blocks the unit after ${calls} calls in ${mode} mode, and again on the run's last pass`, async t => {
   // Continuous mode retries other transient failures without a count limit;
-  // a lock held for good must not keep one unit retrying forever.
+  // a lock held for good must not keep one unit retrying forever. Since
+  // 0.44.0 the unit gets the run's last pass, with a cap of its own.
   const f = await lockedRun(t, mode);
   let count = 0;
   const failure = await translate(f.root, f.config, async () => { count++; throw new Error(lockError); }).then(() => null, e => e);
   assert.ok(failure, 'the run reports the blocked unit');
   assert.match(failure.message, /The shared writer lock timed out/);
-  assert.equal(count, calls);
+  assert.equal(count, 2 * calls);
+  assert.deepEqual(failure.report.selfRepairs.repass, { units: 1, done: 0 });
   assert.equal(failureGuidance(failure, { language: 'ja' }).id, 'cli-lock');
 });
 
@@ -105,7 +107,9 @@ test('a 120-second stall and a lock wait share one retry cap: alternating, the u
   let count = 0;
   const failure = await translate(f.root, f.config, async () => { throw new Error(count++ % 2 ? lockError : stall); }).then(() => null, e => e);
   assert.ok(failure, 'the run reports the blocked unit');
-  assert.equal(count, hostStallRetries + 1);
+  // Once per pass: the run's last pass has a cap of its own.
+  assert.equal(count, 2 * (hostStallRetries + 1));
+  assert.deepEqual(failure.report.selfRepairs.repass, { units: 1, done: 0 });
 });
 
 test('guidance for a lock that stayed busy: from the kit\'s own home go back to ~/.copilot first, from ~/.copilot look for a leftover CLI first', t => {

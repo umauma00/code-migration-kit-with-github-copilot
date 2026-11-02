@@ -231,6 +231,9 @@ a call that writes nothing for `workerSilenceSeconds`) retries the same request
 in a fresh session, as translation does (since 0.44.0). `audit_inputs.mjs run-pending` does the same for
 every request directory without result.json, config.concurrency at a time, and
 exits non-zero if any request failed; rerun it to retry only the remaining ones.
+Ctrl+C stops `run` and `run-pending` together with the Copilot CLI processes
+they started (since 0.44.0; before, on macOS and Linux those processes, in a
+process group of their own, went on after the script ended).
 
 A request whose inputs, configuration or auditor profile changed fails with
 "inputs changed" and can never be submitted. Freeze a replacement, then retire

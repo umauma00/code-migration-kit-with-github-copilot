@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url';
 import { parseCommandLine, specs, usageText } from '../lib/cli.mjs';
 import { loadConfig, safePath, hash, fileHash, treeHash, readJSON, writeJSON, lockRun, semanticConfig, stamp } from '../lib/core.mjs';
 import { recordSession } from '../lib/sessions.mjs';
-import { isTransientFailure, isSystemicFailure, isLimitedRetry, isSilentCall, hostStallRetries, retryDelayMs } from '../lib/failures.mjs';
+import { isTransientFailure, isSystemicFailure, isLimitedRetry, isSilentCall, hostStallRetries, retryDelayMs, stoppedWithRun } from '../lib/failures.mjs';
 import { executionLimits } from '../lib/execution-policy.mjs';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { createCopilotAdapter } from './copilot_adapter.mjs';
@@ -82,6 +82,7 @@ export async function runAudit(root, config, adapter, { directory, signal } = {}
     sessionId = recordSession(root, `audit-${request.task}`, { role: 'preparation-auditor', target: directory });
     try { response = await adapter({ root, config, role: 'preparation-auditor', unit, extra: {}, signal, reviewInput: frozen, runId: `audit-${request.task}`, sessionId, model: request.requestedModel, silentAttempts: silences }); break; }
     catch (e) {
+      stoppedWithRun(e, signal);
       if (isSystemicFailure(e) || !isTransientFailure(e) || retry >= limits.retries || (isLimitedRetry(e) && stalls++ >= hostStallRetries) || signal?.aborted) throw e;
       const silent = isSilentCall(e);
       if (silent) silences++;
@@ -156,16 +157,21 @@ export function submitAudit(root, config, { directory, response, execution } = {
   } finally { release(); }
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  // Ctrl+C stops the audit workers with their child processes (they run in a
+  // process group of their own, which the terminal's Ctrl+C does not reach).
+  const controller = new AbortController(), abort = () => controller.abort(), signal = controller.signal;
+  process.once('SIGINT', abort); process.once('SIGTERM', abort);
   try {
     const args = parseCommandLine(process.argv.slice(2), specs.audit_inputs);
     if (args.help) { console.log(usageText(specs.audit_inputs)); process.exit(0); }
     const root = fs.realpathSync(path.resolve(args.root ?? '.')), config = loadConfig(root);
     const result = args._[0] === 'freeze' ? freezeAudit(root, config, { type: args.type, files: args.files?.split(','), out: args.out })
-      : args._[0] === 'run' ? await runAudit(root, config, createCopilotAdapter({ command: args.copilot }), { directory: args.directory })
-      : args._[0] === 'run-pending' ? await runPendingAudits(root, config, createCopilotAdapter({ command: args.copilot }))
+      : args._[0] === 'run' ? await runAudit(root, config, createCopilotAdapter({ command: args.copilot }), { directory: args.directory, signal })
+      : args._[0] === 'run-pending' ? await runPendingAudits(root, config, createCopilotAdapter({ command: args.copilot }), { signal })
       : args._[0] === 'retire' ? retireAudit(root, config, { directory: args.directory, supersededBy: args['superseded-by'], reason: args.reason })
       : args._[0] === 'submit' ? submitAudit(root, config, { directory: args.directory, response: args.response }) : (() => { throw new Error('Use freeze --type TYPE --files LIST | run --directory PATH [--copilot PATH] | run-pending [--copilot PATH] | retire --directory PATH [--superseded-by PATH] --reason TEXT | submit --directory PATH --response PATH'); })();
     console.log(JSON.stringify(result, null, 2));
     if (result.failed) process.exitCode = 1;
   } catch (e) { console.error(`ERROR: ${e.message}`); process.exitCode = 1; }
+  finally { process.removeListener('SIGINT', abort); process.removeListener('SIGTERM', abort); }
 }

@@ -79,8 +79,10 @@ export function copilotEnv(role, home) {
   if (assistedReviewerRoles.includes(role)) env.GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS = 'true';
   return env;
 }
-export async function copilotVersion(command = 'copilot', prefixArgs = [], { cwd, signal, timeoutMs = 0, home } = {}) {
-  const result = await runProcess(command, [...prefixArgs, '--version'], { cwd, signal, timeoutMs, env: copilotEnv('reviewer-rules', home) });
+// silenceMs: a worker's check stops a CLI that hangs before printing its
+// version, as a worker call would be stopped; every call waits on it.
+export async function copilotVersion(command = 'copilot', prefixArgs = [], { cwd, signal, timeoutMs = 0, silenceMs = 0, home } = {}) {
+  const result = await runProcess(command, [...prefixArgs, '--version'], { cwd, signal, timeoutMs, silenceMs, env: copilotEnv('reviewer-rules', home) });
   const version = result.stdout.match(/\d+\.\d+\.\d+(?:[-+][\w.]*\w)?/)?.[0];
   if (result.code !== 0 || !version) throw new Error(`Cannot read the Copilot CLI version (exit ${result.code}): ${(result.stderr || result.stdout).slice(-500)}`);
   return version;
@@ -370,26 +372,23 @@ ${typeof extra.correction === 'string' ? `${isReviewer(role) ? `Correction: ${ex
 }
 // Streamed text and reasoning (--stream on) only show that a call is at work:
 // the final assistant.message and assistant.reasoning events hold the same
-// text. A failed call's record keeps every other event and how many deltas
-// came, not thousands of fragments of about 200 bytes of JSON each. A log
-// spilled to disk stays whole.
+// text. So the runner keeps no streamed piece (runProcess dropLine), in
+// memory, in a log spilled to disk or in a record, only how many came
+// (streamedDeltas): a long answer is thousands of pieces of about 250 bytes of
+// JSON each.
 const deltaTypes = new Set(['assistant.message_delta', 'assistant.reasoning_delta']);
-export function withoutStreamedDeltas(result) {
-  if (typeof result?.stdout !== 'string' || !result.stdout.includes('_delta"')) return result;
-  let deltas = 0;
-  const kept = result.stdout.split('\n').filter(line => {
-    if (!line.includes('_delta"')) return true;
-    try { if (deltaTypes.has(JSON.parse(line)?.type)) { deltas++; return false; } } catch {}
-    return true;
-  });
-  return deltas ? { ...result, stdout: kept.join('\n'), streamedDeltas: deltas } : result;
-}
-const recordedOutput = (result, root) => relativeProcessOutput(withoutStreamedDeltas(result), root);
+export const isStreamedDelta = line => {
+  if (line.length > 65536 || !line.includes('_delta"')) return false;
+  try { return deltaTypes.has(JSON.parse(String(line))?.type); } catch { return false; }
+};
+const withStreamCount = ({ droppedLines, ...result }) => droppedLines ? { ...result, streamedDeltas: droppedLines } : result;
+const recordedOutput = (result, root) => relativeProcessOutput(withStreamCount(result), root);
 // The model the CLI reported for the call, for the usage log's by-model
 // totals; with several (a fallback mid-call) the requested model stays the key.
 const reportedModel = models => models.length === 1 ? models[0] : undefined;
-// Whether the JSONL stream shows the model at work (an assistant event).
-const modelAnswered = result => { try { for (const line of processOutputLines(result)) if (/"type"\s*:\s*"assistant\./.test(line)) return true; } catch {} return false; };
+// Whether the JSONL stream shows the model at work (an assistant event, or a
+// streamed piece the runner did not keep).
+const modelAnswered = result => { if (result.droppedLines > 0) return true; try { for (const line of processOutputLines(result)) if (/"type"\s*:\s*"assistant\./.test(line)) return true; } catch {} return false; };
 const reportedModelOf = result => { try { return reportedModel(copilotStreamFacts(processOutputLines(result)).observedModels); } catch { return undefined; } };
 // A failed call still spent tokens; its usage, when the CLI wrote it, travels
 // with the error so run totals stay complete (or are marked unknown).
@@ -401,9 +400,9 @@ export function createCopilotAdapter({ command = 'copilot', prefixArgs = [], ver
   // and it repeats only after versionRecheckMs; a change warns once and the run continues.
   let baseline, check;
   const warned = new Set();
-  const currentVersion = (root, signal, timeoutMs, home) => {
-    if (!check || check.timeoutMs !== timeoutMs || check.home !== home || Date.now() - check.at >= versionRecheckMs) {
-      check = { at: Date.now(), timeoutMs, home, result: copilotVersion(command, prefixArgs, { cwd: root, signal, timeoutMs, home }).then(version => ({ version }), error => ({ error })) };
+  const currentVersion = (root, signal, timeoutMs, home, silenceMs) => {
+    if (!check || check.timeoutMs !== timeoutMs || check.home !== home || check.silenceMs !== silenceMs || Date.now() - check.at >= versionRecheckMs) {
+      check = { at: Date.now(), timeoutMs, home, silenceMs, result: copilotVersion(command, prefixArgs, { cwd: root, signal, timeoutMs, silenceMs, home }).then(version => ({ version }), error => ({ error })) };
     }
     return check.result;
   };
@@ -431,7 +430,7 @@ export function createCopilotAdapter({ command = 'copilot', prefixArgs = [], ver
     const effort = modelOverride ? undefined : workerEffort(config, role), context = modelOverride ? undefined : workerContext(config, role);
     let cliVersion = null, cliVersionWarning;
     let home = workerHome(root, config);
-    const checked = await currentVersion(root, signal, processTimeout(config, 'commandTimeoutSeconds'), home);
+    const checked = await currentVersion(root, signal, processTimeout(config, 'commandTimeoutSeconds'), home, baseSilenceMs === undefined ? workerSilenceMs(config) : silenceWait(baseSilenceMs));
     if (signal?.aborted) throw new Error('Interrupted');
     if (checked.error) cliVersionWarning = `Copilot CLI version unknown before this call: ${checked.error.message.slice(0, 300)}`;
     else cliVersion = checked.version;
@@ -466,7 +465,7 @@ export function createCopilotAdapter({ command = 'copilot', prefixArgs = [], ver
     try {
       const silenceMs = baseSilenceMs === undefined ? workerSilenceMs(config, silentAttempts) : silenceWait(baseSilenceMs, silentAttempts);
       argv = [...prefixArgs, ...copilotArgs(worker, model, undefined, layout, session, { usageFile, maxAiCredits: executionLimits(config).aiCredits, effort, context, toolFree: isToolFree(worker) || (usesWorkInput(role, workMode) && workMode === 'frozen' && typeof workInput === 'string'), stream: silenceMs > 0 })];
-      options = { cwd: root, signal, input: prompt, timeoutMs: processTimeout(config, 'timeoutSeconds'), silenceMs, outputDir: safePath(root, 'migration/runs/process-output'), env: copilotEnv(worker, home) };
+      options = { cwd: root, signal, input: prompt, timeoutMs: processTimeout(config, 'timeoutSeconds'), silenceMs, ...(silenceMs > 0 ? { dropLine: isStreamedDelta } : {}), outputDir: safePath(root, 'migration/runs/process-output'), env: copilotEnv(worker, home) };
     } catch (e) { fs.rmSync(usageDir, { recursive: true, force: true }); throw e; }
     try {
       result = await runProcess(command, argv, options);
@@ -524,7 +523,7 @@ export function createCopilotAdapter({ command = 'copilot', prefixArgs = [], ver
       const response = { result: value, requestedModel: model, ...(effort ? { requestedEffort: effort } : {}), ...(context ? { requestedContext: context } : {}), promptBytes, responseBytes: Buffer.byteLength(JSON.stringify(value)),
         observedModel, tokens: usage ? usage.inputTokens + usage.outputTokens : null, aiCredits: null,
         ...(cliUsage || usage ? { cliUsage: { ...cliUsage, ...usage } } : {}), ...(modelWarning ? { modelWarning } : {}),
-        ...(worker !== role ? { workerProfile: worker } : {}), ...(result.outputSpooled ? { processOutput: (({ stdoutFile, stderrFile, stdoutBytes, stderrBytes, stdoutHash, stderrHash }) => ({ stdoutFile, stderrFile, stdoutBytes, stderrBytes, stdoutHash, stderrHash }))(relativeProcessOutput(result, root)) } : {}), ...versionFields };
+        ...(worker !== role ? { workerProfile: worker } : {}), ...(result.droppedLines ? { streamedDeltas: result.droppedLines } : {}), ...(result.outputSpooled ? { processOutput: (({ stdoutFile, stderrFile, stdoutBytes, stderrBytes, stdoutHash, stderrHash }) => ({ stdoutFile, stderrFile, stdoutBytes, stderrBytes, stdoutHash, stderrHash }))(relativeProcessOutput(result, root)) } : {}), ...versionFields };
       ledger(true, reportedModel(observedModels));
       return response;
     } catch (e) {
