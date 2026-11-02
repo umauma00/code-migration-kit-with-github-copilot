@@ -59,7 +59,9 @@ those sources explicitly or choose translation-only scope. The kit cannot make
 an arbitrary whole-project command validate a partial migration automatically.
 
 The coordinator copies source, judge, build inputs and kit profiles, but never
-production outputs, state, gates or phase-03 results. A UUID grant is saved in
+production outputs, state, gates or phase-03 results. A source-only judge's
+plan and every file it names are copied too, such as the scenarios of a
+source-as-spec plan in `migration/source-spec/`. A UUID grant is saved in
 both production `migration/pilots/ID.json` and pilot `migration/pilot.json`.
 It binds parent preparation/judge, child fixed inputs, paths, exact targets and
 the authorized boundary. Changes or revocation require a new pilot; the
