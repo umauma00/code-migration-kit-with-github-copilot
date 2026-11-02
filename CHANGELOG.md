@@ -26,7 +26,8 @@ repair intent or queue) held one hash of everything the kit read.
   again by an older kit on another host, for example) is never used, and the
   command's output and `status` name it as unused. The hooks, the
   dependency mappers, the installer, pilots and every other reader take
-  either place.
+  either place. `workerSilenceSeconds` (0.44.0) is one of the file's
+  detailed settings, beside the other run limits.
 - An edit of the file is applied when the next kit command that does work
   starts (`settingsAtStart`), without waiting for `settings apply`. Every
   entry is checked first: an entry that cannot be used (a misspelt name

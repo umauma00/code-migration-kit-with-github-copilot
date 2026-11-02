@@ -741,3 +741,25 @@ test('review of ac3ad0c: the runner says when the original-runtime answer moves 
   assert.equal(settingsOf(root).verificationMode, 'source-only');
   assert.equal(run('preferences', '--phase-mode', 'normal').verificationMode, undefined);
 });
+
+test('workerSilenceSeconds (0.44.0) is an entry of the file: shown with its default, checked, applied, and it keeps every record', t => {
+  const root = fresh(t);
+  initSettings(root, models);
+  const s = filled(root), recordFile = safePath(root, 'migration/state/config.json');
+  assert.equal(s.workerSilenceSeconds, 600, 'the default is shown');
+  assert.match(helpOf(root), /- `workerSilenceSeconds`: .*300〜86400/);
+  writeSettings(root, s);
+  assert.equal(applySettings(root, models).applied, true);
+  assert.equal(Object.hasOwn(readJSON(recordFile), 'workerSilenceSeconds'), false, 'the default written back adds no key to the record');
+  const before = readJSON(recordFile);
+  writeSettings(root, { ...s, workerSilenceSeconds: 120 });
+  const refused = applySettings(root, models);
+  assert.equal(refused.applied, false);
+  assert.match(refused.errors.join('\n'), /workerSilenceSeconds must be 0 \(off\) or a whole number of seconds from 300 to 86400/);
+  assert.deepEqual(readJSON(recordFile), before, 'nothing written');
+  writeSettings(root, { ...s, workerSilenceSeconds: 1200 });
+  const applied = applySettings(root, models);
+  assert.equal(applied.applied, true, JSON.stringify(applied.errors));
+  assert.equal(loadConfig(root).workerSilenceSeconds, 1200);
+  assert.equal(settingsState(root, readJSON(recordFile)).state, 'applied');
+});

@@ -1227,7 +1227,7 @@
     },
     {
       "path": "lib/guidance.mjs",
-      "sha256": "bab67a7b0f60a53190cb71136afd3c480071b04cc2fc21c8e4aacc33cefaf3a0",
+      "sha256": "7a3bec7d2ccf677e1d69bf5c190ced9306c6f1b4e3243ff13b5b5bd5487c1290",
       "entries": [
         {
           "line": 81,
@@ -3046,115 +3046,115 @@
     },
     {
       "path": "lib/settings.mjs",
-      "sha256": "371ec48afcd13cfa4d63155dcf62a3cffe9af183077120b5ae384736d571b474",
+      "sha256": "740cf69c2f6a03d70bc1ce52f53b974ff43568842d613b9a77cc2fe24dd9bb86",
       "entries": [
         {
-          "line": 47,
+          "line": 48,
           "kind": "error-or-exit-candidate",
           "code": "const modes = ['preserve', 'redesign'], verificationModes = ['runtime', 'source-only'], executionModes = ['continuous', 'bounded'];"
         },
         {
-          "line": 50,
+          "line": 51,
           "kind": "error-or-exit-candidate",
           "code": "const configKeys = ['sourceLanguage', 'targetLanguage', 'mode', 'sourceRoots', 'outputRoots', 'verificationRoots', 'verificationMode', 'executionMode', 'concurrency', 'commands'];"
         },
         {
-          "line": 55,
+          "line": 56,
           "kind": "deadline-or-observation",
           "code": "'maxFixRounds', 'maxAgentCalls', 'maxRunInputBytes', 'maxAiCreditsPerCall', 'timeoutSeconds', 'commandTimeoutSeconds'];"
         },
         {
-          "line": 69,
+          "line": 70,
           "kind": "error-or-exit-candidate",
           "code": "const configDefaults = { verificationMode: 'runtime', executionMode: 'continuous', commands: {},"
         },
         {
-          "line": 92,
+          "line": 93,
           "kind": "error-or-exit-candidate",
           "code": "executionMode: 'continuous は終わるまで続ける、bounded は下の細かい設定の上限（maxAgentCalls など）で止める。', concurrency: '同時に動かすワーカーの数（1〜64）。変えても承認や完了記録は消えない。',"
         },
         {
-          "line": 113,
+          "line": 115,
           "kind": "deadline-or-observation",
           "code": "timeoutSeconds: 'bounded のときの1回の AI 呼び出しの時間上限（秒、0は期限なし）。',"
         },
         {
-          "line": 126,
+          "line": 128,
           "kind": "error-or-exit-candidate",
           "code": "executionMode: 'continuous runs until done; bounded stops at the limits among the detailed settings below (maxAgentCalls and others).', concurrency: 'Workers running at once (1-64). Changing it keeps approvals and completion records.',"
         },
         {
-          "line": 147,
+          "line": 150,
           "kind": "deadline-or-observation",
           "code": "timeoutSeconds: 'Bounded only: time limit of one AI call (seconds, 0: none).',"
         },
         {
-          "line": 175,
+          "line": 178,
           "kind": "error-or-exit-candidate",
           "code": "verificationMode: value('verificationMode'), executionMode: value('executionMode'), concurrency: config.concurrency,"
         },
         {
-          "line": 184,
+          "line": 187,
           "kind": "error-or-exit-candidate",
           "code": "reportLanguage: userLanguages, originalRuntime: originalRuntimes, phaseMode: phaseModes, mode: modes, verificationMode: verificationModes, executionMode: executionModes,"
         },
         {
-          "line": 260,
+          "line": 263,
           "kind": "error-or-exit-candidate",
           "code": "catch (e) { if (e.code !== 'ENOENT' || fs.existsSync(oldFile) || !fs.existsSync(newFile)) throw e; }"
         },
         {
-          "line": 375,
+          "line": 378,
           "kind": "error-or-exit-candidate",
           "code": "if (!config) throw new Error(`The project is not initialized (${configFile} is missing): run install.mjs before writing settings`);"
         },
         {
-          "line": 381,
+          "line": 384,
           "kind": "error-or-exit-candidate",
           "code": "try { values = readJSON(file); } catch (e) { throw new Error(`${settingsFile} is not valid JSON (${e.message}); correct it or delete it and run settings init again`); }"
         },
         {
-          "line": 382,
+          "line": 385,
           "kind": "error-or-exit-candidate",
           "code": "if (!isObject(values)) throw new Error(`${settingsFile} must be a JSON object; correct it or delete it and run settings init again`);"
         },
         {
-          "line": 395,
+          "line": 398,
           "kind": "error-or-exit-candidate",
           "code": "for (const [key, value] of [['source', source], ['target', target]]) if (value !== undefined && (typeof value !== 'string' || !value.trim())) throw new Error(`--${key} must name a language`);"
         },
         {
-          "line": 419,
+          "line": 422,
           "kind": "error-or-exit-candidate",
           "code": "if (!dirs.length) throw new Error('--source-roots must name one or more folders, separated by commas');"
         },
         {
-          "line": 420,
+          "line": 423,
           "kind": "error-or-exit-candidate",
           "code": "if (dirs.some(d => d === '.' || d === '/')) throw new Error('--source-roots: the repository root cannot be a source folder (the kit writes migration/ and the output there); the source files must be in a folder');"
         },
         {
-          "line": 422,
+          "line": 425,
           "kind": "error-or-exit-candidate",
           "code": "if (missing.length) throw new Error(`--source-roots: ${missing.join(', ')} ${missing.length > 1 ? 'are not folders' : 'is not a folder'} in the repository; ask for the source folders again`);"
         },
         {
-          "line": 424,
+          "line": 427,
           "kind": "error-or-exit-candidate",
           "code": "if (empty.length) throw new Error(`--source-roots: ${empty.join(', ')} ${empty.length > 1 ? 'hold' : 'holds'} no files; ask for the source folders again`);"
         },
         {
-          "line": 569,
+          "line": 572,
           "kind": "error-or-exit-candidate",
           "code": "if (!fs.existsSync(file)) throw new Error(`${settingsFile} is missing: run settings init first`);"
         },
         {
-          "line": 571,
+          "line": 574,
           "kind": "error-or-exit-candidate",
           "code": "try { value = readJSON(file); } catch (e) { throw new Error(`${settingsFile} is not valid JSON: ${e.message}`); }"
         },
         {
-          "line": 572,
+          "line": 575,
           "kind": "error-or-exit-candidate",
           "code": "if (!isObject(value)) throw new Error(`${settingsFile} must be a JSON object`);"
         }
