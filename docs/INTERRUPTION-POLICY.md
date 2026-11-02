@@ -4,8 +4,10 @@
 
 通常実行は `executionMode: "continuous"` です。設定を持たない既存プロジェクトも同じです。
 古い設定に `timeoutSeconds: 600` や `maxAgentCalls: 100` が残っていても適用しません。
-CPU使用率、無出力、経過時間、呼び出し数、修正回数、入力累計、ログ量だけでは処理を終了しません。
+CPU使用率、経過時間、呼び出し数、修正回数、入力累計、ログ量だけでは処理を終了しません。
 一時的な通信障害は待って再試行し、既存プロセスが実行中ならそのプロセスを待ちます。
+例外は、作業役の AI 呼び出しが何も出力しないまま `workerSilenceSeconds`（既定600秒）続いたときです。
+その呼び出しだけを止めて、同じ呼び出しをやり直します（エラーが出ないまま切れた接続から戻すためで、出力が続く呼び出しは長くかかっても止めません。下の表）。
 
 上限を必要とする場合だけ、利用者が `executionMode: "bounded"` を選ぶか、コマンドに
 `--max-calls N` / `--max-rounds N` を明示します。エージェントが独断で有限の上限を追加してはいけません。
@@ -15,7 +17,8 @@ CPU使用率、無出力、経過時間、呼び出し数、修正回数、入�
 
 | 条件 | 通常実行での処理 | 実装 |
 |---|---|---|
-| CPU 100%が継続、CPUが低い、無出力 | 終了・再起動しない。CPUによる自動終了コードはなく、親の指示にも中断禁止を明記 | 全ハーネスのskill・orchestrator・工程引継ぎ |
+| CPU 100%が継続、CPUが低い、コマンド・ビルド・比較の無出力 | 終了・再起動しない。CPUによる自動終了コードはなく、親の指示にも中断禁止を明記 | 全ハーネスのskill・orchestrator・工程引継ぎ |
+| 作業役の AI 呼び出しが何も出力しない（0.44.0 から。`workerSilenceSeconds`、既定600秒） | 2026-11-02、Windows・会社の VPN（Cisco Secure Client。ISE Posture の確認がよく迷子になる）・画面ロック中に通信が途切れる PC で、レビュー1回が戻らず、工程 04 が 96/554 のまま11時間43分止まった。エラーが出ないまま切れた接続を CLI は待ち続ける（CLI 1.0.105 は、止まった応答を少なくとも400秒は自分で打ち切らないことを 127.0.0.1 の偽プロバイダで確認）。そこで作業役は途中経過を出力し（`--stream on`。文章と考え中の内容が届くたびに1行）、runner は何も届かない時間を数える。設定の秒数続いたら、その呼び出しだけを止めて（子プロセスごと）、少し待ってから同じ呼び出しをやり直す。期限ではないので、出力が続く呼び出しは長くかかっても止めない。CPU も見ない。やり直すたびに待つ時間を倍にする（最大で設定の4倍。既定では10・20・40・40・40・40分）。途中経過を出さずに長く考えるだけの呼び出しにも、やり直すたびに時間を与えるため。1回の呼び出しにつき5回まで（受け渡し待ち・ロック待ちと合わせて数える。boundedモードでは `transientRetries` が全体の上限）。それでも何も出ないファイルは、実行の最後にもう1周やり直し（答えの書き損じと同じ）、それでも出なければそのファイルとそれを使うファイルだけを未完了にする。ほかのファイルは進める。調査は区切りごとに同じくやり直す（最後のもう1周はない）。時間は区切りごと（設定の20分の1、最大30秒）に数え、予定よりずっと遅れて来た区切り（パソコンのスリープ、runner の一時停止）は2区切りとしか数えないので、目覚めた直後に答える呼び出しを止めない。runner が忙しい間に届いていた出力も、止めるかどうかを決める前に読んで数える。止めた呼び出しの記録には、届いた途中経過の行の数（`streamedDeltas`）だけを残し、行そのものは残さない（ディスクに退避したログはそのまま）。準備監査（`audit_inputs.mjs run`・`run-pending`）も同じくやり直す（最後のもう1周はない）。レビューのベンチマークにはやり直しがないので、止まった呼び出しはエラーで終わり、もう一度実行するとやり直せる。`0` で見張りをやめる（作業役は途中経過を出力せず、0.43.1 までと同じく呼び出しが戻るまで待つ）。status は「a call that showed no sign of progress」と、案内（`cli-silent`）はやり直し・接続の確認・待つ時間の延長を示す | `process.mjs`, `copilot_adapter.mjs`, `execution-policy.mjs`, `failures.mjs`, `pipeline.mjs`, `survey.mjs`, `audit_inputs.mjs`, `status.mjs`, `guidance.mjs` |
 | 1ワーカー600秒、ビルド・比較600秒 | 自動終了しない。既存の正数設定も通常モードでは無効。低水準APIの `timeoutMs: 0` はタイマーを作らない | `execution-policy.mjs`, `process.mjs`, `copilot_adapter.mjs`, `pipeline.mjs` |
 | モデル一覧・バージョン確認の20/30/60秒 | 暗黙の時間切れを撤廃。応答を待つ | `models.mjs`, CLIとadapterの診断 |
 | doctorの各プローブ | 移行作業ではない短い確認なので、continuousでも起動するプロセス1つにつき180秒（boundedで `commandTimeoutSeconds` をそれより短く明示すればその値）で打ち切り、終わらなかった確認とよくある原因（応答しないプロキシ・サインイン待ち・ネットワーク遮断）を出して終わる。応答しないプロキシで1時間以上「still running」が続いた（2026-10-30）。後続のCLIプローブは開始しない。利用者の明示キャンセルも各プローブへ伝える。127.0.0.1 の偽プロバイダを使うプローブは、その子プロセスにだけ `NO_PROXY` へ 127.0.0.1・localhost を足す | `run_migration.mjs` の `doctor`, `copilot_adapter.mjs` |
@@ -27,7 +30,7 @@ CPU使用率、無出力、経過時間、呼び出し数、修正回数、入�
 | 大きい本文に大量のcensus箇所 | 入力容量を本文と箇所に配分し、全箇所で全断片を維持しながら同一断片の重複送信を減らす | `survey-parts.mjs` |
 | 巨大ファイルの途中で手動中断・外部障害 | 検証済み断片を入力ハッシュ付きで保存。再開時に同じ断片を呼び直さない。全断片が揃うまでファイル・scopeは未完了 | `survey.mjs`の `.parts/` 記録 |
 | 100呼び出し、2修正回、入力累計予算、1呼び出しAI Credits上限 | 通常モードでは打ち切り条件にしない。利用量は記録。CLIへ `--max-ai-credits` を渡さない。テンプレートの既定値と異なる値が設定に書かれていれば、doctor の `execution limits` と実行結果の `ignoredLimits` で「適用されていない」と表示する（停止はしない） | `execution-policy.mjs`, `run_migration.mjs` |
-| 一時障害の既定2回リトライ | 通常モードでは回数で打ち切らず、最大60秒の間隔で再試行（例外は CLI 内部の受け渡し待ち・ロック待ちと、サインインの案内つきの通信エラーで、どれも1回の呼び出しにつき5回まで。下の行）。途中の手動キャンセルは受け付ける。認証・残高不足が429等の一時障害にも一致するときは、復旧不能の分類を優先して原因を返す（通信エラーのあとのサインインの案内だけは除く。下の行） | `pipeline.mjs`, `survey.mjs`, `failures.mjs` |
+| 一時障害の既定2回リトライ | 通常モードでは回数で打ち切らず、最大60秒の間隔で再試行（例外は CLI 内部の受け渡し待ち・ロック待ち、何も出力しない呼び出し（上の行）と、サインインの案内つきの通信エラーで、どれも1回の呼び出しにつき5回まで。下の行）。途中の手動キャンセルは受け付ける。準備監査も 0.44.0 から同じく再試行する（それまではすぐ失敗）。認証・残高不足が429等の一時障害にも一致するときは、復旧不能の分類を優先して原因を返す（通信エラーのあとのサインインの案内だけは除く。下の行） | `pipeline.mjs`, `survey.mjs`, `audit_inputs.mjs`, `failures.mjs` |
 | 連続3単位の失敗 | 通常モードでは独立する残りの単位を処理。失敗した単位とその依存先だけ未完了 | `pipeline.mjs` |
 | build-loopの既定5回・呼び出し予算・エラー件数が減らない | 通常モードではクリーンになるまで継続。利用者が指定した有限の上限だけ適用。エラー件数が3回続けて減らない場合は止めずに `stalled` として記録し、status と結果に「ルールブックの修正を提案」と表示する（上流ルール6） | `build-loop.mjs`, `status.mjs` |
 | benchmarkの生成コード検査20秒 | 通常モードは時間で打ち切らない。明示的なboundedモードの検査のみ20秒 | `bench.mjs` |
@@ -35,7 +38,8 @@ CPU使用率、無出力、経過時間、呼び出し数、修正回数、入�
 | 準備工程の定期確認が重い・status や phase next が無言のまま打ち切られる | 生存通知は別スレッドから15秒ごとに出す（検証は同期処理なので、従来のタイマーは処理が終わるまで鳴らなかった）。status・phase・approve・diagnose・source-spec を含む全コマンドが対象。manifest検証は保護パスの解決を1回にまとめ、2,000ファイルで約5.5秒→約2.2秒。`status --fast` と断片進捗も使える。全ソース再検証は工程の境界で実施 | `command-progress.mjs`, `command-progress-heartbeat.mjs`, `core.mjs`, `run_migration.mjs` |
 | 異常終了した実行の run.lock | 同じホストで所有PIDが存在しなければ、次のコマンドがロックを自動で外して続行する（build-loopロックも同じ。短い回収用の印を取り、外す直前に内容が変わっていないか確認する）。別ホストのロック（共有フォルダ）と、PIDが無関係のプロセスに再利用された場合だけは止まり、実行が止まったことを確認して `unlock --pid` を使う。0.10.0 より前に作られたロックはホストを記録していないため、このホストでのPIDで判断する。ホストはホスト名で区別します。実行ごとにホスト名が変わるコンテナでは、自分の異常終了で残ったロックも別ホスト扱いになり `unlock` が必要です。ホスト名が同じでPID空間が別のコンテナ同士で、同じ移行フォルダを共有しないでください。 | `core.mjs` の `lockRun` |
 | サービス・通信側の「timed out」 | 一時障害として再試行する。キット自身が明示的な期限（boundedモード）で止めた場合だけ最終扱い | `failures.mjs` |
-| 通信エラー（ETIMEDOUT・ECONNRESET・ECONNREFUSED・EAI_AGAIN・socket hang up・fetch failed）に、CLI のサインインの案内（「To authenticate, you can use…」「run the '/login' command」）が続くもの | サインイン切れとして実行全体を止めず、一時障害として再試行する。CLI は通信できずにサインインを確認できなかっただけのことが多い。本当にサインインが切れている可能性も残るので、詰まりと同じく1回の呼び出しにつき最大5回まで（通常モードでも無制限にしない）。案内は `cli-network`（やり直し・プロキシとサインインの確認）で、`copilot login` は勧めない。「not signed in to GitHub」「authentication required」・401・Bad credentials・`session.error authentication` のような明示があれば、これまでどおりサインインの問題。ほかの止まる原因（エージェントがない・残高・ファイル数の上限など）も、通信エラーが一緒でも止まる | `failures.mjs`, `guidance.mjs` |
+| 名前解決の失敗・ネットワークに届かない・この PC 側で切れた接続（0.44.0 から。ENOTFOUND・getaddrinfo・ENETUNREACH・ENETDOWN・EHOSTUNREACH・ECONNABORTED・UND_ERR_*、Windows の「No such host is known」「forcibly closed by the remote host」「connected party did not properly respond」「target machine actively refused」「established connection was aborted」と os error 10050〜10054・10060・10061・10064・10065・11001・11002、CLI の通信部分の「dns error」「error sending request」「connection closed before message completed」など） | VPN の再接続や再確認、眠ったネットワークの後に残るエラー。ETIMEDOUT などと同じ通信エラーとして再試行する（通常モードでは回数で打ち切らない）。これまでは再試行せず、そのファイルをすぐ未完了にしていた。案内は `cli-network` | `failures.mjs`, `guidance.mjs` |
+| 通信エラー（ETIMEDOUT・ECONNRESET・ECONNREFUSED・EAI_AGAIN・socket hang up・fetch failed、0.44.0 から上の行のものも）に、CLI のサインインの案内（「To authenticate, you can use…」「run the '/login' command」）が続くもの | サインイン切れとして実行全体を止めず、一時障害として再試行する。CLI は通信できずにサインインを確認できなかっただけのことが多い。本当にサインインが切れている可能性も残るので、詰まりと同じく1回の呼び出しにつき最大5回まで（通常モードでも無制限にしない）。案内は `cli-network`（やり直し・プロキシとサインインの確認）で、`copilot login` は勧めない。「not signed in to GitHub」「authentication required」・401・Bad credentials・`session.error authentication` のような明示があれば、これまでどおりサインインの問題。ほかの止まる原因（エージェントがない・残高・ファイル数の上限など）も、通信エラーが一緒でも止まる | `failures.mjs`, `guidance.mjs` |
 | Copilot CLI 内部の受け渡し待ち（「Session host did not acknowledge 'assistant.reasoning' delivery within …」、Windows の記録では「session event delivery failed: session host did not complete the assistant.reasoning event within 120s」、報告では120秒。または「event poll loop may be wedged」） | そのファイルと、それに依存するファイルを止めず、一時障害として再試行する。1回の呼び出し（調査は1区切りとその1回の修正）につき、ほかの一時障害とは別に数えて最大5回（boundedモードでは `transientRetries` が全体の上限。再試行のたびにAIを1回使う）。それでも詰まる呼び出しは、そのファイルと依存するファイルだけを未完了にする。待ち時間を延ばす設定は CLI 1.0.105 とキットには見当たらない | `failures.mjs`, `pipeline.mjs`, `survey.mjs`, `guidance.mjs` |
 | Copilot CLI 内部のロック待ち（「The shared writer lock timed out.」「MCP installation storage is busy」「Another process is changing MCP configuration」） | そのファイルを止めず、一時障害として同じ CLI の置き場所で再試行する（変換やレビューを担当する CLI を別の置き場所へ移す理由にはしない）。受け渡し待ちと同じく1回の呼び出しにつき最大5回（boundedモードでは `transientRetries` が全体の上限）。それでも通らない呼び出しは、そのファイルと依存するファイルだけを未完了にする。CLI が MCP の起動の失敗として報告しても同じ扱い。案内（`cli-lock`）は、作業役専用の置き場所（`workerCopilotHome` が `separate`）で起きたときは `shared` に戻すこと、`~/.copilot`（既定の `shared`）で起きたときは前の実行で残った CLI の確認を先に勧める | `failures.mjs`, `pipeline.mjs`, `survey.mjs`, `guidance.mjs` |
 | 変換の1回の答えの書き損じ（JSON の前後の文字・形の誤り、最後のメッセージが空やツール呼び出しで終わった答え、裁定の参照名、末尾行 PORT STATUS の位置・件数、何も変えない single-pass の修正） | 止めない。同じ役に何が違ったかを伝えて、その場で1回だけ答え直させる。このファイルでは直せない指摘は、修正役に `TODO(port): <参照名>: <必要なこと>` の行で残させ、直さずに残った指摘は要約の `selfRepairs.flagged` と警告で伝える。書かれたファイルに残った末尾行の誤りは、確認済みの指摘として修正役に回し、直したファイルをレビューする（1回の実行で2回まで。修正回数の上限には数えない）。それでも止まった単位（末尾行を除く）は、実行の最後にもう1周だけ処理する（連続失敗・呼び出し回数の上限、全体に及ぶ失敗、中断で止まった実行ではしない）。回数は実行の要約の `selfRepairs` に残す | `pipeline.mjs`, `markers.mjs`, `copilot_adapter.mjs` |
@@ -92,7 +96,7 @@ npm test
 npm run demo
 ```
 
-回帰テストは古い600秒設定の無効化、短い従来設定時間を超えるCPU負荷・無出力の実プロセス、
+回帰テストは古い600秒設定の無効化、短い従来設定時間を超えるCPU負荷・無出力の実プロセス、何も出力しない作業役の停止とやり直し（子プロセスごとの停止、待ち時間の倍増、最後のもう1周、出力が続く呼び出しは止めないこと、runner の一時停止を沈黙と数えないこと）、
 回数・入力累計・修正回数・連続失敗・build-loop既定回数を超える継続、16MiB超のログと中間診断の読取、
 巨大本文・巨大1行・Unicode・CRLFの無欠落分割、inventoryの巨大ファイルのモデルなしUNKNOWN、手動中断からの断片再利用、範囲外引用が補正後も残る場合のUNKNOWN完了、同期処理中の生存通知、所有者のいないロックの自動解除、明示的キャンセルを確認します。
 モデル応答はテストダブルです。利用者の実プロジェクト・認証済みモデルでの完走時間は未計測です。

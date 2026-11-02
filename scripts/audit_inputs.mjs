@@ -13,6 +13,9 @@ import { fileURLToPath } from 'node:url';
 import { parseCommandLine, specs, usageText } from '../lib/cli.mjs';
 import { loadConfig, safePath, hash, fileHash, treeHash, readJSON, writeJSON, lockRun, semanticConfig, stamp } from '../lib/core.mjs';
 import { recordSession } from '../lib/sessions.mjs';
+import { isTransientFailure, isSystemicFailure, isLimitedRetry, isSilentCall, hostStallRetries, retryDelayMs } from '../lib/failures.mjs';
+import { executionLimits } from '../lib/execution-policy.mjs';
+import { setTimeout as sleep } from 'node:timers/promises';
 import { createCopilotAdapter } from './copilot_adapter.mjs';
 import { readReviewText, readReviewSource, validatePreparationProfile } from '../lib/review.mjs';
 const models = { judge: 'judgeAudit', dependencies: 'dependencyAudit', inventory: 'inventoryAudit', design: 'designAudit' };
@@ -65,11 +68,29 @@ function currentRequest(root, config, directory) {
 export async function runAudit(root, config, adapter, { directory, signal } = {}) {
   const request = currentRequest(root, config, directory);
   if (fileHash(safePath(root, `${directory}/result.json`))) throw new Error('Audit result already submitted; freeze a new request for another independent audit');
-  // A fresh session per request; the journal lets sessions status/prune cover it.
-  const sessionId = recordSession(root, `audit-${request.task}`, { role: 'preparation-auditor', target: directory });
   const unit = { source: null, target: `${directory}/request.json` };
   const frozen = JSON.stringify({ task: request.task, type: request.type, inputHash: request.inputHash, input: request.input, responseContract: request.responseContract });
-  const response = await adapter({ root, config, role: 'preparation-auditor', unit, extra: {}, signal, reviewInput: frozen, runId: `audit-${request.task}`, sessionId, model: request.requestedModel });
+  // Transient failures (rate limits, 5xx, network, a call that showed no sign
+  // of progress) retry the same request after a short wait, as translation
+  // does (since 0.44.0; before, the audit failed at once and a silent call
+  // was waited on forever). A silent call gets a longer wait each time. The
+  // request must still be current, and unsubmitted, before each retry.
+  const limits = executionLimits(config);
+  let response, sessionId;
+  for (let retry = 0, stalls = 0, silences = 0; ; retry++) {
+    // A fresh session per attempt; the journal lets sessions status/prune cover it.
+    sessionId = recordSession(root, `audit-${request.task}`, { role: 'preparation-auditor', target: directory });
+    try { response = await adapter({ root, config, role: 'preparation-auditor', unit, extra: {}, signal, reviewInput: frozen, runId: `audit-${request.task}`, sessionId, model: request.requestedModel, silentAttempts: silences }); break; }
+    catch (e) {
+      if (isSystemicFailure(e) || !isTransientFailure(e) || retry >= limits.retries || (isLimitedRetry(e) && stalls++ >= hostStallRetries) || signal?.aborted) throw e;
+      const silent = isSilentCall(e);
+      if (silent) silences++;
+      console.error(`Preparation audit ${directory}: retry ${retry + 1} after ${silent ? 'a call that showed no sign of progress' : 'transient failure'}: ${e.message.slice(0, 300)}`);
+      await sleep(retryDelayMs(config, retry), undefined, { signal }).catch(() => { throw new Error('Interrupted'); });
+      currentRequest(root, config, directory);
+      if (fileHash(safePath(root, `${directory}/result.json`))) throw new Error('Audit result already submitted; freeze a new request for another independent audit');
+    }
+  }
   const { target, ...result } = response.result;
   writeJSON(safePath(root, `${directory}/response.json`), result);
   return submitAudit(root, config, { directory, response: `${directory}/response.json`, execution: {

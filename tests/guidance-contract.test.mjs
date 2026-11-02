@@ -55,6 +55,7 @@ const samples = {
   'review-deps': 'Review dependency map: Required review dependency map missing: migration/review-dependencies.json',
   'copilot-missing': 'spawn copilot ENOENT',
   'copilot-auth': 'Copilot implementer failed (exit 1): To authenticate, you can use any of the following methods',
+  'cli-silent': 'Process showed no sign of progress for 600s (nothing on stdout or stderr); stopped as a silent call',
   'cli-network': 'Copilot reviewer-rules failed (exit 1): Error: Failed to fetch models: connect ETIMEDOUT 140.82.112.21:443',
   agents: 'No such agent: migration-implementer',
   typecheck: 'Unit typecheck failed; inspect receipt',

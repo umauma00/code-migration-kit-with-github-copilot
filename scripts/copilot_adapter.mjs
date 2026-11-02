@@ -6,7 +6,7 @@ import path from 'node:path';
 import http from 'node:http';
 import { runProcess, processOutputLines, relativeProcessOutput } from '../lib/process.mjs';
 import { roles, workerModel, workerEffort, workerContext, safePath } from '../lib/core.mjs';
-import { executionLimits, processTimeout } from '../lib/execution-policy.mjs';
+import { executionLimits, processTimeout, workerSilenceMs, silenceWait } from '../lib/execution-policy.mjs';
 import { parseResult, validateResult } from '../lib/results.mjs';
 import { isReviewer, isToolFree, toolAssistedRole, assistedReviewerRoles, validateWorkerProfile } from '../lib/review.mjs';
 import { runtimeLayout } from '../lib/runtime.mjs';
@@ -20,7 +20,14 @@ import { isSignedOut, isHomeStateFailure } from '../lib/failures.mjs';
 // `run_migration.mjs sessions` can report or prune exactly the kit's sessions.
 // --usage-output-file is the CLI's own usage record (tokens, cache, AI units);
 // --max-ai-credits is an optional per-call cap the CLI enforces.
-export function copilotArgs(role, model, prompt, layout, session, { usageFile, maxAiCredits, effort, context, toolFree = isToolFree(role) } = {}) {
+// --stream on (0.44.0; before, off) makes the CLI write the model's text and
+// reasoning as they arrive, so the runner can tell a call at work from one
+// whose connection was lost without an error (workerSilenceSeconds). Checked
+// on CLI 1.0.105: with JSON output it writes assistant.message_delta and
+// assistant.reasoning_delta lines as the provider streams, asks the provider
+// for a stream, and still ends with the complete assistant.message the runner
+// parses. With the check off, workers stream nothing, as before.
+export function copilotArgs(role, model, prompt, layout, session, { usageFile, maxAiCredits, effort, context, toolFree = isToolFree(role), stream = true } = {}) {
   // A CLI worker is a fresh session agent: tools: [] alone does not prevent
   // automatic repository/personal instructions from entering its system prompt.
   // Only flags a worker cannot run without belong here: each one is a way for
@@ -30,7 +37,7 @@ export function copilotArgs(role, model, prompt, layout, session, { usageFile, m
   // session sync follows the person's CLI setting.
   // No --no-auto-update: installer-based launchers then run their bundled
   // (possibly much older) build instead of the version the user and doctor see.
-  return [...(prompt === undefined ? [] : ['-p', prompt]), ...(layout?.plugin ? ['--plugin-dir', layout.root] : []), '--output-format', 'json', '--stream', 'off', '--no-custom-instructions', '--disable-builtin-mcps', ...(session ? ['--session-id', session.id] : []), '--agent', layout?.agentId(role) ?? `migration-${role}`, '--model', model, ...(effort ? ['--reasoning-effort', effort] : []), ...(context ? ['--context', context] : []),
+  return [...(prompt === undefined ? [] : ['-p', prompt]), ...(layout?.plugin ? ['--plugin-dir', layout.root] : []), '--output-format', 'json', '--stream', stream ? 'on' : 'off', '--no-custom-instructions', '--disable-builtin-mcps', ...(session ? ['--session-id', session.id] : []), '--agent', layout?.agentId(role) ?? `migration-${role}`, '--model', model, ...(effort ? ['--reasoning-effort', effort] : []), ...(context ? ['--context', context] : []),
     '--available-tools', 'view,grep,glob', ...(toolFree ? ['--deny-tool', 'read,write,shell'] : ['--allow-tool', 'read', '--deny-tool', 'write,shell']),
     ...(usageFile ? ['--usage-output-file', usageFile] : []), ...(maxAiCredits ? ['--max-ai-credits', String(maxAiCredits)] : [])];
 }
@@ -361,6 +368,23 @@ ${role.startsWith('reviewer-') ? 'Return {"schemaVersion":1,"kind":"review","tar
 ${isReviewer(role) ? `${assisted ? 'Tool-assisted review input' : 'Frozen review input'} (JSON task data):\n${reviewInput}` : `${frozenInput === undefined ? '' : `${work && workMode !== 'frozen' ? 'Task input' : 'Frozen task input'} (JSON task data):\n${frozenInput}\n`}Extra task data: ${JSON.stringify(extra)}`}
 ${typeof extra.correction === 'string' ? `${isReviewer(role) ? `Correction: ${extra.correction}` : 'Your previous answer was rejected: extra.correction says why. Return the whole answer again with that corrected.'}\n` : ''}Set target to ${JSON.stringify(unit.target)}.`;
 }
+// Streamed text and reasoning (--stream on) only show that a call is at work:
+// the final assistant.message and assistant.reasoning events hold the same
+// text. A failed call's record keeps every other event and how many deltas
+// came, not thousands of fragments of about 200 bytes of JSON each. A log
+// spilled to disk stays whole.
+const deltaTypes = new Set(['assistant.message_delta', 'assistant.reasoning_delta']);
+export function withoutStreamedDeltas(result) {
+  if (typeof result?.stdout !== 'string' || !result.stdout.includes('_delta"')) return result;
+  let deltas = 0;
+  const kept = result.stdout.split('\n').filter(line => {
+    if (!line.includes('_delta"')) return true;
+    try { if (deltaTypes.has(JSON.parse(line)?.type)) { deltas++; return false; } } catch {}
+    return true;
+  });
+  return deltas ? { ...result, stdout: kept.join('\n'), streamedDeltas: deltas } : result;
+}
+const recordedOutput = (result, root) => relativeProcessOutput(withoutStreamedDeltas(result), root);
 // The model the CLI reported for the call, for the usage log's by-model
 // totals; with several (a fallback mid-call) the requested model stays the key.
 const reportedModel = models => models.length === 1 ? models[0] : undefined;
@@ -370,7 +394,8 @@ const reportedModelOf = result => { try { return reportedModel(copilotStreamFact
 // A failed call still spent tokens; its usage, when the CLI wrote it, travels
 // with the error so run totals stay complete (or are marked unknown).
 const usageFields = usage => usage ? { tokens: usage.inputTokens + usage.outputTokens, cliUsage: usage } : {};
-export function createCopilotAdapter({ command = 'copilot', prefixArgs = [], versionRecheckMs = 10 * 60 * 1000 } = {}) {
+// silenceMs replaces workerSilenceSeconds as the first silence wait (tests).
+export function createCopilotAdapter({ command = 'copilot', prefixArgs = [], versionRecheckMs = 10 * 60 * 1000, silenceMs: baseSilenceMs } = {}) {
   // Workers follow the user's auto-updating CLI, so a run can span versions.
   // Each version check starts a CLI process, so concurrent calls share one check
   // and it repeats only after versionRecheckMs; a change warns once and the run continues.
@@ -394,7 +419,9 @@ export function createCopilotAdapter({ command = 'copilot', prefixArgs = [], ver
     try { return prepareWorkerHome(root, config); }
     catch (e) { sharedHome = true; homeWarning = `Workers use the person's Copilot CLI home: the kit's worker home could not be prepared (${e.message.slice(0, 600)})`; console.error(`WARNING: ${homeWarning}`); return null; }
   };
-  return async ({ root, config, role, unit, extra, signal, reviewInput, reviewMode = 'frozen', workInput, workMode, runId, sessionId, model: modelOverride }) => {
+  // silentAttempts: how many earlier attempts of this same call were stopped
+  // for showing no sign of progress; each one doubles the wait (up to 4x).
+  return async ({ root, config, role, unit, extra, signal, reviewInput, reviewMode = 'frozen', workInput, workMode, runId, sessionId, model: modelOverride, silentAttempts = 0 }) => {
     // Oversized reviews run on the read-only twin profile of the same reviewer.
     const worker = isReviewer(role) && reviewMode === 'tool-assisted' ? toolAssistedRole(role) : role;
     validateWorkerProfile(root, worker, config);
@@ -437,8 +464,9 @@ export function createCopilotAdapter({ command = 'copilot', prefixArgs = [], ver
     // Built before the try: a failure here starts no CLI and is not a logged call.
     let argv, options;
     try {
-      argv = [...prefixArgs, ...copilotArgs(worker, model, undefined, layout, session, { usageFile, maxAiCredits: executionLimits(config).aiCredits, effort, context, toolFree: isToolFree(worker) || (usesWorkInput(role, workMode) && workMode === 'frozen' && typeof workInput === 'string') })];
-      options = { cwd: root, signal, input: prompt, timeoutMs: processTimeout(config, 'timeoutSeconds'), outputDir: safePath(root, 'migration/runs/process-output'), env: copilotEnv(worker, home) };
+      const silenceMs = baseSilenceMs === undefined ? workerSilenceMs(config, silentAttempts) : silenceWait(baseSilenceMs, silentAttempts);
+      argv = [...prefixArgs, ...copilotArgs(worker, model, undefined, layout, session, { usageFile, maxAiCredits: executionLimits(config).aiCredits, effort, context, toolFree: isToolFree(worker) || (usesWorkInput(role, workMode) && workMode === 'frozen' && typeof workInput === 'string'), stream: silenceMs > 0 })];
+      options = { cwd: root, signal, input: prompt, timeoutMs: processTimeout(config, 'timeoutSeconds'), silenceMs, outputDir: safePath(root, 'migration/runs/process-output'), env: copilotEnv(worker, home) };
     } catch (e) { fs.rmSync(usageDir, { recursive: true, force: true }); throw e; }
     try {
       result = await runProcess(command, argv, options);
@@ -471,7 +499,7 @@ export function createCopilotAdapter({ command = 'copilot', prefixArgs = [], ver
       // A CLI that never started (missing command, interrupted first) spent nothing.
       // Read the reported model before the output paths are made relative.
       if (e.spawned) ledger(false, e.result ? reportedModelOf(e.result) : undefined);
-      if (e.result) e.result = relativeProcessOutput(e.result, root);
+      if (e.result) e.result = recordedOutput(e.result, root);
       Object.assign(e, versionFields, usageFields(usage)); throw e;
     }
     finally { fs.rmSync(usageDir, { recursive: true, force: true }); }
@@ -500,6 +528,6 @@ export function createCopilotAdapter({ command = 'copilot', prefixArgs = [], ver
       ledger(true, reportedModel(observedModels));
       return response;
     } catch (e) {
-      ledger(false, reportedModelOf(result)); e.result = relativeProcessOutput(result, root); Object.assign(e, versionFields, usageFields(usage)); throw e; }
+      ledger(false, reportedModelOf(result)); e.result = recordedOutput(result, root); Object.assign(e, versionFields, usageFields(usage)); throw e; }
   };
 }

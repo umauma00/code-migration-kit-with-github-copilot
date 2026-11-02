@@ -408,6 +408,9 @@ wait/poll it. Normal execution is continuous, including legacy configurations;
 never add a finite timeout or call/round budget without the person's choice.
 Respect explicit user cancellation and actual input/permission failures.
 `status --wait 600` returning is only the end of that status wait, not the job.
+A worker call that writes nothing for `workerSilenceSeconds` (600 s by default)
+is stopped and retried by the runner itself, with a longer wait each time
+(status shows it as retrying): it is never a reason to stop or relaunch anything.
 A phase recorded earlier can go out of date when a file it recorded changes
 (a pilot or repair fix, a kit update). `status --fast` does not revalidate;
 `phase next` does and then returns `stale` with what changed, `action`

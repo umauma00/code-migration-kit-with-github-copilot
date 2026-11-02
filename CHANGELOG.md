@@ -1,3 +1,89 @@
+# 0.44.0 — 2026-11-02
+
+The runner stops and retries a worker call that shows no sign of progress. On
+2026-11-02 (Windows, kit 0.42.0, the Copilot app, a company VPN) phase 04
+stayed at 96 of 554 for 11 h 43 min: one review call never returned. The
+computer did not sleep, but its connection dropped after the screen was
+locked, and the VPN's posture check (Cisco Secure Client ISE Posture) often
+gets lost. A connection lost that way gives the CLI no error: Copilot CLI
+1.0.105 waited on a stalled answer from a loopback provider for at least
+400 s without ending it (also with `COPILOT_NATIVE_HTTP_TIMEOUT_MS` set). In
+continuous mode the runner has no time limit and the orchestrator never stops
+it, so the run waited on that one call for good.
+
+- Workers stream: `--stream on` (before, `off`). With JSON output, CLI
+  1.0.105 then writes an `assistant.message_delta` or
+  `assistant.reasoning_delta` line for each piece of text or reasoning the
+  model sends, and still ends with the complete `assistant.message` the
+  runner reads. A provider that answers a stream request without a stream
+  still works (both checked against a loopback provider).
+- A worker call that writes nothing at all, on stdout or stderr, for
+  `workerSilenceSeconds` (new, 600 s by default) is stopped with its child
+  processes ("Process showed no sign of progress for 600s ...") and the same
+  call is retried after the usual short wait, in a new CLI session. It is not
+  a deadline and CPU is not looked at: a call that keeps writing runs as long
+  as it needs. Each retry of the same call doubles the wait, up to four times
+  the setting (10, 20, 40, 40, 40, 40 minutes by default), so a call that only
+  thinks long without a word gets more room each time.
+- A silent call is retried at most 5 times (about 190 minutes in all by
+  default), counted with the CLI's event stall, its lock wait and a network
+  error next to the sign-in help; in bounded mode `transientRetries` caps the
+  total, as before. A file whose call stays silent through them is blocked
+  with the files that use it, the others go on, and translation gives it one
+  more pass at the end of the run, as to a file blocked by a slip in an answer
+  ("one more pass for N unit(s) blocked by a call that showed no sign of
+  progress"): a network that came back meanwhile finishes it without a
+  person. Surveys retry each part the same way (no last pass). The review
+  benchmark has no retry: a silent call ends there with the error, and
+  running it again retries it.
+- Preparation audits (`audit_inputs.mjs run` and `run-pending`) retry a
+  transient failure as translation does: a silent call, a rate limit, a 5xx
+  or a network error retries the same request after a short wait, in a new
+  session, after checking that the request is still current and unsubmitted.
+  Before, the audit failed at once (and a silent call was waited on
+  forever); a failure that is not transient, or that stops the run, still
+  ends it at once.
+- Silence is counted in steps of a twentieth of the wait (at most 30 s). A
+  step that comes much later than planned (the computer slept, the runner was
+  busy or paused) counts as two at most, and output that came meanwhile is
+  read before the decision, so a call that answers right after the computer
+  wakes up is not stopped.
+- `workerSilenceSeconds` is 0 (off: workers stream nothing and calls are
+  waited on until they return, as up to 0.43.1) or a whole number from 60 to
+  86400. It is a run setting: changing it keeps approvals and reviewed work.
+- `status` names a call being retried after silence ("a call that showed no
+  sign of progress, most likely a connection lost without an error") and
+  asks to keep the computer connected, never to stop the runner. The failure
+  guidance `cli-silent` offers a rerun, a connection check, a longer wait (or
+  0 to turn the check off) and a pause.
+- More network errors are retried instead of blocking a file at once: a name
+  that does not resolve (ENOTFOUND, getaddrinfo, "dns error", "failed to
+  lookup address", "No such host is known", os error 11001 and 11002), an
+  unreachable network or host (ENETUNREACH, ENETDOWN, EHOSTUNREACH,
+  EHOSTDOWN, "network is unreachable", "host is unreachable", "no route to
+  host"), a connection this computer dropped, reset or refused
+  (ECONNABORTED, "connection refused", "connection reset by peer", "forcibly
+  closed by the remote host", "connected party did not properly respond",
+  "target machine actively refused", "established connection was aborted",
+  os error 10050 to 10054, 10060, 10061, 10064 and 10065), undici's socket
+  and timeout codes,
+  and "error sending request" and "connection closed before message
+  completed" from the CLI's own network code. They are what a VPN that
+  reconnects or rechecks the computer, or a network that slept, leaves
+  behind. Like ETIMEDOUT they are retried with no count limit in continuous
+  mode; next to the CLI's sign-in help, 5 times at most, as before.
+- A failed call's record keeps every event but the streamed pieces, and how
+  many came (`streamedDeltas`); a log spilled to disk stays whole.
+- The orchestrator's instructions do not change, so a copy install keeps its
+  approvals; the skill, the operating manual and the phase handoff say that
+  the runner retries such a call itself and that it is never a reason to stop
+  or relaunch the run.
+- What is checked and the records' format do not change: from 0.40.1 or
+  later, approvals, completion records, phase records, prepared pilots and
+  finished units are kept. The update can go in during phase 04: stop the
+  runner, update, and run `translate` again; it goes on with the units not
+  finished.
+
 # 0.43.1 — 2026-11-02
 
 `pilot prepare` works in a source-as-spec project. It stopped with "Missing

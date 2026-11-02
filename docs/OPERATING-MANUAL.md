@@ -135,4 +135,7 @@ limits. Never kill, cancel or relaunch a running command/survey/worker for CPU
 at 100% or low CPU, elapsed time, silence or log volume. Use a continuing terminal
 and wait on the same session. A status/host wait returning is not job failure.
 Only user-chosen bounded mode or explicit command budgets impose finite limits.
+The runner itself stops and retries a worker call that writes nothing for
+`workerSilenceSeconds` (600 s by default, longer on each retry): that is its own
+recovery from a connection lost without an error, never a reason to stop the run.
 Read [every interruption condition and source index](INTERRUPTION-POLICY.md).
