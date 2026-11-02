@@ -32,9 +32,15 @@ it, so the run waited on that one call for good.
   group) that keeps the call's pipes open no longer keeps the call from
   ending: 5 s after the CLI is gone, killed or ended by itself, the runner
   lets the pipes go (a call that ended by itself keeps its answer, and is
-  not taken for a silent call or one past its deadline meanwhile). On
-  Windows a taskkill that has not finished after 10 s no longer holds the
-  call: the runner stops the CLI itself.
+  not taken for a silent call or one past its deadline meanwhile). This
+  holds for build and comparison commands too; on macOS and Linux, what a
+  command that ended by itself left running in its own process group (a
+  server a smoke command started in the background and did not stop) is
+  stopped first, SIGTERM then SIGKILL, as a deadline stops it, so it cannot
+  answer the next run's checks in place of the new build. On Windows it
+  keeps running: a command should stop what it starts. On Windows a
+  taskkill that has not finished after 10 s no longer holds the call: the
+  runner stops the CLI itself.
 - A silent call is retried at most 5 times (about 190 minutes in all by
   default), counted with the CLI's event stall, its lock wait, a network
   error next to the sign-in help, a connection taken over, and a call the
@@ -114,8 +120,9 @@ it, so the run waited on that one call for good.
   fetch PAT user login (403): Failed to fetch Copilot user info: 403
   Forbidden: <html>...", or a page that came with a 200: "Invalid Copilot
   user response"; where it loads the models, a page without GitHub's request
-  ID: "Access denied by policy settings" with no "(Request ID: ...)", or a
-  page that came with a 200: "Error: expected value at line 1 column 1"), a
+  ID: the CLI's line "Error: Access denied by policy settings" with no
+  "(Request ID: ...)", or a page that came with a 200: "Error: expected
+  value at line 1 column 1"), a
   proxy asking for its own sign-in inside the tunnel ("407 Proxy
   Authentication Required", or "Error: 407" where the CLI loads the models)
   or one the CLI could not give ("proxy Negotiate authentication failed:
@@ -163,12 +170,17 @@ it, so the run waited on that one call for good.
   5 times at most (guidance `cli-network`), and it never moves workers to
   the person's CLI home. GitHub's refusals there come in other words and
   keep their rules: a 401 ("Authentication failed") stops the run, a 403
-  ("Access denied by policy settings (Request ID: ...)") blocks the file, as
-  before. The same words without GitHub's request ID are a proxy's page, a
-  407 there is a proxy's sign-in, and a 511 or a page that came with a 200
-  ("expected value at line 1 column 1") is a portal's: a connection taken
-  over (above). Checked with the real CLI through an inspecting proxy with a
-  test CA.
+  ("Access denied by policy settings (Request ID: ...)") blocks the file,
+  and a 402 ("Error: 402 Payment Required": AI Credits, a budget or the
+  plan) stops the run, as before, now with the guidance `credits` instead
+  of the sign-in's (retried, every file would have waited out its retries
+  in turn). The same words as the 403 without GitHub's request ID are a
+  proxy's page (so a proxy that passes GitHub's 403 on without its request
+  ID gets the few retries and the last pass before the file is left
+  unfinished), a 407 there is a proxy's sign-in, and a 511 or a page that
+  came with a 200 ("expected value at line 1 column 1") is a portal's: a
+  connection taken over (above). Checked with the real CLI through an
+  inspecting proxy with a test CA.
 - `status` names a call being retried after silence ("a call that showed no
   sign of progress, most likely a connection lost without an error") and
   asks to keep the computer connected, never to stop the runner. After a

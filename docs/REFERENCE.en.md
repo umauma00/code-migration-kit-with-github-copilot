@@ -103,7 +103,7 @@ The minimum settings in `migration/config.json`:
 
 ## Validation commands (commands)
 
-`commands` are argument arrays, not shell strings. Put pipes or several commands in a separate script, and configure only commands you trust.
+`commands` are argument arrays, not shell strings. Put pipes or several commands in a separate script, and configure only commands you trust. A command should stop what it starts: 5 s after it ends, the runner stops waiting for what still holds its output, and on macOS and Linux first stops what it left running in its own process group (since 0.44.0); on Windows that keeps running.
 
 The example below is for the default **runtime mode**. Projects without a usable original environment use [source-only mode](SOURCE-ONLY.md).
 

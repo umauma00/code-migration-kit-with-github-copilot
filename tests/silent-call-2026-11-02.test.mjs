@@ -23,7 +23,7 @@ import { translate } from '../lib/pipeline.mjs';
 import { runProcess, silentProcessMessage, silenceWatch, processOutputLines } from '../lib/process.mjs';
 import { workerSilenceMs, silenceWait, defaultWorkerSilenceSeconds } from '../lib/execution-policy.mjs';
 import { createCopilotAdapter, copilotArgs, isStreamedDelta } from '../scripts/copilot_adapter.mjs';
-import { isTransientFailure, isSystemicFailure, isLimitedRetry, isSilentCall, isSignInDoubt, isSignedOut, networkFailurePattern, hostStallRetries, stoppedWithRun } from '../lib/failures.mjs';
+import { isTransientFailure, isSystemicFailure, isLimitedRetry, isSilentCall, isSignInDoubt, isSignedOut, networkFailurePattern, hostStallRetries, stoppedWithRun, retryCause } from '../lib/failures.mjs';
 import { failureGuidance } from '../lib/guidance.mjs';
 import { migrationStatus } from '../lib/status.mjs';
 import { runSurvey } from '../lib/survey.mjs';
@@ -253,6 +253,41 @@ process.stderr.write('grandchild ' + g.pid + '\\n'); g.unref(); setTimeout(() =>
     assert.ok(!(quiet instanceof Error), `the exited child was stopped (${JSON.stringify(options)}): ${quiet.message}`);
     assert.equal(quiet.code, 0);
   }
+});
+
+test('what a child that ended by itself left running in its own process group, holding its pipes, is stopped as the runner lets them go', { skip: process.platform === 'win32' && 'a POSIX process group' }, async t => {
+  // A stage command such as ["sh", "-c", "./app --port 8080 & sleep 2; curl ..."]:
+  // the app stays in the command's group and holds its stdout and stderr. Left
+  // running, it could answer the next run's checks in place of the new build.
+  const pids = [];
+  t.after(() => { for (const pid of pids) try { process.kill(pid, 'SIGKILL'); } catch {} });
+  for (const [what, keeps] of [['one that stops on SIGTERM', 'setTimeout(() => {}, 60000)'], ['one that ignores SIGTERM', "process.on('SIGTERM', () => {}); setTimeout(() => {}, 60000)"]]) {
+    const started = performance.now();
+    const run = node(`const { spawn } = require('node:child_process');
+const g = spawn(process.execPath, ['-e', ${JSON.stringify(keeps)}], { stdio: ['ignore', 'inherit', 'inherit'] });
+process.stderr.write('left ' + g.pid + '\\n'); g.unref(); process.stdout.write('done\\n'); setTimeout(() => process.exit(3), 300);`).then(r => r, e => e);
+    const outcome = await Promise.race([run, new Promise(resolve => setTimeout(() => resolve('never settled'), 30000))]);
+    assert.notEqual(outcome, 'never settled', what);
+    const pid = Number(String(outcome.stderr ?? outcome.result?.stderr).match(/left (\d+)/)?.[1]);
+    assert.ok(pid, what);
+    pids.push(pid);
+    assert.ok(!(outcome instanceof Error), `${what}: ${outcome.message}`);
+    // The command's own exit code and output, as if nothing had been left.
+    assert.deepEqual([outcome.code, outcome.stdout], [3, 'done\n'], what);
+    for (let i = 0; i < 50 && !gone(pid); i++) await new Promise(r => setTimeout(r, 100));
+    assert.equal(gone(pid), true, `${what} is stopped`);
+    // 5 s for the pipes, and 1.5 s more for one that ignores SIGTERM.
+    assert.ok(performance.now() - started < 20000, `${what}: ${Math.round(performance.now() - started)} ms`);
+  }
+  // A call the runner stopped keeps the stop it had: the group is killed once.
+  const stopped = await node(`const { spawn } = require('node:child_process');
+const g = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 60000)'], { stdio: ['ignore', 'inherit', 'inherit'] });
+process.stderr.write('left ' + g.pid + '\\n'); g.unref(); setInterval(() => {}, 1000);`, { silenceMs: 1000 }).then(() => null, e => e);
+  const left = Number(String(stopped?.result?.stderr).match(/left (\d+)/)?.[1]);
+  if (left) pids.push(left);
+  assert.equal(stopped?.silent, true);
+  for (let i = 0; i < 50 && !gone(left); i++) await new Promise(r => setTimeout(r, 100));
+  assert.equal(gone(left), true);
 });
 
 test('on Windows a taskkill that never finishes does not hold the call: the child is stopped and the call ends', { skip: process.platform === 'win32' && 'a stand-in taskkill on PATH' }, async t => {
@@ -487,6 +522,11 @@ test('a token check GitHub answered with a refusal stops the run as before; a ra
     assert.deepEqual([isTransientFailure(answer), isLimitedRetry(answer), isSystemicFailure(answer), isSignedOut(answer), isSignInDoubt(answer)], [true, true, false, false, false], answer.message);
     for (const language of ['ja', 'en']) assert.equal(failureGuidance(answer, { language }).id, 'cli-intercepted', `a proxy's page (${language})`);
   }
+  // A proxy's page that mentions a rate limit is still a connection taken over, and is recorded as one.
+  const ratePage = tokenCheck(both(403, 'Failed to fetch Copilot user info: 403 Forbidden: <html><body>Blocked by the rate limit policy</body></html>'));
+  assert.deepEqual([isTransientFailure(ratePage), isLimitedRetry(ratePage), isSystemicFailure(ratePage)], [true, true, false]);
+  assert.deepEqual(retryCause(ratePage), { intercepted: true });
+  assert.deepEqual(retryCause(tokenCheck(both(429, 'GitHub returned: API rate limit exceeded'))), { rateLimit: true });
   const allowList = tokenCheck('Failed to fetch PAT user login (403): GitHub returned: Although you appear to have the correct authorization credentials, the `acme` organization has an IP allow list enabled, and your IP address is not permitted to access this resource.');
   assert.deepEqual([isTransientFailure(allowList), isLimitedRetry(allowList), isSystemicFailure(allowList), isSignedOut(allowList)], [true, false, false, false]);
   for (const language of ['ja', 'en']) assert.equal(failureGuidance(allowList, { language }).id, 'cli-network', `the CLI's sentence is no credential finding (${language})`);
@@ -544,6 +584,27 @@ test('a list of models the CLI could not load as it started is retried, never a 
   // GitHub's 403 there (an organization's policy) reads "Access denied by policy settings (Request ID: ...)" and blocks the file, as up to 0.43.1.
   const policy = new Error('Copilot implementer failed (exit 1): Error: Access denied by policy settings (Request ID: ABCD:1234:5678:9ABC:0000)\n\nYour Copilot CLI policy setting may be preventing access. This can happen when:\n  • Your organization has restricted Copilot access\n  • Your Copilot subscription does not include this feature\n  • Required policies have not been enabled by your administrator\n\nTo resolve this, visit your Copilot settings: https://github.com/settings/copilot\n');
   assert.deepEqual(kind(policy).slice(0, 3), [false, false, false]);
+  // Only the CLI's own line is a proxy's page: the same words elsewhere, without
+  // "Error: " before them or in a worker's answer, keep the rule they had up to 0.43.1.
+  for (const elsewhere of [new Error('Copilot implementer failed (exit 1): session.error query 403: Access denied by policy settings'),
+    new Error('Invalid review result: the original prints "Access denied by policy settings" when the role is missing')]) {
+    assert.deepEqual(kind(elsewhere).slice(0, 3), [false, false, false], elsewhere.message);
+    assert.notEqual(failureGuidance(elsewhere, { language: 'en' }).id, 'cli-intercepted', elsewhere.message);
+  }
+  // GitHub's 402 there (exact text, with and without the request ID): no model can be
+  // used until the credits, the budget or the plan allow it. The run stops, as up to
+  // 0.43.1, with the guidance on credits, not on signing in (the CLI adds its sign-in help).
+  for (const payment of [modelsLoad('402 Payment Required'), modelsLoad('402 Payment Required', false)]) {
+    assert.deepEqual(kind(payment), [true, true, true, false, false], payment.message);
+    for (const language of ['ja', 'en']) {
+      const guidance = failureGuidance(payment, { language });
+      assert.equal(guidance.id, 'credits', `${payment.message} (${language})`);
+      assert.deepEqual(guidance.options.map(o => o.id), ['check-billing', 'pause'], 'no cheaper model: none can be used');
+    }
+  }
+  assert.deepEqual(failureGuidance(new Error('Copilot implementer failed (exit 1): Your AI Credits budget has been exhausted'), { language: 'en' }).options.map(o => o.id), ['check-billing', 'cheaper-model', 'pause']);
+  // A 402 later in the text than the CLI's start, or in a worker's answer, is not this.
+  assert.equal(isSystemicFailure(new Error('Invalid review result: the handler returns "402 Payment Required" when the card is declined')), false);
   // The same words from a worker's own answer are not the CLI's start: a 500 needs the CLI's "Failed to load models" before it.
   const bare = 'Error: 500 "oops"\n\nTo resolve this, try the following:';
   assert.equal(isTransientFailure(Object.assign(new Error(`Copilot implementer failed (exit 1): ${bare}`), { result: { stderr: bare, stdout: '' } })), false);
@@ -574,6 +635,14 @@ test('a list of models the CLI could not load as it started is retried, never a 
   assert.match(action, /never stop it for this/);
   assert.doesNotMatch(action, /lowering concurrency/);
   assert.equal(during.retrying[0].modelsLoad, true);
+  // GitHub's 402 there stops the run at the first call: no retry, no last pass.
+  const p = await continuous(t);
+  let paid = 0;
+  const stopped = await translate(p.root, p.config, async () => { paid++; throw modelsLoad('402 Payment Required'); }).then(() => null, e => e);
+  assert.ok(stopped);
+  assert.equal(paid, 1);
+  assert.equal(stopped.report.selfRepairs?.repass, undefined);
+  for (const language of ['ja', 'en']) assert.equal(failureGuidance(stopped, { language }).id, 'credits');
 });
 
 // CLI 1.0.105 when a proxy asks for its own sign-in and the CLI cannot give
