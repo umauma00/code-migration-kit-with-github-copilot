@@ -335,8 +335,11 @@ for (const corruption of ['missing rulebook', 'malformed dependencies']) test(`f
   assert.equal(thirdCalls, 0); assert.equal(fs.existsSync(safePath(f.root, 'migration/run.lock')), false);
   const directories = fs.readdirSync(safePath(f.root, 'migration/runs')).filter(run => /^\d+-[0-9a-f]{8}$/.test(run));
   const summary = readJSON(safePath(f.root, `migration/runs/${directories[0]}/summary.json`));
-  assert.equal(summary.agentCalls, 4); assert.equal(summary.done, 1);
-  // A finished before corruption; the held B response is never accepted.
+  assert.equal(summary.agentCalls, 4); assert.equal(summary.done, 0);
+  // A finished before the corruption but after the run's last full input
+  // check, so it goes back to review; the held B response is never accepted.
+  const first = JSON.parse(fs.readFileSync(statePath(f.root, f.units[0]), 'utf8'));
+  assert.equal(first.status, 'blocked'); assert.match(first.error, /its reviews are made again by the next run/);
   assert.ok(summary.errors.some(e => corruption === 'missing rulebook' ? /RULEBOOK/.test(e.error) : /JSON|property/i.test(e.error)));
   const state = fs.readFileSync(statePath(f.root, f.units[1]), 'utf8');
   assert.equal(JSON.parse(state).status, 'blocked');

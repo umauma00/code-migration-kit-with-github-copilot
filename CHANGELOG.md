@@ -1,3 +1,109 @@
+# 0.43.0 — 2026-11-02
+
+Phase 04 no longer reads every source file again before and after each worker
+call. On 2026-11-02 (Windows, kit 0.42.0, source-only, 554 source files, two
+workers at a time) translation had finished 25 units in 2 h 37 min. The
+runner checks before and after every worker call that its inputs have not
+changed (about 8 checks per unit, 12 with findings). Each check read every
+source file again (about 6 s a pass on that PC, estimated from its phase 03
+pilot) and checked every manifest row and every file the review dependency
+map names. The checks run one at a time, so they also held back the other
+unit in flight.
+
+- The input checks of one translation run share a cache (`runCache` in
+  `lib/core.mjs`). Each check still walks the input folders and looks at
+  every file, so a file added, removed, renamed or replaced is seen at the
+  next check as before. A file whose identity (device and file number),
+  size, modification time and change time are those it was hashed with
+  keeps its hash instead of being read again. A file changed less than 3 s
+  before it was read is read again at every check until it has settled
+  (coarse kernel clocks and FAT's 2 s times may not show a second change).
+  The manifest and the dependency map are still read at every check, but
+  their rows are checked again only when their text changed (a file the map
+  names under `node_modules`, `__pycache__` or `.git`, which the source walk
+  does not enter, is still looked at every check).
+- A change that leaves a file's size and times as this computer sees them
+  is not seen by those checks: a write through a memory map or a handle
+  still open (Windows updates the times when it is closed), a file system
+  without a change time (FAT, exFAT) with the modification time put back,
+  or a network share that answers from its attribute cache or whose clock
+  runs 3 s or more behind. Three things cover it:
+  - The text given to each worker is checked against the run's first read
+    of it as it is read, with no extra reads: a difference stops the run
+    before any worker sees it ("Migration inputs changed before worker
+    invocation"). An accepted RULEBOOK amendment passes, as in the context.
+  - Every ten minutes, and once when a run that started work ends (after
+    an interrupt or another failure too, when the progress says "checking
+    every input once more"), a check reads and checks every input again (at
+    the end: "Migration inputs changed during the run; fresh approval
+    required").
+  - Workers that read files with their tools (the arbiter at any input
+    size; the implementer, the fixer and the reviewers only when their
+    evidence is over `maxReviewInputBytes`, as frozen they have no file
+    tools) may have seen such a change before a check found it. So when a run
+    finds its inputs changed, at any check, every unit it took a worker's
+    answer for or finished since its last full check (at most about ten
+    minutes of work) goes back to review ("…; its reviews are made again by
+    the next run"), also if the change is then undone: its reviews, and an
+    arbitration or single-pass fix made from them, are made again, and its
+    candidate is reviewed again. No unit finishes after that. Before, the
+    run stopped at the next check; the units finished before it stayed done
+    and the others kept their reviews. The run then neither counts its
+    scope as complete, retires a phase 04 waiver, nor tells the build loop
+    it ran out of calls. A unit whose record cannot be written back is
+    named in the run's errors, with the file to delete.
+
+  A check that cannot read an input that is there (busy, locked, too many
+  open files) stops the run, as before, but sends no unit back: the run's
+  last check reads it again, with pauses of 0.3, 1 and 3 s if it must, and
+  the units it still cannot confirm go back to review. An input a check
+  cannot find is a change. Gates, phase commands, `status` and the next run always read
+  the files themselves. Two limits remain:
+  - Such a change that is undone before the next full check, and before a
+    worker is given that file's text, is not found, and what a worker made
+    meanwhile from the file with its tools is kept. Before, the check after
+    that worker's call found it.
+  - A run that ends without its last check (killed, stopped with a second
+    Ctrl+C, or its terminal closed) keeps what its workers answered or
+    finished since its last full check as it is.
+- The evidence for each worker call uses the review dependency map from
+  the run's first read of its inputs; each call read the map again and
+  checked every file it names.
+- In a test fixture with the installed policies (two units, one with a
+  finding, 8 worker calls) a source outside the units was read 21 times,
+  now twice (the first check and the last); the two units' sources 23 and
+  25 times, now 4 and 6 (the others are the text sent to their workers);
+  the dependency map 48 times, now 24, and the manifest 43 times, now 25.
+  In the same fixture's pilot a production source was read 30 times, now 8.
+  On Linux, one check of a 554-file project after the first took about 210
+  to 300 ms, now about 40 to 60 ms: it reads no source file (575 file
+  reads, now 4 small records) and about 49,000 file system lookups are now
+  about 12,300. The gain on Windows has not been measured; the time per
+  unit in `status` shows it after the update.
+- `status --wait` watches the recorded progress (as `status --fast`) while
+  it waits and builds the status asked for once, when it returns. Without
+  `--fast` it built the full status at every poll (every 5 s), reading
+  every source file each time while the runner read them too: in a
+  one-second test wait polling every 20 ms, about 36 reads of a source
+  file, now one. The orchestrator's `status --root ROOT --wait 600` is now
+  as light while it waits as `status --fast --wait 600`. A manifest that
+  cannot be read (a folder in its place) is a blocker of `status --fast`
+  and `status --fast --wait`, as it is of the full status, instead of a
+  failure; if the recorded progress cannot be read at all, `status --wait`
+  returns the full status.
+- `status --fast` (and so `status --wait` while it waits) treats a lock
+  written on another host as the full status does: not running, named in
+  `foreignLock`, and the next actions say to run `unlock --pid` once that
+  run has stopped. A lock whose process this user may not signal counts as
+  running, as in the full status. Before, with a process of the same number
+  on this host, `--fast` showed it running and `--fast --wait` waited out
+  its whole time.
+- What is checked and the records' format do not change, and the kit's
+  code is not an input: from 0.40.1 or later, approvals, completion
+  records, phase records, prepared pilots and finished units are kept. The update can go
+  in during phase 04: stop the runner, update, and run `translate` again;
+  it goes on with the units not finished.
+
 # 0.42.1 — 2026-11-02
 
 Phase commands and status read each source file once. On 2026-11-02 (Windows,
