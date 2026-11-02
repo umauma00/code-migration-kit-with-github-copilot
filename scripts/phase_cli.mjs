@@ -49,15 +49,15 @@ export function phaseCommand(root, config, action, phase, options = {}) {
     if (!report.ok) throw new Error(report.blockers[0].reason);
     return report.workflow;
   }
-  // One read of the inputs for the whole command: each source file is hashed
-  // once for every gate, record and staleness check below (in a source-as-spec
-  // fixture, phase complete 00b,01,02 read each one 61 times in 0.42.0 and
-  // phase complete 03 26 times). The receipts this command writes are read
-  // from disk again, and none of its writes (the RULEBOOK copy, a retired
-  // waiver, the cost log) is one of those inputs. Gates of runner commands
-  // make their own reads.
-  const read = inputRead();
+  // One read of the inputs for the whole command (made under the lock for the
+  // commands that write): each source file is hashed once for every gate,
+  // record and staleness check below (in a source-as-spec fixture, phase
+  // complete 00b,01,02 read each one 61 times in 0.42.0 and phase complete 03
+  // 26 times). The receipts this command writes are read from disk again,
+  // and none of its writes (the RULEBOOK copy, a retired waiver, the cost
+  // log) is one of those inputs. Gates of runner commands make their own reads.
   if (action === 'check') {
+    const read = inputRead();
     // A list checks a package (source-as-spec: 00b,01,02) the way phase
     // complete would record it: each phase in order, predecessors assumed.
     const ids = typeof phase === 'string' && phase.includes(',') ? phase.split(',').map(p => p.trim()) : [phase];
@@ -91,6 +91,7 @@ export function phaseCommand(root, config, action, phase, options = {}) {
   const release = lockRun(root,`phase-${action}-${phase ?? 'policy'}`);
   try {
     if (action === 'init') return initializePhases(root);
+    const read = inputRead();
     // The first phase record waits for setup to settle the verification
     // method (a phase out of order would end setup without it).
     if (['start','complete','waive'].includes(action)) { const blocker = setupBlocker(root, config); if (blocker) throw new Error(blocker); }

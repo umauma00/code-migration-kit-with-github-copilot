@@ -6,8 +6,10 @@
 // that PC). In this source-as-spec fixture phase next and status read a
 // source file 20 times each, phase check 00b,01,02 43 times, phase complete
 // 00b,01,02 61 times and phase complete 03 26 times. After parity, one status
-// read each translated file 33 times. Each command now reads every file once
-// (an output twice: its hash and its markers); nothing is kept between commands.
+// read each translated file 33 times. Each command now reads each source file
+// once and each output twice (its hash and its markers); a report, the
+// RULEBOOK or the manifest may still be read again for its text. Nothing is
+// kept between commands.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -18,12 +20,14 @@ import { prepare, fake, mini } from './helpers.mjs';
 import { safePath, atomicWrite, writeJSON, readJSON, fileHash, contextHash, loadConfig } from '../lib/core.mjs';
 import { phaseCommand } from '../scripts/phase_cli.mjs';
 import { install } from '../scripts/install.mjs';
-import { currentPhase, requirePhase } from '../lib/phases.mjs';
+import { currentPhase, requirePhase, phaseWaiver, phaseStaleness, earliestStale, staleText, inputRead, readContext } from '../lib/phases.mjs';
 import { judgeInputHash } from '../lib/judge.mjs';
 import { runStage, approve, translate, requireGate } from '../lib/pipeline.mjs';
 import { installGuardrails } from '../lib/guardrails.mjs';
 import { migrationStatus } from '../lib/status.mjs';
 import { initSourceSpec } from '../lib/source-spec.mjs';
+import { setPreferences } from '../lib/preferences.mjs';
+import { preparePilot } from '../lib/pilot.mjs';
 
 const kitRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -70,10 +74,9 @@ async function specProject(t) {
     'src/math_ops.py': [], 'src/text_ops.py': [], 'src/main.py': ['src/math_ops.py', 'src/text_ops.py'] } }));
   atomicWrite(safePath(root, 'migration/RULEBOOK.md'), '# Rules drafted from source\nPreserve floor division and code-point lengths.\n');
   atomicWrite(safePath(root, 'migration/inventory.tsv'), 'file\tissue\tdecision\nsrc/math_ops.py\tnegative division\tfloor\n');
-  const sources = ['math_ops', 'text_ops', 'main'].map(n => safePath(root, `src/${n}.py`));
-  once(sources, 'phase complete 00b,01,02', () => phaseCommand(root, config, 'complete', '00b,01,02', { note: 'User reviewed the specification package' }));
+  phaseCommand(root, config, 'complete', '00b,01,02', { note: 'User reviewed the specification package' });
   assert.equal((await runStage(root, config, 'judge')).success, true);
-  return { root, config, sources };
+  return { root, config, sources: ['math_ops', 'text_ops', 'main'].map(n => safePath(root, `src/${n}.py`)) };
 }
 // Each record names the receipt it was recorded after, and holds when read
 // again from scratch (no memo of the command that wrote it).
@@ -106,6 +109,8 @@ test('recording 00b to 03 again after the kit update reads each source file once
   assert.deepEqual(check.map(c => [c.phase, c.ready]), [['00b', true], ['01', true], ['02', true]]);
   assert.deepEqual(check[0].stale.reasons.map(r => r.kind), ['judge-format']);
   once(sources, 'phase check 00b', () => phaseCommand(root, config, 'check', '00b'));
+  // Starting a phase of the package (source-as-spec: it waits only for 00).
+  once(sources, 'phase start 01', () => phaseCommand(root, config, 'start', '01'));
   const recorded = once(sources, 'phase complete 00b,01,02', () => phaseCommand(root, config, 'complete', '00b,01,02', { note: 'Recorded again after the kit update; nothing changed' }));
   assert.deepEqual(recorded.map(r => r.phase), ['00b', '01', '02']);
   // Written in the middle of the command, the receipts were read again: each
@@ -183,4 +188,124 @@ test('a translation approval for named files reads the manifest once, not once p
   // A target no longer in the manifest still makes the approval invalid.
   atomicWrite(manifest, `source\ttarget\n${f.units.filter(u => u.target !== targets[1]).map(u => `${u.source}\t${u.target}`).join('\n')}\n`);
   assert.throws(() => requireGate(f.root, f.config, 'translation', contextHash(f.root, f.config)), /Invalid translation approval scope/);
+});
+
+test('in a strict project a translation approval for more named files does not read the manifest more often', async t => {
+  const f = await reviewedPreparation(t);
+  for (const id of ['00', '00b', '01', '02']) phaseCommand(f.root, f.config, 'complete', id, { note: 'Synthetic preparation review for a regression test only' });
+  await runStage(f.root, f.config, 'judge');
+  atomicWrite(safePath(f.root, 'migration/stress-test/report.md'), 'Disposable stress-test fixture; not an actual stress test.\n');
+  installGuardrails(f.root, kitRoot, { waiver: 'Test fixture: disposable sandbox, no real commands' });
+  phaseCommand(f.root, f.config, 'complete', '03', { note: 'Synthetic stress-test review for a regression test only' });
+  const manifest = safePath(f.root, 'migration/manifest.tsv'), targets = f.units.map(u => u.target);
+  // The gate as translate checks it, without a read of its own caller.
+  const reads = named => {
+    approve(f.root, f.config, 'translation', 'Test fixture batch approval', { targets: named });
+    const { counts, value } = readsOf([manifest], () => requireGate(f.root, f.config, 'translation', contextHash(f.root, f.config)));
+    assert.deepEqual(value.targets, named);
+    return counts[0];
+  };
+  const one = reads(targets.slice(0, 1)), all = reads(targets);
+  assert.equal(all, one, `manifest read ${one} times for one named file and ${all} times for ${targets.length}`);
+  // In one read (a status or phase command) whose context is known, the gate
+  // and its chain of phase records add one read of the manifest: the check
+  // of the named files.
+  const read = inputRead(), context = readContext(f.root, f.config, read);
+  assert.equal(readsOf([manifest], () => requireGate(f.root, f.config, 'translation', context, read)).counts[0], 1);
+});
+
+// Phases 00 to 02 of a strict runtime project recorded, judge run.
+async function reviewedPreparation(t) {
+  const f = prepare(t, { realCommands: true, count: 3 });
+  f.config.phasePolicy = 'strict'; writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  fs.rmSync(safePath(f.root, 'migration/stress-test/report.md'));
+  for (const p of ['migration/judge-report.md', 'migration/depmap/report.md', 'migration/gap-report.md']) atomicWrite(safePath(f.root, p), 'Disposable preparation fixture; not actual AI review or human signoff.\n');
+  return { ...f, sources: f.units.map(u => safePath(f.root, u.source)) };
+}
+
+for (const mode of ['relaxed', 'auto']) test(`${mode} mode: one command records a waived phase, retires its waiver and binds the next records to the new receipt`, async t => {
+  const f = await reviewedPreparation(t), { root, config, sources } = f;
+  setPreferences(root, { phaseMode: mode });
+  phaseCommand(root, config, 'complete', '00', { note: 'Fixture feasibility reviewed' });
+  // 00b waived; 01 and 02 recorded on that waiver.
+  once(sources, 'phase waive 00b', () => phaseCommand(root, config, 'waive', '00b', { note: 'The person chose to look at the dependency map first' }));
+  const waiver = phaseWaiver(root, '00b');
+  assert.ok(waiver);
+  phaseCommand(root, config, 'complete', '01', { note: 'Fixture map reviewed' });
+  phaseCommand(root, config, 'complete', '02', { note: 'Fixture rules reviewed' });
+  assert.equal(readJSON(safePath(root, 'migration/phases/01.json')).predecessorHash, waiver.hash);
+  // The package recorded for real in one command: 00b retires its waiver
+  // in the middle, and 01 and 02 name the receipts written before them.
+  once(sources, 'phase complete 00b,01,02', () => phaseCommand(root, config, 'complete', '00b,01,02', { note: 'The person reviewed the judge setup after all' }));
+  assert.equal(phaseWaiver(root, '00b'), false);
+  assert.ok(fs.readdirSync(safePath(root, 'migration/phases/waivers/retired')).some(name => name.startsWith('00b-')));
+  chainHolds(root, config, ['00', '00b', '01', '02']);
+  // A waiver of a later phase, read once too.
+  once(sources, 'phase waive 03', () => phaseCommand(root, config, 'waive', '03', { note: 'The person chose to skip the stress test for this fixture' }));
+  assert.match(phaseWaiver(root, '03').unmet, /Run judge successfully/);
+});
+
+test('a pilot\'s status reads each production source and each pilot file once', async t => {
+  const f = await reviewedPreparation(t);
+  for (const id of ['00', '00b', '01', '02']) phaseCommand(f.root, f.config, 'complete', id, { note: 'Synthetic preparation review for a regression test only' });
+  await runStage(f.root, f.config, 'judge');
+  const child = `${f.root}-pilot`;
+  t.after(() => fs.rmSync(child, { recursive: true, force: true }));
+  preparePilot(f.root, f.config, { target: child, sources: ['src/main.py'], note: 'Disposable regression pilot' });
+  const files = [safePath(f.root, 'src/math_ops.py'), path.join(child, 'src/math_ops.py')], config = loadConfig(child);
+  assert.equal(once(files, 'pilot status', () => migrationStatus(child)).ok, true);
+  assert.equal((await runStage(child, config, 'judge')).success, true);
+  approve(child, config, 'translation', 'Disposable regression pilot approval');
+  const report = once(files, 'approved pilot status', () => migrationStatus(child));
+  assert.equal(report.ok, true);
+  assert.equal(report.workflow.policy, 'isolated-pilot');
+  assert.deepEqual(report.blockers, []);
+  // The parent changed after that status: the next one says so for every gate.
+  atomicWrite(safePath(f.root, 'migration/judge-report.md'), 'Disposable preparation fixture; a note added later.\n');
+  const stale = migrationStatus(child);
+  assert.match(stale.blockers.map(b => b.reason).join('\n'), /Pilot parent phase 02 is out of date/);
+  assert.equal(stale.approvedTargets.length, 0);
+});
+
+// With "verificationRoots": ["migration"] the judge inputs included the phase
+// records, so a record went out of date as soon as it was written (0.42.0
+// refused the next phase of a package; phase next sent 00b back for ever).
+test('a verification root or input over the records the kit writes is refused when the config is read', async t => {
+  const f = prepare(t, { count: 1 }), file = safePath(f.root, 'migration/config.json'), raw = readJSON(file);
+  const load = change => { writeJSON(file, { ...raw, ...change }); return loadConfig(f.root); };
+  for (const roots of [['migration'], ['migration/phases'], ['migration/results/judge'], ['migration/rulebook-history'], ['migration/pilots'], ['tests', 'migration']]) {
+    assert.throws(() => load({ verificationRoots: roots }), /^Error: verificationRoots overlaps the records the kit writes: migration/, JSON.stringify(roots));
+  }
+  assert.throws(() => load({ verificationInputs: ['migration/rulebook-history/RULEBOOK-1.md'] }), /verificationInputs\/designInputs overlaps outputs or runtime state/);
+  // status names the entry to correct.
+  writeJSON(file, { ...raw, verificationRoots: ['migration'] });
+  const report = migrationStatus(f.root);
+  assert.equal(report.ok, false);
+  assert.match(report.blockers.map(b => b.reason).join('\n'), /verificationRoots overlaps the records the kit writes: migration \(/);
+  // The source-as-spec folder and a folder of the project's own under migration are kept.
+  assert.deepEqual(load({ verificationRoots: ['migration/source-spec'] }).verificationRoots, ['migration/source-spec']);
+  assert.deepEqual(load({ verificationRoots: ['tests', 'migration/judge'] }).verificationRoots, ['tests', 'migration/judge']);
+  assert.deepEqual(load({}).verificationRoots, raw.verificationRoots);
+});
+
+test('a phase check given no read, null or an empty one makes its own and answers as before', async t => {
+  const f = await reviewedPreparation(t), { root, config, sources } = f;
+  for (const id of ['00', '00b', '01', '02']) phaseCommand(root, config, 'complete', id, { note: 'Synthetic preparation review for a regression test only' });
+  for (const read of [undefined, null, {}]) for (const id of ['00', '02']) {
+    assert.ok(currentPhase(root, config, id, read), `${id} with ${JSON.stringify(read)}`);
+    assert.doesNotThrow(() => requirePhase(root, config, id, read));
+    assert.equal(phaseStaleness(root, config, id, read), null);
+    assert.equal(staleText(root, config, id, read), null);
+  }
+  // A source changed: every form gives the same answer and explanation.
+  atomicWrite(sources[0], `${fs.readFileSync(sources[0], 'utf8')}# changed\n`);
+  const stale = phaseStaleness(root, config, '02'), text = staleText(root, config, '02'), earliest = earliestStale(root, config, ['00', '00b', '01', '02']);
+  assert.ok(stale && text && earliest);
+  for (const read of [null, {}, inputRead()]) {
+    assert.equal(currentPhase(root, config, '02', read), false);
+    assert.deepEqual(phaseStaleness(root, config, '02', read), stale);
+    assert.equal(staleText(root, config, '02', read), text);
+    assert.deepEqual(earliestStale(root, config, ['00', '00b', '01', '02'], read), earliest);
+    assert.throws(() => requirePhase(root, config, '02', read), /out of date/);
+  }
 });

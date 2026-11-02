@@ -1,6 +1,6 @@
 # 0.42.1 — 2026-11-02
 
-Phase commands and status read each file once. On 2026-11-02 (Windows,
+Phase commands and status read each source file once. On 2026-11-02 (Windows,
 source-as-spec, auto mode) an update from 0.40.0 made phase 00b's record out
 of date (0.40.1 changed its judge fingerprint format), and recording 00b to
 03 again took a long time: every check of every command hashed the whole
@@ -14,8 +14,11 @@ source tree again, at about 6 s per pass on that PC.
   once (`memoValue` in `lib/core.mjs`). In a source-as-spec fixture one
   source file was read 20 times by `phase next` or `status`, 43 times by
   `phase check 00b,01,02`, 61 times by `phase complete 00b,01,02` and 26
-  times by `phase complete 03`; each now reads it once (204 reads for the
-  whole re-record, now 7).
+  times by `phase complete 03`; each now reads it once. Recording again in
+  the order phase next, status, phase check 00b,01,02, phase complete
+  00b,01,02, phase next, phase complete 03, phase next read it 204 times,
+  now 7. A report, the RULEBOOK or the manifest may still be read again for
+  its text (to parse it or to check it is not the template).
 - A phase command writes records in the middle (`phase complete 00b,01,02`
   records 00b before checking 01). Receipts are always read from disk again,
   and none of the command's writes (receipts, the RULEBOOK copy, a retired
@@ -25,12 +28,31 @@ source tree again, at about 6 s per pass on that PC.
   record and gate, and their predecessors, asked for the output fingerprint
   and whether every unit is done); now twice, once for its hash and once for
   its markers (`done` checks each unit once per read).
+- In a pilot workspace, `status` checks the pilot grant, and with it the
+  production project, once for all its gates instead of once per gate
+  (`readPilot` in `lib/pipeline.mjs`; `requirePilot` takes the caller's
+  memo).
 - A phase gate of a runner command (`judge`, `approve`, `translate` and the
   others) shares one read across the chain of records it checks, so a
   passing or refused gate reads each source once. A translation approval for
-  named files reads the manifest once instead of once per file.
-- What is checked and recorded does not change: from 0.40.1 or later,
-  approvals, completion records, phase records and prepared pilots are kept.
+  named files checks them against one read of the manifest instead of one
+  read per file.
+- `verificationRoots`, `verificationInputs` and `designInputs` may no longer
+  overlap what the kit writes as it works (`migration/phases`,
+  `migration/results`, `migration/rulebook-history`, `migration/pilots` and
+  the other runtime state); `loadConfig` names the entry to correct. With
+  `"verificationRoots": ["migration"]` a phase record went out of date as
+  soon as it was written: 0.42.0 refused the next phase of a package and
+  `phase next` sent 00b back for ever, and with one read per command the
+  package would have been recorded and sent back by the next command.
+  `migration/source-spec` and other directories of the project's own under
+  `migration/` are still accepted.
+- Otherwise what is checked and recorded does not change: from 0.40.1 or
+  later, approvals, completion records, phase records and prepared pilots are
+  kept. One message is more exact: once a command has checked a record of
+  02 or later, `phase check` and a phase gate (like `phase next` before) no
+  longer say that recording 02 again ends a pilot that already ended because
+  the production project's inputs changed.
 
 # 0.42.0 — 2026-11-01
 
