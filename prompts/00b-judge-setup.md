@@ -6,8 +6,12 @@ End with its report; ask for the next decision only when needed.
 Prerequisite: feasibility reviewed. Stop after the judge report.
 
 Save the judge design and preparation results in `migration/judge-report.md`,
-including test/scenario paths, configured commands, coverage, failures and any
-deferred formal validation. This report is not the runner's validation receipt.
+including test/scenario paths, configured commands, coverage and failures. This
+report is not the runner's validation receipt. The formal judge runs after 02:
+its receipt is `migration/results/judge.json` and phase 03's report states its
+result. Write no pending-judge status here and never come back to update this
+file for it: the 00b record binds the file, so a later edit makes 00b and every
+later recorded phase be recorded again, which ends a prepared pilot.
 
 For verificationMode source-only, follow [source-only preparation](../docs/SOURCE-ONLY.md).
 Do not require an executable original environment or original/mutation commands.

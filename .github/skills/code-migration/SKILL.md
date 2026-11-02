@@ -266,6 +266,15 @@ an answer: choose nothing and ask the person to continue interactively (in
 auto mode, phase boundaries ask nothing; see the auto mode paragraph).
 After a phase, resolve the next step from the user's instruction and current
 evidence, not just a report/template's existence.
+Never edit a recorded phase's report (feasibility.md, judge-report.md,
+depmap/report.md, gap-report.md; stress-test/report.md once 03 is recorded) to
+note progress or a later result such as the formal judge outcome: write it in
+the report of the phase you are working on while it is not yet recorded
+(stress-test/report.md during 03), or in chat. The record
+binds the file, so the edit makes that phase and every later one be recorded
+again (for a report of 00 to 02 a prepared pilot cannot run until it is undone,
+and recording again ends it). Removing an added note byte for byte, with the
+file edit tool rather than git, makes the record current again ([why](../../../docs/PHASE-HANDOFF.md#phase-routing-and-durable-evidence)).
 
 At start or resumption, follow the [ten-phase TODO tracking contract](../../../docs/PHASE-HANDOFF.md#track-the-ten-phases-in-the-host-todo-list).
 Create or reconcile the host TODO list before starting phase work; update it on
@@ -405,9 +414,11 @@ A phase recorded earlier can go out of date when a file it recorded changes
 (`record-again` when only files the phase recorded, an earlier record or the
 kit changed: check that change and record again; `redo` when sources, settings
 or verification inputs changed) and the
-exact `phase complete` command. Follow `stale.next`: in auto mode record again
-(or redo) without asking; otherwise ask once, recommending it and naming the
-changed files. Never ask why `status --fast` and `phase next` differ.
+exact `phase complete` command. Follow `stale.next`: when only a report
+changed it first says to remove a note you added (with the file edit tool, not
+git), else to record again (or redo). In auto mode do that without asking;
+otherwise ask once, recommending it and naming the changed files. Never ask why
+`status --fast` and `phase next` differ.
 
 ## Ordered workflow entry
 

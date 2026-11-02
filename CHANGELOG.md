@@ -1,3 +1,51 @@
+# 0.41.1 — 2026-11-01
+
+A note added to a recorded phase report no longer has to cost a re-record. On
+2026-11-01 (Windows, kit 0.40.0, auto mode) phase 03 had just started when the
+agent added the formal judge result to `judge-report.md`, which phase 00b's
+prompt had told it to fill with "any deferred formal validation". Phase 00b's
+record binds that file, so 00b to 02 had to be recorded again; after `pilot
+prepare` the same edit would also have ended the pilot.
+
+- Phase 00b's prompt no longer asks for a pending-judge status: the formal
+  judge's receipt is `migration/results/judge.json` and phase 03's report
+  states its result. Phase 03's prompt and checklist say never to edit the
+  reports of 00 to 02 (`feasibility.md`, `judge-report.md`,
+  `depmap/report.md`, `gap-report.md`) to note progress or a result; the
+  skill, the phase handoff and the ordered workflow say the same and add
+  `stress-test/report.md` once 03 is recorded.
+- When a phase is out of date only because its own reports changed, and every
+  later record still names the one before it, `phase next` first says to
+  remove a note the agent added, with its file edit tool and not git (the
+  guardrails may deny git restore and git checkout), that the records are then
+  current with nothing recorded again, and that such a note belongs in the
+  report of the phase being worked on (`stress-test/report.md` during 03) or in
+  chat; otherwise, or if that does not do it, to record again
+  (`stale.reportsOnly`). It names the pilots that recording 02 again would end
+  (`stale.pilots`: prepared on 02's record and the current judge receipt, with
+  their workspace and grant still in place).
+- A gate refused because only an earlier record is out of date (`phase start
+  03`, `judge` and the like after a note in `judge-report.md`) names the
+  earliest such phase and what it needs, instead of "only phase 01's record
+  changed"; so do `pilot plan`, `pilot prepare` and a refused `rulebook
+  accept`. The phase-order guidance then recommends removing the note first,
+  and to record again if `phase next` still shows the record out of date after
+  the removal. A gate now hashes the sources once for the whole chain of
+  records instead of once per record.
+- The pilot's error for an out-of-date parent 02 says to remove the note when
+  that is the cause (and otherwise that recording again ends the pilot), and
+  the pilot's status says to bring the parent up to date (`phase next --root
+  PARENT`) instead of "Prepare a new authorized pilot". `status --fast` no
+  longer reports a report changed when its bytes are the recorded ones again.
+- Records still bind their reports as before; this release changes prompts and
+  guidance only. Updating from 0.40.1 or later keeps every record.
+- Test: `tests/report-edit-rerecord-2026-11-01.test.mjs` (the note and its
+  removal, the gate error and guidance, `pilot plan`, a refused `rulebook
+  accept`, the source reads of a refused gate, the pilot named, kept by the
+  removal and ended by recording again, its error and status, `status --fast`,
+  no hint for non-report inputs, a later record made again or a removed or
+  changed pilot, a source-only source-as-spec project, and the prompts).
+
 # 0.41.0 — 2026-11-01
 
 The translation run now repairs slips of one worker answer by itself, so the

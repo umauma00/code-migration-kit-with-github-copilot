@@ -72,8 +72,9 @@ test('pilot plan shows the final scope without writing, and prepare then matches
   assert.match(planPilot(f.root, f.config, { sources: ['src/main.py'], through: 'build' }).plain.ja, /ビルドや動作確認も行います/);
   assert.throws(() => planPilot(f.root, f.config, { sources: [] }), /explicit source/);
   // Plan applies prepare's own checks, so an approved count is never refused later for them.
+  // (0.41.1: an out-of-date parent record is named with what it needs.)
   assert.throws(() => planPilot(f.root, { ...f.config, mode: 'redesign' }, { sources: ['src/main.py'] }), /preserve mode/);
-  assert.throws(() => planPilot(f.root, { ...f.config, commands: { ...f.config.commands, smoke: undefined } }, { sources: ['src/main.py'], through: 'smoke' }), /phases 00 through 02|commands\.smoke/);
+  assert.throws(() => planPilot(f.root, { ...f.config, commands: { ...f.config.commands, smoke: undefined } }, { sources: ['src/main.py'], through: 'smoke' }), /Phase 02's record is out of date, so a pilot cannot be authorized yet|phases 00 through 02|commands\.smoke/);
   assert.throws(() => planPilot(f.root, f.config, { sources: ['src/none.py'] }), /not in the manifest/);
   // Prepare refuses a scope other than the count the person approved, and writes nothing.
   assert.throws(() => preparePilot(f.root, f.config, { target: child, sources: ['src/main.py'], note: 'Plan of 1 file approved', expectTotal: 1 }), /3 files, not the 1 approved/);

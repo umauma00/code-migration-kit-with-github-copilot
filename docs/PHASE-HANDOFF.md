@@ -231,8 +231,10 @@ yourself. When the session cannot ask (autopilot or a non-interactive run report
 "unable to ask user for confirmation"), stop and ask them to continue in an
 interactive chat session instead of working around it. These hooks
 work only where the host loads them (see `doctor`).
-If artifacts or predecessor results changed, refresh the report and authorization
-as required by the runner. A user's change request is not approval to proceed.
+If artifacts or predecessor results changed, refresh the current phase's report and the
+authorization as required by the runner (a recorded phase's report only to correct it,
+never to note progress or a result: see [phase routing](#phase-routing-and-durable-evidence)).
+A user's change request is not approval to proceed.
 
 For a failed phase, follow [When a step fails](#when-a-step-fails). For a
 recommendation against migration, offer relevant choices such as "Revise the
@@ -329,6 +331,21 @@ or the absence of a later receipt does not decide the next phase by itself.
 Existing projects may already have prepared judge tests and commands without
 `judge-report.md`. Inspect that evidence and any current receipt; do not repeat
 judge design solely to create the new report format.
+
+A recorded phase's reports are its evidence: the record binds their bytes. Never
+edit `feasibility.md`, `judge-report.md`, `depmap/report.md`, `gap-report.md` (or
+`stress-test/report.md` once 03 is recorded) to note progress or a later result,
+such as the formal judge outcome: put the note in the report of the phase you
+are working on while it is not yet recorded (`stress-test/report.md` during 03),
+or in chat. The edit makes that phase and every
+later one be recorded again. For a report of 00 to 02 a prepared pilot cannot run
+until the edit is undone, and recording again ends it; after the translation
+approval an edit to `feasibility.md` or `stress-test/report.md` also makes that
+approval stale. Edit a recorded report only to correct an error, then follow
+`phase next`. If a note was added by mistake, removing exactly what was added
+with a file edit (byte for byte, line endings included; not git, which the
+guardrails may deny) makes the record current again; if `phase next` still shows
+it out of date, record again as it says.
 
 | Phase | Evidence to show | Normal next phase |
 |---|---|---|
