@@ -183,12 +183,22 @@ Within one run those checks walk the inputs again each time but keep a file's
 content hash while its identity, size, modification time and change time stay
 those it was hashed with (a file changed less than 3 s before it was read is
 read again until it settles), and check the manifest rows and the review
-dependency map again only when their text changed. A change those do not show
-(a write through a memory map or a handle still open, a FAT or exFAT file with
-its modification time put back, a network share answering from its attribute
-cache or with a clock 3 s or more behind) is found by the full check the run
-makes every ten minutes and when it ends. Gates, phase commands, status and
-the next run always hash the files' content.
+dependency map again only when their text changed (a file the map names under
+`node_modules`, `__pycache__` or `.git`, which the walk does not enter, is
+looked at every check). A change those do not show (a write through a memory
+map or a handle still open, a FAT or exFAT file with its modification time put
+back, a network share answering from its attribute cache or with a clock 3 s
+or more behind) is found by the full check the run makes every ten minutes and
+when a run that started work ends (after an interrupt or another failure
+too), or when the text given to a worker differs from the run's first read of
+that file ("Migration inputs changed before worker invocation"; an accepted
+RULEBOOK amendment keeps its identity, as in the context). Once a run finds
+its inputs changed, at any check, the units it marked done since its last
+passing full check go back to review (`blocked`, "…; its reviews are made
+again by the next run") even if the change is undone, because a worker that
+reads files itself may have seen it, and no unit is marked done after that.
+A run killed without a stop signal makes no last check. Gates, phase
+commands, status and the next run always hash the files' content.
 
 Optional `buildArtifactRoots` (default `[]`) declares repository-relative
 directories containing generated objects, binaries and reports. Command paths

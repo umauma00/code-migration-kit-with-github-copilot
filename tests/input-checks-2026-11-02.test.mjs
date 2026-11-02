@@ -206,7 +206,7 @@ const rewriteSameSize = file => fs.writeFileSync(file, fs.readFileSync(file, 'ut
 
 test('with settled inputs a run reads each source a few times only, and still stops on every change of a source during a worker call', async t => {
   // Every project first, then one wait until all their files have settled.
-  const [counted, appended, rewritten, hidden, periodic, pilot, parent] = await Promise.all([production(t, 2), ready(t), ready(t), ready(t), ready(t), reviewedPreparation(t), reviewedPreparation(t)]);
+  const [counted, appended, rewritten, hidden, pinned, interrupted, periodic, budget, removed] = await Promise.all([production(t, 2), ready(t), ready(t), ready(t), ready(t), ready(t, { count: 2 }), ready(t), ready(t), ready(t, { count: 2 })]);
   // main.py is no unit of these projects: only the input checks read it.
   const other = f => safePath(f.root, 'src/main.py'), whole = wholeSecond();
   fs.utimesSync(other(rewritten), whole, whole);
@@ -214,6 +214,8 @@ test('with settled inputs a run reads each source a few times only, and still st
 
   await t.test('two units, one with a finding: a source outside them is read when the run starts and by its last check', async () => {
     const f = counted, files = [other(f), safePath(f.root, 'src/math_ops.py'), safePath(f.root, 'migration/review-dependencies.json'), safePath(f.root, 'migration/manifest.tsv')];
+    const waiver = safePath(f.root, 'migration/phases/waivers/04.json');
+    writeJSON(waiver, { schemaVersion: 1, phase: '04', note: 'Synthetic waiver for a regression test only', waivedAt: new Date().toISOString() });
     const reads = readCounter(files);
     let found = false, summary;
     try {
@@ -224,6 +226,8 @@ test('with settled inputs a run reads each source a few times only, and still st
       });
     } finally { reads.stop(); }
     assert.equal(summary.done, 2);
+    assert.equal(summary.scopeComplete, true);
+    assert.equal(fs.existsSync(waiver), false, 'every unit done: phase 04\'s waiver retires');
     const [main, unitSource, map, manifest] = reads.counts;
     // Before 0.43.0 this run read main.py 21 times (once per check), the
     // unit's own math_ops.py 23 times, the dependency map 48 times and the
@@ -272,8 +276,9 @@ test('with settled inputs a run reads each source a few times only, and still st
     assert.equal(fs.existsSync(safePath(f.root, f.units[0].target)), false, 'nothing written after the change');
   });
 
-  await t.test('a change the file\'s size and times do not show is found by the run\'s last check', async () => {
-    const f = hidden;
+  await t.test('a change the file\'s size and times do not show is found by the run\'s last check, and its unit is reviewed again even once it is undone', async () => {
+    const f = hidden, waiver = safePath(f.root, 'migration/phases/waivers/04.json'), original = fs.readFileSync(other(f));
+    writeJSON(waiver, { schemaVersion: 1, phase: '04', note: 'Synthetic waiver for a regression test only', waivedAt: new Date().toISOString() });
     let undo = () => {};
     let failure;
     try {
@@ -284,6 +289,54 @@ test('with settled inputs a run reads each source a few times only, and still st
     } finally { undo(); }
     assert.match(failure?.message ?? 'completed', /Migration inputs changed during the run/);
     assert.ok(failure.report.errors.some(e => e.target === '(inputs)'), JSON.stringify(failure.report.errors));
+    // The unit it finished since the last full check goes back to review: it
+    // is not done, the run's scope is not complete and phase 04's waiver stays.
+    assert.equal(failure.report.done, 0);
+    assert.equal(failure.report.scopeComplete, false);
+    assert.equal(fs.existsSync(waiver), true);
+    const state = readJSON(safePath(f.root, `migration/state/units/${f.units[0].id}.json`));
+    assert.equal(state.status, 'blocked');
+    assert.match(state.error, /Migration inputs changed during the run.*its reviews are made again/);
+    // Undone, the inputs are those approved again: the next run reviews the
+    // unit again rather than keep reviews a worker reading files itself may
+    // have made of the changed text.
+    fs.writeFileSync(other(f), original);
+    const roles = [];
+    const summary = await translate(f.root, f.config, async call => { roles.push(call.role); return fake(call); });
+    assert.equal(summary.done, 1);
+    assert.equal(roles.filter(role => role.startsWith('reviewer-')).length, 2, roles.join(', '));
+  });
+
+  await t.test('a change of a unit\'s own source its size and times do not show stops the run before a reviewer is given the text', async () => {
+    const f = pinned, source = safePath(f.root, f.units[0].source), roles = [];
+    let undo = () => {};
+    let failure;
+    try {
+      failure = await translate(f.root, f.config, async call => {
+        roles.push(call.role);
+        if (call.role === 'implementer') { undo = freezeStat(source); fs.writeFileSync(source, fs.readFileSync(source, 'utf8').replace('division', 'Division')); }
+        return fake(call);
+      }).then(() => null, e => e);
+    } finally { undo(); }
+    assert.match(failure?.message ?? 'completed', /Migration inputs changed before worker invocation/);
+    assert.deepEqual(roles, ['implementer'], 'no reviewer was called');
+  });
+
+  await t.test('an interrupted run still makes its last check, and sends back a unit it finished after such a change', async () => {
+    const f = interrupted, stop = new AbortController();
+    let undo = () => {}, finished = null;
+    let failure;
+    try {
+      failure = await translate(f.root, f.config, async call => {
+        if (call.role === 'implementer' && call.unit.source === 'src/math_ops.py') { undo = freezeStat(other(f)); rewriteSameSize(other(f)); }
+        return fake(call);
+      }, { signal: stop.signal, onProgress: event => { if (event.stage === 'done' && !finished) { finished = event.unit; stop.abort(); } } }).then(() => null, e => e);
+    } finally { undo(); }
+    assert.ok(finished, 'a unit finished before the interrupt');
+    assert.match(failure?.message ?? 'completed', /Migration inputs changed during the run/);
+    const unit = f.units.find(u => u.target === finished);
+    assert.equal(readJSON(safePath(f.root, `migration/state/units/${unit.id}.json`)).status, 'blocked');
+    assert.equal(failure.report.done, 0);
   });
 
   await t.test('after ten minutes a check reads every input again and finds such a change at once', async () => {
@@ -300,6 +353,37 @@ test('with settled inputs a run reads each source a few times only, and still st
     assert.match(failure?.message ?? 'completed', /Migration inputs changed during worker invocation/);
     assert.equal(fs.existsSync(safePath(f.root, f.units[0].target)), false, 'nothing written after the change');
   });
+
+  await t.test('a run that also ran out of calls is not a budget stop when its last check finds such a change', async () => {
+    const f = budget;
+    let undo = () => {};
+    let failure;
+    try {
+      failure = await translate(f.root, f.config, async call => {
+        if (call.role === 'implementer') { undo = freezeStat(other(f)); rewriteSameSize(other(f)); }
+        return fake(call);
+      }, { maxCalls: 1 }).then(() => null, e => e);
+    } finally { undo(); }
+    assert.match(failure?.message ?? 'completed', /Migration inputs changed during the run/);
+    // The build loop would ask for more calls within the current approval.
+    assert.equal(failure.budgetStop, false);
+  });
+
+  await t.test('a source of another unit removed during a worker call is named, as before 0.43.0', async () => {
+    const f = removed;
+    const failure = await translate(f.root, f.config, async call => {
+      if (call.role === 'implementer' && call.unit.source === 'src/math_ops.py') fs.rmSync(safePath(f.root, 'src/text_ops.py'));
+      return fake(call);
+    }).then(() => null, e => e);
+    assert.match(failure?.message ?? 'completed', /Review dependency file missing: src\/text_ops\.py/);
+  });
+});
+
+test('with settled inputs a pilot reads the production project\'s and its own sources a few times only, and stops when a production source changes', async t => {
+  // Its own top-level test: each pilot prepares a production project with
+  // its judge (slow on Windows), then one wait until their files have settled.
+  const [pilot, parent] = await Promise.all([reviewedPreparation(t), reviewedPreparation(t)]);
+  await sleep(settled);
 
   await t.test('a pilot reads the production project\'s and its own settled sources a few times only', async () => {
     const config = loadConfig(pilot.child), files = [safePath(pilot.root, 'src/math_ops.py'), path.join(pilot.child, 'src/math_ops.py')];

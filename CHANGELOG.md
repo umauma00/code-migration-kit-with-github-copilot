@@ -27,11 +27,30 @@ unit in flight.
   still open (Windows updates the times when it is closed), a file system
   without a change time (FAT, exFAT) with the modification time put back,
   or a network share that answers from its attribute cache or whose clock
-  runs 3 s or more behind. So every ten minutes, and once when the run
-  ends, a check reads and checks every input again; a change found there
-  stops the run as before (at the end: "Migration inputs changed during the
-  run; fresh approval required"). Gates, phase commands, `status` and the
-  next run always read the files themselves.
+  runs 3 s or more behind. Three things cover it:
+  - The text given to each worker is checked against the run's first read
+    of it as it is read, with no extra reads: a difference stops the run
+    before any worker sees it ("Migration inputs changed before worker
+    invocation"). An accepted RULEBOOK amendment passes, as in the context.
+  - Every ten minutes, and once when a run that started work ends (after
+    an interrupt or another failure too), a check reads and checks every
+    input again (at the end: "Migration inputs changed during the run;
+    fresh approval required").
+  - Workers that read files themselves (the arbiter, a tool-assisted
+    reviewer, an implementer or fixer over the input limit) may have seen
+    such a change before a check found it. So when a run finds its inputs
+    changed, at any check, the units it finished since its last full check
+    (at most about ten minutes of work) go back to review ("…; its reviews
+    are made again by the next run"), also if the change is then undone,
+    and no unit finishes after that. Before, the run stopped at the next
+    check and the units finished before it stayed done. The run then
+    neither counts its scope as complete, retires a phase 04 waiver, nor
+    tells the build loop it ran out of calls.
+
+  Gates, phase commands, `status` and the next run always read the files
+  themselves. A run that is killed (not stopped with Ctrl+C or a stop
+  signal) makes no last check, so its last finished units are kept as they
+  are.
 - The evidence for each worker call uses the review dependency map from
   the run's first read of its inputs; each call read the map again and
   checked every file it names.
@@ -54,9 +73,9 @@ unit in flight.
   file, now one. The orchestrator's `status --root ROOT --wait 600` is now
   as light while it waits as `status --fast --wait 600`. A manifest that
   cannot be read (a folder in its place) is a blocker of `status --fast`
-  and `status --fast --wait`, as of the full status, instead of a failure;
-  if the recorded progress cannot be read at all, `status --wait` returns
-  the full status.
+  and `status --fast --wait`, as it is of the full status, instead of a
+  failure; if the recorded progress cannot be read at all, `status --wait`
+  returns the full status.
 - `status --fast` (and so `status --wait` while it waits) treats a lock
   written on another host as the full status does: not running, named in
   `foreignLock`, and the next actions say to run `unlock --pid` once that
@@ -64,9 +83,9 @@ unit in flight.
   running, as in the full status. Before, with a process of the same number
   on this host, `--fast` showed it running and `--fast --wait` waited out
   its whole time.
-- What is checked and recorded does not change, and the kit's code is not
-  an input: from 0.40.1 or later, approvals, completion records, phase
-  records, prepared pilots and finished units are kept. The update can go
+- What is checked and the records' format do not change, and the kit's
+  code is not an input: from 0.40.1 or later, approvals, completion
+  records, phase records, prepared pilots and finished units are kept. The update can go
   in during phase 04: stop the runner, update, and run `translate` again;
   it goes on with the units not finished.
 
