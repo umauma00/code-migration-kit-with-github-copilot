@@ -1,3 +1,31 @@
+# 0.43.1 — 2026-11-02
+
+`pilot prepare` works in a source-as-spec project. It stopped with "Missing
+scenario input: migration/source-spec/sources.md" (found on 2026-11-02 while
+reviewing 0.42.1; 0.42.0 and 0.43.0 stop the same way). A source-only judge
+reads its plan (`migration/judge-plan.json`) and every file the plan names, and
+the copy's inputs include them. A source-as-spec plan keeps its scenarios in
+`migration/source-spec/` (`sources.md`, or the contract memo `contracts.md` of
+plans made before 0.10.0). The copy held the source roots, the verification
+roots, the verification inputs and named records, but not that folder, so the
+copy's inputs could not be read and `pilot prepare` removed the copy again.
+A source-only plan whose scenarios are under `verificationRoots` or
+`verificationInputs` was already copied.
+
+- A source-only pilot's copy now holds the plan and every file it names
+  (`lib/pilot.mjs`). The list comes from the read that computed the
+  project's own inputs for the same command, so no source is read again
+  for it.
+- Nothing else changes. A failed `pilot prepare` left no copy and no grant,
+  so there is nothing to clean up: run `pilot plan` and `pilot prepare`
+  again. Records, approvals and pilots prepared before are kept.
+- Test: `tests/pilot-source-spec-2026-11-02.test.mjs` (a source-as-spec
+  pilot with the files it uses, prepared and run to the end with the
+  project unchanged; in auto mode a pilot of the chosen file whose plan
+  also names a contract memo; an edit of a copied scenario in the copy or
+  in the project stops the pilot as other inputs do). All three fail on
+  0.43.0.
+
 # 0.43.0 — 2026-11-02
 
 Phase 04 no longer reads every source file again before and after each worker

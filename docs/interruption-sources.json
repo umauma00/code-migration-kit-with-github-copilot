@@ -1557,7 +1557,7 @@
     },
     {
       "path": "lib/pilot.mjs",
-      "sha256": "c30f52896bcf3b0469e41bb561238855da37a042b6bd1098dc1cdba08c3e42af",
+      "sha256": "52fa1de7516e5bc13919691d50026199ab33a3c5e64e1e3e19e8b0990595dc10",
       "entries": [
         {
           "line": 40,
@@ -1670,12 +1670,12 @@
           "code": "if (expectTotal !== undefined && Number(expectTotal) !== scope.length) throw new Error(`Pilot scope is ${scope.length} files, not the ${expectTotal} approved; run pilot plan again and ask with the new count`);"
         },
         {
-          "line": 174,
+          "line": 179,
           "kind": "error-or-exit-candidate",
           "code": "if (contextHash(parent, config) !== context) throw new Error('Parent inputs changed while preparing the pilot');"
         },
         {
-          "line": 183,
+          "line": 188,
           "kind": "error-or-exit-candidate",
           "code": "throw e;"
         }

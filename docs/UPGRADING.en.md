@@ -1,6 +1,14 @@
-# Upgrading (0.43.0 and earlier releases)
+# Upgrading (0.43.1 and earlier releases)
 
 [日本語](UPGRADING.md) | English
+
+## 0.43.1 (a pilot could not be prepared in a source-as-spec project)
+
+In a source-as-spec project `pilot prepare` stopped with "Missing scenario input: migration/source-spec/sources.md" (found on 2026-11-02 while reviewing 0.42.1; 0.42.0 and 0.43.0 stop the same way). A source-only judge reads its plan (`migration/judge-plan.json`) and every file the plan names, and so do the input checks of a pilot's copy. A source-as-spec plan keeps its scenarios in `migration/source-spec/` (`sources.md`, or the contract memo `contracts.md` of plans made before 0.10.0). The pilot's copy held the sources, the verification roots, the verification inputs and named records, but not that folder, so the copy's inputs could not be checked and `pilot prepare` removed the copy again. A source-only plan whose scenarios are under `verificationRoots` or `verificationInputs` was already copied.
+
+1. A source-only pilot's copy now holds the plan and every file it names (`lib/pilot.mjs`). The list comes from the read that checked the project's own inputs for the same command, so no source is read again for it.
+2. Nothing else changes. A `pilot prepare` that stopped left no copy and no grant, so there is nothing to clean up: update, then run `pilot plan` and `pilot prepare` again. The kit's code is not an input of the records, so updating from 0.40.1 or later keeps approvals, completion receipts, phase records, prepared pilots and finished units (from 0.40.0, see 0.40.1).
+3. For a copied install, replace the whole `migration-kit/` with the staged copy. A plugin install only needs the update.
 
 ## 0.43.0 (phase 04 no longer reads every source again for each AI call)
 
