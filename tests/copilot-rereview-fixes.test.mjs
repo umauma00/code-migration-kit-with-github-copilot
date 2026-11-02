@@ -79,7 +79,7 @@ test('rereview 3: stock Python repo-root edges convert without doubled package p
   });
   assert.ok(report.ignoredEdges.some(e => e.from === 'tests/import_pkg.py' && e.to === 'pkg/a.py'));
   assert.equal(report.ignoredEdgeCount, report.ignoredEdges.length);
-  f.config.sourceRoots = ['pkg']; writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  f.config.sourceRoots = ['pkg']; writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   assert.deepEqual(loadReviewDependencies(f.root, f.config), deps);
   assert.deepEqual(reviewSources(f.root, f.config, 'pkg/a.py'), ['pkg/__init__.py', 'pkg/a.py', 'pkg/b.py', 'pkg/c.py']);
 });

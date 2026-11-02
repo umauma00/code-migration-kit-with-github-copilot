@@ -17,7 +17,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { prepare, fake, mini } from './helpers.mjs';
-import { safePath, atomicWrite, writeJSON, readJSON, fileHash, contextHash, loadConfig } from '../lib/core.mjs';
+import { safePath, atomicWrite, writeJSON, readJSON, fileHash, inputContext, loadConfig } from '../lib/core.mjs';
 import { phaseCommand } from '../scripts/phase_cli.mjs';
 import { install } from '../scripts/install.mjs';
 import { currentPhase, requirePhase, phaseWaiver, phaseStaleness, earliestStale, staleText, inputRead, readContext } from '../lib/phases.mjs';
@@ -118,9 +118,9 @@ test('recording 00b to 03 again after the kit update reads each source file once
   // names the one recorded just before it, with this kit's judge format.
   chainHolds(root, config, ['00', '00b', '01', '02']);
   const b = readJSON(file);
-  assert.equal(b.judgeInputSchema, 2);
+  assert.equal(b.judgeInputSchema, 3);
   assert.equal(b.judgeInputHash, judgeInputHash(root, config));
-  assert.equal(readJSON(safePath(root, 'migration/phases/02.json')).contextHash, contextHash(root, config));
+  assert.equal(readJSON(safePath(root, 'migration/phases/02.json')).contextHash, inputContext(root, config).content);
   // Phase 03 waits only for its predecessor; recording it reads once too.
   assert.deepEqual(once(sources, 'phase next', () => phaseCommand(root, config, 'next')).stale.reasons.map(r => r.kind), ['predecessor']);
   once(sources, 'phase complete 03', () => phaseCommand(root, config, 'complete', '03', { note: 'Recorded again after phase 02; the stress test still holds' }));
@@ -154,7 +154,7 @@ test('status after parity reads each source once and each translated file once f
   const f = prepare(t, { count: 3 });
   // The installed marker policy: done() also reads each output for its markers.
   f.config.markerPolicy = 'todo-lines-v1';
-  writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   await runStage(f.root, f.config, 'judge');
   approve(f.root, f.config, 'translation', 'Test fixture approval');
   // The fixture outputs with the trailer that policy asks for.
@@ -183,12 +183,12 @@ test('a translation approval for named files reads the manifest once, not once p
   await runStage(f.root, f.config, 'judge');
   const targets = f.units.slice(0, 2).map(u => u.target);
   approve(f.root, f.config, 'translation', 'Test fixture batch approval', { targets });
-  const context = contextHash(f.root, f.config), manifest = safePath(f.root, 'migration/manifest.tsv');
+  const context = inputContext(f.root, f.config), manifest = safePath(f.root, 'migration/manifest.tsv');
   const gate = once([manifest], 'translation gate', () => requireGate(f.root, f.config, 'translation', context));
   assert.deepEqual(gate.targets, targets);
   // A target no longer in the manifest still makes the approval invalid.
   atomicWrite(manifest, `source\ttarget\n${f.units.filter(u => u.target !== targets[1]).map(u => `${u.source}\t${u.target}`).join('\n')}\n`);
-  assert.throws(() => requireGate(f.root, f.config, 'translation', contextHash(f.root, f.config)), /Invalid translation approval scope/);
+  assert.throws(() => requireGate(f.root, f.config, 'translation', inputContext(f.root, f.config)), /Invalid translation approval scope/);
 });
 
 test('in a strict project a translation approval for more named files does not read the manifest more often', async t => {
@@ -202,7 +202,7 @@ test('in a strict project a translation approval for more named files does not r
   // The gate as translate checks it, without a read of its own caller.
   const reads = named => {
     approve(f.root, f.config, 'translation', 'Test fixture batch approval', { targets: named });
-    const { counts, value } = readsOf([manifest], () => requireGate(f.root, f.config, 'translation', contextHash(f.root, f.config)));
+    const { counts, value } = readsOf([manifest], () => requireGate(f.root, f.config, 'translation', inputContext(f.root, f.config)));
     assert.deepEqual(value.targets, named);
     return counts[0];
   };
@@ -218,7 +218,7 @@ test('in a strict project a translation approval for more named files does not r
 // Phases 00 to 02 of a strict runtime project recorded, judge run.
 async function reviewedPreparation(t) {
   const f = prepare(t, { realCommands: true, count: 3 });
-  f.config.phasePolicy = 'strict'; writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  f.config.phasePolicy = 'strict'; writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   fs.rmSync(safePath(f.root, 'migration/stress-test/report.md'));
   for (const p of ['migration/judge-report.md', 'migration/depmap/report.md', 'migration/gap-report.md']) atomicWrite(safePath(f.root, p), 'Disposable preparation fixture; not actual AI review or human signoff.\n');
   return { ...f, sources: f.units.map(u => safePath(f.root, u.source)) };
@@ -272,7 +272,7 @@ test('a pilot\'s status reads each production source and each pilot file once', 
 // records, so a record went out of date as soon as it was written (0.42.0
 // refused the next phase of a package; phase next sent 00b back for ever).
 test('a verification root or input over the records the kit writes is refused when the config is read', async t => {
-  const f = prepare(t, { count: 1 }), file = safePath(f.root, 'migration/config.json'), raw = readJSON(file);
+  const f = prepare(t, { count: 1 }), file = safePath(f.root, 'migration/state/config.json'), raw = readJSON(file);
   const load = change => { writeJSON(file, { ...raw, ...change }); return loadConfig(f.root); };
   for (const roots of [['migration'], ['migration/phases'], ['migration/results/judge'], ['migration/rulebook-history'], ['migration/pilots'], ['tests', 'migration']]) {
     assert.throws(() => load({ verificationRoots: roots }), /^Error: verificationRoots overlaps the kit's phase and run records: migration/, JSON.stringify(roots));

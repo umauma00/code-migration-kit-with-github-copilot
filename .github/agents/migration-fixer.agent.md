@@ -12,4 +12,4 @@ Work from the task input the coordinator supplies; read files only when it lists
 
 For human setup: [operating manual](../../docs/OPERATING-MANUAL.md) and
 [JSON contracts](../../docs/CONTRACTS.md). Model selection belongs to
-`migration/config.json`; do not add a `model` frontmatter override.
+`migration/settings.json`; do not add a `model` frontmatter override.

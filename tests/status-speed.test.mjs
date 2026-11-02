@@ -8,8 +8,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { prepare } from './helpers.mjs';
-import { safePath, pathMemo, contextHash, reviewSources, reachableSources, writeJSON, atomicWrite } from '../lib/core.mjs';
+import { prepare, scopesOf } from './helpers.mjs';
+import { safePath, pathMemo, inputContext, reviewSources, reachableSources, writeJSON, atomicWrite } from '../lib/core.mjs';
 
 test('a path memo keeps every symlink and parent check of safePath', t => {
   const { root } = prepare(t);
@@ -56,14 +56,14 @@ test('contextHash checks each parent directory once per read, not once per edge'
   const { root, config, names } = wideProject(t);
   const counts = { lstatSync: 0, existsSync: 0, statSync: 0, realpathSync: 0 };
   const originals = Object.fromEntries(Object.keys(counts).map(k => [k, fs[k]]));
-  const first = contextHash(root, config);
+  const first = scopesOf(root, config);
   try {
     for (const k of Object.keys(counts)) {
       const original = originals[k];
       fs[k] = function (...args) { counts[k]++; return original.apply(this, args); };
       if (k === 'realpathSync') fs[k].native = original.native;
     }
-    assert.equal(contextHash(root, config), first, 'the hash is stable');
+    assert.equal(scopesOf(root, config), first, 'the hash is stable');
   } finally { Object.assign(fs, originals); }
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
   // 120 units x 60 dependencies = 7,200 edges. Checking each edge's path from
@@ -73,16 +73,16 @@ test('contextHash checks each parent directory once per read, not once per edge'
 
 test('contextHash still notices a changed dependency, a missing declaration and a linked source', t => {
   const { root, config, names } = wideProject(t, 20, 5);
-  const before = contextHash(root, config);
+  const before = scopesOf(root, config);
   fs.appendFileSync(path.join(root, names[3]), '# changed\n');
-  assert.notEqual(contextHash(root, config), before);
+  assert.notEqual(scopesOf(root, config), before);
   const map = JSON.parse(fs.readFileSync(path.join(root, 'migration/review-dependencies.json'), 'utf8'));
   delete map.dependencies[names[0]];
   writeJSON(safePath(root, 'migration/review-dependencies.json'), map);
-  assert.throws(() => contextHash(root, config), new RegExp(`declaration missing: ${names[0]}`));
+  assert.throws(() => inputContext(root, config), new RegExp(`declaration missing: ${names[0]}`));
   map.dependencies[names[0]] = [];
   writeJSON(safePath(root, 'migration/review-dependencies.json'), map);
   fs.rmSync(path.join(root, names[1]));
   try { fs.symlinkSync(path.join(root, names[2]), path.join(root, names[1])); } catch { t.skip('symlinks unavailable'); return; }
-  assert.throws(() => contextHash(root, config), /Symlinks are not supported/);
+  assert.throws(() => inputContext(root, config), /Symlinks are not supported/);
 });

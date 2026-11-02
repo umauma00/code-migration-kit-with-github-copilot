@@ -14,7 +14,7 @@ Register the marketplace from the source below (the repository's default branch,
 umauma00/code-migration-kit-with-github-copilot
 ```
 
-Manage the plugin from one source only. If it is registered several ways at once (marketplace, local checkout, `chat.pluginLocations`), two orchestrators appear and the first one found wins. An older repository copy's `.github/skills/code-migration/` also takes precedence as a skill of the same name. To switch, keep the existing data, explicitly remove the old skill and set `"runtime": "plugin"` in `migration/config.json`. Existing approvals and completion records must be re-checked.
+Manage the plugin from one source only. If it is registered several ways at once (marketplace, local checkout, `chat.pluginLocations`), two orchestrators appear and the first one found wins. An older repository copy's `.github/skills/code-migration/` also takes precedence as a skill of the same name. To switch, keep the existing data, explicitly remove the old skill and set `"runtime": "plugin"` in the kit's record `migration/state/config.json` (`migration/config.json` until 0.44.x). From 0.45.0 the switch keeps approvals and completion records (until 0.44.x they had to be checked again); in a project from 0.44.x, run a 0.45.0 kit command such as `doctor` once before switching.
 
 ### GitHub Copilot CLI
 
@@ -110,7 +110,7 @@ node /path/to/code-migration-kit/scripts/install.mjs --target . --layout plugin 
 
 Whether you start from VS Code, the Copilot CLI or the GitHub Copilot app, the parent agent runs the runner in a terminal and the runner starts Copilot CLI workers. The AI runs these commands from chat too.
 
-It creates three files, `migration/config.json`, `migration/RULEBOOK.md` and `migration/inventory.tsv`, plus `migration/preferences.json` (the report language) when `--language` is given. Models and rules of an already configured project are never overwritten. Initialization approves no phase. The AI asks the models, languages, source location, phase mode and whether the original runs as questions and writes the answers into `migration/run-settings.json` (written by `run_migration.mjs settings init`). The remaining entries, such as output/test locations and validation commands, and later changes are made in that file and recorded with `settings apply`.
+It creates three files, `migration/state/config.json` (the kit's record of the settings), `migration/RULEBOOK.md` and `migration/inventory.tsv`, plus `migration/state/preferences.json` (the report language) when `--language` is given. Models and rules of an already configured project are never overwritten. Initialization approves no phase. The AI asks the models, languages, source location, phase mode and whether the original runs as questions and writes the answers into `migration/settings.json` (written by `run_migration.mjs settings init`). The remaining entries, such as output/test locations and validation commands, and later changes are made in that file only and recorded with `settings apply` (the next kit command that starts applies them too).
 
 Call the plugin's scripts by absolute path, with the target repository as the working directory.
 
@@ -119,7 +119,7 @@ node /path/to/code-migration-kit/scripts/run_migration.mjs doctor --check-cli
 node /path/to/code-migration-kit/scripts/run_migration.mjs status
 ```
 
-In a new project, doctor shows the dependency declaration as `pending` (not needed yet) until phase 01 is recorded. From then on, artifacts, run records and approvals live in the target's `migration/`, and translated output in the configured `outputRoots`. Updating the plugin, or changing the project's `.github/hooks/`, `.github/agents/` or `.claude/agents/`, revokes existing approvals and completion. Track additional scripts inside the target repository that a hook uses via `verificationInputs`.
+In a new project, doctor shows the dependency declaration as `pending` (not needed yet) until phase 01 is recorded. From then on, artifacts, run records and approvals live in the target's `migration/`, and translated output in the configured `outputRoots`. Updating the plugin, or changing the project's `.github/hooks/`, `.github/agents/` or `.claude/agents/`, revokes no approval or completion: they decide how the work is done, not what it produces, and apply to the work after the change. A project agent with the name of one of the kit's roles stops a worker from starting, and says why.
 
 ## Backends and verification scope
 
@@ -133,6 +133,6 @@ This plugin targets the Copilot session type. Choose VS Code Local hooks and the
 
 Automated tests check translation of three files, independent review and build/smoke/parity without any `.github/` or `migration-kit/` in the project; model responses are test doubles. Plugin recognition, installation from a local marketplace and resolution of the named worker IDs were also checked on the real CLI (installation from the GitHub-hosted marketplace is not); re-check with `node tests/verify_plugin.mjs /absolute/path/to/copilot` (no external AI). `doctor --check-cli` also proves, under the same conditions as the workers, that every worker ID resolves.
 
-`node tests/verify_plugin_resolution.mjs /absolute/path/to/runtime.node` compares worker collisions and post-hook invalidation with CLI 1.0.93's actual discovery, selection and hook APIs. Only this verification script depends on those internal APIs.
+`node tests/verify_plugin_resolution.mjs /absolute/path/to/runtime.node` compares worker collisions, and that approvals and completion stay after a hook change, with CLI 1.0.93's actual discovery, selection and hook APIs. Only this verification script depends on those internal APIs.
 
 On macOS, the real CLI (1.0.95 and 1.0.98) with a stand-in (loopback) model was used to check plugin-layout translation, independent review (including tool-assisted review) and denial by the guardrail hook. An old CLI (1.0.40) cannot load the plugin's agents, and `doctor` reports the missing worker IDs. Exhaustive checks from the VS Code and GitHub Copilot app screens, and translation quality with a real model through the last phase, are not verified yet. Before a real project, run the small check in [LIVE-SMOKE.en.md](LIVE-SMOKE.en.md), reading its `migration-kit/` as the plugin's absolute path.

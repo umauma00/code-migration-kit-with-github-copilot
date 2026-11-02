@@ -126,7 +126,7 @@ test('prompts put shared rules first and the unit-specific target last for promp
 test('a run stops cleanly at maxRunInputBytes and reports measured bytes with estimated tokens', async t => {
   const f = await ready(t, { count: 3 });
   Object.assign(f.config, { maxRunInputBytes: 1024, concurrency: 1 });
-  writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   const { approve, runStage } = await import('../lib/pipeline.mjs');
   await runStage(f.root, f.config, 'judge');
   approve(f.root, f.config, 'translation', 'Budget fixture');
@@ -139,5 +139,5 @@ test('a run stops cleanly at maxRunInputBytes and reports measured bytes with es
   assert.match(summary.usageEstimate.basis, /not measured/);
   assert.equal(failureGuidance('Translation stopped: ported/a.mjs: Run input budget (maxRunInputBytes) reached; resume', { language: 'ja' }).id, 'input-budget');
   assert.equal(failureGuidance('Copilot implementer failed (exit 1): Your AI Credits budget has been exhausted', { language: 'en' }).id, 'credits');
-  assert.throws(() => { writeJSON(safePath(f.root, 'migration/config.json'), { ...f.config, maxRunInputBytes: 10 }); loadConfig(f.root); }, /maxRunInputBytes/);
+  assert.throws(() => { writeJSON(safePath(f.root, 'migration/state/config.json'), { ...f.config, maxRunInputBytes: 10 }); loadConfig(f.root); }, /maxRunInputBytes/);
 });

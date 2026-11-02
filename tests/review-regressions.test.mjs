@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { prepare, ready, fake, result, cliOutput, cliDouble } from './helpers.mjs';
-import { approve, requireGate, runStage, translate } from '../lib/pipeline.mjs';
-import { safePath, atomicWrite, writeJSON, readJSON, contextHash, readManifest, done, verificationFiles, filesUnder, loadConfig, unitState } from '../lib/core.mjs';
+import { prepare, ready, fake, result, cliOutput, cliDouble, scopesOf } from './helpers.mjs';
+import { approve, requireGate, runStage, translate, currentRecord } from '../lib/pipeline.mjs';
+import { safePath, atomicWrite, writeJSON, readJSON, inputContext, readManifest, done, verificationFiles, filesUnder, loadConfig, unitState } from '../lib/core.mjs';
 import { runProcess } from '../lib/process.mjs';
 import { reviewInput } from '../lib/review.mjs';
 import { copilotArgs, createCopilotAdapter } from '../scripts/copilot_adapter.mjs';
@@ -15,7 +15,7 @@ import { doctor } from '../scripts/run_migration.mjs';
 import { kitRoot } from '../scripts/install.mjs';
 
 const write = (root, name, text) => atomicWrite(safePath(root, name), text);
-const persist = f => writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+const persist = f => writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
 const node = (args, options) => runProcess(process.execPath, args, options);
 async function start(f) {
   persist(f); await runStage(f.root, f.config, 'judge');
@@ -38,11 +38,11 @@ test('R1: explicit manifest source under a normally excluded directory invalidat
   map.dependencies['src/node_modules/dependency.py'] = [];
   writeJSON(safePath(f.root, 'migration/review-dependencies.json'), map);
   await start(f);
-  const unit = readManifest(f.root, f.config)[0], before = contextHash(f.root, f.config);
-  assert.ok(done(f.root, unit, before));
+  const unit = readManifest(f.root, f.config)[0], before = scopesOf(f.root, f.config);
+  assert.ok(done(f.root, unit, inputContext(f.root, f.config)));
   write(f.root, unit.source, 'value = 2\n');
-  assert.notEqual(contextHash(f.root, f.config), before);
-  assert.equal(done(f.root, unit, contextHash(f.root, f.config)), false);
+  assert.notEqual(scopesOf(f.root, f.config), before);
+  assert.equal(done(f.root, unit, inputContext(f.root, f.config)), false);
   await assert.rejects(translate(f.root, f.config, fake), /stale/);
 });
 
@@ -54,17 +54,27 @@ test('R1: build scripts, standard configs and explicit nested inputs participate
   f.config.commands.build = [process.execPath, 'build.mjs'];
   f.config.verificationInputs = ['build-settings/options.json'];
   await start(f); await validateThrough(f, 'build');
-  for (const name of ['build.mjs', 'package.json', 'build-settings/options.json']) {
-    const before = contextHash(f.root, f.config);
+  // 0.45.0: the build command's own file sends back the build; a build file
+  // at the root and a verificationInputs file send back every run (the
+  // judge too). None of them changes what a reviewed unit is.
+  for (const [name, judgeToo] of [['build.mjs', false], ['package.json', true], ['build-settings/options.json', true]]) {
+    const before = scopesOf(f.root, f.config), text = fs.readFileSync(safePath(f.root, name), 'utf8');
     fs.appendFileSync(safePath(f.root, name), '\n');
-    assert.notEqual(contextHash(f.root, f.config), before, name);
-    assert.throws(() => approve(f.root, f.config, 'smoke', 'test'), /current reviewed receipts/);
+    assert.notEqual(scopesOf(f.root, f.config), before, name);
+    const context = inputContext(f.root, f.config);
+    assert.equal(done(f.root, f.units[0], context), true, name);
+    assert.equal(Boolean(currentRecord(f.root, f.config, 'judge', context, false)), !judgeToo, name);
+    assert.equal(currentRecord(f.root, f.config, 'build', context), false, name);
+    assert.throws(() => approve(f.root, f.config, 'smoke', 'test'), new RegExp(`Run ${judgeToo ? 'judge' : 'build'} successfully for the current inputs first`), name);
+    write(f.root, name, text);
+    assert.equal(scopesOf(f.root, f.config), before, name);
+    assert.ok(currentRecord(f.root, f.config, 'build', inputContext(f.root, f.config)), name);
   }
   assert.ok(verificationFiles(f.root, f.config).includes('build.mjs'));
   assert.ok((await doctor(f.root, f.config)).ok);
   fs.unlinkSync(safePath(f.root, 'build-settings/options.json'));
   assert.equal((await doctor(f.root, f.config)).ok, false);
-  assert.throws(() => contextHash(f.root, f.config), /verificationInputs file missing/);
+  assert.throws(() => inputContext(f.root, f.config), /verificationInputs file missing/);
 });
 
 test('R2: failed build retry revokes downstream results and already issued approvals', async t => {
@@ -72,9 +82,9 @@ test('R2: failed build retry revokes downstream results and already issued appro
   f.config.commands.build = [process.execPath, '-e', 'process.exit(require("node:fs").existsSync("migration/fail-build") ? 7 : 0)'];
   await start(f); await validateThrough(f);
   approve(f.root, f.config, 'parity', 'Approved before build retry');
-  const before = contextHash(f.root, f.config);
+  const before = scopesOf(f.root, f.config);
   write(f.root, 'migration/fail-build', 'fail');
-  assert.equal(contextHash(f.root, f.config), before);
+  assert.equal(scopesOf(f.root, f.config), before);
   await assert.rejects(runStage(f.root, f.config, 'build'), /exit 7/);
   assert.equal(readJSON(safePath(f.root, 'migration/results/smoke.json')).invalidatedBy, 'build');
   assert.throws(() => approve(f.root, f.config, 'parity', 'stale smoke'), /smoke successfully/);
@@ -95,7 +105,7 @@ test('R2: successful upstream retry also changes generation; restoring stale fil
   assert.notEqual(next.executionId, build.executionId);
   writeJSON(safePath(f.root, 'migration/results/smoke.json'), smoke);
   writeJSON(safePath(f.root, 'migration/gates/parity.json'), gate);
-  assert.throws(() => requireGate(f.root, f.config, 'parity', contextHash(f.root, f.config)), /smoke successfully/);
+  assert.throws(() => requireGate(f.root, f.config, 'parity', inputContext(f.root, f.config)), /smoke successfully/);
   await runStage(f.root, f.config, 'judge');
   assert.throws(() => approve(f.root, f.config, 'build', 'old translation gate'), /No translation approval/);
 });
@@ -174,7 +184,14 @@ test('R4: workflow CLI reviewers receive frozen input and reject a profile that 
   }
   const p = safePath(f.root, '.github/agents/migration-reviewer-rules.agent.md');
   fs.writeFileSync(p, fs.readFileSync(p, 'utf8').replace('tools: []', 'tools: ["read", "search"]'));
-  await runStage(f.root, f.config, 'judge'); approve(f.root, f.config, 'translation', 'Changed profile fixture');
+  // 0.45.0: the finished unit was reviewed with the frozen profile and stays
+  // finished; the next review refuses the changed profile.
+  assert.equal(done(f.root, f.units[0], inputContext(f.root, f.config)), true);
+  const calls = () => fs.readFileSync(safePath(f.root, 'cli-double-calls.jsonl'), 'utf8').trim().split('\n').length, before = calls();
+  await run();
+  assert.equal(calls(), before, 'nothing to review again');
+  fs.appendFileSync(safePath(f.root, f.units[0].source), '\n# Changed after review.\n');
+  await runStage(f.root, f.config, 'judge'); approve(f.root, f.config, 'translation', 'Changed source fixture');
   await assert.rejects(run(), /tools: \[\]/);
 });
 

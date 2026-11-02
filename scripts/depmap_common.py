@@ -28,8 +28,10 @@ EXTERNAL = "\x00external:"
 COMMON_SKIP = {"node_modules", "__pycache__"}
 # A repository-copy install (migration-kit/) and run metadata (migration/)
 # are never sources to port. Skipped only at the top of --root and only when
-# the marker proves it is the kit, as in depmap_python.py.
-KIT_DIRS = {"migration-kit": "scripts/run_migration.mjs", "migration": "config.json"}
+# a marker proves it is the kit, as in depmap_python.py. The kit's record of
+# the settings is migration/state/config.json (migration/config.json until
+# 0.44.x).
+KIT_DIRS = {"migration-kit": ("scripts/run_migration.mjs",), "migration": ("state/config.json", "config.json")}
 
 
 def find_files(root: Path, exts, skip_dirs=(), markers=(), warnings=None, skip_all=(), source_roots=()):
@@ -46,7 +48,7 @@ def find_files(root: Path, exts, skip_dirs=(), markers=(), warnings=None, skip_a
         skip = {d.lower(): {m.lower() for m in ms} for d, ms in skip_dirs.items()}
     else:
         skip = {d.lower(): {m.lower() for m in markers} for d in skip_dirs}
-    kit = {name for name, marker in KIT_DIRS.items() if (root / name / marker).is_file()}
+    kit = {name for name, found in KIT_DIRS.items() if any((root / name / marker).is_file() for marker in found)}
 
     def beside_marker(d, wanted):
         try:

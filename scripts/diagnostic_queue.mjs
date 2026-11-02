@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseCommandLine, specs, usageText } from '../lib/cli.mjs';
-import { loadConfig, safePath, readJSON, readManifest, fileHash, contextHash, atomicWrite, writeJSON, lockRun, assertReportPath } from '../lib/core.mjs';
+import { loadConfig, safePath, readJSON, readManifest, fileHash, inputContext, sameStage, atomicWrite, writeJSON, lockRun, assertReportPath } from '../lib/core.mjs';
 import { outputFingerprint } from '../lib/pipeline.mjs';
 import { readReviewText } from '../lib/review.mjs';
 import { diagnosticsForUnits, diagnosticTsv } from '../lib/diagnostics.mjs';
@@ -24,8 +24,9 @@ export function makeRepairQueue(root, config, { diagnostics, out = 'migration/re
   assertReportPath(root, config, out);
   const release = lockRun(root, 'diagnostic-queue');
   try {
-    const context = contextHash(root, config), build = readJSON(safePath(root, `migration/results/${stage}.json`));
-    if (!build.executionId || build.stage !== stage || build.invalidatedAt || build.contextHash !== context || build.outputHash !== outputFingerprint(root, config)) throw new Error(`Diagnostics need a current ${stage} attempt for these inputs and outputs`);
+    // Bound to the inputs of the run it comes from, as that run's record is.
+    const context = inputContext(root, config), build = readJSON(safePath(root, `migration/results/${stage}.json`));
+    if (!build.executionId || build.stage !== stage || build.invalidatedAt || !sameStage(context, stage, build.contextHash) || build.outputHash !== outputFingerprint(root, config)) throw new Error(`Diagnostics need a current ${stage} attempt for these inputs and outputs`);
     assertRepairableRun(build, stage);
     const units = new Map(readManifest(root, config).map(u => [u.target, u]));
     const lines = readReviewText(root, diagnostics).replace(/^\uFEFF/, '').trimEnd().split(/\r?\n/);
@@ -52,9 +53,9 @@ export function makeRepairQueue(root, config, { diagnostics, out = 'migration/re
       job.evidenceHash = fileHash(safePath(root, job.evidence));
     }
     // buildExecutionId names the failed validation run, whichever stage it was.
-    const queue = { schemaVersion: 1, kind: 'repair-queue', ...(stage === 'build' ? {} : { stage }), contextHash: context, buildExecutionId: build.executionId,
+    const queue = { schemaVersion: 1, kind: 'repair-queue', ...(stage === 'build' ? {} : { stage }), contextHash: context.stages[stage], buildExecutionId: build.executionId,
       diagnostics: [diagnostics, fileHash(safePath(root, diagnostics))], jobs };
-    if (contextHash(root, config) !== context) throw new Error('Protected inputs changed while creating diagnostics');
+    if (inputContext(root, config).stages[stage] !== context.stages[stage]) throw new Error('Protected inputs changed while creating diagnostics');
     writeJSON(safePath(root, out), queue); return queue;
   } finally { release(); }
 }

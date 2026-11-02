@@ -76,7 +76,7 @@ try {
     COPILOT_PROVIDER_WIRE_API: 'completions', COPILOT_MODEL: 'gpt-4.1', COPILOT_GITHUB_TOKEN: '', GH_TOKEN: '', GITHUB_TOKEN: '' });
   // The session checks below are about the kit's own worker home, which
   // workers use only with "separate" (shared is the default since 0.42.0).
-  f.config.timeoutSeconds = 30; f.config.workerCopilotHome = 'separate'; writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  f.config.timeoutSeconds = 30; f.config.workerCopilotHome = 'separate'; writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   const adapter = createCopilotAdapter({ command, prefixArgs: ['--log-dir', safePath(f.root, 'cli-test-logs')] });
   const checks = await doctor(f.root, f.config, { checkCLI: true, command }); assert.equal(checks.ok, true);
   // Same CLI/profile/input, but deliberately omit the isolation flag once.

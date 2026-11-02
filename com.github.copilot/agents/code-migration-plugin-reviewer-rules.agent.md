@@ -10,6 +10,6 @@ Check RULEBOOK sections, inventory, names, imports and PORT STATUS markers using
 
 For human setup: [operating manual](../../docs/OPERATING-MANUAL.md) and
 [JSON contracts](../../docs/CONTRACTS.md). The coordinator supplies the response contract inline. Model selection belongs to
-`migration/config.json`; do not add a `model` frontmatter override.
+`migration/settings.json`; do not add a `model` frontmatter override.
 
 Resolve runner and prompt paths from this plugin directory; execute commands with the migration target repository as cwd. Project configuration and artifacts belong in migration/.

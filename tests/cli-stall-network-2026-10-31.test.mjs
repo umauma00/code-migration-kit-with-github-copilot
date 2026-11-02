@@ -80,7 +80,7 @@ test('the network guidance names no sign-in and offers a rerun and a proxy check
 
 async function run(t, failure, failRole, failures = 1) {
   const f = prepare(t, { executionMode: 'continuous' }); f.config.transientRetryDelayMs = 1;
-  writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   await runStage(f.root, f.config, 'judge');
   approve(f.root, f.config, 'translation', 'Regression fixture only');
   const unit = f.units[0], counter = safePath(f.root, 'failures.txt'), script = safePath(f.root, 'flaky-cli.mjs');

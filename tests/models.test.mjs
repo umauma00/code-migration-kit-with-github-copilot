@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { ready, fake } from './helpers.mjs';
-import { contextHash, done, readJSON, safePath, loadConfig, validateEfforts, workerEffort } from '../lib/core.mjs';
+import { ready, fake, scopesOf } from './helpers.mjs';
+import { inputContext, done, readJSON, safePath, loadConfig, validateEfforts, workerEffort } from '../lib/core.mjs';
 import { translate } from '../lib/pipeline.mjs';
 import { listAvailableModels, checkChoice, setRoleModels, modelsMarkdown, currentAssignments } from '../lib/models.mjs';
 import { copilotArgs } from '../scripts/copilot_adapter.mjs';
@@ -75,27 +75,30 @@ test('a choice must be an enabled listed model and one of its efforts', async t 
   assert.throws(() => checkChoice(models, 'big-model', 'extreme'), /Effort must be one of/);
 });
 
-test('models set records the person\'s choice and revokes reviews made under the old one', async t => {
+test('models set records the person\'s choice and keeps reviews made under the old one', async t => {
   const f = await ready(t);
   await translate(f.root, f.config, fake);
-  const before = contextHash(f.root, f.config);
-  assert.equal(done(f.root, f.units[0], before), true);
+  const before = scopesOf(f.root, f.config);
+  assert.equal(done(f.root, f.units[0], inputContext(f.root, f.config)), true);
   const models = await listAvailableModels({ command: process.execPath, prefixArgs: [fakeCli(t)] });
   setRoleModels(f.root, models, { role: 'all', model: 'small-model', effort: 'high' });
   setRoleModels(f.root, models, { role: 'reviewers', model: 'big-model', effort: 'xhigh' });
   setRoleModels(f.root, models, { role: 'arbiter', model: 'big-model', effort: 'default' });
   const result = setRoleModels(f.root, models, { role: 'surveyor', model: 'plain-model' });
-  const written = readJSON(safePath(f.root, 'migration/config.json'));
+  const written = readJSON(safePath(f.root, 'migration/state/config.json'));
   assert.deepEqual(written.models, { implementer: 'small-model', 'reviewer-semantics': 'big-model', 'reviewer-rules': 'big-model', arbiter: 'big-model', fixer: 'small-model' });
   assert.deepEqual(written.reasoningEfforts, { implementer: 'high', fixer: 'high', 'reviewer-semantics': 'xhigh', 'reviewer-rules': 'xhigh' });
   assert.equal(written.phaseModels.survey, 'plain-model');
   assert.equal(result.assignments.find(a => a.role === 'surveyor').effort, null, 'a surveyor with its own model never inherits the implementer\'s effort');
   const config = loadConfig(f.root);
   assert.equal(workerEffort(config, 'arbiter'), undefined);
-  assert.equal(done(f.root, f.units[0], contextHash(f.root, config)), false, 'a new model or effort means a new review');
+  // 0.45.0: the models and efforts decide how the remaining work is done.
+  assert.equal(done(f.root, f.units[0], inputContext(f.root, config)), true, 'a new model or effort keeps the finished review');
+  assert.equal(scopesOf(f.root, config), before, 'no record depends on the models');
+  assert.match(result.note, /Finished units, approvals and runs are kept/);
   assert.throws(() => setRoleModels(f.root, models, { role: 'planner', model: 'big-model' }), /Unknown role planner/);
   assert.throws(() => setRoleModels(f.root, models, { role: 'fixer', model: 'blocked-model' }), /disabled/);
-  assert.deepEqual(readJSON(safePath(f.root, 'migration/config.json')), written, 'a refused choice changes nothing');
+  assert.deepEqual(readJSON(safePath(f.root, 'migration/state/config.json')), written, 'a refused choice changes nothing');
   assert.match(modelsMarkdown(models, config, 'en'), /\| reviewer-rules \| `big-model` \| xhigh \| default \|/);
   assert.deepEqual(currentAssignments({ models: {} }).find(a => a.role === 'surveyor'), { role: 'surveyor', model: null, effort: null, context: 'default', inherits: 'implementer' });
 });
@@ -103,14 +106,14 @@ test('models set records the person\'s choice and revokes reviews made under the
 test('models set --assign records every role from one answer, all or nothing', async t => {
   const f = await ready(t);
   const models = await listAvailableModels({ command: process.execPath, prefixArgs: [fakeCli(t)] });
-  const before = readJSON(safePath(f.root, 'migration/config.json'));
+  const before = readJSON(safePath(f.root, 'migration/state/config.json'));
   // One refused entry (an effort the model lacks) writes nothing at all.
   assert.throws(() => setRoleModels(f.root, models, { assign: 'all=small-model:high, arbiter=plain-model:low' }), /no selectable reasoning effort/);
   assert.throws(() => setRoleModels(f.root, models, { assign: 'implementer' }), /ROLE=MODEL_ID\[:EFFORT\]/);
   assert.throws(() => setRoleModels(f.root, models, { assign: 'all=small-model', role: 'fixer' }), /either/);
-  assert.deepEqual(readJSON(safePath(f.root, 'migration/config.json')), before);
+  assert.deepEqual(readJSON(safePath(f.root, 'migration/state/config.json')), before);
   const result = setRoleModels(f.root, models, { assign: 'all=small-model:high, reviewers=big-model:xhigh arbiter=big-model:default,fixer=small-model' });
-  const written = readJSON(safePath(f.root, 'migration/config.json'));
+  const written = readJSON(safePath(f.root, 'migration/state/config.json'));
   assert.deepEqual(written.models, { implementer: 'small-model', 'reviewer-semantics': 'big-model', 'reviewer-rules': 'big-model', arbiter: 'big-model', fixer: 'small-model' });
   assert.deepEqual(written.reasoningEfforts, { implementer: 'high', 'reviewer-semantics': 'xhigh', 'reviewer-rules': 'xhigh' });
   assert.equal(result.assignments.find(a => a.role === 'surveyor').inherits, 'implementer');
@@ -133,8 +136,8 @@ test('recording a model choice runs unasked on its own and asks when chained; li
   assert.equal(humanGate('node migration-kit/scripts/run_migration.mjs models list --format markdown'), null);
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'models-gate-'));
   try {
-    fs.mkdirSync(path.join(root, 'migration'));
-    fs.writeFileSync(path.join(root, 'migration/config.json'), '{}');
+    fs.mkdirSync(path.join(root, 'migration/state'), { recursive: true });
+    fs.writeFileSync(path.join(root, 'migration/state/config.json'), '{}');
     assert.equal(interactiveDecision({ toolName: 'bash', toolArgs: { command: 'node migration-kit/scripts/run_migration.mjs models set --role fixer --model big-model' }, cwd: root }), null);
     const decision = interactiveDecision({ toolName: 'bash', toolArgs: { command: 'node migration-kit/scripts/run_migration.mjs models set --role fixer --model big-model && echo done' }, cwd: root });
     assert.equal(decision.decision, 'ask');
@@ -146,12 +149,12 @@ test('questions ask the report language first, then stay in Japanese when ja is 
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'language-gate-'));
   const ask = toolArgs => interactiveDecision({ toolName: 'ask_user', toolArgs, cwd: root });
   try {
-    fs.mkdirSync(path.join(root, 'migration'));
-    fs.writeFileSync(path.join(root, 'migration/config.json'), '{}');
+    fs.mkdirSync(path.join(root, 'migration/state'), { recursive: true });
+    fs.writeFileSync(path.join(root, 'migration/state/config.json'), '{}');
     assert.equal(ask({ question: 'Which target language?', choices: ['Java', 'Go'] }).decision, 'deny');
     assert.match(ask({ question: 'Which target language?' }).reason, /preferences --language/);
     assert.equal(ask({ question: 'Report language / 報告言語', choices: ['日本語 (ja)', 'English (en)'] }), null);
-    fs.writeFileSync(path.join(root, 'migration/preferences.json'), JSON.stringify({ schemaVersion: 1, userLanguage: 'ja' }));
+    fs.writeFileSync(path.join(root, 'migration/state/preferences.json'), JSON.stringify({ schemaVersion: 1, userLanguage: 'ja' }));
     const english = ask({ question: 'How should Phase 01 proceed?', choices: ['Keep blocked', 'Specify another path'] });
     assert.equal(english.decision, 'deny'); assert.match(english.reason, /日本語/);
     assert.equal(ask({ question: 'Phase 01 をどう進めますか？', choices: ['blocked を維持', '`audit_inputs.mjs run` で実行'] }), null);
@@ -173,7 +176,7 @@ test('questions ask the report language first, then stay in Japanese when ja is 
     assert.match(ask({ question: '次に何をしますか？', choices: ['blocked を維持', 'Keep everything blocked'] }).reason, /Keep everything blocked/);
     assert.equal(ask({ question: '移行先の言語は？', choices: ['Java', 'Go', '`Spring Boot` を使う'] }), null);
     assert.match(vscode({ questions: [{ question: '進めますか？', options: [{ label: 'はい', description: 'Runs every pending audit now' }] }] }).reason, /Runs every pending audit/);
-    fs.writeFileSync(path.join(root, 'migration/preferences.json'), JSON.stringify({ schemaVersion: 1, userLanguage: 'en' }));
+    fs.writeFileSync(path.join(root, 'migration/state/preferences.json'), JSON.stringify({ schemaVersion: 1, userLanguage: 'en' }));
     assert.equal(ask({ question: 'How should Phase 01 proceed?' }), null);
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
@@ -189,7 +192,7 @@ test('a surveyor set to its model default does not run with the implementer\'s e
   const args = copilotArgs('surveyor', 'plain-model', undefined, null, null, { effort: workerEffort(config, 'surveyor') });
   assert.equal(args.includes('--reasoning-effort'), false);
   // The effective combination is checked too, inheritance included.
-  const file = safePath(f.root, 'migration/config.json'), raw = readJSON(file);
+  const file = safePath(f.root, 'migration/state/config.json'), raw = readJSON(file);
   delete raw.phaseModels.survey; raw.models.implementer = 'plain-model';
   fs.writeFileSync(file, JSON.stringify(raw));
   assert.throws(() => setRoleModels(f.root, models, { role: 'fixer', model: 'big-model' }), /implementer would run plain-model with reasoning effort high/);

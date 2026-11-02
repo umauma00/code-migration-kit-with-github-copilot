@@ -22,7 +22,7 @@ import { phaseCommand } from '../scripts/phase_cli.mjs';
 import { decide } from '../scripts/migration_hook.mjs';
 
 const R = 'node migration-kit/scripts/run_migration.mjs';
-const persist = f => writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+const persist = f => writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
 async function approvedWith(t, options, change = () => {}) {
   const f = prepare(t, options);
   change(f.config); persist(f);

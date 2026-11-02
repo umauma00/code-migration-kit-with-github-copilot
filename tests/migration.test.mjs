@@ -3,10 +3,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { prepare, ready, result, fake, finding, cliOutput, cliDouble, python } from './helpers.mjs';
+import { prepare, ready, result, fake, finding, cliOutput, cliDouble, python, scopesOf } from './helpers.mjs';
 import { approve, requireGate, runStage, translate } from '../lib/pipeline.mjs';
-import { safePath, atomicWrite, readJSON, writeJSON, fileHash, loadConfig, contextHash,
-  readManifest, done, unitState, statePath, lockRun, roles } from '../lib/core.mjs';
+import { safePath, atomicWrite, readJSON, writeJSON, fileHash, loadConfig, inputContext, readManifest, done, unitState, statePath, lockRun, roles } from '../lib/core.mjs';
 import { parseResult, validateResult } from '../lib/results.mjs';
 import { install, kitRoot } from '../scripts/install.mjs';
 import { runProcess } from '../lib/process.mjs';
@@ -41,7 +40,7 @@ test('existing nonempty output needs both reviews and cannot pass queue verify b
   const called = [];
   await translate(f.root, f.config, async args => { called.push(args.role); return fake(args); });
   assert.deepEqual(called.sort(), ['reviewer-rules', 'reviewer-semantics']);
-  assert.ok(done(f.root, f.units[0], contextHash(f.root, f.config)));
+  assert.ok(done(f.root, f.units[0], inputContext(f.root, f.config)));
 });
 
 test('reviewer failure resumes only missing review, preserving the completed independent review', async t => {
@@ -59,7 +58,7 @@ test('deleted or corrupt review evidence forces fresh review on resume', async t
   const f = await ready(t);
   await translate(f.root, f.config, fake);
   fs.unlinkSync(safePath(f.root, receipt(f).reviews[0]));
-  assert.equal(done(f.root, f.units[0], contextHash(f.root, f.config)), false);
+  assert.equal(done(f.root, f.units[0], inputContext(f.root, f.config)), false);
   const restarted = await translate(f.root, f.config, fake);
   assert.equal(restarted.agentCalls, 2); assert.equal(restarted.done, 1);
   write(f.root, receipt(f).reviews[1], '{broken');
@@ -70,21 +69,26 @@ test('edited output invalidates completion; changed judge/source/config invalida
   const f = await ready(t);
   await translate(f.root, f.config, fake);
   fs.appendFileSync(safePath(f.root, f.units[0].target), '\n// human edit\n');
-  assert.equal(done(f.root, f.units[0], contextHash(f.root, f.config)), false);
+  assert.equal(done(f.root, f.units[0], inputContext(f.root, f.config)), false);
   assert.equal((await translate(f.root, f.config, fake)).agentCalls, 2);
-  const initial = contextHash(f.root, f.config);
+  const initial = scopesOf(f.root, f.config);
   fs.appendFileSync(safePath(f.root, 'tests/judge.py'), '\n# changed judge\n');
-  assert.notEqual(contextHash(f.root, f.config), initial);
-  await assert.rejects(translate(f.root, f.config, fake), /stale/);
+  assert.notEqual(scopesOf(f.root, f.config), initial);
+  // A judge input: the judge runs again before translation goes on (0.45.0:
+  // the finished unit stays).
+  assert.equal(done(f.root, f.units[0], inputContext(f.root, f.config)), true);
+  await assert.rejects(translate(f.root, f.config, fake), /Run judge successfully for the current inputs first/);
   assert.equal(fs.existsSync(safePath(f.root, 'migration/run.lock')), false);
-  const second = contextHash(f.root, f.config);
+  const second = scopesOf(f.root, f.config);
   fs.appendFileSync(safePath(f.root, 'src/math_ops.py'), '\n# source edit\n');
-  assert.notEqual(contextHash(f.root, f.config), second);
-  const third = contextHash(f.root, f.config), file = safePath(f.root, 'migration/config.json');
+  assert.notEqual(scopesOf(f.root, f.config), second);
+  const third = scopesOf(f.root, f.config), file = safePath(f.root, 'migration/state/config.json');
   fs.appendFileSync(file, '\n');
-  assert.equal(contextHash(f.root, f.config), third, 'formatting is not a configuration change');
+  assert.equal(scopesOf(f.root, f.config), third, 'formatting is not a configuration change');
   writeJSON(file, { ...f.config, models: { ...f.config.models, fixer: 'another-model' } });
-  assert.notEqual(contextHash(f.root, f.config), third, 'detect on-disk edits even with an in-memory config');
+  assert.equal(scopesOf(f.root, f.config), third, 'a model is an input of no record (0.45.0)');
+  writeJSON(file, { ...f.config, targetLanguage: 'TypeScript' });
+  assert.notEqual(scopesOf(f.root, f.config), third, 'detect on-disk edits even with an in-memory config');
 });
 
 test('confirmed finding is fixed, then independently reviewed again', async t => {
@@ -108,9 +112,9 @@ test('rejected finding completes only with bound arbitration evidence', async t 
     if (args.role === 'arbiter') return { result: result(args.role, args.unit, { decisions: args.extra.findings.map(x => ({ finding: x.reference, confirmed: false, reason: 'Rule already satisfied' })) }) };
     return fake(args);
   });
-  assert.ok(done(f.root, f.units[0], contextHash(f.root, f.config)));
+  assert.ok(done(f.root, f.units[0], inputContext(f.root, f.config)));
   fs.unlinkSync(safePath(f.root, receipt(f).arbitration.path));
-  assert.equal(done(f.root, f.units[0], contextHash(f.root, f.config)), false);
+  assert.equal(done(f.root, f.units[0], inputContext(f.root, f.config)), false);
   assert.equal((await translate(f.root, f.config, fake)).done, 1);
 });
 
@@ -189,7 +193,7 @@ test('lock blocks overlapping execution/approval; interruption releases lock', a
 
 test('agent call budget limits actual invocations and can resume', async t => {
   const f = prepare(t); f.config.maxAgentCalls = 2;
-  writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   await runStage(f.root, f.config, 'judge'); approve(f.root, f.config, 'translation', 'Test');
   let calls = 0;
   await assert.rejects(translate(f.root, f.config, async args => { calls++; return fake(args); }), /call limit/);
@@ -199,7 +203,7 @@ test('agent call budget limits actual invocations and can resume', async t => {
 
 test('failed build records real exit code and prevents smoke approval', async t => {
   const f = prepare(t); f.config.commands.build = [process.execPath, '-e', 'process.exit(7)'];
-  writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   await runStage(f.root, f.config, 'judge'); approve(f.root, f.config, 'translation', 'Test');
   await translate(f.root, f.config, fake); approve(f.root, f.config, 'build', 'Test');
   await assert.rejects(runStage(f.root, f.config, 'build'), /exit 7/);
@@ -236,7 +240,7 @@ test('protected roots, traversal, duplicate mappings and symlinks are refused', 
   assert.throws(() => readManifest(f.root, f.config), /Duplicate/);
   write(f.root, 'migration/manifest.tsv', 'source\ttarget\nsrc/math_ops.py\tported/a\nsrc/text_ops.py\tported/a/b\n');
   assert.throws(() => readManifest(f.root, f.config), /parent/);
-  f.config.outputRoots = ['src/ported']; writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  f.config.outputRoots = ['src/ported']; writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   assert.throws(() => loadConfig(f.root), /protected/);
   if (process.platform !== 'win32') {
     fs.symlinkSync(os.tmpdir(), path.join(f.root, 'escape'));

@@ -16,7 +16,7 @@ function fixture(t, { concurrency, sites = 400 }) {
   atomicWrite(safePath(f.root, 'case/A.cs'), 'var value = Create();\nvalue = Change(value);\nEscape(value);\n');
   atomicWrite(safePath(f.root, sitesFile), 'file\tsymbol\tsource_construct\n'
     + Array.from({ length: sites }, (_, i) => `case/A.cs\tvalue_with_a_long_descriptive_name_${i}\tnullable reference\n`).join(''));
-  writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   return f;
 }
 const answer = (args, evidence = 'case/A.cs:1-3') => {

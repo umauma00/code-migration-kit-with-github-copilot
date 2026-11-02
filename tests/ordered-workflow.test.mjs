@@ -17,7 +17,7 @@ import { failureGuidance } from '../lib/guidance.mjs';
 function fixture(t, mode = 'runtime') {
   const f = prepare(t);
   Object.assign(f.config,{phasePolicy:'strict',verificationMode:mode});
-  writeJSON(safePath(f.root,'migration/config.json'),f.config);
+  writeJSON(safePath(f.root,'migration/state/config.json'),f.config);
   // The human-installed command guardrails that phases 03/04 require.
   fs.copyFileSync(path.join(kitRoot,'templates/guardrails.json'),safePath(f.root,'migration/guardrails.json'));
   atomicWrite(safePath(f.root,'migration/judge-report.md'),'Reviewed public arithmetic scenarios, commands, normalization and limitations.');
@@ -44,7 +44,7 @@ const rows = root => fs.readFileSync(safePath(root,'migration/cost-log.tsv'),'ut
 test('new installations default to strict and the installed CLI enforces order',async t=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'ordered-installed-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
   install(root,{apply:true,model:'test-double'});
-  assert.equal(readJSON(safePath(root,'migration/config.json')).phasePolicy,'strict');
+  assert.equal(readJSON(safePath(root,'migration/state/config.json')).phasePolicy,'strict');
   const script=safePath(root,'migration-kit/scripts/run_migration.mjs');
   const next=await runProcess(process.execPath,[script,'phase','next'],{cwd:root});
   assert.equal(next.code,0,next.stderr);assert.equal(JSON.parse(next.stdout).next,'00');
@@ -53,7 +53,7 @@ test('new installations default to strict and the installed CLI enforces order',
 });
 
 test('skill initialization enables strict order on an existing legacy configuration without changing it',t=>{
-  const f=prepare(t),file=safePath(f.root,'migration/config.json'),before=fs.readFileSync(file);
+  const f=prepare(t),file=safePath(f.root,'migration/state/config.json'),before=fs.readFileSync(file);
   phaseCommand(f.root,f.config,'init');
   assert.equal(migrationStatus(f.root).workflow.policy,'strict');
   assert.equal(migrationStatus(f.root).workflow.next,'00');
@@ -135,7 +135,7 @@ test('main-compatible cost rows preserve unknowns, measured usage, existing rows
 });
 
 test('failed worker logs actual calls and unknown usage, not unused reservations',async t=>{
-  const f=fixture(t);f.config.concurrency=1;writeJSON(safePath(f.root,'migration/config.json'),f.config);
+  const f=fixture(t);f.config.concurrency=1;writeJSON(safePath(f.root,'migration/state/config.json'),f.config);
   await preparation(f);
   await assert.rejects(translate(f.root,f.config,c=>{if(c.role==='reviewer-semantics')throw new Error('Review transport failed: Bad credentials');return fake(c);}),/transport failed/);
   assert.deepEqual(rows(f.root).findLast(r=>r[0]==='04').slice(3),['unknown','2','unknown']);

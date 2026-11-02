@@ -38,7 +38,7 @@ node migration-kit/scripts/run_migration.mjs source-spec init          # preview
 node migration-kit/scripts/run_migration.mjs source-spec init --apply  # after the user agrees
 ```
 
-`init --apply` switches `migration/config.json` to `verificationMode: "source-only"`
+`init --apply` switches the settings (`migration/settings.json` and the kit's record) to `verificationMode: "source-only"`
 and `preparationProfile: "source-as-spec"`, and creates only missing files:
 
 - `migration/judge-plan.json`: every file under sourceRoots
@@ -48,8 +48,9 @@ Since 0.10.0 no per-file contract memo (`contracts.md`) is drafted. The source i
 the specification, so surveying a memo and then checking the memo only added
 time; reviewers read the cited source lines directly.
 
-Switching the profile changes config, so earlier approvals and receipts are
-invalidated (review again from 00b).
+Switching the profile sends back the phase records (from 00; from 00b for a
+project already on source-only), the judge and the runs after it, and the
+translation approval. Since 0.45.0 finished units are kept.
 
 A project installed with source-as-spec keeps its configuration, so plain
 `source-spec init` (no `--apply`) writes the drafts at once: the kit never asks

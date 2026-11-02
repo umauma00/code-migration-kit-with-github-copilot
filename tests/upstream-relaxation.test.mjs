@@ -16,7 +16,7 @@ import { currentPhase } from '../lib/phases.mjs';
 import { humanGate, interactiveDecision } from '../lib/guardrails.mjs';
 import { runProcess } from '../lib/process.mjs';
 
-const persist = f => writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+const persist = f => writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
 // Smoke fails on ported/math_ops.mjs until a repair marks it FIXED; build always passes.
 const fixedSmoke = [process.execPath, '-e', 'const fs=require("fs");if(!fs.readFileSync("ported/math_ops.mjs","utf8").includes("FIXED")){console.error("ported/math_ops.mjs:1:1: error: smoke not fixed");process.exit(1)}console.log("smoke OK")'];
 const repairing = async args => {

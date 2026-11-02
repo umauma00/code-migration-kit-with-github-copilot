@@ -6,7 +6,7 @@ This continues the [README](../README.en.md). Normally the orchestrator runs the
 
 ## Models, reasoning effort and context size
 
-**The person chooses models, reasoning effort and context size.** Install without `--model`, then in the target repository run the commands below: the first reads the models your account can use, each model's selectable efforts (and default), context sizes (prompt limits) and prices from the CLI. Right after installation the AI asks for every role's model from that list in **one question** and records it with `models set --role all` (the person already chose, so the host does not ask); per-role effort and context are changed in the run settings file below. To change models later from chat, the AI asks for every role's model, effort and context in one question and records it with one `models set --assign`. Values changed with `models set` and `preferences` are written to the run settings file too.
+**The person chooses models, reasoning effort and context size.** Install without `--model`, then in the target repository run the commands below: the first reads the models your account can use, each model's selectable efforts (and default), context sizes (prompt limits) and prices from the CLI. Right after installation the AI asks for every role's model from that list in **one question** and records it with `models set --role all` (the person already chose, so the host does not ask); per-role effort and context are changed in the settings file below. To change models later from chat, the AI asks for every role's model, effort and context in one question and records it with one `models set --assign`. Values changed with `models set` and `preferences` are written to the settings file too.
 
 ```bash
 node migration-kit/scripts/run_migration.mjs models list --format markdown
@@ -16,13 +16,13 @@ node migration-kit/scripts/run_migration.mjs models set --role reviewers --model
 
 `--assign` is one answer: `role=MODEL_ID:EFFORT` entries separated by commas (effort left out = default; `all=ID` first sets every role, and later roles override it). Every entry is checked before writing, so one refused entry changes nothing. `--role` takes a role name, `reviewers` (both reviewers) or `all` (the surveyor drops its own setting and follows the implementer). The surveyor inherits the implementer's model and effort only while it has no model of its own. Prices are the CLI's published token prices, shown as AI Credits per million tokens. `--effort default` returns to the model's default. A model that is not listed or is disabled by policy, or an effort the model does not support, is refused. Listing needs a signed-in Copilot CLI.
 
-For context size, only roles with `:long_context` after the effort run the long context tier (the Copilot CLI's `--context long_context`), and only models whose Context column lists long_context accept it. It costs more, so keep it to the roles that need it. Without it a role runs the default context and workers get no `--context` flag (the CLI's own `contextTier` setting applies). For a single role, `--role ROLE --model ID --context long_context|default` works too. Like model and effort, a change makes reviewed units be reviewed again.
+For context size, only roles with `:long_context` after the effort run the long context tier (the Copilot CLI's `--context long_context`), and only models whose Context column lists long_context accept it. It costs more, so keep it to the roles that need it. Without it a role runs the default context and workers get no `--context` flag (the CLI's own `contextTier` setting applies). For a single role, `--role ROLE --model ID --context long_context|default` works too. Like model and effort, a change keeps the reviewed units and the approvals; it applies to the work still to do.
 
 `--models implementer=ID,reviewers=ID,arbiter=ID,fixer=ID` still sets per-role models (unlisted roles use `--model`). As in the upstream model plan, choose by blast radius: reviewers on the largest or a mid model, high-volume implementers on a mid or small model, fixers and the arbiter on a mid model.
 
-## The run settings file (run-settings.json)
+## The settings file (settings.json)
 
-**Every first choice is asked as a question, and the answer is written into `migration/run-settings.json`.** You are never asked to type into the file. Setup asks, one question each:
+**Every first choice is asked as a question, and the answer is written into `migration/settings.json`.** It is the only file to change settings in (from 0.9.0 to 0.44.x it was named `migration/run-settings.json`; the next kit command that does work renames it). You are never asked to type into the file. Setup asks, one question each:
 
 1. **Every role's model**, from the models your account offers (recorded with `models set --role all`).
 2. **The target language.** The kit guesses the source language from the files' extensions and asks "The source looks like C# (120 files in src). Which language do you migrate to?" (free text corrects the source; recorded with `settings init --source C# --target TypeScript`, which also fills the source folders from the guess). One source language is migrated: another language of comparable size is pointed out so you pick the main one, and a language with only a few files (such as SQL) is not treated as the source language.
@@ -32,7 +32,7 @@ For context size, only roles with `:long_context` after the effort run the long 
 
 Where a sandbox stops writes outside the project, setup also asks about it, because phase 03 needs them. With auto mode chosen, every setup question starts with a line saying setup is still manual and about how many confirmations remain, and when setup is done the run stops once before phase 00. Switch to autopilot mode and send "continue" to start phase 00.
 
-The file is for changing settings later (several at once, such as every role's effort), for resuming in another session, and as the record of the conditions a run used. It holds values only: migration languages, folders, verification mode, whether the original can run, execution mode, concurrency, stage commands, and each role's model, effort and context size. Each field's explanation and choices, and your account's models, efforts and context tiers, are in `migration/run-settings.help.md` beside it. Entries not decided yet read `FILL_IN`; the setup questions fill them. After an edit, answer the AI's question "filled in, or do you have a question?". "Filled in" runs `settings apply`, which checks every entry and, if any is wrong, writes nothing and returns every problem (your edited file is the answer, so the host does not ask, except when it switches auto mode on). Applying checks every model entry, so the Copilot CLI must be signed in.
+The file is for changing settings later (several at once, such as every role's effort), for resuming in another session, and as the record of the conditions a run used. It holds values only: migration languages, folders, verification mode, whether the original can run, execution mode, concurrency, stage commands, and each role's model, effort and context size. Each field's explanation and choices, and your account's models, efforts and context tiers, are in `migration/settings.help.md` beside it. Entries not decided yet read `FILL_IN`; the setup questions fill them. After an edit, answer the AI's question "filled in, or do you have a question?". "Filled in" runs `settings apply`, which checks every entry and, if any is wrong, writes nothing and returns every problem (your edited file is the answer, so the host does not ask, except when it switches auto mode on). Applying checks every model entry, so the Copilot CLI must be signed in.
 
 ```bash
 node migration-kit/scripts/run_migration.mjs settings init
@@ -40,15 +40,28 @@ node migration-kit/scripts/run_migration.mjs settings check
 node migration-kit/scripts/run_migration.mjs settings apply
 ```
 
-The values are recorded where they always were, `migration/config.json` (languages, folders, models...) and `migration/preferences.json` (report language, whether the original can run), so changing the report language never revokes approvals. The file stays as the record of the conditions a run used; while an edit is not applied, `status` says so.
+Applied values go into the kit's own records, `migration/state/config.json` (languages, folders, models...) and `migration/state/preferences.json` (report language, whether the original can run). The kit writes them; they are never edited by hand. Until 0.44.x they were `migration/config.json` and `migration/preferences.json`; the next kit command that does work moves them without changing their content (every record and approval made before stays valid). After an edit of the file, the next kit command that starts applies it too, without waiting for `settings apply` (`status` and other read-only commands do not; they show "changed"). A value changed from chat (`models set` and the like) is written back into the file. The file stays as the record of the conditions a run used.
+
+### What a change sends back
+
+From 0.45.0 a change sends back only the work it affects (until 0.44.x any setting change sent every finished unit back to review).
+
+| What changed | What is redone |
+|---|---|
+| What the migration produces: source files, the RULEBOOK, the source and target languages, `preserve`/`redesign`, the folders, the package map, the source encoding... | Finished units are reviewed again on the next run; approvals and phase records are made again (`phase next` says from which phase) |
+| The test settings (`verificationMode`, `verificationRoots`, `verificationInputs`, `buildArtifactRoots`) and the test files | The judge and the build, smoke and parity runs after it. The phases are checked and recorded again (from phase 00 for `verificationMode` and `verificationRoots`, from 00b's judge inputs for the others), and translation is approved again. Finished units are kept |
+| A stage command (`original`, `mutation`, `build`, `smoke`, `parity`) | Only the runs that use it and the runs after them. For example, the build command reruns build, and smoke and parity are approved and run again. A command the judge uses (`original`, `mutation`, `parity`) also has phase 00b's judge inputs checked and the phases from 00b recorded again, and `original` or `mutation` reruns the judge and needs translation approved again. Finished units are kept |
+| Models, efforts and context tiers; how reviews run (`fixPolicy`, `reviewFocus`, `dependencyOrder`, `maxReviewInputBytes`); the per-unit `typecheck`; run limits (`concurrency` and the like); the report language; how phases advance | Nothing; the change applies to the work still to do |
+
+The source files count as one whole: changing one file still sends every finished unit back to review (as in 0.44.x).
 
 ## Report language
 
-`--language ja|en` sets the language of phase reports, questions and `status --format markdown`. It is stored in `migration/preferences.json` and never affects approvals or completion. If omitted, the skill asks Japanese or English at the start. Change it later with `run_migration.mjs preferences --language ja`. Until it is set, the hook denies any other question; with `ja` it checks each question's text and choices (`ask_user`, VS Code askQuestions) and asks for a Japanese rewrite. Headers, other questions and \`backticked\` text do not count. Text with hiragana passes as Japanese, even with a path joined to it (`src/main.pyを移行しますか？`); without hiragana, whitespace-separated paths and file names are set aside first, so `Should we migrate 売上集計.java next?` is denied; a choice of two or more English words with no Japanese is denied (a one-word name such as `Java` passes). This is a character-class check, not language detection: an English sentence containing a name with hiragana still passes.
+`--language ja|en` sets the language of phase reports, questions and `status --format markdown`. It is stored in the kit's record `migration/state/preferences.json` and never affects approvals or completion. If omitted, the skill asks Japanese or English at the start. Change it later with `run_migration.mjs preferences --language ja`. Until it is set, the hook denies any other question; with `ja` it checks each question's text and choices (`ask_user`, VS Code askQuestions) and asks for a Japanese rewrite. Headers, other questions and \`backticked\` text do not count. Text with hiragana passes as Japanese, even with a path joined to it (`src/main.pyを移行しますか？`); without hiragana, whitespace-separated paths and file names are set aside first, so `Should we migrate 売上集計.java next?` is denied; a choice of two or more English words with no Japanese is denied (a one-word name such as `Java` passes). This is a character-class check, not language detection: an English sentence containing a name with hiragana still passes.
 
 ## What a copy install puts in the repository
 
-Scripts and documents go to `migration-kit/` in the target, and the Copilot entry points to `.github/`. A managed block is appended to existing Copilot instructions. Existing files with different content are never overwritten (the installer stops), and an existing `migration/config.json` is kept. Re-running with the same content changes nothing.
+Scripts and documents go to `migration-kit/` in the target, and the Copilot entry points to `.github/`. A managed block is appended to existing Copilot instructions. Existing files with different content are never overwritten (the installer stops), and the kit's existing record (`migration/state/config.json`, or `migration/config.json` until 0.44.x) is kept. Re-running with the same content changes nothing.
 
 To use VS Code **Local** hooks, add `--harness vscode-local` to both commands; its event format differs from the standard `copilot` one. The option only selects which hook format is installed and does not switch the VS Code session: pick **Local** in the chat's Session Target. In VS Code 1.144 Local is hidden by default (the settings that show it are in the [VS Code docs](https://code.visualstudio.com/docs/agents/run/agent-harnesses)) and is not available in the Agents window. The plugin install uses the Copilot harness (the default). CLI workers also restrict tools on their command line.
 
@@ -62,9 +75,9 @@ node migration-kit/scripts/run_migration.mjs doctor --check-cli
 
 `doctor` checks the configuration, profiles, CLI version and required options. It also starts the CLI with the same arguments and environment as the workers and proves that every worker agent resolves (no AI calls). The dependency declaration created in phase 01 shows as `pending`, not failed, until phase 01 is recorded; after that a missing declaration fails. It then runs the real CLI against a local loopback model (no account, network or AI usage) and proves that the hook keeps a tool-assisted reviewer out of `migration/runs`. Loading that hook relies on the undocumented `GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS` variable, so this check fails if a CLI update stops honoring it (verified on CLI 1.0.98 and 1.0.100-1). It does not guarantee model availability or that hooks run in interactive sessions.
 
-## migration/config.json entries
+## Settings entries
 
-The minimum settings in `migration/config.json`:
+The main settings. They are changed in `migration/settings.json`, and the kit copies them into its record `migration/state/config.json`. Entries the file does not show, such as `phasePolicy`, `markerPolicy`, `workerBackend` and `reviewDependencyMap`, are set by the kit's commands.
 
 | Setting | Meaning |
 |---|---|
@@ -80,7 +93,7 @@ The minimum settings in `migration/config.json`:
 | `mode` | `preserve` for automatic file translation. `redesign` is supported up to the design and trial prompts |
 | `phasePolicy` | `strict` for new installs. Unset in existing ones keeps legacy behavior; `phase init` from the skill enables ordered phases without changing the config |
 | `models` | IDs for implementer, reviewer-semantics, reviewer-rules, arbiter and fixer, chosen by the person from `models list` and recorded with `models set` |
-| `reasoningEfforts` | Optional per-role reasoning effort (`low` to `max`, as the model supports); unset means the model's default. Passed to workers as `--reasoning-effort`. Like models, a change makes reviewed units be reviewed again |
+| `reasoningEfforts` | Optional per-role reasoning effort (`low` to `max`, as the model supports); unset means the model's default. Passed to workers as `--reasoning-effort`. Like models, a change keeps reviewed units and approvals |
 | `phaseModels` | Explicit host models for rulebook, judgeAudit, dependencyAudit, inventoryAudit, stressA/B, stressInspector and designAudit. Preparation audits run in the parent and are never inherited by the automatic runner |
 | `designInputs` | Design documents included in full in the frozen input and protected. A link alone does not count as the body. This does not enable a redesign module runner |
 | `packageMap` | Optional source→target package declaration JSON. When set, phase 01 records a separate package-cycle audit |
@@ -149,7 +162,7 @@ When the mapper's `--root` differs from the source directory to enumerate, pass 
 python3 migration-kit/scripts/depmap_python.py --root . --out migration/depmap
 node migration-kit/scripts/make_review_dependencies.mjs \
   --source-root pkg --depmap-root . --edges migration/depmap/edges.tsv
-# With dependencies across several source roots (set config.sourceRoots to the same range)
+# With dependencies across several source roots (set sourceRoots in settings.json to the same range)
 node migration-kit/scripts/make_review_dependencies.mjs \
   --source-roots pkg,shared --depmap-root . --edges migration/depmap/edges.tsv
 ```
@@ -207,7 +220,7 @@ node migration-kit/scripts/run_migration.mjs repair \
   --target ported/example.mjs --evidence migration/diagnostic-slice.txt
 ```
 
-Repairs go through review → arbitration → fixing confirmed findings (re-review only with `fixPolicy: rereview`). A changed output revokes approvals from the old build onward, so review and approve again. If sources, configuration, rules or the comparator change, re-validate from judge, review the updated stress test and approve translation again. When only the rules change after 02, check the change and the files it may touch with `rulebook changes`, and accept it with `rulebook accept --note TEXT --redo listed|all|none|PATH,...`: phase records, approvals and the other finished units stay, and only the chosen units are reviewed again ([steps](ORDERED-WORKFLOW.en.md#rulebook-amendment)). A kit (plugin) update does not revoke approvals or completion records either. Run limits (`concurrency`, `maxAgentCalls`, `maxFixRounds`, timeouts and retries, `maxRunInputBytes`, `maxAiCreditsPerCall`), documents, phase prompts, skills and Copilot instructions do not reach worker outputs, so changing them keeps reviewed units, phase records and approvals.
+Repairs go through review → arbitration → fixing confirmed findings (re-review only with `fixPolicy: rereview`). A changed output revokes approvals from the old build onward, so review and approve again. If sources, a setting of what the migration produces or of its tests ([what a change sends back](#what-a-change-sends-back)), rules or the comparator change, re-validate from judge, review the updated stress test and approve translation again. When only the rules change after 02, check the change and the files it may touch with `rulebook changes`, and accept it with `rulebook accept --note TEXT --redo listed|all|none|PATH,...`: phase records, approvals and the other finished units stay, and only the chosen units are reviewed again ([steps](ORDERED-WORKFLOW.en.md#rulebook-amendment)). A kit (plugin) update does not revoke approvals or completion records either. Run limits (`concurrency`, `maxAgentCalls`, `maxFixRounds`, timeouts and retries, `maxRunInputBytes`, `maxAiCreditsPerCall`), documents, phase prompts, skills and Copilot instructions do not reach worker outputs, so changing them keeps reviewed units, phase records and approvals.
 
 Smoke and parity failures take the same path (upstream Step 6). After classifying each divergence against the original, `repair-round --stage smoke|parity` turns output lines that name translated files into a reviewed repair queue. When the comparator reports cases only, write each confirmed regression as `file<TAB>module<TAB>code<TAB>message`, then run `diagnostic_queue.mjs --stage parity --diagnostics migration/PATH.tsv` and `repair --queue`. A failing original suite is inherited or environmental, so the runner refuses to queue it. Repaired outputs need fresh build, smoke and parity approvals.
 

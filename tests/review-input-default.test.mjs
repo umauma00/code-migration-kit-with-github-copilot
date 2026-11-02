@@ -21,7 +21,7 @@ test('new installs default maxReviewInputBytes to 1 MiB in both layouts and the 
 test('an existing config keeps its maxReviewInputBytes on reinstall', t => {
   const root = temp(t);
   install(root, { apply: true, model: 'test-double' });
-  const file = path.join(root, 'migration/config.json'), config = JSON.parse(fs.readFileSync(file, 'utf8'));
+  const file = path.join(root, 'migration/state/config.json'), config = JSON.parse(fs.readFileSync(file, 'utf8'));
   config.maxReviewInputBytes = 262144;
   fs.writeFileSync(file, `${JSON.stringify(config, null, 2)}\n`);
   install(root, { apply: true, model: 'test-double' });

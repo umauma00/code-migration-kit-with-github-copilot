@@ -16,14 +16,14 @@ import { statusSnapshot } from '../lib/status-snapshot.mjs';
 import { setPreferences, readPreferences, autoModeFile } from '../lib/preferences.mjs';
 import { failureGuidance } from '../lib/guidance.mjs';
 import { humanGate, interactiveDecision, requireGuardrails, readGuardrails } from '../lib/guardrails.mjs';
-import { initRunSettings, applyRunSettings, runSettingsFile, runSettingsHelpFile } from '../lib/run-settings.mjs';
+import { initSettings, applySettings, settingsFile, settingsHelpFile } from '../lib/settings.mjs';
 import { setRoleModels } from '../lib/models.mjs';
 import { kitRoot } from '../scripts/install.mjs';
 
 function fixture(t, { mode, guardrails = true } = {}) {
   const f = prepare(t);
   Object.assign(f.config, { phasePolicy: 'strict' });
-  writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   if (guardrails) fs.copyFileSync(path.join(kitRoot, 'templates/guardrails.json'), safePath(f.root, 'migration/guardrails.json'));
   atomicWrite(safePath(f.root, 'migration/judge-report.md'), 'Reviewed public arithmetic scenarios, commands, normalization and limitations.');
   atomicWrite(safePath(f.root, 'migration/depmap/report.md'), 'Audited parser coverage, isolated files and source dependency map.');
@@ -162,19 +162,19 @@ test('auto mode installs the template guardrails when none exist; an existing fi
 test('auto mode is offered as the third choice of the phase-mode question and applies from the run settings', t => {
   const f = prepare(t);
   assert.throws(() => setPreferences(f.root, { phaseMode: 'autopilot' }), /normal, relaxed or auto/);
-  writeJSON(safePath(f.root, 'migration/preferences.json'), { schemaVersion: 1, userLanguage: 'en', phaseMode: 'yes' });
+  writeJSON(safePath(f.root, 'migration/state/preferences.json'), { schemaVersion: 1, userLanguage: 'en', phaseMode: 'yes' });
   assert.throws(() => readPreferences(f.root), /normal, relaxed or auto/);
-  writeJSON(safePath(f.root, 'migration/preferences.json'), { schemaVersion: 1, userLanguage: 'en' });
+  writeJSON(safePath(f.root, 'migration/state/preferences.json'), { schemaVersion: 1, userLanguage: 'en' });
   const catalog = [{ id: 'm', name: 'M', state: 'enabled', efforts: [], contexts: [] }];
   setRoleModels(f.root, catalog, { role: 'all', model: 'm' });
-  const init = initRunSettings(f.root, catalog, { source: 'Python', target: 'JavaScript' });
+  const init = initSettings(f.root, catalog, { source: 'Python', target: 'JavaScript' });
   assert.match(init.next, /three choices: normal .*relaxed .*auto .*preferences --phase-mode normal\|relaxed\|auto/s);
-  const file = safePath(f.root, runSettingsFile);
+  const file = safePath(f.root, settingsFile);
   const s = readJSON(file);
-  assert.match(fs.readFileSync(safePath(f.root, runSettingsHelpFile), 'utf8'), /`phaseMode`: .*auto is relaxed without asking/);
+  assert.match(fs.readFileSync(safePath(f.root, settingsHelpFile), 'utf8'), /`phaseMode`: .*auto is relaxed without asking/);
   Object.assign(s, { reportLanguage: 'en', originalRuntime: 'available', phaseMode: 'auto' });
   writeJSON(file, s);
-  const applied = applyRunSettings(f.root, catalog);
+  const applied = applySettings(f.root, catalog);
   assert.equal(applied.applied, true, applied.errors?.join('\n'));
   assert.equal(readPreferences(f.root).phaseMode, 'auto');
   assert.ok(fs.existsSync(safePath(f.root, autoModeFile)), 'applying auto from the file records the deviation too');
@@ -185,7 +185,7 @@ test('auto mode is offered as the third choice of the phase-mode question and ap
 test('review of 333c70f: auto mode needs its record, and agents cannot write that record or switch auto on by any spelling', t => {
   const f = fixture(t, { mode: 'relaxed' });
   // A hand-edited preferences file is not auto mode: the gates keep asking.
-  writeJSON(safePath(f.root, 'migration/preferences.json'), { ...readPreferences(f.root), phaseMode: 'auto' });
+  writeJSON(safePath(f.root, 'migration/state/preferences.json'), { ...readPreferences(f.root), phaseMode: 'auto' });
   for (const command of gateCommands) assert.equal(decide(f, command)?.decision, 'ask', command);
   try { requirePhase(f.root, f.config, '02'); assert.fail('gate expected'); }
   catch (e) { assert.match(e.message, /Relaxed mode: ask the person/); }
@@ -212,11 +212,11 @@ test('review of 333c70f: auto mode needs its record, and agents cannot write tha
 
 test('review of 333c70f: settings apply that switches auto on says so; the build-loop grant and a person\'s approval', async t => {
   const f = fixture(t);
-  writeJSON(safePath(f.root, runSettingsFile), { schemaVersion: 1, phaseMode: 'auto' });
+  writeJSON(safePath(f.root, settingsFile), { schemaVersion: 1, phaseMode: 'auto' });
   const ask = decide(f, `${kit} settings apply`);
   assert.equal(ask?.decision, 'ask');
   assert.match(ask.reason, /switches to auto mode.*rule 3/s);
-  writeJSON(safePath(f.root, runSettingsFile), { schemaVersion: 1, phaseMode: 'relaxed' });
+  writeJSON(safePath(f.root, settingsFile), { schemaVersion: 1, phaseMode: 'relaxed' });
   assert.equal(decide(f, `${kit} settings apply`), null, 'settings without the auto switch apply unasked');
   assert.doesNotMatch(decide(f, `${kit} settings apply && ${kit} status`).reason, /auto mode/);
   // A person's current approval is kept when auto mode approves again.
@@ -241,7 +241,7 @@ test('review of 7855afc: leaving auto retires its record, an escaped install opt
   assert.equal(fs.existsSync(safePath(f.root, autoModeFile)), false);
   assert.equal(fs.readdirSync(safePath(f.root, 'migration/phases/retired')).filter(n => n.startsWith('auto-mode-')).length, 1);
   // A hand edit back to auto after an earlier auto session is not in effect.
-  writeJSON(safePath(f.root, 'migration/preferences.json'), { ...readPreferences(f.root), phaseMode: 'auto' });
+  writeJSON(safePath(f.root, 'migration/state/preferences.json'), { ...readPreferences(f.root), phaseMode: 'auto' });
   assert.equal(decide(f, `${kit} phase waive 04 --note x`)?.decision, 'ask');
   assert.equal(migrationStatus(f.root).autoMode.unrecorded, true);
   // Moving the retired record back is a write of the record: denied.
@@ -277,7 +277,7 @@ test('review of 0c2a8c5: a failed retire leaves auto chosen, an invalid preferen
   assert.equal(decide(f, 'node migration-kit\\scripts\\run_migration.mjs guardrails install'), null);
   assert.equal(decide(f, 'node migration-kit\\scripts\\run_migration.mjs guardrails install --waiver x')?.decision, 'ask');
   // A preferences file the runner rejects is not auto mode anywhere.
-  writeJSON(safePath(f.root, 'migration/preferences.json'), { schemaVersion: 1, userLanguage: 'fr', phaseMode: 'auto' });
+  writeJSON(safePath(f.root, 'migration/state/preferences.json'), { schemaVersion: 1, userLanguage: 'fr', phaseMode: 'auto' });
   assert.equal(decide(f, gateCommands[0])?.decision, 'ask');
   assert.equal(statusSnapshot(f.root).autoMode?.active ?? false, false);
 });
@@ -295,21 +295,21 @@ test('review (Sonnet): a gate runs unasked only on its own; switching auto on ou
   // The kit's preference modules reached in a form the hook cannot read ask.
   assert.equal(decide(f, `node -e "import('./migration-kit/lib/preferences.mjs').then(m=>m.setPreferences(process.cwd(),{phaseMode:'auto'}))"`)?.decision, 'ask');
   // Writing auto into preferences.json outside the runner asks.
-  assert.equal(decide(f, `echo '{"schemaVersion":1,"userLanguage":"ja","phaseMode":"auto"}' > migration/preferences.json`)?.decision, 'ask');
-  assert.equal(interactiveDecision({ toolName: 'edit', toolArgs: { path: 'migration/preferences.json', old_str: 'normal', new_str: 'auto' }, cwd: f.root }, f.root)?.decision, 'ask');
-  assert.equal(decide(f, 'cat migration/preferences.json'), null);
+  assert.equal(decide(f, `echo '{"schemaVersion":1,"userLanguage":"ja","phaseMode":"auto"}' > migration/state/preferences.json`)?.decision, 'ask');
+  assert.equal(interactiveDecision({ toolName: 'edit', toolArgs: { path: 'migration/state/preferences.json', old_str: 'normal', new_str: 'auto' }, cwd: f.root }, f.root)?.decision, 'ask');
+  assert.equal(decide(f, 'cat migration/state/preferences.json'), null);
   // The record named relative to a cd is still the record.
   for (const command of ['cd migration && cp x phases/auto-mode.json', 'cd migration/phases && cp x ./auto-mode.json']) assert.equal(decide(f, command)?.decision, 'deny', command);
   // A record left behind a hand-edited mode is retired on the next read.
-  writeJSON(safePath(f.root, 'migration/preferences.json'), { ...readPreferences(f.root), phaseMode: 'normal' });
+  writeJSON(safePath(f.root, 'migration/state/preferences.json'), { ...readPreferences(f.root), phaseMode: 'normal' });
   assert.ok(fs.existsSync(safePath(f.root, autoModeFile)));
   readPreferences(f.root);
   assert.equal(fs.existsSync(safePath(f.root, autoModeFile)), false);
-  writeJSON(safePath(f.root, 'migration/preferences.json'), { ...readPreferences(f.root), phaseMode: 'auto' });
+  writeJSON(safePath(f.root, 'migration/state/preferences.json'), { ...readPreferences(f.root), phaseMode: 'auto' });
   assert.equal(decide(f, gateCommands[0])?.decision, 'ask');
   // Preferences without userLanguage are invalid for the runner, so not auto anywhere.
   setPreferences(f.root, { phaseMode: 'auto' });
-  writeJSON(safePath(f.root, 'migration/preferences.json'), { schemaVersion: 1, phaseMode: 'auto' });
+  writeJSON(safePath(f.root, 'migration/state/preferences.json'), { schemaVersion: 1, phaseMode: 'auto' });
   assert.equal(decide(f, gateCommands[0])?.decision, 'ask');
 });
 
@@ -320,7 +320,7 @@ test('review of 6e26d89: guardrails.json matching is unchanged in every mode; th
     'cd app && npm run gen -- --out ./guardrails.json', 'cd src && touch sub/guardrails.json'])
     assert.equal(decide(f, command), null, command);
   // A commit message with the word auto is not a switch to auto mode.
-  assert.equal(decide(f, 'cp migration/preferences.json backups/prefs-auto-backup.json'), null);
+  assert.equal(decide(f, 'cp migration/state/preferences.json backups/prefs-auto-backup.json'), null);
   // The record and preferences.json named relative to the session's working directory.
   const inside = (dir, command) => interactiveDecision({ toolName: 'bash', toolArgs: { command }, cwd: safePath(f.root, dir) }, f.root);
   fs.mkdirSync(safePath(f.root, 'migration/phases'), { recursive: true });
@@ -334,12 +334,12 @@ test('review of 6e26d89: guardrails.json matching is unchanged in every mode; th
   assert.equal(decide(f, `${kit} phase complete 02 --note "costs \`id\`"`)?.decision, 'ask');
   // A record retired by another reader first never makes reading fail.
   setPreferences(f.root, { phaseMode: 'auto' });
-  writeJSON(safePath(f.root, 'migration/preferences.json'), { ...readPreferences(f.root), phaseMode: 'normal' });
+  writeJSON(safePath(f.root, 'migration/state/preferences.json'), { ...readPreferences(f.root), phaseMode: 'normal' });
   readPreferences(f.root);
   assert.doesNotThrow(() => readPreferences(f.root));
   // A record with no preferences file is retired too.
   setPreferences(f.root, { phaseMode: 'auto' });
-  fs.rmSync(safePath(f.root, 'migration/preferences.json'));
+  fs.rmSync(safePath(f.root, 'migration/state/preferences.json'));
   readPreferences(f.root);
   assert.equal(fs.existsSync(safePath(f.root, autoModeFile)), false);
 });
@@ -349,7 +349,7 @@ test('review of 5d5d992: quotes are tracked as the shell does, and an in-place e
   assert.equal(decide(f, `${kit} approve build --note "a'" --note "$(touch /tmp/evil)'"`)?.decision, 'ask');
   assert.equal(decide(f, `${kit} approve build --note 'it'"'"'s $5'`), null);
   assert.equal(decide(f, `${kit} approve build --note "a \\$5"`), null, 'an escaped $ in double quotes is literal');
-  for (const command of ["sed -i 's/normal/auto/' migration/preferences.json", "perl -pi -e 's/relaxed/auto/' migration/preferences.json"])
+  for (const command of ["sed -i 's/normal/auto/' migration/state/preferences.json", "perl -pi -e 's/relaxed/auto/' migration/state/preferences.json"])
     assert.equal(decide(f, command)?.decision, 'ask', command);
 });
 
@@ -387,7 +387,7 @@ test('review of 0.20.0: a note quoting a settings command keeps its gate; settin
     assert.equal(decide(f, `${kit} sessions prune --note "after run_migration.mjs approve translation"`)?.decision, 'ask', `${mode}: prune`);
     // Another project's settings, or a CLI of the agent's choosing, keep asking.
     const other = fixture(t, { mode: 'normal' });
-    writeJSON(safePath(other.root, runSettingsFile), { schemaVersion: 1, phaseMode: 'auto' });
+    writeJSON(safePath(other.root, settingsFile), { schemaVersion: 1, phaseMode: 'auto' });
     for (const command of [`${kit} settings apply --root ${other.root}`, `${kit} settings apply --root=${other.root}`, `${kit} models set --role all --model gpt-5 --root ${other.root}`,
       `${kit} settings apply --copilot ./fake`, `${kit} models set --role all --model gpt-5 --copilot=./fake`])
       assert.equal(decide(f, command)?.decision, 'ask', `${mode}: ${command}`);

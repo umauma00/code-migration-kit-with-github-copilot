@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { prepare, ready, fake } from './helpers.mjs';
-import { atomicWrite, safePath, readJSON, writeJSON, fileHash, lockRun, contextHash } from '../lib/core.mjs';
+import { atomicWrite, safePath, readJSON, writeJSON, fileHash, lockRun, inputContext } from '../lib/core.mjs';
 import { surveyInput, planSurvey, runSurvey, surveyStatus, mergeSurvey } from '../lib/survey.mjs';
 import { statusSnapshot } from '../lib/status-snapshot.mjs';
 import { migrationStatus, statusMarkdown, statusChecklist, statusTodo } from '../lib/status.mjs';
@@ -18,7 +18,7 @@ function fixture(t) {
   f.config.concurrency = 1;
   atomicWrite(safePath(f.root, 'case/A.cs'), 'class A {}\r\n// 日本語\r\n');
   atomicWrite(safePath(f.root, 'case/B.cs'), 'class B {}\n');
-  writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   return f;
 }
 function answer(args) {
@@ -280,13 +280,13 @@ test('fast recorded completion cannot bypass a gate after the source changes', a
   assert.equal(snapshot.done, 1, 'this is explicitly a view of old records');
   assert.equal(snapshot.recordedOnly, true);
   assert.equal(snapshot.implementationReady, false);
-  assert.throws(() => requireGate(f.root, f.config, 'translation', contextHash(f.root, f.config)), /stale|changed/);
+  assert.throws(() => requireGate(f.root, f.config, 'translation', inputContext(f.root, f.config)), /stale|changed/);
   assert.equal(migrationStatus(f.root).done, 0, 'normal status still checks current inputs');
 });
 
 test('fast status keeps a disposable pilot separate from production preparation phases', t => {
   const f = fixture(t);
-  f.config.executionPurpose = 'pilot'; writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  f.config.executionPurpose = 'pilot'; writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   writeJSON(safePath(f.root, 'migration/pilot.json'), { through: 'build' });
   const report = statusSnapshot(f.root);
   assert.equal(report.workflow.policy, 'isolated-pilot');
@@ -322,13 +322,13 @@ console.log('done');`;
 test('a bounded call limit reached before the correction keeps the part unfinished instead of writing uncited rows', async t => {
   const f = fixture(t);
   Object.assign(f.config, { executionMode: 'bounded', maxAgentCalls: 1 });
-  writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   const bad = async args => { const r = answer(args); r.result.items[0].evidence = `${r.result.items[0].file}:999`; return r; };
   await assert.rejects(runSurvey(f.root, f.config, 'contracts', bad), /Agent call limit reached/);
   const records = fs.existsSync(safePath(f.root, 'migration/surveys/contracts')) ? fs.readdirSync(safePath(f.root, 'migration/surveys/contracts')).filter(n => n.endsWith('.json')) : [];
   assert.ok(records.every(n => !readJSON(safePath(f.root, `migration/surveys/contracts/${n}`)).items?.some(i => i.uncited)), 'no uncited rows without a correction');
   // A larger limit then runs the correction (and only then may finish rows as uncited).
-  f.config.maxAgentCalls = 10; writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  f.config.maxAgentCalls = 10; writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   let calls = 0;
   const report = await runSurvey(f.root, f.config, 'contracts', async args => { calls++; return answer(args); });
   assert.equal(report.done, report.total); assert.ok(calls >= 1);

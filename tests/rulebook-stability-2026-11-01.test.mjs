@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { ready, prepare, fake, result, finding } from './helpers.mjs';
-import { safePath, writeJSON, readJSON, unitState, contextHash, done } from '../lib/core.mjs';
+import { safePath, writeJSON, readJSON, unitState, inputContext, done } from '../lib/core.mjs';
 import { translate, arbitrationProblem } from '../lib/pipeline.mjs';
 import { markerEvidence } from '../lib/markers.mjs';
 import { agentPrompt } from '../scripts/copilot_adapter.mjs';
@@ -98,7 +98,7 @@ test('an arbiter that copies the placeholder is asked once more and the unit fin
   assert.deepEqual(arbiters[0].extra.references, ['reviewer-rules:F1']);
   assert.equal(arbiters[0].extra.correction, undefined);
   assert.match(arbiters[1].extra.correction, /Unknown finding "reviewer-role:F1"; Missing: "reviewer-rules:F1"/);
-  assert.equal(done(f.root, f.units[0], contextHash(f.root, f.config)), true);
+  assert.equal(done(f.root, f.units[0], inputContext(f.root, f.config)), true);
   const state = unitState(f.root, f.units[0]);
   assert.equal(readJSON(safePath(f.root, state.arbitration.path)).result.decisions[0].finding, 'reviewer-rules:F1');
 });
@@ -181,7 +181,7 @@ test('after phase 01 an edit keeps the replaced version; after translation start
   // Other files are untouched by this check.
   assert.equal(interactiveDecision({ toolName: 'apply_patch', toolArgs: patch('migration/gap-report.md'), cwd: f.root }, f.root), null);
 
-  const prefs = safePath(f.root, 'migration/preferences.json');
+  const prefs = safePath(f.root, 'migration/state/preferences.json');
   writeJSON(prefs, { ...(fs.existsSync(prefs) ? readJSON(prefs) : { schemaVersion: 1 }), userLanguage: 'ja' });
   const ja = editRulebook(f);
   assert.equal(ja.decision, 'ask');
@@ -202,7 +202,7 @@ test('in auto mode the edit is refused with the way on, since autopilot cannot s
   writeJSON(safePath(f.root, 'migration/gates/translation.json'), { schemaVersion: 1, stage: 'translation' });
   writeJSON(safePath(f.root, 'migration/state/units/a.json'), { status: 'done' });
   writeJSON(safePath(f.root, autoModeFile), { schemaVersion: 1, enabledAt: new Date().toISOString() });
-  const prefs = safePath(f.root, 'migration/preferences.json');
+  const prefs = safePath(f.root, 'migration/state/preferences.json');
   writeJSON(prefs, { ...(fs.existsSync(prefs) ? readJSON(prefs) : { schemaVersion: 1, userLanguage: null }), phaseMode: 'auto' });
   const denied = editRulebook(f);
   assert.equal(denied.decision, 'deny');

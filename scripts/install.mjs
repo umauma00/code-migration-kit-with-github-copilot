@@ -4,7 +4,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { safePath, readJSON, filesUnder, atomicWrite } from '../lib/core.mjs';
+import { safePath, readJSON, filesUnder, atomicWrite, configFile, legacyConfigFile, readMovedJSON } from '../lib/core.mjs';
+import { preferencesFile, legacyPreferencesFile } from '../lib/preferences.mjs';
 import { parseCommandLine, specs } from '../lib/cli.mjs';
 export const kitRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const repositoryUrl = readJSON(path.join(kitRoot, 'plugin.json')).repository;
@@ -42,7 +43,7 @@ export function otherWorktreeMigrations(root) {
     try { other = fs.realpathSync.native(line.slice('worktree '.length)); } catch { continue; }
     if (other === top) continue;
     const candidate = path.join(other, rel);
-    if (fs.existsSync(path.join(candidate, 'migration/config.json'))) found.push(candidate);
+    if ([configFile, legacyConfigFile].some(record => fs.existsSync(path.join(candidate, record)))) found.push(candidate);
   }
   return found;
 }
@@ -61,7 +62,7 @@ function parseRoleModels(value) {
 }
 const templateFor = (rel, language) => rel === 'RULEBOOK.md' && language === 'ja' ? 'templates/RULEBOOK.ja.md' : `templates/${rel}`;
 function recordedLanguage(target) {
-  try { return readJSON(safePath(fs.realpathSync(target), 'migration/preferences.json')).userLanguage ?? null; } catch { return null; }
+  try { return readMovedJSON(fs.realpathSync(target), preferencesFile, legacyPreferencesFile)?.value?.userLanguage ?? null; } catch { return null; }
 }
 function setModels(config, model, roleModels) {
   for (const role of Object.keys(config.models)) if (model) config.models[role] = model;
@@ -72,8 +73,12 @@ export function install(target, { apply = false, model, harness = 'copilot', wit
   // Upstream model plan: tier by blast radius (reviewers largest or mid tier,
   // high-volume implementers mid or small, fixers mid). --models overrides --model per role.
   const roleModels = parseRoleModels(models);
-  // Report language lives outside config.json so changing it never revokes approvals.
-  const preferences = language && !fs.existsSync(safePath(fs.realpathSync(path.resolve(target)), 'migration/preferences.json'))
+  // Report language lives outside the configuration record so changing it
+  // never revokes approvals. Both records go to migration/state/; a project
+  // from 0.44.x or earlier keeps them in their old places until its next
+  // command moves them, so neither is written again there.
+  const targetRoot = fs.realpathSync(path.resolve(target));
+  const preferences = language && ![preferencesFile, legacyPreferencesFile].some(rel => fs.existsSync(safePath(targetRoot, rel)))
     ? `${JSON.stringify({ schemaVersion: 1, userLanguage: language }, null, 2)}\n` : null;
   // The rulebook is read by the person too: with Japanese recorded (or chosen
   // now), its template is the Japanese one, so the rules are drafted in it. A
@@ -101,20 +106,20 @@ export function install(target, { apply = false, model, harness = 'copilot', wit
   if (layout === 'plugin' && (harness !== 'copilot' || withWorkflow)) throw new Error('Plugin layout uses Copilot hooks and does not include the experimental workflow extension');
   const root = fs.realpathSync(path.resolve(target));
   if (root === kitRoot || kitRoot.startsWith(`${root}${path.sep}`)) throw new Error('Install into a separate migration target repository');
-  const existingConfig = safePath(root, 'migration/config.json');
-  if (layout === 'repository' && fs.existsSync(existingConfig) && readJSON(existingConfig).runtime === 'plugin') throw new Error('Existing configuration uses plugin layout; reconcile it explicitly before switching to repository layout');
-  const existingMigrations = fs.existsSync(existingConfig) ? [] : otherWorktreeMigrations(root);
+  const existing = readMovedJSON(root, configFile, legacyConfigFile)?.value ?? null;
+  if (layout === 'repository' && existing?.runtime === 'plugin') throw new Error('Existing configuration uses plugin layout; reconcile it explicitly before switching to repository layout');
+  const existingMigrations = existing ? [] : otherWorktreeMigrations(root);
   const withExisting = result => existingMigrations.length ? { ...result, existingMigrations, existingMigrationsNote } : result;
   if (layout === 'plugin') {
-    const files = new Map(), configPath = safePath(root, 'migration/config.json');
-    if (fs.existsSync(configPath)) {
-      if (readJSON(configPath).runtime !== 'plugin') throw new Error('Existing configuration uses repository layout; reconcile it explicitly before switching to plugin layout');
+    const files = new Map();
+    if (existing) {
+      if (existing.runtime !== 'plugin') throw new Error('Existing configuration uses repository layout; reconcile it explicitly before switching to plugin layout');
     } else {
       const config = readJSON(path.join(kitRoot, 'templates/migration-config.json'));
       config.runtime = 'plugin';
       configureBackend(config);
       setModels(config, model, roleModels);
-      files.set('migration/config.json', `${JSON.stringify(config, null, 2)}\n`);
+      files.set(configFile, `${JSON.stringify(config, null, 2)}\n`);
     }
     for (const rel of ['RULEBOOK.md', 'inventory.tsv']) {
       const name = `migration/${rel}`, file = safePath(root, name);
@@ -122,10 +127,10 @@ export function install(target, { apply = false, model, harness = 'copilot', wit
         if (!fs.statSync(file).isFile()) throw new Error(`Destination is not a regular file: ${name}`);
       } else files.set(name, fs.readFileSync(path.join(kitRoot, templateFor(rel, rulebookLanguage)), 'utf8'));
     }
-    if (preferences) files.set('migration/preferences.json', preferences);
+    if (preferences) files.set(preferencesFile, preferences);
     if (apply) for (const [name, content] of files) atomicWrite(safePath(root, name), content);
     return withExisting({ applied: apply, target: root, layout, changes: [...files.keys()],
-      next: 'Edit migration/config.json (languages, paths, models and commands), then select the code-migration-plugin-orchestrator agent from the installed plugin. Existing configuration is retained.' });
+      next: 'Select the code-migration-plugin-orchestrator agent from the installed plugin: it asks the setup questions and records the answers in migration/settings.json, the one file to change settings in later. Existing configuration is retained.' });
   }
   const files = new Map();
   for (const dir of ['lib', 'scripts', 'prompts', 'templates', 'docs']) for (const rel of filesUnder(kitRoot, dir)) {
@@ -153,9 +158,9 @@ export function install(target, { apply = false, model, harness = 'copilot', wit
   const config = readJSON(path.join(kitRoot, 'templates/migration-config.json'));
   configureBackend(config);
   setModels(config, model, roleModels);
-  if (!fs.existsSync(safePath(root, 'migration/config.json'))) files.set('migration/config.json', `${JSON.stringify(config, null, 2)}\n`);
+  if (!existing) files.set(configFile, `${JSON.stringify(config, null, 2)}\n`);
   for (const rel of ['RULEBOOK.md', 'inventory.tsv']) if (!fs.existsSync(safePath(root, `migration/${rel}`))) files.set(`migration/${rel}`, fs.readFileSync(path.join(kitRoot, templateFor(rel, rulebookLanguage)), 'utf8'));
-  if (preferences) files.set('migration/preferences.json', preferences);
+  if (preferences) files.set(preferencesFile, preferences);
   const changes = [];
   for (const [rel, content] of files) {
     const file = safePath(root, rel);
@@ -168,7 +173,7 @@ export function install(target, { apply = false, model, harness = 'copilot', wit
   }
   if (apply) for (const rel of changes) atomicWrite(safePath(root, rel), files.get(rel));
   return withExisting({ applied: apply, target: root, harness, changes,
-    next: 'Edit migration/config.json, then select the migration-orchestrator agent in a new chat to draft the rulebook and inventory. Existing configuration is retained.' });
+    next: 'Select the migration-orchestrator agent in a new chat: it asks the setup questions, records the answers in migration/settings.json (the one file to change settings in later), then drafts the rulebook and inventory. Existing configuration is retained.' });
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
   try {

@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { ready, prepare, fake, cliDouble } from './helpers.mjs';
-import { contextHash, done, readJSON, safePath, loadConfig, workerContext, validateContextTiers } from '../lib/core.mjs';
+import { inputContext, done, readJSON, safePath, loadConfig, workerContext, validateContextTiers } from '../lib/core.mjs';
 import { translate, runStage, approve } from '../lib/pipeline.mjs';
 import { normalizeModels, parseAssignments, checkChoice, setRoleModels, modelsMarkdown, currentAssignments } from '../lib/models.mjs';
 import { copilotArgs, requiredCopilotFlags, createCopilotAdapter } from '../scripts/copilot_adapter.mjs';
@@ -50,11 +50,11 @@ test('one answer can carry a context tier after the effort, before it, or alone'
   assert.throws(() => checkChoice(models, 'tiered', undefined, 'huge'), /Context must be one of default, long_context/);
 });
 
-test('models set records long_context per role, all or nothing, and revokes old reviews', async t => {
+test('models set records long_context per role, all or nothing, and keeps finished reviews', async t => {
   const f = await ready(t);
   await translate(f.root, f.config, fake);
-  assert.equal(done(f.root, f.units[0], contextHash(f.root, f.config)), true);
-  const file = safePath(f.root, 'migration/config.json'), before = readJSON(file);
+  assert.equal(done(f.root, f.units[0], inputContext(f.root, f.config)), true);
+  const file = safePath(f.root, 'migration/state/config.json'), before = readJSON(file);
   assert.throws(() => setRoleModels(f.root, models, { assign: 'all=tiered:long_context, fixer=limits-only:long_context' }), /offers no long_context tier/);
   assert.throws(() => setRoleModels(f.root, models, { assign: 'all=tiered', context: 'long_context' }), /either/);
   assert.deepEqual(readJSON(file), before, 'a refused answer writes nothing');
@@ -65,7 +65,9 @@ test('models set records long_context per role, all or nothing, and revokes old 
   assert.equal(result.assignments.find(a => a.role === 'implementer').context, 'default');
   assert.match(modelsMarkdown(models, written, 'en'), /\| reviewer-rules \| `tiered` \| low \| long_context \|/);
   assert.match(modelsMarkdown(models, written, 'ja'), /\| implementer \| `tiered` \| high \| 既定 \|/);
-  assert.equal(done(f.root, f.units[0], contextHash(f.root, loadConfig(f.root))), false, 'a new context tier means a new review');
+  // 0.45.0: a context tier decides how the remaining work is done, not what was produced.
+  assert.equal(done(f.root, f.units[0], inputContext(f.root, loadConfig(f.root))), true, 'a new context tier keeps the finished review');
+  assert.match(result.note, /Finished units, approvals and runs are kept/);
   // Leaving the suffix out returns a role to the default tier; the key goes when empty.
   setRoleModels(f.root, models, { role: 'reviewers', model: 'tiered', effort: 'low' });
   setRoleModels(f.root, models, { role: 'arbiter', model: 'tiered', context: 'default' });
@@ -86,9 +88,9 @@ test('the surveyor inherits the implementer\'s tier like its effort, and all res
   assert.equal(config.contextTiers, undefined);
   assert.deepEqual(currentAssignments(config).map(a => a.context), Array(6).fill('default'));
   // The effective combination is checked, inheritance included.
-  const raw = readJSON(safePath(f.root, 'migration/config.json'));
+  const raw = readJSON(safePath(f.root, 'migration/state/config.json'));
   raw.models.implementer = 'limits-only'; raw.contextTiers = { implementer: 'long_context' };
-  fs.writeFileSync(safePath(f.root, 'migration/config.json'), JSON.stringify(raw));
+  fs.writeFileSync(safePath(f.root, 'migration/state/config.json'), JSON.stringify(raw));
   assert.throws(() => setRoleModels(f.root, models, { role: 'fixer', model: 'tiered' }), /implementer would run limits-only with the long_context tier/);
 });
 
@@ -124,8 +126,8 @@ test('recording a context tier follows the model gate: unasked alone, asked when
   assert.equal(humanGate('node migration-kit/scripts/run_migration.mjs models set --assign "all=tiered:high:long_context"'), 'models set');
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'context-gate-'));
   try {
-    fs.mkdirSync(path.join(root, 'migration'));
-    fs.writeFileSync(path.join(root, 'migration/config.json'), '{}');
+    fs.mkdirSync(path.join(root, 'migration/state'), { recursive: true });
+    fs.writeFileSync(path.join(root, 'migration/state/config.json'), '{}');
     assert.equal(interactiveDecision({ toolName: 'bash', toolArgs: { command: 'node migration-kit/scripts/run_migration.mjs models set --role fixer --model tiered --context long_context' }, cwd: root }), null);
     // Chained with another command it still asks, and the message names the cost.
     const decision = interactiveDecision({ toolName: 'bash', toolArgs: { command: 'node migration-kit/scripts/run_migration.mjs models set --role fixer --model tiered --context long_context && echo done' }, cwd: root });
@@ -135,7 +137,7 @@ test('recording a context tier follows the model gate: unasked alone, asked when
 });
 
 test('records name the requested tier; a host-chosen override and a leftover suffix stay clear', async t => {
-  const f = prepare(t), file = safePath(f.root, 'migration/config.json');
+  const f = prepare(t), file = safePath(f.root, 'migration/state/config.json');
   const config = { ...f.config, contextTiers: { implementer: 'long_context' } };
   fs.writeFileSync(file, JSON.stringify({ ...readJSON(file), contextTiers: config.contextTiers }));
   await runStage(f.root, config, 'judge');

@@ -64,7 +64,7 @@ test('a piped or file-redirected long runner command is detected, the plain form
 
 test('the hook denies a hidden long run with the unified way to run it, in the chosen language', t => {
   const f = prepare(t);
-  writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   const decide = command => interactiveDecision({ toolName: 'powershell', toolArgs: { command }, cwd: f.root }, f.root);
   const piped = `$r='C:\\kit\\scripts\\run_migration.mjs'; node $r pilot run --root 'C:\\p' 2>&1 | Out-String`;
   let d = decide(piped);
@@ -83,7 +83,7 @@ test('the hook denies a hidden long run with the unified way to run it, in the c
 
 test('translate progress events count this run\'s finished units out of its pending units', async t => {
   const f = await ready(t, { count: 3 });
-  writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   await runStage(f.root, f.config, 'judge'); approve(f.root, f.config, 'translation', 'Counting fixture');
   const events = [];
   await translate(f.root, f.config, fake, { onProgress: e => events.push(e) });
@@ -96,7 +96,7 @@ test('translate progress events count this run\'s finished units out of its pend
 
 test('a blocked unit shows in the progress lines at once', async t => {
   const f = await ready(t, { count: 1 });
-  writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   await runStage(f.root, f.config, 'judge'); approve(f.root, f.config, 'translation', 'Blocked fixture');
   const events = [];
   await assert.rejects(translate(f.root, f.config, async call => { if (call.role === 'implementer') throw new Error('Worker returned malformed JSON'); return fake(call); },
@@ -109,7 +109,7 @@ test('survey run progress events count finished scopes out of planned scopes', a
   const f = prepare(t);
   f.config.sourceRoots = ['case']; f.config.concurrency = 1;
   atomicWrite(safePath(f.root, 'case/A.cs'), 'class A {}\n');
-  writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   const events = [];
   const report = await runSurvey(f.root, f.config, 'contracts', async args => {
     const input = JSON.parse(args.reviewInput);

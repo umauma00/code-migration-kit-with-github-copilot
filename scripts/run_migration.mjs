@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { lockRun, readLock, loadConfig, unsetModels, readManifest, contextHash, unitState, done, safePath, readJSON, verificationFiles, loadReviewDependencies, reviewSources, reviewDependencyPath } from '../lib/core.mjs';
+import { lockRun, readLock, loadConfig, unsetModels, readManifest, unitState, done, safePath, readJSON, verificationFiles, loadReviewDependencies, reviewSources, reviewDependencyPath, configFile, legacyConfigFile } from '../lib/core.mjs';
 import { strictPhases, phaseRecorded } from '../lib/phases.mjs';
 import { validateWorkerProfile, assistedReviewerRoles } from '../lib/review.mjs';
 import { runProcess } from '../lib/process.mjs';
@@ -30,7 +30,7 @@ import { readPreferences, setPreferences, preferencesReport } from '../lib/prefe
 import { autoModeOn } from '../lib/auto-mode.mjs';
 import { readGuardrails, cliFolderTrust, guardrailsProposal, installGuardrails } from '../lib/guardrails.mjs';
 import { listAvailableModels, modelsMarkdown, setRoleModels, readConfigIfPresent, currentAssignments } from '../lib/models.mjs';
-import { initRunSettings, checkRunSettings, applyRunSettings, syncRunSettings, runSettingsFile, runSettingsState, setupEnd, phase00Started } from '../lib/run-settings.mjs';
+import { initSettings, checkSettings, applySettings, syncSettings, settingsFile, legacySettingsFile, settingsState, settingsConfirmed, setupEnd, phase00Started, settingsAtStart, settingsNotice } from '../lib/settings.mjs';
 import { ignoredLimits, processTimeout } from '../lib/execution-policy.mjs';
 import { localSandboxProbe, sandboxCheck, sandboxQuestion, sandboxNext } from '../lib/sandbox.mjs';
 
@@ -52,10 +52,11 @@ export const usage = `Usage: node migration-kit/scripts/run_migration.mjs COMMAN
   preferences [--language ja|en] [--original-runtime available|unavailable] [--phase-mode normal|relaxed|auto] [--specification available|unavailable]
                               Report language; whether the original can still run (guides recommendations)
   settings init [--source LANGUAGE] [--target LANGUAGE] [--source-roots CSV] | check | apply
-                              migration/run-settings.json: write it (values only; explanations and your account's models
-                              as choices go to migration/run-settings.help.md) with a guess
+                              migration/settings.json, the one file to change settings in: write it (values only;
+                              explanations and your account's models as choices go to migration/settings.help.md) with a guess
                               of the source language (init; --source/--target and --source-roots record the answers to its questions),
-                              check every entry (check), or check and record it in config.json and preferences.json (apply)
+                              check every entry (check), or check and apply it now, switching to auto mode included (apply).
+                              Every other command that does work applies an edit of the file when it starts (status does not)
   usage [--format json|markdown] [--run RUN_ID]
                              AI usage of the kit's own worker calls (tokens, AI units), in total, by role and model
   sessions status | prune [--run RUN_ID]
@@ -101,7 +102,7 @@ export const usage = `Usage: node migration-kit/scripts/run_migration.mjs COMMAN
   build | smoke | parity | handoff     Run one approved validation stage and stop
   unlock --pid PID           Remove a lock only after its owning process has stopped
 Options: --root PATH (default cwd), --copilot PATH (default copilot)
-Configuration: migration/config.json. No command commits or pushes changes.`;
+Settings: migration/settings.json (the kit keeps its own record of them in migration/state/). No command commits or pushes changes.`;
 // Comparison B runs outside the repository, in a directory holding only the
 // copied source files, so no repository instruction or skill reaches it.
 export async function stressB(root, config, { dir, model, command = 'copilot', signal } = {}) {
@@ -111,7 +112,7 @@ export async function stressB(root, config, { dir, model, command = 'copilot', s
   const inside = path.relative(fs.realpathSync.native(root), fs.realpathSync.native(dir));
   if (!inside || (inside !== '..' && !inside.startsWith(`..${path.sep}`) && !path.isAbsolute(inside))) throw new Error(`stress-b command: ${dir} is inside the repository; B must run in a directory outside it`);
   model ??= config.phaseModels?.stressB ?? config.models.implementer;
-  if (typeof config.targetLanguage !== 'string' || !config.targetLanguage.trim()) throw new Error('stress-b command needs targetLanguage in migration/config.json');
+  if (typeof config.targetLanguage !== 'string' || !config.targetLanguage.trim()) throw new Error('stress-b command needs targetLanguage in migration/settings.json');
   const found = await stressBTools(command, model, { signal, timeoutMs: processTimeout(config, 'commandTimeoutSeconds') });
   return { dir, model, tools: found.tools, verified: found.verified, ...(found.verified ? {} : { note: `The CLI's tools for ${model} could not be read here (${found.detail}); the command lists the file tools of every model family the kit knows.` }),
     ...stressBCommand({ command, model, dir, targetLanguage: config.targetLanguage, tools: found.tools }),
@@ -316,6 +317,21 @@ export async function waitForProgress(root, seconds, { intervalMs = 5000, fast =
   }
   return fast ? report : migrationStatus(root);
 }
+// Commands that only read: an edit of the settings file waits for the next
+// command that does work (status says it is pending).
+const readOnlyCommand = (cmd, sub) => (cmd === 'sessions' && sub === 'status') || (cmd === 'guardrails' && sub === 'show')
+  || (cmd === 'survey' && ['plan', 'status'].includes(sub)) || (cmd === 'pilot' && sub === 'plan') || (cmd === 'source-spec' && sub === 'check')
+  || (cmd === 'phase' && ['next', 'check'].includes(sub));
+// What the start of a command did with the settings file: one line on
+// stderr at once (a long run shows its result only at the end), and the
+// whole of it in the result.
+async function startSettings(root, args) {
+  const started = await settingsAtStart(root, () => listAvailableModels({ command: args.copilot ?? 'copilot', cwd: root }));
+  const notice = settingsNotice(started);
+  if (notice) console.error(notice);
+  return started;
+}
+const withSettings = (result, started) => Object.keys(started).length && result && typeof result === 'object' && !Array.isArray(result) ? { ...result, settings: started } : result;
 export async function main(argv = process.argv.slice(2)) {
   const args = parseCommandLine(argv, specs.run_migration), cmd = args._[0];
   // Agents probe `COMMAND --help` before acting; answer with the usage, never run the command.
@@ -348,16 +364,16 @@ export async function main(argv = process.argv.slice(2)) {
     const result = setting ? setPreferences(root, { language: args.language, originalRuntime: args['original-runtime'], phaseMode: args['phase-mode'], specification: args.specification }) : preferencesReport(root);
     if (setting) {
       const report = {};
-      const synced = syncRunSettings(root, { keys: [...(args.language ? ['reportLanguage'] : []), ...(args['original-runtime'] ? ['originalRuntime'] : []), ...(args['phase-mode'] ? ['phaseMode'] : [])], report });
-      if (synced) result.runSettings = `${synced} updated to match`;
-      if (report.verificationMode) result.verificationMode = 'The original does not run, so verificationMode in the run settings file is now source-only (runtime verification runs the original). Tell the person.';
-      if (report.verificationModeKept) result.verificationMode = 'The original runs, but verificationMode in the run settings file is source-only. Ask the person whether to verify by running the original (runtime); on yes, set verificationMode to runtime in the file and run settings apply.';
+      const synced = syncSettings(root, { keys: [...(args.language ? ['reportLanguage'] : []), ...(args['original-runtime'] ? ['originalRuntime'] : []), ...(args['phase-mode'] ? ['phaseMode'] : [])], report });
+      if (synced) result.settingsFile = `${synced} updated to match`;
+      if (report.verificationMode) result.verificationMode = `The original does not run, so verificationMode in ${settingsFile} is now source-only (runtime verification runs the original). Tell the person.`;
+      if (report.verificationModeKept) result.verificationMode = `The original runs, but verificationMode in ${settingsFile} is source-only. Ask the person whether to verify by running the original (runtime); on yes, set verificationMode to runtime in the file and run settings apply.`;
       // Auto chosen after setup was applied but before phase 00: the handoff
       // to autopilot comes now, since no later apply would show it.
       if (args['phase-mode'] === 'auto' && !wasAuto && !phase00Started(root)) {
         let config = null;
         try { config = loadConfig(root, { requireModels: false }); } catch {}
-        if (config && runSettingsState(root, config)?.state === 'applied') Object.assign(result, setupEnd(root, config));
+        if (config && settingsState(root, config)?.state === 'applied' && settingsConfirmed(root)) Object.assign(result, setupEnd(root, config));
       }
     }
     console.log(JSON.stringify(result, null, 2));
@@ -371,12 +387,12 @@ export async function main(argv = process.argv.slice(2)) {
     if (args.format !== undefined && !['json', 'markdown'].includes(args.format)) throw new Error('models list format must be json or markdown');
     const models = await listAvailableModels({ command: args.copilot ?? 'copilot', cwd: root });
     if (args._[1] === 'set') {
-      if (!readConfigIfPresent(root)) throw new Error('migration/config.json is missing: initialize the project (install.mjs) before recording model choices');
+      if (!readConfigIfPresent(root)) throw new Error(`The project is not initialized (${configFile} is missing): run install.mjs before recording model choices`);
       const release = lockRun(root, 'models-set');
       try {
         const result = setRoleModels(root, models, { role: args.role, model: args.model, effort: args.effort, context: args.context, assign: args.assign });
-        const synced = syncRunSettings(root, { roles: result.updated });
-        console.log(JSON.stringify(synced ? { ...result, runSettings: `${synced} updated to match` } : result, null, 2));
+        const synced = syncSettings(root, { roles: result.updated });
+        console.log(JSON.stringify(synced ? { ...result, settingsFile: `${synced} updated to match` } : result, null, 2));
       } finally { release(); }
       return;
     }
@@ -389,26 +405,28 @@ export async function main(argv = process.argv.slice(2)) {
     // One file instead of one question per setting; every entry is checked
     // before anything is written, and every problem is reported at once.
     const action = args._[1];
-    if (!readConfigIfPresent(root)) throw new Error('migration/config.json is missing: initialize the project (install.mjs) before run settings');
+    if (!readConfigIfPresent(root)) throw new Error(`The project is not initialized (${configFile} is missing): run install.mjs before settings`);
     // A file that cannot be read still gets written (init) or checked (the
     // other fields); the model entries then report why.
     let models;
     try { models = await listAvailableModels({ command: args.copilot ?? 'copilot', cwd: root }); } catch (e) { models = e.message; }
-    if (action === 'init') { console.log(JSON.stringify(initRunSettings(root, models, { source: args.source, target: args.target, sourceRoots: args['source-roots'] }), null, 2)); return; }
+    if (action === 'init') { console.log(JSON.stringify(initSettings(root, models, { source: args.source, target: args.target, sourceRoots: args['source-roots'] }), null, 2)); return; }
     if (action === 'check') {
-      const file = safePath(root, runSettingsFile);
-      if (!fs.existsSync(file)) throw new Error(`${runSettingsFile} is missing: run settings init first`);
+      // The file's old name (0.44.x and earlier) is read as it is; the next command renames it.
+      const name = !fs.existsSync(safePath(root, settingsFile)) && fs.existsSync(safePath(root, legacySettingsFile)) ? legacySettingsFile : settingsFile;
+      const file = safePath(root, name);
+      if (!fs.existsSync(file)) throw new Error(`${settingsFile} is missing: run settings init first`);
       let settings;
-      try { settings = JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, '')); } catch (e) { throw new Error(`${runSettingsFile} is not valid JSON: ${e.message}`); }
-      const { errors } = checkRunSettings(root, settings && typeof settings === 'object' && !Array.isArray(settings) ? settings : {}, models);
+      try { settings = JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, '')); } catch (e) { throw new Error(`${name} is not valid JSON: ${e.message}`); }
+      const { errors } = checkSettings(root, settings && typeof settings === 'object' && !Array.isArray(settings) ? settings : {}, models);
       if (errors.length) process.exitCode = 1;
-      console.log(JSON.stringify({ ok: !errors.length, file: runSettingsFile, errors }, null, 2));
+      console.log(JSON.stringify({ ok: !errors.length, file: name, errors }, null, 2));
       return;
     }
     if (action !== 'apply') throw new Error('Use settings init | check | apply');
     const release = lockRun(root, 'settings-apply');
     try {
-      const result = applyRunSettings(root, models);
+      const result = applySettings(root, models);
       if (!result.applied) process.exitCode = 1;
       // Asked during setup (on each apply while it fails), before phase 00 and
       // the autopilot handoff.
@@ -443,11 +461,12 @@ export async function main(argv = process.argv.slice(2)) {
   if (cmd === 'rulebook') {
     // changes is read-only; accept is a human gate (the hook asks the person).
     if (args.format && !['json', 'markdown'].includes(args.format)) throw new Error('rulebook format must be json or markdown');
+    const started = args._[1] === 'accept' ? await startSettings(root, args) : {};
     const config = loadConfig(root);
     const result = args._[1] === 'changes' ? rulebookChanges(root, config)
       : args._[1] === 'accept' ? acceptRulebook(root, config, { note: args.note, redo: args.redo })
       : (() => { throw new Error('Use rulebook changes [--format json|markdown] | accept --note TEXT --redo listed|all|none|PATH,PATH'); })();
-    console.log(args.format === 'markdown' ? rulebookMarkdown(result) : JSON.stringify(result, null, 2));
+    console.log(args.format === 'markdown' ? rulebookMarkdown(result) : JSON.stringify(withSettings(result, started), null, 2));
     return;
   }
   if (cmd === 'guidance') {
@@ -456,6 +475,10 @@ export async function main(argv = process.argv.slice(2)) {
     console.log(args.format === 'json' ? JSON.stringify(g, null, 2) : guidanceMarkdown(g, language));
     return;
   }
+  // An edit of the settings file is applied (and the kit's records leave
+  // their old places) before the command reads the configuration, so it runs
+  // with them; commands that only read leave that to the next one.
+  const started = readOnlyCommand(cmd, args._[1]) ? {} : await startSettings(root, args);
   const config = loadConfig(root, { requireModels: cmd !== 'doctor' }), controller = new AbortController();
   const abort = () => controller.abort();
   process.once('SIGINT', abort); process.once('SIGTERM', abort);
@@ -485,17 +508,18 @@ export async function main(argv = process.argv.slice(2)) {
       const release = lockRun(root, 'source-spec-init');
       try {
         result = initSourceSpec(root, config, { apply: args.apply });
-        // The switch writes verificationMode to config.json; the run settings
-        // file follows, so a later settings apply does not write runtime back.
-        if (result.applied && result.changes.some(c => c.path === 'migration/config.json')) {
-          const synced = syncRunSettings(root, { keys: ['verificationMode'] });
-          if (synced) result.runSettings = `${synced} updated to match`;
+        // The switch writes verificationMode to the configuration record; the
+        // settings file follows, so a later command does not write runtime back.
+        if (result.applied && result.changes.some(c => [configFile, legacyConfigFile].includes(c.path))) {
+          const synced = syncSettings(root, { keys: ['verificationMode'] });
+          if (synced) result.settingsFile = `${synced} updated to match`;
           // Switched during setup: phase 00 comes first, and auto mode stops here for autopilot.
           if (!phase00Started(root)) {
             result.next = 'The source-as-spec profile is set as part of setup. Phase 00 comes first; the drafts listed in readiness are phase 00b-02 work.';
-            // Setup ends here only once the run settings are applied; before
-            // that, setup goes on and settings apply ends it.
-            if (runSettingsState(root, config)?.state === 'applied') Object.assign(result, setupEnd(root, config));
+            // Setup ends here only once settings apply took the person's
+            // "filled in" (this command's start may have applied the file
+            // without it); before that, setup goes on and settings apply ends it.
+            if (settingsState(root, config)?.state === 'applied' && settingsConfirmed(root)) Object.assign(result, setupEnd(root, config));
             else result.next = 'The source-as-spec profile is set as part of setup, which is not finished: run settings init and follow its next (settings apply ends setup). Phase 00 comes after it.';
           }
         }
@@ -567,7 +591,7 @@ export async function main(argv = process.argv.slice(2)) {
         maxCalls: args['max-calls'] === undefined ? undefined : Number(args['max-calls']),
         onProgress: event => console.error(progressLine(event)) });
     } else throw new Error(`Unknown command ${cmd}\n${usage}`);
-    console.log(JSON.stringify(result, null, 2));
+    console.log(JSON.stringify(withSettings(result, started), null, 2));
   } finally { process.removeListener('SIGINT', abort); process.removeListener('SIGTERM', abort); }
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {

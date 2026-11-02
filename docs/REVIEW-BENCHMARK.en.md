@@ -42,7 +42,7 @@ Model calls use your account's GitHub AI Credits. The cases use the three files 
    ```
 
    Workers can read the root, so setup leaves out this benchmark's docs and code, and the fixture judge's mutant, and fails if a line of the correct code is still there. CHANGELOG and other docs still say the benchmark exists. Every role gets that model; edit `models` and `reasoningEfforts` in
-   `/tmp/review-bench/migration/config.json` to differ per role. Setup sets
+   `/tmp/review-bench/migration/state/config.json` (the kit's record) to differ per role. Setup sets
    `reviewFocus: "shared"` so a single reviewer covers both lenses.
 
 2. Start with one run per case to check the root and workers. Check the call bound:

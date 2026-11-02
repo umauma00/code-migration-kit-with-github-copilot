@@ -37,7 +37,7 @@ SKIP_DIRS = {"venv", "node_modules", "__pycache__", "generated"}
 # A repository-copy install (migration-kit/) and run metadata (migration/) are
 # never sources to port. Skip them only at the top of --root and only when the
 # marker proves it is the kit, so a real package named "migration" is kept.
-KIT_DIRS = {"migration-kit": "scripts/run_migration.mjs", "migration": "config.json"}
+KIT_DIRS = {"migration-kit": ("scripts/run_migration.mjs",), "migration": ("state/config.json", "config.json")}
 
 
 def find_py_files(root: Path, warnings=None, source_roots=()):

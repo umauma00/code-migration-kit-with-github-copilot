@@ -85,8 +85,8 @@ or start a new migration here.
 Before anything else at start or resumption, run `run_migration.mjs preferences`
 (skip only before initialization, see below). If it returns an `action`, ask the
 user with the available question tool: 日本語 (ja) or English (en). Record the
-answer with `preferences --language ja|en` (it lives outside config.json and
-never revokes approvals). The hook denies any other question until the language
+answer with `preferences --language ja|en` (it is not part of what approvals
+depend on, so it never revokes them). The hook denies any other question until the language
 is recorded, and with ja denies a question that has no Japanese text. Re-read
 the preference after a compaction. Write every user-facing report, question, TODO label
 and next-instruction example in that language, and link the matching documents:
@@ -100,10 +100,10 @@ ja the installer starts the RULEBOOK from the Japanese template; the block that
 a RULEBOOK that already holds rules: it is part of the approval context, so a
 rewrite revokes approvals. Before
 initialization, ask only the report language and pass `--language ja|en` to the
-installer; everything else is decided in the [run settings file](#run-settings-file-instead-of-one-question-per-setting).
+installer; everything else is decided in the [settings file](#settings-file-instead-of-one-question-per-setting).
 
 **Models and reasoning effort are the person's choice.** At setup, one question
-picks the model for every role and the run settings file takes per-role changes
+picks the model for every role and the settings file takes per-role changes
 (below). When the person asks in chat to change models later, run
 `run_migration.mjs models list --format markdown`: it lists the models and
 reasoning efforts their own Copilot account offers (read live from the CLI) and
@@ -131,9 +131,10 @@ run as a command of its own, the host does not ask again. Every entry is checked
 written: if one is refused (unlisted model, unsupported effort or context), nothing
 changes, so ask again about that entry only and record the full answer again.
 If `models list` reports that the CLI is not signed in, start `copilot login`
-first. A changed model, effort or context makes reviewed units be reviewed again.
+first. A changed model, effort or context keeps the reviewed units and the
+approvals: it applies to the work still to do.
 
-## Run settings file (instead of one question per setting)
+## Settings file (instead of one question per setting)
 
 After initialization, choose the models first with **one** question for every
 role: run `run_migration.mjs models list --format markdown`, show it, and offer
@@ -142,12 +143,13 @@ each enabled model as a choice ("every role on MODEL"). Record the answer with
 (the person already chose, so the host does not ask again; every role then runs
 the model's default effort and context).
 If the list cannot be read, offer no models: sign the CLI in first. Then run `run_migration.mjs settings init`. It writes
-`migration/run-settings.json` from the current configuration: report language,
+`migration/settings.json` (named `migration/run-settings.json` until 0.44.x; the
+next command renames it) from the current configuration: report language,
 whether the original can still run, migration languages, preserve or redesign,
 source/output/test roots, verification mode, execution mode, concurrency, stage
 commands, and every role's model, effort and context size. The file holds only
 values: each field's explanation and choices, and the account's models, efforts
-and context tiers (read live from the CLI), are in `migration/run-settings.help.md`
+and context tiers (read live from the CLI), are in `migration/settings.help.md`
 beside it (rewritten by every `settings init`, never read back). `FILL_IN` marks
 what is still open; every role already holds the model just chosen, and the
 person edits a role only to give it another model, effort or context.
@@ -238,7 +240,8 @@ they have a question? Offer two choices, "filled in" and "I have a question"
 - Filled in: run `run_migration.mjs settings apply`. It checks every entry
   (the account's model list, each model's efforts and the runner's own
   configuration checks), writes nothing unless all pass, and records the values
-  in migration/config.json and migration/preferences.json. Run it as a command of
+  in the kit's records (migration/state/config.json and preferences.json, never
+  edited by hand). Run it as a command of
   its own: the person's answer is the approval, so the host does not ask again
   (it asks only when the file switches auto mode on, or when the command is
   chained with another). If it returns `errors`, show every error and ask the
@@ -292,7 +295,7 @@ for review; they do not route directly to a later phase. Respect redesign mode.
 
 ## No runnable original or no specification
 
-At initialization, whether the original can run is the run settings' fourth
+At initialization, whether the original can run is the settings' fourth
 question (above); take the verification mode from the file. If the original cannot run,
 the fifth question asks whether a specification or portable test suite exists, and
 without one setup switches to source-as-spec before phase 00 (above). Whenever runtime
@@ -303,7 +306,7 @@ available|unavailable` (presentation only; failure guidance uses it to pick its
 recommendation). If both answers are no, recommend [source as the only specification](../../../docs/SOURCE-AS-SPEC.md)
 (`--preparation-profile source-as-spec` for a new project, `source-spec init`
 then `--apply` after consent for an existing one; `--apply` also sets
-`verificationMode` to `source-only` in the run settings file, so never ask the
+`verificationMode` to `source-only` in the settings file, so never ask the
 person to edit it) and explain that equivalence stays unverified; if the original runs, recommend runtime. The user chooses.
 In source-as-spec, draft 00b, 01 and 02 together from the source (no per-file
 contract memo: `source-spec init` writes a source index and reviewers read cited
@@ -319,7 +322,7 @@ written yet": that is the work ahead, never a reason to stop or ask. Legacy
 encodings (Shift_JIS, EUC-JP, Latin-1, UTF-16) are read decoded and named in
 worker input, and binaries under a source root are left out of surveys: never
 ask the person to convert the original's encoding. If decoded Japanese
-looks wrong (kanji-only files), set `sourceEncoding` in migration/config.json.
+looks wrong (kanji-only files), set `sourceEncoding` in migration/settings.json.
 
 ## Dependency map (01)
 
@@ -350,7 +353,7 @@ anything but a small repository. Use [surveys](../../../docs/SURVEYS.md): `surve
 inventory` sends each scope to a fresh tool-free surveyor (a new
 Copilot CLI process) and saves its answer as a file; `survey merge` builds the draft you review. Check cited lines before relying
 on them; merged drafts still go through the phase's audits and the human gate.
-Before the inventory survey (at setup, once the run settings are confirmed), run
+Before the inventory survey (at setup, once the settings are confirmed), run
 `preparation_cli.mjs generated-files --write` and `preparation_cli.mjs policy-questions`.
 Report generated files as counts only and never ask the person to review the
 list: their census sites get mechanical GENERATED rows, and each file is
@@ -489,7 +492,7 @@ contextHash, so an edit would force a full re-survey and make the recorded
 phases stale) and put the conservative representation with `TODO(port)` into the
 translated output (upstream rule 8). List each as decided without the person. Missing guardrails are installed from the template
 automatically. Everything else still stops: safety checks, sign-in and credits,
-unfilled run settings, and the commands the hook still asks about (sessions
+unfilled settings, and the commands the hook still asks about (sessions
 prune, switching auto mode on, guardrails install with options or over an
 existing file, kit calls it cannot read, and any gate chained with another
 command); report them and stop. `models set`, `settings apply`, `pilot
@@ -497,8 +500,8 @@ prepare` and `source-spec init --apply` run unasked as commands of their own. If
 not run after all, or a specification turns up), say which answer and why, and
 ask the person to leave autopilot and decide in chat; never switch the profile
 yourself. Never switch auto mode on yourself, neither with `preferences --phase-mode
-auto` nor by writing `phaseMode: "auto"` into run-settings.json or
-preferences.json: it is the person's act (the hook asks for the command, and a
+auto` nor by writing `phaseMode: "auto"` into settings.json or the
+preferences record: it is the person's act (the hook asks for the command, and a
 hand edit is not in effect). Every report and the handoff list the
 records made without the person (`status` `autoMode.records`, marked
 【自動・人の確認なし】 / [auto, not reviewed by the person]) and the waivers. See
@@ -532,9 +535,11 @@ typecheck needs them. `concurrency` (up to 64, both reviewers included) should
 stay within the account's rate limits. `reviewFocus`: `shared` (new installs; both
 reviewers check semantics and rules, each from its own lens first) or
 `specialized` (one check each, upstream's split). Changing `fixPolicy`,
-`dependencyOrder` or `reviewFocus` revokes approvals. Run limits (`concurrency`,
-`maxAgentCalls`, `maxFixRounds`, timeouts, retry settings, `maxRunInputBytes`,
-`maxAiCreditsPerCall`, `workerCopilotHome`) can change between runs and keep reviewed work and approvals.
+`dependencyOrder` or `reviewFocus`, a model, an effort, a context tier or a run
+limit (`concurrency`, `maxAgentCalls`, `maxFixRounds`, timeouts, retry settings,
+`maxRunInputBytes`, `maxAiCreditsPerCall`, `workerCopilotHome`) keeps reviewed
+work and approvals: it is how the work is done, not what it produces. A stage
+command or a test file sends back only that run and the runs after it.
 
 Long runner commands (`translate`, `repair`, `repair-round`, `build-loop`,
 `pilot run`, `survey run`) all run the same way. Start the command alone in a
@@ -594,8 +599,8 @@ code; when you cannot tell, pass listed and go on: the result's warning names
 those sections, so put it in the report. The note says which files and why).
 Phases 02 and 03, the approvals and the other finished units stay current, and
 the next `translate` reviews only the chosen units again. Without it, phases 02
-and 03 go stale and every finished unit is reviewed again. A kit (plugin)
-update keeps them too; the project's own agents and hooks still count.
+and 03 go stale and every finished unit is reviewed again. A kit update, and
+a change of the project's own agents or hooks, keep them too.
 
 After a failed build, propose `build-loop --note TEXT [--through build|smoke|parity]
 [--max-rounds N] [--max-calls N]` (defaults: build only, continuous until clean;

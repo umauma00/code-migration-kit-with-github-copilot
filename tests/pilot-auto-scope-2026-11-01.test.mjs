@@ -20,7 +20,7 @@ async function reviewed(t, { typecheck = false } = {}) {
   const f = prepare(t, { realCommands: true, count: 3 });
   f.config.phasePolicy = 'strict';
   if (!typecheck) f.config.commands.typecheck = null;
-  writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   fs.rmSync(safePath(f.root, 'migration/stress-test/report.md'));
   for (const p of ['migration/judge-report.md', 'migration/depmap/report.md', 'migration/gap-report.md'])
     atomicWrite(safePath(f.root, p), 'Disposable preparation fixture; not actual AI review or human signoff.\n');

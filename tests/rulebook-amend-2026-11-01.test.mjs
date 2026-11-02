@@ -6,8 +6,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { ready, fake } from './helpers.mjs';
-import { safePath, atomicWrite, writeJSON, readJSON, fileHash, contextHash, done, unitState, rulebookAmendmentsFile, rulebookHistoryDir } from '../lib/core.mjs';
+import { ready, fake, scopesOf } from './helpers.mjs';
+import { safePath, atomicWrite, writeJSON, readJSON, fileHash, inputContext, done, unitState, rulebookAmendmentsFile, rulebookHistoryDir } from '../lib/core.mjs';
 import { autoModeReport } from '../lib/preferences.mjs';
 import { runStage, approve, translate, requireGate } from '../lib/pipeline.mjs';
 import { phaseCommand } from '../scripts/phase_cli.mjs';
@@ -33,9 +33,9 @@ async function translated(t) {
   approve(f.root, f.config, 'translation', 'Automated fixture approval for tests only');
   for (const id of ['00', '00b', '01', '02']) phaseCommand(f.root, f.config, 'complete', id, { note: 'Test fixture reviewed preparation only' });
   await translate(f.root, f.config, fake);
-  const context = contextHash(f.root, f.config);
+  const context = inputContext(f.root, f.config);
   assert.ok(f.units.every(u => done(f.root, u, context)));
-  return { ...f, context };
+  return { ...f, context, scopes: scopesOf(f.root, f.config) };
 }
 const finished = f => f.units.map(u => done(f.root, u, f.context));
 
@@ -55,7 +55,7 @@ test('accepting a RULEBOOK change keeps phases, approvals and finished units, an
   const f = await translated(t);
   amend(f, '\n## Division\nfloor-division keeps the sign of the divisor.\n');
   // Without acceptance the change revokes, as before, and says how to keep the work.
-  assert.notEqual(contextHash(f.root, f.config), f.context);
+  assert.notEqual(scopesOf(f.root, f.config), f.scopes);
   const stale = phaseStaleness(f.root, f.config, '02');
   assert.equal(stale.action, 'accept-rulebook');
   assert.match(stale.next, /rulebook changes.*rulebook accept --note TEXT --redo listed\|all\|none\|PATH/s);
@@ -77,7 +77,7 @@ test('accepting a RULEBOOK change keeps phases, approvals and finished units, an
   assert.deepEqual(accepted.redo, ['ported/math_ops.mjs']);
   assert.equal(accepted.kept, 2);
   // Every record made under the reviewed RULEBOOK holds again.
-  assert.equal(contextHash(f.root, f.config), f.context);
+  assert.equal(scopesOf(f.root, f.config), f.scopes);
   assert.ok(currentPhase(f.root, f.config, '02'));
   assert.doesNotThrow(() => requireGate(f.root, f.config, 'translation', f.context));
   assert.deepEqual(finished(f), [false, true, true]);
@@ -144,7 +144,7 @@ test('without the reviewed version kept, listed is refused and the person names 
   // Auto mode does not stop: listed (or none) goes on, always with the warning.
   fs.rmSync(safePath(f.root, rulebookHistoryDir), { recursive: true, force: true });
   writeJSON(safePath(f.root, autoModeFile), { schemaVersion: 1, enabledAt: new Date().toISOString() });
-  const prefs = safePath(f.root, 'migration/preferences.json');
+  const prefs = safePath(f.root, 'migration/state/preferences.json');
   writeJSON(prefs, { ...(fs.existsSync(prefs) ? readJSON(prefs) : { schemaVersion: 1, userLanguage: null }), phaseMode: 'auto' });
   amend(f, '\nKeep error messages.\n');
   assert.match(rulebookChanges(f.root, f.config).next, /In auto mode pass --redo listed/);
@@ -166,7 +166,7 @@ test('the hook asks before rulebook accept (unasked in auto mode) and keeps agen
   assert.equal(shell(`echo '{}' > ${rulebookAmendmentsFile}`).decision, 'deny');
   assert.equal(interactiveDecision({ toolName: 'apply_patch', toolArgs: `*** Begin Patch\n*** Add File: ${rulebookAmendmentsFile}\n+{}\n*** End Patch\n`, cwd: f.root }, f.root).decision, 'deny');
   writeJSON(safePath(f.root, autoModeFile), { schemaVersion: 1, enabledAt: new Date().toISOString() });
-  const prefs = safePath(f.root, 'migration/preferences.json');
+  const prefs = safePath(f.root, 'migration/state/preferences.json');
   writeJSON(prefs, { ...(fs.existsSync(prefs) ? readJSON(prefs) : { schemaVersion: 1, userLanguage: null }), phaseMode: 'auto' });
   assert.equal(shell(accept), null, 'auto mode records it unasked, like the other approvals');
   amend(f, '\n## Division\nfloor-division keeps the sign of the divisor.\n');
@@ -212,7 +212,7 @@ test('an acceptance needs its log entry, and re-recording 02 leaves nothing to a
   // A mapping without the entry that accepted it (a forged file) is ignored.
   const raw = fileHash(rules(f)), identity = readJSON(safePath(f.root, 'migration/phases/02.json')).evidence.find(e => e[0] === 'migration/RULEBOOK.md')[1];
   writeJSON(safePath(f.root, rulebookAmendmentsFile), { schemaVersion: 1, accepted: { [raw]: identity }, log: [] });
-  assert.notEqual(contextHash(f.root, f.config), f.context);
+  assert.notEqual(scopesOf(f.root, f.config), f.scopes);
   fs.rmSync(safePath(f.root, rulebookAmendmentsFile));
   // Recording 02 again on the new RULEBOOK: the later phases are stale for the
   // predecessor, and accepting is no longer offered.

@@ -225,8 +225,8 @@ footer { padding-top: 40px; color: var(--muted); font-size: 13px; display: grid;
   </div>
 
   <article class="phase" id="p-setup">
-    <div class="phase-head"><span class="id">設定</span><h3>初期設定</h3><span class="out">migration/config.json・run-settings.json</span></div>
-    <p>報告の言語を聞いて導入し、全担当のモデル、移行先の言語、工程の進め方、元のプログラムが動くか（動かなければ仕様の有無）を1問ずつ聞きます。答えは run-settings.json に記録されます。</p>
+    <div class="phase-head"><span class="id">設定</span><h3>初期設定</h3><span class="out">migration/settings.json</span></div>
+    <p>報告の言語を聞いて導入し、全担当のモデル、移行先の言語、工程の進め方、元のプログラムが動くか（動かなければ仕様の有無）を1問ずつ聞きます。答えは settings.json に記録されます。設定を変えるのはこのファイルだけで、キットは反映した内容を migration/state/ に記録して使います。</p>
     <div class="calls">
       <div class="call"><div class="who"><span class="chip host">オーケストレーター</span></div><div class="how">質問を作り、答えを記録するコマンドを実行する<span class="from">導入（install.mjs）・settings init／apply・doctor</span></div><div class="n">数ターン</div></div>
       <div class="call none">ワーカーは 0 回。<code>models list</code> は CLI からモデルの一覧を読むだけ、<code>doctor</code> の確認は手元の疑似モデルで行い、どちらも AI を使いません。</div>
@@ -445,7 +445,7 @@ footer { padding-top: 40px; color: var(--muted); font-size: 13px; display: grid;
 
   <h3>このキットが足したもの</h3>
   <ul class="plain">
-    <li>初期設定の質問と run-settings.json（設定をあとで一括で変える・別のセッションで再開する）</li>
+    <li>初期設定の質問と settings.json（設定をあとで一括で変える・別のセッションで再開する。モデルやレビューの進め方を変えても完了済みの作業は残る）</li>
     <li>元のプログラムが動かない案件の方式（source-only）と、仕様もない案件の方式（source-as-spec）</li>
     <li>準備工程で全ファイルを範囲ごとにワーカーへ分ける調査（survey）と、準備工程の独立監査の約束事（修正は1回）</li>
     <li>03 の試運転をプロジェクトの外で、専用の許可を取って行う仕組み（pilot）</li>

@@ -84,7 +84,7 @@ test('stress-b command refuses a directory inside the repository and runs from t
   assert.ok(result.tools.includes('apply_patch'));
   assert.match(result.bash, /--available-tools view,glob,rg,apply_patch --allow-tool write$/);
   // Through the runner, with the model named on the command line.
-  const file = safePath(f.root, 'migration/config.json');
+  const file = safePath(f.root, 'migration/state/config.json');
   writeJSON(file, { ...readJSON(file), targetLanguage: 'TypeScript' });
   const r = spawnSync(process.execPath, [path.join(kitRoot, 'scripts/run_migration.mjs'), 'stress-b', 'command', '--dir', outside, '--model', 'gpt-4.1', '--copilot', cli, '--root', f.root], { encoding: 'utf8' });
   assert.equal(r.status, 0, r.stderr);

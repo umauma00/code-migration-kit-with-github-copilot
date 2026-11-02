@@ -8,7 +8,7 @@ The six macro stages remain distinct from the ten internal evidence IDs.
 
 These rules apply to running a language migration, not to maintaining this kit.
 
-For plugin installations (`migration/config.json` has `"runtime": "plugin"`),
+For plugin installations (the kit's record `migration/state/config.json`, `migration/config.json` until 0.44.x, has `"runtime": "plugin"`),
 resolve the plugin root from the loaded skill/agent file. Replace `migration-kit/`
 in executable paths below and in phase prompts with that absolute plugin root.
 Run commands from the target repository; project artifacts stay relative to it.
@@ -66,13 +66,20 @@ does not apply to automated workers, which keep their JSON-only contracts.
    single-pass` (upstream Step 3: one fix, then build/smoke/parity judge it).
    Do not weaken tests to clear a queue.
 6. Disk receipts, not conversation memory or file existence, determine completion.
-   The receipt binds the input context, output hash and review evidence. Existing
+   The receipt binds what the work depends on, the output hash and review
+   evidence: a finished unit, an approval and the records of phases 02 and later
+   bind the content (sources, rules, languages, folders and the like); a run's
+   record also binds the test inputs and its own commands. Existing
    outputs without a receipt are reviewed again. Partial work is not done.
    Retrying an upstream stage revokes downstream results and approvals even
    if the inputs did not change. A fresh success requires fresh downstream runs.
-   Run limits (concurrency, maxAgentCalls, maxFixRounds, timeouts, retries,
-   maxRunInputBytes, maxAiCreditsPerCall), documents, phase prompts, skills and
-   Copilot instructions do not reach workers' outputs and never revoke them.
+   How the work is done never revokes a record: models, efforts, context tiers,
+   the review procedure (fixPolicy, reviewFocus, dependencyOrder,
+   maxReviewInputBytes), the per-unit typecheck, run limits (concurrency,
+   maxAgentCalls, maxFixRounds, timeouts, retries, maxRunInputBytes,
+   maxAiCreditsPerCall), documents, phase prompts, skills, agents, hooks and
+   Copilot instructions. A stage command or a test file sends back only that
+   run and the runs after it.
 7. Only the coordinator runs configured commands. Expensive builds and suites
    run once per round. A configured cheap unit typecheck may run inside the loop.
    A unit is one source file to one target file in this version.
@@ -83,7 +90,8 @@ does not apply to automated workers, which keep their JSON-only contracts.
    edits or routes around the file otherwise.
 8. Report requested model, timing and observed usage when available. Unknown
    usage/model fields stay null; never invent measurements. Set each worker model
-   explicitly in config. The runner rejects profile-level model overrides.
+   explicitly in migration/settings.json (or with `models set`). The runner
+   rejects profile-level model overrides.
 9. Use the current phase's bounded recovery and read-only diagnostics without
    asking again. Preserve validated work and report the recovery. When it is
    exhausted or a new decision is needed, report cause, impact and choices, one

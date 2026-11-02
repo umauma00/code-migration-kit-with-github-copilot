@@ -141,7 +141,7 @@ test('ordinary evidence text with host:port or numbers is not a foreign citation
   const f = prepare(t);
   f.config.sourceRoots = ['case']; f.config.concurrency = 1; f.config.maxAgentCalls = 2;
   atomicWrite(safePath(f.root, 'case/A.cs'), 'class A {}\n// calls api.example.com:8443\n');
-  writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   const answer = extra => async args => {
     const input = JSON.parse(args.reviewInput);
     return { result: { schemaVersion: 1, kind: 'survey', survey: 'contracts', target: args.unit.target,

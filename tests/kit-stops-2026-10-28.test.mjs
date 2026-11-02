@@ -29,7 +29,7 @@ function project(t, { profile = 'source-as-spec', files = { 'app/A.php': '<?php\
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   install(root, { apply: true, model: 'test-double', language: 'ja', ...(profile ? { preparationProfile: profile } : {}) });
   for (const [name, content] of Object.entries(files)) atomicWrite(safePath(root, name), content);
-  const file = safePath(root, 'migration/config.json'), config = readJSON(file);
+  const file = safePath(root, 'migration/state/config.json'), config = readJSON(file);
   Object.assign(config, { sourceLanguage: 'PHP', targetLanguage: 'TypeScript', sourceRoots: ['app'] });
   writeJSON(file, config);
   assert.equal(run(root, 'phase', 'init').status, 0);
@@ -128,7 +128,7 @@ test('runtime projects still need their verification roots, and the error names 
   reviewFeasibility(root);
   const r = run(root, 'judge-prepare');
   assert.notEqual(r.status, 0);
-  assert.match(r.stderr, /Judge input root missing: tests \(verificationRoots in migration\/config\.json/);
+  assert.match(r.stderr, /Judge input root missing: tests \(verificationRoots in migration\/settings\.json/);
   assert.match(r.stderr, /verificationRoots を実在するディレクトリに直す/);
 });
 
@@ -235,7 +235,7 @@ test('re-review fixes: legacy audit inputs freeze, a wrong root stays a blocker,
   // Kanji without kana reads as Latin-1 by its bytes; a declared encoding decides.
   const { readReviewSource } = await import('../lib/review.mjs');
   assert.equal(readReviewSource(root, 'app/K.php').encoding, 'windows-1252');
-  const file = safePath(root, 'migration/config.json');
+  const file = safePath(root, 'migration/state/config.json');
   writeJSON(file, { ...readJSON(file), sourceEncoding: 'shift_jis' });
   assert.deepEqual(readReviewSource(root, 'app/K.php'), { content: '<?\n//日本語\n', encoding: 'shift_jis' });
   assert.equal(readReviewSource(root, 'app/A.php').encoding, 'windows-1252', 'a file the declared encoding cannot read still decodes');
@@ -292,15 +292,15 @@ test('a legacy-encoded unit source over the input budget is named, not inlined',
 
 test('Sonnet review: distinct blockers stay listed; missing source roots get no profile switch', async t => {
   const root = project(t, { profile: null });
-  const file = safePath(root, 'migration/config.json');
+  const file = safePath(root, 'migration/state/config.json');
   writeJSON(file, { ...readJSON(file), phasePolicy: 'legacy' });
   fs.rmSync(safePath(root, 'migration/phases/policy.json'), { force: true });
   const missing = migrationStatus(root).blockers.filter(b => b.reason === 'Preparation artifact missing').map(b => b.path);
   assert.ok(missing.length > 1, `every missing artifact is listed: ${missing}`);
   const { failureGuidance } = await import('../lib/guidance.mjs');
   const options = message => failureGuidance(new Error(message), { root }).options.map(o => o.id);
-  assert.ok(!options('Input root missing: nosuch (sourceRoots in migration/config.json must name existing source directories)').includes('source-as-spec'));
-  assert.ok(options('Input root missing: tests (verificationRoots in migration/config.json must name the existing directory)').includes('source-as-spec'));
+  assert.ok(!options('Input root missing: nosuch (sourceRoots in migration/state/config.json must name existing source directories)').includes('source-as-spec'));
+  assert.ok(options('Input root missing: tests (verificationRoots in migration/state/config.json must name the existing directory)').includes('source-as-spec'));
 });
 
 test('C spellings get real manifest extensions before the map exists', t => {

@@ -100,7 +100,7 @@ test('usage command is read-only, needs no gate and rejects unknown options', t 
 test('survey runs total their surveyor calls from the ledger and fill cost-log tokens', async t => {
   const f = prepare(t, { count: 2 });
   Object.assign(f.config, { transientRetryDelayMs: 1, phaseModels: { survey: 'survey-model' } });
-  writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   const answer = ({ unit, reviewInput }) => {
     const input = JSON.parse(reviewInput);
     return { result: { schemaVersion: 1, kind: 'survey', survey: 'facts', target: unit.target,
@@ -160,7 +160,7 @@ test('a call that fails before the CLI starts is not logged', async t => {
 test('a survey with one unmeasured surveyor call keeps its tokens unknown', async t => {
   const f = prepare(t, { count: 2 });
   Object.assign(f.config, { transientRetryDelayMs: 1, phaseModels: { survey: 'survey-model' } });
-  writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   let n = 0;
   const report = await runSurvey(f.root, f.config, 'facts', async args => {
     recordCallUsage(args.root, { runId: args.runId, role: 'surveyor', model: 'survey-model', ok: true, usage: n++ ? null : { inputTokens: 3, outputTokens: 1, cacheReadTokens: 0, cacheWriteTokens: 0, nanoAiu: 1 } });

@@ -1,6 +1,29 @@
-# Upgrading (0.44.0 and earlier releases)
+# Upgrading (0.45.0 and earlier releases)
 
 [日本語](UPGRADING.md) | English
+
+## 0.45.0 (settings.json is the one file for settings; a settings change sends back only what it affects)
+
+On 2026-11-02, from the remark "what is the difference between run-settings and config? It is confusing; one file should do." Three files that looked like settings sat in `migration/` (`run-settings.json`, `config.json` and `preferences.json`), and it was not clear which one to change. And whichever setting changed, a model or a command alike, every finished unit was reviewed again.
+
+1. `migration/settings.json` is now the only file for changing settings. When the next kit command that does work starts (not one that only reads, such as `status` or `phase next`), `migration/run-settings.json` (and `run-settings.help.md`) is renamed `settings.json` (and `settings.help.md`), with the values as written. Its description (`_about`) and the help file are written again when they name the old file.
+2. At the same time the kit's own records `migration/config.json` and `migration/preferences.json` move to `migration/state/`. They are renamed, not changed, so approvals, completion records, phase records and prepared pilots stay valid. While another command runs, the move waits for the next command (the records are read where they are meanwhile). A record that cannot be read (broken) is not moved; `status` names its place, so correct it there (for example, restore it from version control).
+3. An edit of the file is applied when the next kit command starts, without waiting for `settings apply`. Every entry is checked first: when one cannot be used, nothing is written, and the command's output and `status` name every error (a misspelt entry name too). A value changed in the chat (`models set`, `preferences` and the like) or by editing the kit's records by hand is copied into the file (not undone). When both changed, the file's value is used, and the command says so. A changed model is checked against the account's model list before it applies (this needs a sign-in). Only the switch to auto mode still waits for `settings apply`, as before (the host asks first).
+4. A settings change now sends back only the work it affects ([What a change sends back](REFERENCE.en.md#what-a-change-sends-back); `settings.help.md` says the same).
+
+   | What changed | 0.44.x | 0.45.0 |
+   |---|---|---|
+   | Models, efforts and context tiers; how reviews run (`fixPolicy`, `reviewFocus`, `dependencyOrder`, `maxReviewInputBytes`); the per-unit `typecheck`; the project's own agents and hooks | Every finished unit reviewed again; approvals and the records of phase 02 and later made again | Nothing (the change applies to the work still to do) |
+   | The `build` or `smoke` command | The same | Only that command's run and the runs after it (from their approval) |
+   | The `parity` command | The same | The parity run, and the phases from 00b recorded again. Approvals and finished units are kept |
+   | The `original` or `mutation` command; the test settings and the test files | The same | The judge and the runs after it, the phases recorded again (from 00b; from 00 for `verificationMode` and `verificationRoots`), and translation approved again. Finished units are kept |
+   | What the migration produces (the source files, the RULEBOOK, the languages, the folders and the like) | Every finished unit reviewed again | The same |
+
+   The explanation a change prints (`note`, for example after a command is rewritten) now says what is made again.
+5. Records made by 0.44.x are not invalidated by the update. The first kit command that does work writes down once, in `migration/state/context-upgrade.json`, what the old records stood for; from then on they are made again only when a setting that affects them changes, as 0.45.0's own records are (for example, they are kept when a model is changed after the update). A record that was already out of date at the update stays out of date even if the settings or files are put back: record it again.
+6. Use the same kit release on every host (another PC, VS Code and the CLI, and so on). A 0.44.x kit that runs may write its records in the old places again. While the new place holds a record, the old file is not used, and the command's output and `status` say it is unused. Delete it once every host runs 0.45.0.
+7. For a copy install, replace the whole `migration-kit/` with the staged copy, and run a kit command such as `doctor` once before you replace `.github/`. The records of 0.44.x also covered the project's `.github/agents/` and `.github/hooks/`; replaced first, they change before what the old records stood for is written down. Even then the records are kept when phase 02 or 03 has a record, which shows what the old records stood for (a `phasePolicy: legacy` project, which has no phase records, loses them). A plugin install only needs the update.
+8. A limit remains: the source files count as one whole, so changing one file still sends every finished unit back to review (as in 0.44.x).
 
 ## 0.44.0 (an AI call that shows no sign of progress is stopped and retried)
 

@@ -35,7 +35,7 @@ const samples = {
   'spec-placeholder': 'Source-derived contracts still contain TODO(spec): migration/source-spec/contracts.md',
   'outside-roots': 'Source outside sourceRoots: tools/gen.py',
   artifact: 'Nonempty phase artifact required: migration/feasibility.md',
-  'input-root': 'Judge input root missing: tests (verificationRoots in migration/config.json must name the existing directory of the judge and its scenarios; "tests" is only the installer\'s default)',
+  'input-root': 'Judge input root missing: tests (verificationRoots in migration/state/config.json must name the existing directory of the judge and its scenarios; "tests" is only the installer\'s default)',
   'no-dependencies': 'Review dependency map declares no dependencies between 3 manifest files',
   'template-rules': 'migration/RULEBOOK.md is still the installed template',
   'arbitration-slip': 'Unknown/duplicate arbitration finding',
@@ -291,7 +291,7 @@ test('doctor shows the review dependency map as pending until phase 01 is record
   assert.equal(failureGuidance(missing.guidance.message, { root, language: 'en' }).recommended, 'make-review-deps');
   // Legacy projects without phase records keep failing as before.
   fs.rmSync(safePath(root, 'migration/phases/01.json'));
-  writeJSON(safePath(root, 'migration/config.json'), { ...loadConfig(root), phasePolicy: 'legacy' });
+  writeJSON(safePath(root, 'migration/state/config.json'), { ...loadConfig(root), phasePolicy: 'legacy' });
   assert.equal((await mapCheck()).ok, false);
 });
 

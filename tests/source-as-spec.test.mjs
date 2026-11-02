@@ -42,22 +42,22 @@ function draftPackage(root) {
 
 test('installer profile implies source-only and rejects runtime', t => {
   const root = project(t, { preparationProfile: 'source-as-spec' });
-  const config = readJSON(safePath(root, 'migration/config.json'));
+  const config = readJSON(safePath(root, 'migration/state/config.json'));
   assert.equal(config.verificationMode, 'source-only');
   assert.equal(config.preparationProfile, 'source-as-spec');
   assert.throws(() => install(fs.mkdtempSync(path.join(os.tmpdir(), 'sas-bad-')), { model: 'm', preparationProfile: 'source-as-spec', verificationMode: 'runtime' }), /source-only/);
-  const file = safePath(root, 'migration/config.json');
+  const file = safePath(root, 'migration/state/config.json');
   fs.writeFileSync(file, JSON.stringify({ ...config, verificationMode: 'runtime' }));
   assert.throws(() => loadConfig(root), /requires verificationMode source-only/);
 });
 
 test('source-spec init previews, then switches an existing runtime project and drafts only missing files', t => {
   const root = project(t);
-  const config = loadConfig(root), before = fs.readFileSync(safePath(root, 'migration/config.json'), 'utf8');
+  const config = loadConfig(root), before = fs.readFileSync(safePath(root, 'migration/state/config.json'), 'utf8');
   const preview = initSourceSpec(root, config);
   assert.equal(preview.applied, false);
-  assert.deepEqual(preview.changes.map(c => c.path), ['migration/config.json', 'migration/judge-plan.json', sourcesFile]);
-  assert.equal(fs.readFileSync(safePath(root, 'migration/config.json'), 'utf8'), before, 'preview never writes');
+  assert.deepEqual(preview.changes.map(c => c.path), ['migration/state/config.json', 'migration/judge-plan.json', sourcesFile]);
+  assert.equal(fs.readFileSync(safePath(root, 'migration/state/config.json'), 'utf8'), before, 'preview never writes');
   const applied = initSourceSpec(root, config, { apply: true });
   assert.match(applied.warning, /verification mode invalidates every phase record from 00/);
   const saved = loadConfig(root);
@@ -215,9 +215,9 @@ test('review fixes: guidance does not misroute file/diagnostic errors and never 
 
 test('review fixes: an invalid config never reads as "all phases complete"', t => {
   const root = project(t);
-  fs.writeFileSync(safePath(root, 'migration/config.json'), '{bad');
+  fs.writeFileSync(safePath(root, 'migration/state/config.json'), '{bad');
   const report = migrationStatus(root);
-  assert.match(statusChecklist(report, 'en'), /^Migration flow: progress cannot be determined\. Cause: migration\/config\.json/);
+  assert.match(statusChecklist(report, 'en'), /^Migration flow: progress cannot be determined\. Cause: migration\/state\/config\.json/);
   const todo = statusTodo(report, 'ja');
   assert.ok(todo.blocked && todo.todoList.every(i => i.status !== 'completed' && i.description.startsWith('判定不能')));
 });
@@ -259,7 +259,7 @@ test('review fixes: python depmap keeps a real migration package; manifest --inc
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'depmap-migration-'));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   for (const [p, text] of [['src/app/__init__.py', ''], ['src/app/migration/__init__.py', ''], ['src/app/migration/step.py', 'X = 1\n'],
-    ['tests/test_app.py', 'import app\n'], ['migration/config.json', '{}'], ['migration/x.py', '']]) {
+    ['tests/test_app.py', 'import app\n'], ['migration/state/config.json', '{}'], ['migration/x.py', '']]) {
     fs.mkdirSync(path.dirname(path.join(dir, p)), { recursive: true }); fs.writeFileSync(path.join(dir, p), text);
   }
   const map = await runProcess(python, ['-I', path.join(kitRoot, 'scripts/depmap_python.py'), '--root', '.', '--out', 'migration/depmap'], { cwd: dir });

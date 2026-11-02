@@ -4,7 +4,7 @@
 // Copilot adaptation: reviewed, hash-bound receipts determine completion.
 import fs from 'node:fs';
 import path from 'node:path';
-import { loadConfig, readManifest, contextHash, done } from '../lib/core.mjs';
+import { loadConfig, readManifest, inputContext, done } from '../lib/core.mjs';
 import { parseCommandLine, specs, usageText } from '../lib/cli.mjs';
 try {
   const args = parseCommandLine(process.argv.slice(2), specs.queue_runner);
@@ -12,7 +12,7 @@ try {
   const root = fs.realpathSync(path.resolve(args.root ?? '.'));
   if (args.manifest && args.manifest !== 'migration/manifest.tsv') throw new Error('Use migration/manifest.tsv; receipts are bound to the canonical manifest');
   const config = loadConfig(root), units = readManifest(root, config, args.manifest ?? 'migration/manifest.tsv');
-  const context = contextHash(root, config), completed = units.filter(u => done(root, u, context));
+  const context = inputContext(root, config), completed = units.filter(u => done(root, u, context));
   const command = args._[0] ?? 'status';
   if (command === 'status') console.log(`${completed.length}/${units.length} done (reviewed and hash-verified)`);
   else if (command === 'next') {

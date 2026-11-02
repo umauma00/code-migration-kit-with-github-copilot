@@ -1,3 +1,102 @@
+# 0.45.0 — 2026-11-02
+
+`migration/settings.json` is the one file for changing settings, and a
+settings change sends back only the work it affects. On 2026-11-02 the
+question "what is the difference between run-settings and config? It is
+confusing; one file should do" showed three files that looked like settings
+side by side in `migration/` (`run-settings.json`, `config.json` and
+`preferences.json`). And whichever setting changed, a model or a command
+alike, every finished unit went back to review: every record (a finished
+unit, an approval, a run, a record of phase 02 or later, a pilot grant, a
+repair intent or queue) held one hash of everything the kit read.
+
+- One file. `migration/run-settings.json` and `run-settings.help.md` are
+  renamed `migration/settings.json` and `settings.help.md` (`lib/settings.mjs`,
+  renamed from `lib/run-settings.mjs`) by the next kit command that does
+  work, and by `settings`, `models set` and `preferences`; the values are
+  kept, and an `_about` or a help file that names the old file is written
+  again. The kit's own records `migration/config.json` and
+  `migration/preferences.json` move unchanged to `migration/state/` when the
+  next command that does work starts, under the run lock (while another
+  command holds it, the move waits for the next command, and the records
+  are read where they are). A reader looks in the new place, then the old,
+  then the new again (`readMovedJSON`), so a move in between is not missed.
+  A record that cannot be parsed is not moved, and `status` names it where
+  it is. While the new place holds a record, an old file beside it (written
+  again by an older kit on another host, for example) is never used, and the
+  command's output and `status` name it as unused. The hooks, the
+  dependency mappers, the installer, pilots and every other reader take
+  either place.
+- An edit of the file is applied when the next kit command that does work
+  starts (`settingsAtStart`), without waiting for `settings apply`. Every
+  entry is checked first: an entry that cannot be used (a misspelt name
+  too) leaves the configuration as it was, and the command's output and
+  `status` name every error. A value changed from chat (`models set`,
+  `preferences`) or in the kit's record is copied into the file, not undone;
+  when both changed, the file's value is used and the command says so. A
+  changed model is checked against the account's model list first. The
+  switch to auto mode still waits for `settings apply`, which the host
+  confirms. Commands that only read (`status`, `phase next`, `phase check`,
+  `pilot plan` and the like) leave the edit to the next command. A pilot's
+  copy applies the project's file first, then takes the project's
+  concurrency, limits and retries. `status` also names the records to move
+  and the unused old files of a project that has no settings file yet.
+- A settings change sends back only what it affects (`inputContext` in
+  `lib/core.mjs`). A finished unit, an approval, a repair intent, a pilot
+  grant and the records of phases 02, 03, 05c and 06 are bound to the
+  content: the sources, the RULEBOOK as accepted, the inventory and the
+  manifest, the dependency map, the package map, the generated files, the
+  design inputs and the settings that say what the output is. A run (judge,
+  build, smoke, parity, handoff) and a repair queue made from it are bound
+  to the content, the verification inputs (the test settings and files, the
+  build files at the root, `verificationInputs`, the judge plan) and the
+  run's own commands with the files they name (judge: `original` and
+  `mutation`; parity: `original` and `parity`). Neither depends on how the
+  work is done: the models with their efforts and context tiers, the review
+  procedure (`fixPolicy`, `reviewFocus`, `dependencyOrder`,
+  `maxReviewInputBytes`), the per-unit `typecheck`, the kit's layout, the
+  project's worker profiles and hooks, or the run limits. Phase 00b's judge
+  fingerprint (schema 3, `lib/judge.mjs`) names the files of the judge's
+  commands (`original`, `mutation`, `parity`) only, so a build, smoke or
+  typecheck script no longer sends it back. A pilot grant seals the content
+  and every run's inputs. The note a change prints (`settingsEffect`) and
+  `settings.help.md` say what is made again.
+- Records of 0.44.x stay current through the update. The first command of
+  this kit that does work writes down once what the old hash and the schema
+  2 judge fingerprint stand for (`migration/state/context-upgrade.json`,
+  `lib/context-upgrade.mjs`), before it applies an edit of the file. An old
+  record then holds for as long as what it depends on stays as it was, also
+  after the models, a command or the tests change. A record already out of
+  date at that moment stays out of date, also after a revert. A copy update
+  that replaced `.github/agents` or `.github/hooks` (inputs until 0.44.x)
+  before the first command keeps the records when a record of phase 02, 03,
+  05c or 06 shows that nothing else changed; a `phasePolicy: legacy`
+  project has no phase records and loses them, so the upgrade notes say to
+  run a command such as `doctor` before replacing `.github/`.
+- Limits: the source tree is one input of the content, so changing one
+  source still sends every finished unit back, as before. A change of
+  `verificationMode` or `verificationRoots` sends the phases back from 00,
+  since every phase record names them.
+- Tests: `tests/rerun-scope-2026-11-02.test.mjs` (models, efforts, context
+  tiers, the review procedure and the per-unit typecheck keep every record;
+  a build or smoke command sends back its run and the runs after it; an
+  original or a test change sends back the judge and what follows it with
+  the phases from 00b, and keeps the units; a parity command change keeps
+  the approvals once the phases are recorded again; a change of what the
+  migration produces still sends every unit back, and putting it back
+  restores them; how a setting is written (absent, null, empty, a default
+  written out) changes nothing; records and a pilot of 0.44.x hold through
+  the update and a model change, also after a copy update replaced the
+  agent files, and the upgrade record is written before an edit is
+  applied), `tests/settings-move-2026-11-02.test.mjs` (the records move
+  unchanged and every record stays current; the old file name and help
+  renamed; old files beside new ones named and unused; a move deferred
+  under the lock and a read during a move; the hooks, a reinstall, a pilot
+  and the dependency mappers in both layouts; edits applied at the start of
+  a command, typos, a lost preferences record and an unreadable record
+  reported). `tests/settings.test.mjs` is `tests/run-settings.test.mjs`
+  renamed.
+
 # 0.44.0 — 2026-11-02
 
 The runner stops and retries a worker call that shows no sign of progress. On

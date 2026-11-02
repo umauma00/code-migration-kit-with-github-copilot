@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { prepare, fake } from '../tests/helpers.mjs';
 import { approve, runStage, translate } from '../lib/pipeline.mjs';
-import { safePath, writeJSON, atomicWrite } from '../lib/core.mjs';
+import { safePath, writeJSON, atomicWrite, configFile } from '../lib/core.mjs';
 import { parseCommandLine, specs, usageText } from '../lib/cli.mjs';
 const args = parseCommandLine(process.argv.slice(2), specs.demo);
 if (args.help) { console.log(usageText(specs.demo)); process.exit(0); }
@@ -21,7 +21,7 @@ console.log(JSON.stringify({ root, simulation: args._[0] !== 'setup', message: a
 if (args._[0] === 'setup') {
   // Live setup uses the actual new-project policy, not the offline helper bypass.
   config.phasePolicy = 'strict'; config.markerPolicy = 'todo-lines-v1';
-  writeJSON(safePath(root, 'migration/config.json'), config);
+  writeJSON(safePath(root, configFile), config);
   fs.rmSync(safePath(root, 'migration/stress-test/report.md'));
   for (const name of ['migration/judge-report.md', 'migration/depmap/report.md', 'migration/gap-report.md']) {
     atomicWrite(safePath(root, name), '# Draft live-check preparation\nInspect the fixture evidence and perform the applicable independent audits before recording review. This is not a completed review.\n');

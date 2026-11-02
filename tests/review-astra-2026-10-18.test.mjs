@@ -14,7 +14,7 @@ import { humanGate, interactiveDecision } from '../lib/guardrails.mjs';
 const R = 'node migration-kit/scripts/run_migration.mjs';
 async function approvedWith(t, options, change = () => {}) {
   const f = prepare(t, options);
-  change(f.config); writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  change(f.config); writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   await runStage(f.root, f.config, 'judge');
   approve(f.root, f.config, 'translation', 'Automated fixture approval for tests only');
   return f;
@@ -32,7 +32,7 @@ test('a quoted substitution behind a read-only command still reaches the human g
     [`cat "\`${R} phase complete 05\`"`, 'phase complete 05'],
     [`test -n "$(${R} frobnicate approve)"`, 'unrecognized runner command'],
     ['grep -n "approve build" scripts/run_migration.mjs', null],
-    [`test -f "$(pwd)/migration/config.json"`, null]]) {
+    [`test -f "$(pwd)/migration/state/config.json"`, null]]) {
     assert.equal(humanGate(command), gate, command);
   }
   const f = prepare(t);
