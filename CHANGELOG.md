@@ -80,7 +80,8 @@ repair intent or queue) held one hash of everything the kit read.
   it changes any setting. When an input cannot be read then (a missing
   file, say), it keeps the configuration record as it was and writes the
   rest down from it once the input can be read, so a setting changed
-  meanwhile changes nothing either. Only the kit writes the file: the hooks
+  meanwhile sends back only what it affects, as after the note is written
+  (a model change, say, keeps them). Only the kit writes the file: the hooks
   refuse an agent's edit, as for the accepted RULEBOOK changes. An old
   record then holds for as long as what it depends on stays as it was, also
   after the models, a command or the tests change. A record already out of
@@ -123,8 +124,10 @@ repair intent or queue) held one hash of everything the kit read.
   reported; two commands that rename together; an edit made by another
   command while one starts is not undone; the model list at a command's
   start has a deadline, survives a CLI that exits at once, and is not read
-  for the help file; the hooks keep agents off the upgrade record).
-  `tests/settings.test.mjs` is `tests/run-settings.test.mjs` renamed.
+  for the help file; the hooks keep agents off the upgrade record),
+  `tests/source-as-spec.test.mjs` (switching an already source-only
+  project to source-as-spec keeps phases 00 to 02 and sends the judge
+  back). `tests/settings.test.mjs` is `tests/run-settings.test.mjs` renamed.
 
 # 0.44.0 — 2026-11-02
 

@@ -6,8 +6,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { install, kitRoot } from '../scripts/install.mjs';
 import { mini, python } from './helpers.mjs';
-import { loadConfig, safePath, readJSON, atomicWrite } from '../lib/core.mjs';
-import { runStage } from '../lib/pipeline.mjs';
+import { loadConfig, safePath, readJSON, atomicWrite, inputContext } from '../lib/core.mjs';
+import { runStage, currentRecord } from '../lib/pipeline.mjs';
 import { phaseCommand } from '../scripts/phase_cli.mjs';
 import { migrationStatus, statusTodo, statusChecklist } from '../lib/status.mjs';
 import { initSourceSpec, sourceSpecReadiness, sourcesFile, contractsFile, legacyContractsSkeleton } from '../lib/source-spec.mjs';
@@ -237,22 +237,32 @@ test('review fixes: the bundle records nothing when a later phase is incomplete'
   assert.throws(() => phaseCommand(root, config, 'complete', '02,03', { note: 'x' }), /00 through 02/);
 });
 
-test('review fixes: TODO(spec) only blocks source-as-spec; a profile-only switch keeps 00-01 valid', t => {
+test('review fixes: TODO(spec) only blocks source-as-spec; a profile-only switch keeps 00-02 valid', async t => {
   const root = project(t, { verificationMode: 'source-only' });
   const config = loadConfig(root);
   phaseCommand(root, config, 'init');
   atomicWrite(safePath(root, 'migration/feasibility.md'), 'Feasible.\n');
   phaseCommand(root, config, 'complete', '00', { note: 'Reviewed' });
+  draftPackage(root);
   atomicWrite(safePath(root, 'tests/scenarios.md'), 'Scenario notes; the literal TODO(spec) is allowed here.\n');
   writeJSONFile(root, 'migration/judge-plan.json', { schemaVersion: 1, verificationMode: 'source-only', method: 'Source review', sources: ['src/main.py'],
     scenarios: [{ path: 'tests/scenarios.md', contract: 'main prints results', expectationBasis: 'source-inferred' }], unverified: ['Original not executed'] });
   atomicWrite(safePath(root, 'migration/judge-report.md'), 'Judge plan reviewed.\n');
   phaseCommand(root, config, 'complete', '00b', { note: 'Reviewed plan' });
+  phaseCommand(root, config, 'complete', '01', { note: 'Reviewed dependencies' });
+  phaseCommand(root, config, 'complete', '02', { note: 'Reviewed rules' });
+  assert.equal((await runStage(root, config, 'judge')).success, true);
+  assert.ok(currentRecord(root, config, 'judge', inputContext(root, config), false));
   const preview = initSourceSpec(root, config);
   assert.match(preview.warning, /phase 03 is recorded again once the judge has run\. The records of phases 00 to 02 and the finished units are kept\./);
   initSourceSpec(root, config, { apply: true });
-  const after = migrationStatus(root).workflow;
-  assert.equal(after.phases.find(p => p.id === '00b').complete, true, 'profile switch keeps 00b');
+  // What the warning says, on an already source-only project: phases 00 to 02
+  // stay recorded, and the judge goes back.
+  const switched = loadConfig(root), after = migrationStatus(root).workflow;
+  assert.equal(switched.preparationProfile, 'source-as-spec');
+  for (const id of ['00', '00b', '01', '02']) assert.equal(after.phases.find(p => p.id === id).complete, true, `profile switch keeps ${id}`);
+  assert.equal(currentRecord(root, switched, 'judge', inputContext(root, switched), false), false, 'the judge runs again');
+  assert.equal(after.next, '03');
 });
 
 test('review fixes: python depmap keeps a real migration package; manifest --include keeps only source roots', async t => {
