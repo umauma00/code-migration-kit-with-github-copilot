@@ -1,3 +1,37 @@
+# 0.42.1 — 2026-11-02
+
+Phase commands and status read each file once. On 2026-11-02 (Windows,
+source-as-spec, auto mode) an update from 0.40.0 made phase 00b's record out
+of date (0.40.1 changed its judge fingerprint format), and recording 00b to
+03 again took a long time: every check of every command hashed the whole
+source tree again, at about 6 s per pass on that PC.
+
+- `status`, `phase next`, `phase check`, `phase start`, `phase complete` and
+  `phase waive` share one read of the inputs per command (`inputRead` in
+  `lib/phases.mjs`): the source fingerprint, the judge inputs, the context
+  with its parts and each file's content hash are computed once for every
+  gate, record and staleness check the command makes, and a tree is walked
+  once (`memoValue` in `lib/core.mjs`). In a source-as-spec fixture one
+  source file was read 20 times by `phase next` or `status`, 43 times by
+  `phase check 00b,01,02`, 61 times by `phase complete 00b,01,02` and 26
+  times by `phase complete 03`; each now reads it once (204 reads for the
+  whole re-record, now 7).
+- A phase command writes records in the middle (`phase complete 00b,01,02`
+  records 00b before checking 01). Receipts are always read from disk again,
+  and none of the command's writes (receipts, the RULEBOOK copy, a retired
+  waiver, the cost log) is part of the shared read. Nothing is kept between
+  commands: a file changed after one command is seen by the next.
+- After parity one `status` read each translated file 33 times (every stage
+  record and gate, and their predecessors, asked for the output fingerprint
+  and whether every unit is done); now twice, once for its hash and once for
+  its markers (`done` checks each unit once per read).
+- A phase gate of a runner command (`judge`, `approve`, `translate` and the
+  others) shares one read across the chain of records it checks, so a
+  passing or refused gate reads each source once. A translation approval for
+  named files reads the manifest once instead of once per file.
+- What is checked and recorded does not change: from 0.40.1 or later,
+  approvals, completion records, phase records and prepared pilots are kept.
+
 # 0.42.0 — 2026-11-01
 
 A phase 03 pilot no longer blocks every unit at once on the Copilot CLI's own

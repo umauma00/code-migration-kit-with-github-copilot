@@ -1,6 +1,25 @@
-# Upgrading (0.42.0 and earlier releases)
+# Upgrading (0.42.1 and earlier releases)
 
 [日本語](UPGRADING.md) | English
+
+## 0.42.1 (phase commands and status read each file once)
+
+On 2026-11-02, after an update from 0.40.0 on Windows (source-as-spec, auto mode), recording phases 00b to 03 again took a long time. The record itself is needed once, as the 0.40.1 notes say, but the kit's commands read the whole source tree again for every check (about 6 s per pass on that PC).
+
+1. `status`, `phase next`, `phase check`, `phase start`, `phase complete` and `phase waive` now read each file once per command. Measured as reads of one source file in a source-as-spec fixture (204 for the whole re-record, now 7):
+
+   | Command | 0.42.0 | 0.42.1 |
+   |---|---|---|
+   | `phase next`, `status` | 20 | 1 |
+   | `phase check 00b,01,02` | 43 | 1 |
+   | `phase complete 00b,01,02` | 61 | 1 |
+   | `phase complete 03` | 26 | 1 |
+
+2. `phase complete 00b,01,02` writes phase records in the middle of the command (it records 00b before checking 01). A record it wrote is read from the file again every time, and what the command writes (phase records, the RULEBOOK copy in `migration/rulebook-history/`, a waiver moved to `waivers/retired/`, cost-log.tsv) is never part of the shared read. Nothing is kept between commands: a file changed after one command is seen by the next.
+3. After parity, one `status` read each translated file 33 times. It now reads it twice: once for its hash and once for its markers.
+4. When `judge`, `approve`, `translate` and the other runner commands check the phase records, they read each source once for the whole chain of records. A translation approval for named files reads the manifest once instead of once per file.
+5. What is checked and recorded does not change. From 0.40.1 or later, approvals, completion records, phase records and prepared pilots are kept. Updating from 0.40.0 still needs the record again described under 0.40.1, but each command now reads the files once, so it is shorter.
+6. A copied install replaces all of `migration-kit/` with the temporary install's contents. A plugin install only needs the update.
 
 ## 0.42.0 (a pilot all blocked on the CLI's lock; the workers' default CLI home; the size of an auto-mode pilot)
 
