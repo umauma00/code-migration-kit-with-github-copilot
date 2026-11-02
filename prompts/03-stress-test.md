@@ -29,6 +29,7 @@ may deny git restore and git checkout); then nothing is recorded again unless a
 phase was recorded again since (`phase next` shows it).
 
 Select 3–5 difficult files by risk and inventory coverage, with scored evidence.
+In auto mode select 3, the fewest: nobody is asked about the count.
 For preserve mode, run a dual translation experiment:
 
 - A follows the rulebook exactly in a disposable workspace.
@@ -65,7 +66,8 @@ behavior. Do not mix disposable receipts with production receipts.
 
 Use the formal [pilot grant](../docs/PILOT.md): after current 00–02 and judge,
 run the read-only `pilot plan --sources CSV --through STAGE` and ask for permission
-once with its final file count (chosen files plus the files they use) and its
+once with its final file count (chosen files plus the files they use; in auto mode
+a translation-only pilot without a unit typecheck takes the chosen files only) and its
 `plain` sentence, then
 `pilot prepare --expect-total TOTAL --target NEW_EXTERNAL_DIR --sources CSV --through STAGE --note TEXT`,
 then `pilot run --root NEW_EXTERNAL_DIR` in a background terminal, never piped or

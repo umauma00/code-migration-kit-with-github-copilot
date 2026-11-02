@@ -71,6 +71,7 @@ const samples = {
   approval: 'No build approval for the current outputs',
   'build-failed': 'Build failed (exit 2)',
   'cli-host-stall': "Copilot implementer failed (exit 1): Session host did not acknowledge 'assistant.reasoning' delivery within 120s",
+  'cli-lock': 'Copilot implementer failed (exit 1): Error: Request session.send failed with message: The shared writer lock timed out.',
   timeout: 'Copilot reviewer timed out after 600 s',
   'worker-output': 'Invalid review result for src/login.py',
   'credential-candidate': 'Local scan: the /P argument is still a literal credential candidate',

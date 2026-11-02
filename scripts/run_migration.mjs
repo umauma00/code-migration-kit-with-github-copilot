@@ -85,7 +85,7 @@ export const usage = `Usage: node migration-kit/scripts/run_migration.mjs COMMAN
   stress-b command --dir DIR [--model ID]
                               Phase 03 comparison B: the exact isolated copilot -p command, with the model's own file tools
   pilot plan --sources src/a,src/b [--through STAGE]
-                              Read-only: the files a pilot would cover (chosen + the files they use), to show before asking
+                              Read-only: the files a pilot would cover (chosen + the files they use; in auto mode a translation-only pilot without a unit typecheck keeps the chosen only), to show before asking
   pilot prepare --target NEW_DIR --sources src/a,src/b --note TEXT [--through translation|build|smoke|parity] [--expect-total N]
   pilot run --root PILOT_DIR  Run only the explicitly authorized, isolated pilot
   repair --target PATH --evidence migration/PATH | repair --queue migration/QUEUE.json [--max-calls N]
@@ -243,7 +243,9 @@ export async function doctor(root, config, { checkCLI = false, command = 'copilo
       try { home = prepareWorkerHome(root, config); } catch (e) { homeError = e.message; }
       checks.push({ check: 'worker Copilot CLI home', ok: true, status: home ? 'separate' : homeError ? 'shared: the worker home could not be prepared' : 'shared',
         ...(home ? { path: home } : {}), ...(homeError ? { warning: `Workers will use the person's Copilot CLI home: ${homeError}` } : {}),
-        note: 'Workers run in a Copilot CLI home of their own (workerCopilotHome), with the person\'s sign-in, settings and plugins but not their session records, MCP servers or CLI state. A local sandbox must let workers write there as well as to ~/.copilot.' });
+        note: home ? 'Workers run in a Copilot CLI home of their own (workerCopilotHome "separate"), with the person\'s sign-in, settings and plugins but not their session records, MCP servers or CLI state. A local sandbox must let workers write there as well as to ~/.copilot.'
+          : homeError ? 'workerCopilotHome is "separate", but its home could not be prepared, so workers fall back to the person\'s Copilot CLI home (~/.copilot or COPILOT_HOME) and their sessions sit beside the person\'s; sessions prune removes the kit\'s.'
+          : 'Workers run in the person\'s Copilot CLI home (~/.copilot or COPILOT_HOME; workerCopilotHome "shared", the default), so their sessions sit beside the person\'s; sessions prune removes the kit\'s. "separate" gives them a home of their own.' });
       const env = copilotEnv('reviewer-rules', home);
       const version = await runProcess(command, ['--version'], { cwd: root, env, signal, timeoutMs });
       checks.push({ check: 'Copilot executable', ok: version.code === 0, detail: version.stdout.trim() });
@@ -517,8 +519,8 @@ export async function main(argv = process.argv.slice(2)) {
         onProgress: event => console.error(progressLine(event)) });
     }
     else if (cmd === 'sessions') {
-      if (args._[1] === 'status') result = sessionsStatus(root, { run: args.run });
-      else if (args._[1] === 'prune') result = pruneSessions(root, { run: args.run });
+      if (args._[1] === 'status') result = sessionsStatus(root, { run: args.run, config });
+      else if (args._[1] === 'prune') result = pruneSessions(root, { run: args.run, config });
       else throw new Error('Use sessions status | prune [--run RUN_ID]');
     }
     else if (cmd === 'guardrails') {

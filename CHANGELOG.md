@@ -1,3 +1,77 @@
+# 0.42.0 — 2026-11-01
+
+A phase 03 pilot no longer blocks every unit at once on the Copilot CLI's own
+lock, its input checks no longer read the whole source tree again and again,
+workers run in the person's own CLI home again by default, and an auto-mode
+pilot translates only the files it chose when nothing needs more. On 2026-11-01
+a Windows pilot (kit 0.40.0, Copilot CLI 1.0.105, one worker at a time) stayed
+at 0 of 40: every worker failed at session.send with "The shared writer lock
+timed out." and the kit blocked each unit at once, several minutes apart.
+
+- The CLI's lock waits ("The shared writer lock timed out.", "MCP installation
+  storage is busy", "Another process is changing MCP configuration") are
+  transient: the same call is retried with the usual backoff, in the same CLI
+  home, up to 5 times per call like the CLI's event stall (bounded mode:
+  `transientRetries` if lower). Before, the unit was blocked at the first one,
+  and the guidance read it as a deadline ("timed out"). A lock wait the CLI
+  reports as a failed MCP host start ("Failed to initialize MCP host: Another
+  process is changing MCP configuration.") is the same wait: it never moves
+  workers to the person's home. `status` names the wait while a file's call
+  retries (the attempt record marks each such retry `cliLock: true`) and
+  suggests checking for a CLI left from an earlier run if it persists; a
+  survey names it in its progress line. When the retries run out, the
+  guidance (`cli-lock`) suggests going back to `shared` first when workers ran
+  in their own home (`workerCopilotHome` `separate`), and when they ran in
+  `~/.copilot` a check for a Copilot CLI left from an earlier run first, then
+  a rerun, then their own home. Switching the home is a run setting:
+  approvals and finished units are kept.
+- `workerCopilotHome` now defaults to `shared`: workers run in the person's
+  `~/.copilot` (or `COPILOT_HOME`), as before 0.34.0. The kit's own worker
+  home (`separate`) failed every worker on that Windows PC twice on the same
+  day (kit 0.40.0): while starting MCP servers (from the copies 0.40.2 stopped
+  making), and at the prompt with the lock above. Neither failure was seen
+  with workers in the person's home: rerun with `shared`, the same pilot
+  finished its first unit with no lock error, and a Mac had run that way all
+  along. The reason the worker home was made (a large session index behind the CLI's 120 s
+  event stall, 2026-10-31) was never confirmed. `"workerCopilotHome":
+  "separate"` keeps the worker home, with its fallback to `~/.copilot`.
+  Worker sessions now sit beside the person's own; `sessions prune` removes
+  only the ones the kit recorded, and `sessions status` names the folder of
+  the current setting first (`sessionState`). `doctor --check-cli` says which
+  home workers use, and that a `separate` home that could not be prepared
+  falls back to the person's.
+- A pilot's input check (when a unit is dispatched, before and after every
+  worker call, after a retry wait, and when a unit fails or completes) reads
+  each file once. Through 0.41.0 it computed the pilot's context twice and,
+  for the production project, the context twice, the source fingerprint of
+  phases 00 to 02 four times and the phase 00b judge inputs once, each reading
+  every source file again; one context alone read a source file three times
+  (the source tree, the manifest and the review dependency map). In a fixture
+  pilot that was 33 reads of a production source file and 18 of its pilot
+  copy per failed unit, and 136 per finished unit. 0.41.1 shares the
+  fingerprint and the production context across the phase chain (15 and 18,
+  and 88); it is now 3 and 3, and 16.
+  On that Windows PC one check took about 1 min 45 s (the time a unit shows
+  `validating` is one check), and a unit with three worker calls runs eight.
+  The context, the phase chain and the judge inputs of one check share one
+  read (`readMemo` in `lib/core.mjs`), and every `contextHash` reads a file
+  once, so production runs check faster too. What a check compares did not
+  change: a change to the production project or to the pilot copy still stops
+  the pilot at the next check.
+- In auto mode a pilot stays small, like upstream (the same three files as
+  the bakeoff, nothing added). Phase 03 chooses 3 files there, and a
+  translation-only pilot without a unit typecheck translates only those:
+  `pilot plan` and `pilot prepare` no longer add the files they use
+  (`scopeKind: "chosen-only"`; they stay in the copy as originals, listed in
+  `readOnly`, and the reviewers read them there as before). On 2026-11-01 an
+  auto-mode pilot chose 3 files and the kit added the 37 they use, unasked:
+  40 files, about half a day on that PC. A unit typecheck or a build, smoke or
+  parity boundary needs those files translated, so those pilots keep them
+  (`scopeKind: "with-dependencies"`), and outside auto mode nothing changes:
+  the person is asked with the full count.
+- Updating from 0.40.1 or later keeps approvals, finished units, phase
+  records and prepared pilots: no input changed.
+
 # 0.41.1 — 2026-11-01
 
 A note added to a recorded phase report no longer has to cost a re-record. On

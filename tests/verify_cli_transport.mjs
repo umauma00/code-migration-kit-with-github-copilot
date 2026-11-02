@@ -74,7 +74,9 @@ try {
   Object.assign(process.env, { COPILOT_HOME: cliHome, COPILOT_PROVIDER_BASE_URL: `http://127.0.0.1:${server.address().port}/v1`,
     COPILOT_PROVIDER_TYPE: 'openai', COPILOT_PROVIDER_API_KEY: 'local-test-only', COPILOT_PROVIDER_BEARER_TOKEN: '',
     COPILOT_PROVIDER_WIRE_API: 'completions', COPILOT_MODEL: 'gpt-4.1', COPILOT_GITHUB_TOKEN: '', GH_TOKEN: '', GITHUB_TOKEN: '' });
-  f.config.timeoutSeconds = 30; writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  // The session checks below are about the kit's own worker home, which
+  // workers use only with "separate" (shared is the default since 0.42.0).
+  f.config.timeoutSeconds = 30; f.config.workerCopilotHome = 'separate'; writeJSON(safePath(f.root, 'migration/config.json'), f.config);
   const adapter = createCopilotAdapter({ command, prefixArgs: ['--log-dir', safePath(f.root, 'cli-test-logs')] });
   const checks = await doctor(f.root, f.config, { checkCLI: true, command }); assert.equal(checks.ok, true);
   // Same CLI/profile/input, but deliberately omit the isolation flag once.
@@ -109,7 +111,7 @@ try {
   atomicWrite(safePath(f.root, 'AGENTS.md'), canaries.root + '_EDITED\n');
   const resumed = await runTranslation(); assert.equal(resumed.agentCalls, 0);
   if (providerError) throw providerError;
-  // Workers ran as runner-named sessions in the kit's worker home (0.34.0):
+  // Workers ran as runner-named sessions in the kit's worker home (separate):
   // each recorded ID exists there, none in the person's home, and prune
   // removes exactly those (the control run's session in the person's home stays).
   const [workerState, personState] = sessionStateDirs(f.root);

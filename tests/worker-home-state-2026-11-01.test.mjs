@@ -20,6 +20,9 @@ import { runtimeLayout } from '../lib/runtime.mjs';
 import { prepareWorkerHome, workerCopilotHome, resetPreparedWorkerHomes, workerHomeMarker, workerHomeLayout, workerSettingFiles, workerLinkedFolders, workerHomeUpgradeLockMs } from '../lib/worker-home.mjs';
 import { isHomeStateFailure, isSignedOut, isSystemicFailure } from '../lib/failures.mjs';
 
+// These tests are about the kit's own worker home, which workers use only
+// with workerCopilotHome "separate" (shared is the default since 0.42.0).
+const separate = { workerCopilotHome: 'separate' };
 const linkType = process.platform === 'win32' ? 'junction' : 'dir';
 function personHome(t) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kit-person-home-')), home = path.join(dir, '.copilot');
@@ -42,7 +45,7 @@ test('the worker home takes only the sign-in, settings and plugin folders, never
     ['mcp-installations.json', '{"storageId":"person"}'], ['mcp-activations.json', '{}'], ['mcp-installations-writer.binding', 'person-home'], ['permissions-config.json', '{}'],
     ['statusline.sh', '#!/bin/sh\n'], ['keybindings.json', '{}']]) fs.writeFileSync(path.join(home, name), body);
   for (const dir of [...workerLinkedFolders, 'ide', 'mcp-oauth-config', 'plugin-data', 'protected', 'cache']) fs.mkdirSync(path.join(home, dir, 'inside'), { recursive: true });
-  const worker = prepareWorkerHome(root, {});
+  const worker = prepareWorkerHome(root, separate);
   assert.deepEqual(fs.readdirSync(worker).sort(), [workerHomeMarker, ...workerSettingFiles, ...workerLinkedFolders].sort());
   for (const dir of workerLinkedFolders) assert.ok(fs.lstatSync(path.join(worker, dir)).isSymbolicLink(), dir);
   assert.deepEqual(JSON.parse(fs.readFileSync(path.join(worker, workerHomeMarker), 'utf8')), { layout: workerHomeLayout });
@@ -50,7 +53,7 @@ test('the worker home takes only the sign-in, settings and plugin folders, never
   resetPreparedWorkerHomes();
   fs.writeFileSync(path.join(worker, 'mcp-installations.json'), '{"storageId":"worker"}');
   fs.symlinkSync(path.join(home, 'ide'), path.join(worker, 'ide'), linkType);
-  prepareWorkerHome(root, {});
+  prepareWorkerHome(root, separate);
   assert.equal(fs.readFileSync(path.join(worker, 'mcp-installations.json'), 'utf8'), '{"storageId":"worker"}');
   assert.ok(!fs.existsSync(path.join(worker, 'ide')));
   assert.ok(fs.existsSync(path.join(home, 'ide', 'inside')), 'the person\'s folder is untouched');
@@ -61,7 +64,7 @@ test('a worker home from 0.34.0 to 0.40.x is emptied once, keeping session recor
   fs.writeFileSync(path.join(home, 'config.json'), '{"a":1}');
   fs.writeFileSync(path.join(home, 'mcp-installations-writer.binding'), 'person-home');
   for (const dir of ['installed-plugins/p', 'ide/kept']) fs.mkdirSync(path.join(home, dir), { recursive: true });
-  const worker = workerCopilotHome(root, {});
+  const worker = workerCopilotHome(root, separate);
   fs.mkdirSync(worker, { recursive: true });
   // What 0.34.0 left: copies of every file, links to every folder, and what
   // worker CLIs wrote against those copies; plus the workers' records.
@@ -71,7 +74,7 @@ test('a worker home from 0.34.0 to 0.40.x is emptied once, keeping session recor
   for (const dir of ['protected/root', 'session-state/11111111-1111-4111-8111-111111111111', 'logs']) fs.mkdirSync(path.join(worker, dir), { recursive: true });
   // A real folder holding a link into the person's home: the link goes, the person's folder stays.
   fs.symlinkSync(path.join(home, 'ide'), path.join(worker, 'protected', 'into-person'), linkType);
-  prepareWorkerHome(root, {});
+  prepareWorkerHome(root, separate);
   // The lock goes with its binding: no lock is left without the binding beside it.
   assert.deepEqual(fs.readdirSync(worker).sort(), [workerHomeMarker, 'config.json', 'installed-plugins', 'logs', 'session-state', 'session-store.db', 'session-store.db-wal'].sort());
   assert.equal(fs.readFileSync(path.join(worker, 'config.json'), 'utf8'), '{"a":1}');
@@ -80,7 +83,7 @@ test('a worker home from 0.34.0 to 0.40.x is emptied once, keeping session recor
   // Once only: the CLI's own state in the current layout is kept.
   resetPreparedWorkerHomes();
   fs.mkdirSync(path.join(worker, 'protected', 'root'), { recursive: true });
-  prepareWorkerHome(root, {});
+  prepareWorkerHome(root, separate);
   assert.ok(fs.existsSync(path.join(worker, 'protected', 'root')));
 });
 
@@ -111,7 +114,7 @@ console.log(JSON.stringify({ type: 'assistant.message', data: { content: JSON.st
 console.log(JSON.stringify({ type: 'result', exitCode: 0 }));
 `);
   const adapter = createCopilotAdapter({ command: process.execPath, prefixArgs: [script] });
-  return { call: () => adapter({ root: f.root, config: f.config, role: 'implementer', unit: f.units[0], extra: {} }), homes: () => fs.readFileSync(log, 'utf8').trim().split('\n').map(line => JSON.parse(line).home) };
+  return { call: () => adapter({ root: f.root, config: { ...f.config, ...separate }, role: 'implementer', unit: f.units[0], extra: {} }), homes: () => fs.readFileSync(log, 'utf8').trim().split('\n').map(line => JSON.parse(line).home) };
 }
 
 test('a worker that cannot start its MCP servers in the worker home is repeated in the person\'s home, and later calls stay there', async t => {
@@ -136,13 +139,13 @@ test('the same failure in both homes fails that call as before and moves no late
 
 test('an older worker home is emptied by one kit process at a time, and a broken marker counts as older', t => {
   const home = personHome(t), root = project(t);
-  const worker = workerCopilotHome(root, {}), lock = path.join(worker, '.migration-kit-upgrading');
+  const worker = workerCopilotHome(root, separate), lock = path.join(worker, '.migration-kit-upgrading');
   fs.mkdirSync(lock, { recursive: true });
   fs.writeFileSync(path.join(worker, 'mcp-installations.json'), 'old');
   fs.writeFileSync(path.join(worker, workerHomeMarker), 'not json');
   fs.writeFileSync(path.join(lock, 'owner.json'), JSON.stringify({ pid: process.pid, token: 'another' }));
   // Another process is emptying it: this one waits, then says so (the adapter then uses the person's home for that command).
-  assert.throws(() => prepareWorkerHome(root, {}, { upgradeWaitMs: 300 }), /another kit process is still clearing/);
+  assert.throws(() => prepareWorkerHome(root, separate, { upgradeWaitMs: 300 }), /another kit process is still clearing/);
   assert.ok(fs.existsSync(path.join(worker, 'mcp-installations.json')));
   assert.ok(fs.existsSync(lock), 'another process\'s lock is left alone');
   assert.equal(fs.readFileSync(path.join(worker, workerHomeMarker), 'utf8'), 'not json');
@@ -150,7 +153,7 @@ test('an older worker home is emptied by one kit process at a time, and a broken
   resetPreparedWorkerHomes();
   const old = (Date.now() - workerHomeUpgradeLockMs - 60000) / 1000;
   fs.utimesSync(lock, old, old);
-  assert.equal(prepareWorkerHome(root, {}), worker);
+  assert.equal(prepareWorkerHome(root, separate), worker);
   assert.ok(!fs.existsSync(path.join(worker, 'mcp-installations.json')) && !fs.existsSync(lock));
   assert.deepEqual(fs.readdirSync(worker).filter(name => name.startsWith('.migration-kit-upgrading')), [], 'the stale lock was taken over and removed');
   // A lock whose owner process has ended is taken over at once.
@@ -159,7 +162,7 @@ test('an older worker home is emptied by one kit process at a time, and a broken
   fs.writeFileSync(path.join(worker, 'mcp-activations.json'), 'old');
   fs.mkdirSync(lock);
   fs.writeFileSync(path.join(lock, 'owner.json'), JSON.stringify({ pid: 2 ** 31 - 2, token: 'ended' }));
-  assert.equal(prepareWorkerHome(root, {}, { upgradeWaitMs: 300 }), worker);
+  assert.equal(prepareWorkerHome(root, separate, { upgradeWaitMs: 300 }), worker);
   assert.ok(!fs.existsSync(path.join(worker, 'mcp-activations.json')) && !fs.existsSync(lock));
   assert.deepEqual(JSON.parse(fs.readFileSync(path.join(worker, workerHomeMarker), 'utf8')), { layout: workerHomeLayout });
 });
@@ -168,8 +171,8 @@ test('a worker home that is a link is never emptied, and workers use the person\
   const home = personHome(t), f = prepare(t);
   fs.writeFileSync(path.join(home, 'mcp-config.json'), '{"mcpServers":{}}');
   // Someone pointed the worker home at ~/.copilot as a workaround.
-  fs.symlinkSync(home, workerCopilotHome(f.root, {}), linkType);
-  assert.throws(() => prepareWorkerHome(f.root, {}), /is a link/);
+  fs.symlinkSync(home, workerCopilotHome(f.root, separate), linkType);
+  assert.throws(() => prepareWorkerHome(f.root, separate), /is a link/);
   assert.ok(fs.existsSync(path.join(home, 'mcp-config.json')), 'nothing in the person\'s home was removed');
   const cli = cliDouble(f, '');
   const response = await cli.call();
@@ -187,7 +190,7 @@ test('a CLI that reached the model is never repeated, whatever its error says', 
 
 test('doctor follows workers to the person\'s home when the worker home cannot start MCP servers', async t => {
   const home = personHome(t), f = prepare(t);
-  const layout = runtimeLayout(f.root, f.config), worker = prepareWorkerHome(f.root, f.config);
+  const layout = runtimeLayout(f.root, f.config), worker = prepareWorkerHome(f.root, { ...f.config, ...separate });
   const required = ['implementer'].map(r => layout.agentId(r));
   const script = safePath(f.root, 'probe-cli.mjs');
   atomicWrite(script, `for await (const _ of process.stdin);
@@ -201,7 +204,7 @@ process.stderr.write('No such agent: ${probeAgentName}, available: ${required.jo
 
 test('a worker home still being cleared moves that command to the person\'s home with a warning, once', async t => {
   const home = personHome(t), f = prepare(t);
-  const worker = workerCopilotHome(f.root, {}), lock = path.join(worker, '.migration-kit-upgrading');
+  const worker = workerCopilotHome(f.root, separate), lock = path.join(worker, '.migration-kit-upgrading');
   fs.mkdirSync(lock, { recursive: true });
   fs.writeFileSync(path.join(lock, 'owner.json'), JSON.stringify({ pid: process.pid, token: 'another' }));
   const cli = cliDouble(f, '');

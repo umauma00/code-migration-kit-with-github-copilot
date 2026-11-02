@@ -15,6 +15,7 @@ Phase numbers (00 to 06) and the model-change answer format stay as they are.
 | through build / smoke / parity | 変換後のビルド／簡単な動作確認／新旧の動作比較まで | up to build / a quick run / comparing old and new |
 | revoke the grant, clean the target | 許可記録とコピー先フォルダーを消す | delete the permission record and the copy folder |
 | dependency expansion | 選んだファイルが使っているファイルも自動で加わる | files the chosen ones use are added automatically |
+| chosen-only scope (auto mode) | 選んだファイルだけを試す（使っているファイルは変換せず、元のコードを読むだけ） | only the chosen files are tried (the files they use are read as original code, not translated) |
 | judge | テストの準備の判定（元のコードを動かす方式では新旧の比較、動かさない方式では計画の確認） | the test check (comparing old and new when the original runs, checking the plan when it does not) |
 | manifest | 変換するファイルの一覧 | the list of files to translate |
 | inventory | 要注意箇所の一覧 | the list of tricky spots |
