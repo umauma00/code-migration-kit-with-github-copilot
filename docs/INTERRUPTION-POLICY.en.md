@@ -61,7 +61,7 @@ These are not time or load cutoffs: continuing could not save a correct result.
 | Input/output safety | writing over sources, protected paths, traversal, symlinks, duplicate targets, guardrail violations |
 | Inputs changed during a run | source, rules, config, judge or repair intent changed |
 | Concurrency and record integrity | a run/build-loop lock whose owner is alive or that comes from another host (an ownerless lock on this host is removed automatically), broken ledgers or hashes |
-| Cannot start, sign-in, credits | missing CLI or runtime, unknown agent or model, expired sign-in, 403, service quota or billing limits (also GitHub's 402 Payment Required where the CLI loads the models, since 0.44.0 with the guidance `credits`) |
+| Cannot start, sign-in, credits | missing CLI or runtime, unknown agent or model, expired sign-in, 403, service quota or billing limits (also GitHub's 402 Payment Required where the CLI loads the models and the CLI's "Copilot Pro trial paused", since 0.44.0 with the guidance `credits`) |
 | Broken streams | corrupt JSONL or terminal events from the CLI itself, session errors (classified as above) |
 | Preparation audit request over the input limit | `audit_inputs.mjs freeze` refuses instead of truncating; freeze again with fewer files per batch (or raise `maxReviewInputBytes`) |
 | Required data that truly cannot be processed | binary files (NUL bytes that are not UTF-16), unreadable files, or required metadata (rulebook, one census site) larger than the model capacity on its own |

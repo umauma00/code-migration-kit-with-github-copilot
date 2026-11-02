@@ -290,6 +290,24 @@ process.stderr.write('left ' + g.pid + '\\n'); g.unref(); setInterval(() => {}, 
   assert.equal(gone(left), true);
 });
 
+test('a process group that was empty when the child exited is never signalled: its id is a pid that a new process can take', { skip: process.platform === 'win32' && 'a POSIX process group' }, async t => {
+  // A grandchild in a session of its own holds the pipes; the child's group
+  // has no one left in it. A signal to it could reach a new process that took
+  // the child's pid as a group leader (each worker CLI the runner starts is one).
+  const realKill = process.kill, sent = [];
+  process.kill = function (pid, signal) { if (pid < 0 && signal !== 0) sent.push([pid, signal]); return realKill.call(process, pid, signal); };
+  let grandchild;
+  t.after(() => { process.kill = realKill; if (grandchild) try { realKill.call(process, grandchild, 'SIGKILL'); } catch {} });
+  const outcome = await node(`const { spawn } = require('node:child_process');
+const g = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 60000)'], { detached: true, stdio: ['ignore', 'inherit', 'inherit'] });
+process.stderr.write('grandchild ' + g.pid + ' leader ' + process.pid + '\\n'); g.unref();`);
+  grandchild = Number(outcome.stderr.match(/grandchild (\d+)/)?.[1]) || undefined;
+  const leader = Number(outcome.stderr.match(/leader (\d+)/)?.[1]);
+  assert.ok(grandchild && leader);
+  assert.equal(outcome.code, 0);
+  assert.deepEqual(sent.filter(([pid]) => pid === -leader), []);
+});
+
 test('on Windows a taskkill that never finishes does not hold the call: the child is stopped and the call ends', { skip: process.platform === 'win32' && 'a stand-in taskkill on PATH' }, async t => {
   const dir = fs.mkdtempSync(path.join(fs.realpathSync(process.env.TMPDIR ?? '/tmp'), 'taskkill-'));
   const pidFile = path.join(dir, 'pid');
@@ -594,6 +612,18 @@ test('a list of models the CLI could not load as it started is retried, never a 
   // GitHub's 402 there (exact text, with and without the request ID): no model can be
   // used until the credits, the budget or the plan allow it. The run stops, as up to
   // 0.43.1, with the guidance on credits, not on signing in (the CLI adds its sign-in help).
+  // A paused trial, which the CLI names in its own words (exact text, GitHub's 403
+  // with its error in the body, with and without the ID; up to 0.43.1 each file was
+  // left unfinished with the advice for a worker's answer), is the same matter.
+  const trialPaused = id => new Error(`Copilot implementer failed (exit 1): Error: Copilot Pro trial paused${id ? ' (Request ID: ABCD:1234:5678:9ABC:0000)' : ''}\n\nCopilot Pro trials have been temporarily paused. Please upgrade your account or revert to Copilot Free.\n`);
+  for (const paused of [trialPaused(true), trialPaused(false), new Error(`${trialPaused(true).message}${helpText}`)]) {
+    assert.deepEqual(kind(paused).slice(0, 3), [false, false, true], paused.message);
+    for (const language of ['ja', 'en']) {
+      const guidance = failureGuidance(paused, { language });
+      assert.equal(guidance.id, 'credits', `${paused.message} (${language})`);
+      assert.deepEqual(guidance.options.map(o => o.id), ['check-billing', 'pause']);
+    }
+  }
   for (const payment of [modelsLoad('402 Payment Required'), modelsLoad('402 Payment Required', false)]) {
     assert.deepEqual(kind(payment), [true, true, true, false, false], payment.message);
     for (const language of ['ja', 'en']) {
@@ -643,6 +673,12 @@ test('a list of models the CLI could not load as it started is retried, never a 
   assert.equal(paid, 1);
   assert.equal(stopped.report.selfRepairs?.repass, undefined);
   for (const language of ['ja', 'en']) assert.equal(failureGuidance(stopped, { language }).id, 'credits');
+  const q = await continuous(t);
+  let trials = 0;
+  const paused = await translate(q.root, q.config, async () => { trials++; throw new Error('Copilot implementer failed (exit 1): Error: Copilot Pro trial paused (Request ID: ABCD:1234:5678:9ABC:0000)\n\nCopilot Pro trials have been temporarily paused. Please upgrade your account or revert to Copilot Free.\n'); }).then(() => null, e => e);
+  assert.ok(paused);
+  assert.equal(trials, 1);
+  assert.equal(failureGuidance(paused, { language: 'en' }).id, 'credits');
 });
 
 // CLI 1.0.105 when a proxy asks for its own sign-in and the CLI cannot give

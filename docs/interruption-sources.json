@@ -1049,7 +1049,7 @@
     },
     {
       "path": "lib/failures.mjs",
-      "sha256": "da120b081ccc10ee2e2bf5560bd41083c42af3ce9be5a6f8dbba0a26d661216b",
+      "sha256": "e9a188d80e37f58a1102bafc02d4908154da53148321d32b5249a89ce77c7b08",
       "entries": [
         {
           "line": 142,
@@ -1192,7 +1192,7 @@
     },
     {
       "path": "lib/guidance.mjs",
-      "sha256": "3a2cc4fa5d5a616152038fab7fe0096c209512504082a92dc4bc725a72259aa3",
+      "sha256": "6fe99c63c22247fd4958a8952fafc1c680c9dabd323be9cfee3135943f254825",
       "entries": [
         {
           "line": 81,
@@ -1230,42 +1230,42 @@
           "code": "{ id: 'lower-concurrency', label: t('同時に動かすAIの数を減らすか、やり直すまでの待ち時間を延ばす', 'Lower concurrency or raise transientRetryDelayMs'),"
         },
         {
-          "line": 662,
+          "line": 663,
           "kind": "error-or-exit-candidate",
           "code": "{ id: 'check-billing', label: t('GitHub の課金・予算・プランの設定で残量と状態を確認し、追加・引き上げ・変更のあとで再実行する', 'Check credits, budget and plan in GitHub billing, add, raise or change them, then rerun'),"
         },
         {
-          "line": 706,
+          "line": 707,
           "kind": "deadline-or-observation",
           "code": "// and a cancellation are final and stay with the timeout rule."
         },
         {
-          "line": 715,
+          "line": 716,
           "kind": "deadline-or-observation",
           "code": "// (failures.mjs); seen here when those ran out. Before the timeout rule,"
         },
         {
-          "line": 749,
+          "line": 750,
           "kind": "deadline-or-observation",
           "code": "// rules (failures.mjs cliGaveUpPattern). Before timeout and worker-output."
         },
         {
-          "line": 760,
+          "line": 761,
           "kind": "deadline-or-observation",
           "code": "{ id: 'timeout', match: /timed out|\\btimeout\\b(?!Seconds)/i,"
         },
         {
-          "line": 765,
+          "line": 766,
           "kind": "deadline-or-observation",
           "code": "{ id: 'raise-timeout', label: t('選択済みの時間制限を見直す', 'Review an explicitly selected deadline'), reason: t('利用者が継続実行を望んだ場合はcontinuousへ戻すか0（期限なし）を選びます。', 'When the person wants continuous work, use continuous mode or an explicitly unlimited deadline of 0.') },"
         },
         {
-          "line": 836,
+          "line": 837,
           "kind": "loop-exit-candidate",
           "code": "for (const r of rules) { m = message.match(r.match); if (m) { rule = r; break; } }"
         },
         {
-          "line": 947,
+          "line": 948,
           "kind": "deadline-or-observation",
           "code": "[/^hook responds before its timeout$/, c => `Hook check failed: ${c.command ?? 'no hook command'} took ${c.durationMs ?? '?'} ms (timeout ${c.timeoutSec ?? '?'} s)`],"
         }
@@ -2467,7 +2467,7 @@
     },
     {
       "path": "lib/process.mjs",
-      "sha256": "880f5c9f497997ee4cc65805873442291fb2d8ef6eb63b5ff37e0e3ad8c8eecf",
+      "sha256": "a3a6967fbb982c9b6e3fb0a3f00e2eb28755de5519cb6a9a36eeab8d0bb197df",
       "entries": [
         {
           "line": 90,
@@ -2492,7 +2492,7 @@
         {
           "line": 164,
           "kind": "deadline-or-observation",
-          "code": "let child, failure, timeout, watch, watcher, killTimer, releaseTimer, reapTimer, closed = false, terminated = true, settled = false, exited = false;"
+          "code": "let child, failure, timeout, watch, watcher, killTimer, releaseTimer, reapTimer, closed = false, terminated = true, settled = false, exited = false, groupGone = false;"
         },
         {
           "line": 206,
@@ -2505,97 +2505,102 @@
           "code": "if (failure) { failure.result = result; failure.spawned = Boolean(child?.pid); reject(failure); } else resolve(result);"
         },
         {
-          "line": 242,
+          "line": 247,
           "kind": "process-termination",
           "code": "try { process.kill(-child.pid, 'SIGTERM'); } catch { letGo(); return; }"
         },
         {
-          "line": 243,
+          "line": 248,
           "kind": "process-termination",
           "code": "reapTimer = setTimeout(() => { try { process.kill(-child.pid, 'SIGKILL'); } catch {} letGo(); }, groupKillWaitMs);"
         },
         {
-          "line": 249,
+          "line": 254,
           "kind": "deadline-or-observation",
           "code": "failure = error; clearTimeout(timeout); clearInterval(watch);"
         },
         {
-          "line": 258,
+          "line": 263,
           "kind": "process-termination",
           "code": "killTimer = setTimeout(() => { failure.message += `; taskkill did not finish within ${taskkillWaitMs / 1000} s (tree termination unconfirmed)`; child.kill(); killed(); }, taskkillWaitMs);"
         },
         {
-          "line": 260,
+          "line": 265,
           "kind": "process-termination",
           "code": "killer.once('error', e => { clearTimeout(killTimer); if (settled) return; failure.message += `; taskkill failed: ${e.message}`; child.kill(); killed(); });"
         },
         {
-          "line": 264,
+          "line": 269,
           "kind": "process-termination",
           "code": "if (status !== 0) { failure.message += `; taskkill exit ${status} (tree termination unconfirmed)`; child.kill(); }"
         },
         {
-          "line": 268,
+          "line": 273,
           "kind": "process-termination",
           "code": "try { process.kill(-child.pid, 'SIGTERM'); } catch {}"
         },
         {
-          "line": 272,
+          "line": 277,
           "kind": "process-termination",
           "code": "try { process.kill(-child.pid, 'SIGKILL'); } catch (e) { if (e.code !== 'ESRCH') failure.message += `; group kill failed: ${e.message}`; }"
         },
         {
-          "line": 277,
+          "line": 282,
           "kind": "error-or-exit-candidate",
           "code": "const abort = () => fail(new Error('Interrupted'));"
         },
         {
-          "line": 284,
+          "line": 289,
           "kind": "deadline-or-observation",
           "code": "if (timeoutMs > 0) timeout = setTimeout(() => fail(new Error(`Process timed out after ${timeoutMs}ms (explicit bounded deadline)`)), timeoutMs);"
         },
         {
-          "line": 291,
+          "line": 296,
           "kind": "error-or-exit-candidate",
           "code": "if (watcher.tick()) setImmediate(() => { if (watcher.silent && !exited) fail(Object.assign(new Error(silentProcessMessage(silenceMs)), { silent: true })); });"
         },
         {
-          "line": 325,
+          "line": 330,
           "kind": "error-or-exit-candidate",
           "code": "else fail(new Error(`Cannot preserve process output: ${e.message}`, { cause: e }));"
         },
         {
-          "line": 332,
+          "line": 338,
           "kind": "deadline-or-observation",
-          "code": "child.once('exit', () => { exited = true; clearInterval(watch); clearTimeout(timeout); release(); });"
+          "code": "exited = true; clearInterval(watch); clearTimeout(timeout);"
         },
         {
-          "line": 335,
+          "line": 339,
+          "kind": "pid-probe",
+          "code": "if (process.platform !== 'win32') { try { process.kill(-child.pid, 0); } catch (e) { if (e.code === 'ESRCH') groupGone = true; } }"
+        },
+        {
+          "line": 344,
           "kind": "error-or-exit-candidate",
           "code": "child.stdin.on('error', e => { if (e.code !== 'EPIPE') fail(e); });"
         },
         {
-          "line": 362,
+          "line": 371,
           "kind": "error-or-exit-candidate",
           "code": "if (!relative.startsWith('migration/runs/process-output/') || relative.split('/').includes('..')) throw new Error('Process output file outside runner log directory');"
         },
         {
-          "line": 364,
+          "line": 373,
           "kind": "error-or-exit-candidate",
           "code": "if (fs.lstatSync(at).isSymbolicLink()) throw new Error('Symlink in process output path');"
         },
         {
-          "line": 368,
+          "line": 377,
           "kind": "error-or-exit-candidate",
           "code": "if (fs.lstatSync(file).isSymbolicLink()) throw new Error('Symlink in process output path');"
         },
         {
-          "line": 375,
+          "line": 384,
           "kind": "loop-exit-candidate",
           "code": "if (!count) break;"
         },
         {
-          "line": 384,
+          "line": 393,
           "kind": "error-or-exit-candidate",
           "code": "if ((root && typeof expected !== 'string') || (expected && hasher.digest('hex') !== expected)) throw new Error('Process output log changed or has no recorded hash; refusing altered diagnostic evidence');"
         }
@@ -5318,5 +5323,5 @@
       ]
     }
   ],
-  "candidateLines": 970
+  "candidateLines": 971
 }

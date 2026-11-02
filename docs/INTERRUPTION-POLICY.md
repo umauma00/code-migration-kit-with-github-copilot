@@ -67,7 +67,7 @@ inventoryの巨大ファイルは断片をまたぐデータフローを確定�
 | 入出力の安全性 | 元ソースへの上書き、保護パス、パストラバーサル、symlink、重複した変換先、未知の書き込み先、guardrails違反 |
 | 実行中の前提変更 | ソース・ルール・設定・比較器・repair intentの変更、候補出力の外部変更。古い結果を採用しない |
 | 同時実行と記録の整合性 | 生存する所有者または別ホストのrun/build-loopロック（このホストで所有者がいないロックは自動で外す）、破損した台帳・ハッシュ・レビュー証跡、未完了依存先、typecheck付きの循環依存 |
-| 起動不能・認証・残高 | CLIや言語ランタイムがない、agentが見つからない、モデルが利用不可、認証切れ、403、サービス側のquota/credits/billing制限（モデルの一覧を取る段階で GitHub が返す 402 Payment Required も。0.44.0 から案内は `credits`）。新規起動を止め原因を報告 |
+| 起動不能・認証・残高 | CLIや言語ランタイムがない、agentが見つからない、モデルが利用不可、認証切れ、403、サービス側のquota/credits/billing制限（モデルの一覧を取る段階で GitHub が返す 402 Payment Required と、CLI の「Copilot Pro trial paused」も。0.44.0 から案内は `credits`）。新規起動を止め原因を報告 |
 | 実際に壊れた応答 | 不正JSON/JSONL、不完全なterminal event、誤target/schema、範囲外引用、取りこぼし・重複、裁定漏れ、レビューとverdictの矛盾。変換では、その場で1回答え直させ、実行の最後にもう1周しても直らないときだけ、その単位を未完了にする（上の表）。surveyでは正常終了したCLIストリーム内の不正なモデルJSON/schema/項目/引用を保存し、不正箇所だけ1回補正する。再び不正なら、その行を `uncited` 付きのUNKNOWNにして完了する（止めない）。CLIストリーム自体の破損やsession.errorは障害の分類に従って扱う |
 | 準備監査の入力が上限超 | `audit_inputs.mjs freeze` は切り詰めずに拒否する。1 batch のファイル数を減らして freeze し直す（または `maxReviewInputBytes` を上げる） |
 | 本当に処理できない必須データ | バイナリ（NULを含み UTF-16 でもない）・読取権限、rulebookやcensusの1項目など必須メタデータだけでモデル容量を超える。ソース本文の大きさによる停止とは区別して報告 |
