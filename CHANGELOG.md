@@ -41,7 +41,11 @@ repair intent or queue) held one hash of everything the kit read.
   the next command, with a note that says why. A help file written again at
   a command's start does not start the Copilot CLI (it points to `models`
   for the list), and a Copilot CLI that exits before it reads the request no
-  longer crashes the command (EPIPE). The switch to auto mode still waits
+  longer crashes the command (EPIPE). On Windows the model list runs a
+  Copilot CLI that is a batch file (a `copilot.cmd` wrapper other than npm's
+  shim) through cmd.exe with its arguments, as the workers do, and stops
+  the whole process tree; before, it started cmd.exe alone, and the list
+  failed with "sent a malformed message". The switch to auto mode still waits
   for `settings apply`, which the host confirms. Commands that only read (`status`, `phase next`, `phase check`,
   `pilot plan` and the like) leave the edit to the next command. A pilot's
   copy applies the project's file first, then takes the project's
@@ -127,7 +131,9 @@ repair intent or queue) held one hash of everything the kit read.
   for the help file; the hooks keep agents off the upgrade record),
   `tests/source-as-spec.test.mjs` (switching an already source-only
   project to source-as-spec keeps phases 00 to 02 and sends the judge
-  back). `tests/settings.test.mjs` is `tests/run-settings.test.mjs` renamed.
+  back), `tests/windows-launch.test.mjs` (the model list starts a
+  batch-file Copilot CLI through cmd.exe). `tests/settings.test.mjs` is
+  `tests/run-settings.test.mjs` renamed.
 
 # 0.44.0 — 2026-11-02
 

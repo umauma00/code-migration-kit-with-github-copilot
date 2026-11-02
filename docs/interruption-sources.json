@@ -1340,180 +1340,190 @@
     },
     {
       "path": "lib/models.mjs",
-      "sha256": "d122e0605807d2aa3044dafb5bac1dc49d5dbcc2a9a6d4d73dd249995dbc5aff",
+      "sha256": "08ba9e22dd77f429374743edcc542021d803ac2bfa2407d9f944c1983af0eabc",
       "entries": [
         {
-          "line": 16,
+          "line": 26,
           "kind": "deadline-or-observation",
           "code": "function rpcSession(command, prefixArgs, { cwd, timeoutMs, signal }) {"
         },
         {
-          "line": 17,
+          "line": 27,
           "kind": "error-or-exit-candidate",
           "code": "if (signal?.aborted) throw new Error('Interrupted');"
         },
         {
-          "line": 23,
-          "kind": "error-or-exit-candidate",
-          "code": "const failAll = error => { ended ??= error; for (const { reject } of pending.values()) reject(error); pending.clear(); };"
-        },
-        {
-          "line": 24,
+          "line": 37,
           "kind": "process-termination",
-          "code": "const timer = timeoutMs > 0 ? setTimeout(() => { failAll(new Error(`Copilot CLI model list timed out after ${timeoutMs / 1000} s (explicit deadline)`)); child.kill(); }, timeoutMs) : undefined;"
-        },
-        {
-          "line": 25,
-          "kind": "process-termination",
-          "code": "const abort = () => { failAll(new Error('Interrupted')); child.kill(); };"
-        },
-        {
-          "line": 27,
-          "kind": "error-or-exit-candidate",
-          "code": "child.on('error', e => failAll(new Error(`Cannot start the Copilot CLI (${command}): ${e.message}`)));"
-        },
-        {
-          "line": 28,
-          "kind": "error-or-exit-candidate",
-          "code": "child.on('close', code => failAll(new Error(`Copilot CLI exited (code ${code}) before answering${stderr ? `: ${stderr.slice(-500)}` : ''}`)));"
-        },
-        {
-          "line": 31,
-          "kind": "process-termination",
-          "code": "child.stdin.on('error', e => { failAll(new Error(`Copilot CLI closed its input before answering (${e.code ?? e.message})${stderr ? `: ${stderr.slice(-500)}` : ''}`)); child.kill(); });"
+          "code": "if (!launch.batch || child.pid === undefined || child.exitCode !== null) { child.kill(); return; }"
         },
         {
           "line": 39,
           "kind": "process-termination",
-          "code": "if (!Number.isSafeInteger(length)) { failAll(new Error('Copilot CLI sent a malformed message')); child.kill(); return; }"
+          "code": "killer.once('error', () => child.kill());"
         },
         {
-          "line": 47,
+          "line": 40,
+          "kind": "process-termination",
+          "code": "killer.once('close', status => { if (status !== 0) child.kill(); });"
+        },
+        {
+          "line": 44,
           "kind": "error-or-exit-candidate",
-          "code": "if (message.error) waiter.reject(Object.assign(new Error(message.error.message ?? 'Copilot CLI request failed'), { code: message.error.code }));"
+          "code": "const failAll = error => { ended ??= error; for (const { reject } of pending.values()) reject(error); pending.clear(); };"
+        },
+        {
+          "line": 45,
+          "kind": "deadline-or-observation",
+          "code": "const timer = timeoutMs > 0 ? setTimeout(() => { failAll(new Error(`Copilot CLI model list timed out after ${timeoutMs / 1000} s (explicit deadline)`)); stop(); }, timeoutMs) : undefined;"
+        },
+        {
+          "line": 46,
+          "kind": "error-or-exit-candidate",
+          "code": "const abort = () => { failAll(new Error('Interrupted')); stop(); };"
+        },
+        {
+          "line": 48,
+          "kind": "error-or-exit-candidate",
+          "code": "child.on('error', e => failAll(new Error(`Cannot start the Copilot CLI (${command}): ${e.message}`)));"
+        },
+        {
+          "line": 49,
+          "kind": "error-or-exit-candidate",
+          "code": "child.on('close', code => failAll(new Error(`Copilot CLI exited (code ${code}) before answering${stderr ? `: ${stderr.slice(-500)}` : ''}`)));"
         },
         {
           "line": 52,
           "kind": "error-or-exit-candidate",
-          "code": "if (ended) { reject(ended); return; }"
+          "code": "child.stdin.on('error', e => { failAll(new Error(`Copilot CLI closed its input before answering (${e.code ?? e.message})${stderr ? `: ${stderr.slice(-500)}` : ''}`)); stop(); });"
         },
         {
-          "line": 57,
-          "kind": "process-termination",
-          "code": "const close = () => { clearTimeout(timer); signal?.removeEventListener('abort', abort); ended ??= new Error('closed'); child.stdin.end(); child.kill(); };"
+          "line": 60,
+          "kind": "error-or-exit-candidate",
+          "code": "if (!Number.isSafeInteger(length)) { failAll(new Error('Copilot CLI sent a malformed message')); stop(); return; }"
+        },
+        {
+          "line": 68,
+          "kind": "error-or-exit-candidate",
+          "code": "if (message.error) waiter.reject(Object.assign(new Error(message.error.message ?? 'Copilot CLI request failed'), { code: message.error.code }));"
         },
         {
           "line": 73,
           "kind": "error-or-exit-candidate",
+          "code": "if (ended) { reject(ended); return; }"
+        },
+        {
+          "line": 94,
+          "kind": "error-or-exit-candidate",
           "code": "if (!Array.isArray(models)) throw new Error('Copilot CLI returned no model list');"
         },
         {
-          "line": 87,
+          "line": 108,
           "kind": "deadline-or-observation",
           "code": "export async function listAvailableModels({ command = 'copilot', prefixArgs = [], cwd, timeoutMs = 0, signal } = {}) {"
         },
         {
-          "line": 88,
+          "line": 109,
           "kind": "deadline-or-observation",
           "code": "const rpc = rpcSession(command, prefixArgs, { cwd, timeoutMs, signal });"
         },
         {
-          "line": 91,
+          "line": 112,
           "kind": "error-or-exit-candidate",
           "code": "catch (e) { if (e.code === -32601) await rpc.call('ping', {}); else throw e; }"
         },
         {
-          "line": 95,
+          "line": 116,
           "kind": "error-or-exit-candidate",
           "code": "if (/not authenticated|authenticate first|401/i.test(e.message)) throw new Error(`The Copilot CLI is not signed in to Copilot, so it cannot list your models; run copilot login first (${e.message})`);"
         },
         {
-          "line": 96,
+          "line": 117,
           "kind": "error-or-exit-candidate",
           "code": "throw new Error(`Copilot CLI could not list models: ${e.message}`);"
         },
         {
-          "line": 110,
+          "line": 131,
           "kind": "deadline-or-observation",
           "code": "export const listAtStart = (command, cwd, timeoutMs = startListTimeoutMs) => () => listAvailableModels({ command, cwd, timeoutMs });"
         },
         {
-          "line": 129,
+          "line": 150,
           "kind": "error-or-exit-candidate",
           "code": "throw new Error(`Model ${model} is not in your Copilot model list${hint}; run models list and pick one of its ids`);"
         },
         {
-          "line": 131,
+          "line": 152,
           "kind": "error-or-exit-candidate",
           "code": "if (found.state !== 'enabled') throw new Error(`Model ${found.id} is ${found.state} for your account (an organization policy or terms decide this); pick an enabled model`);"
         },
         {
-          "line": 132,
+          "line": 153,
           "kind": "error-or-exit-candidate",
           "code": "if (context !== undefined && !contextTiers.includes(context)) throw new Error(`Context must be one of ${contextTiers.join(', ')}`);"
         },
         {
-          "line": 133,
+          "line": 154,
           "kind": "error-or-exit-candidate",
           "code": "if (context === 'long_context' && !found.contexts.includes('long_context')) throw new Error(`Model ${found.id} offers no long_context tier; use the default context`);"
         },
         {
-          "line": 136,
+          "line": 157,
           "kind": "error-or-exit-candidate",
           "code": "if (!effortLevels.includes(effort)) throw new Error(`Effort must be one of ${effortLevels.join(', ')} or default`);"
         },
         {
-          "line": 137,
+          "line": 158,
           "kind": "error-or-exit-candidate",
           "code": "if (!found.efforts.includes(effort)) throw new Error(found.efforts.length ? `Model ${found.id} supports reasoning effort ${found.efforts.join(', ')}; not ${effort}` : `Model ${found.id} has no selectable reasoning effort; use default`);"
         },
         {
-          "line": 147,
+          "line": 168,
           "kind": "error-or-exit-candidate",
           "code": "if (found && a.context === 'long_context' && !found.contexts.includes('long_context')) throw new Error(`${a.role} would run ${found.id} with the long_context tier${a.inherits ? ' (inherited from implementer)' : ''}, which that model does not offer; choose ${a.role}'s context explicitly`);"
         },
         {
-          "line": 149,
+          "line": 170,
           "kind": "error-or-exit-candidate",
           "code": "if (!found.efforts.includes(a.effort)) throw new Error(`${a.role} would run ${found.id} with reasoning effort ${a.effort}${a.inherits ? ' (inherited from implementer)' : ''}, which that model does not support (${found.efforts.join(', ') || 'no selectable effort'}); choose ${a.role}'s effort explicitly`);"
         },
         {
-          "line": 159,
+          "line": 180,
           "kind": "error-or-exit-candidate",
           "code": "else throw new Error(`Unknown role ${r}: use ${effortRoles.join(', ')}, reviewers or all`);"
         },
         {
-          "line": 161,
+          "line": 182,
           "kind": "error-or-exit-candidate",
           "code": "if (!out.length) throw new Error('models set requires --role ROLE[,ROLE] (or reviewers, all)');"
         },
         {
-          "line": 171,
+          "line": 192,
           "kind": "error-or-exit-candidate",
           "code": "if (eq <= 0 || eq === part.length - 1) throw new Error(`Write each assignment as ROLE=MODEL_ID[:EFFORT][:long_context], not ${part}`);"
         },
         {
-          "line": 180,
+          "line": 201,
           "kind": "loop-exit-candidate",
           "code": "else break;"
         },
         {
-          "line": 185,
+          "line": 206,
           "kind": "error-or-exit-candidate",
           "code": "if (!entries.length) throw new Error('models set --assign needs ROLE=MODEL_ID[:EFFORT][:long_context] entries, for example implementer=ID:medium,reviewers=ID:high:long_context,arbiter=ID,fixer=ID');"
         },
         {
-          "line": 197,
+          "line": 218,
           "kind": "error-or-exit-candidate",
           "code": "if (assign !== undefined && (role !== undefined || model !== undefined || effort !== undefined || context !== undefined)) throw new Error('Use either models set --assign ROLE=ID[:EFFORT][:long_context],... or --role/--model/--effort/--context, not both');"
         },
         {
-          "line": 198,
+          "line": 219,
           "kind": "error-or-exit-candidate",
           "code": "if (assign === undefined && !model) throw new Error('models set requires --model ID from models list (or --assign ROLE=ID[:EFFORT][:long_context],... for several roles at once)');"
         },
         {
-          "line": 199,
+          "line": 220,
           "kind": "error-or-exit-candidate",
           "code": "if (!fs.existsSync(configPath(root))) throw new Error(`The project is not initialized (${configFile} is missing): run install.mjs before recording model choices`);"
         }
@@ -5383,5 +5393,5 @@
       ]
     }
   ],
-  "candidateLines": 982
+  "candidateLines": 984
 }

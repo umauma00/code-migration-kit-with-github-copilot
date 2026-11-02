@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { windowsLaunch, runProcess, batchCommandLine } from '../lib/process.mjs';
+import { rpcLaunch } from '../lib/models.mjs';
 
 // A global npm install on Windows: copilot.cmd on PATH, the loader in the
 // package and the platform binary as its dependency (nested or hoisted).
@@ -157,6 +158,22 @@ test('Windows runs other batch files (npx.cmd, gradlew.bat) through cmd.exe with
     ['/d', '/s', '/c', '"C:\\Program^ Files\\nodejs\\npx.cmd ^^^"tsc^^^" ^^^"a^^^ b^^^" ^^^"x\\^^^"y^^^" ^^^"100^^^%^^^""']);
   // A batch file reparses the %* it forwards, so metacharacters are escaped twice.
   assert.equal(batchCommandLine('C:\\p\\node_modules\\.bin\\tsc.cmd', ['a&b'])[3], '"C:\\p\\node_modules\\.bin\\tsc.cmd ^^^"a^^^&b^^^""');
+});
+
+test('the model list runs a batch-file Copilot CLI through cmd.exe, as the workers do', () => {
+  // A wrapper of the person's own (not npm's shim). Before 0.45.0 the list
+  // started cmd.exe with only --headless --stdio: a shell of its own, whose
+  // banner read as a malformed message (Windows CI of 767b08b).
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kit-win-wrapper-'));
+  const file = path.join(dir, 'copilot.cmd');
+  fs.writeFileSync(file, '@"C:\\tools\\node.exe" "%~dp0wrapper.js" %*\r\n');
+  const env = { Path: dir, ComSpec: 'C:\\Windows\\system32\\cmd.exe' };
+  for (const command of ['copilot', file])
+    assert.deepEqual(rpcLaunch(command, ['--x'], { platform: 'win32', env }), { command: env.ComSpec, args: batchCommandLine(file, ['--x', '--headless', '--stdio']), verbatim: true, batch: file });
+  // npm's shim and any other command start as before.
+  const { dir: npm, exe } = npmGlobal();
+  assert.deepEqual(rpcLaunch('copilot', [], win(npm)), { command: exe, args: ['--headless', '--stdio'], verbatim: false });
+  assert.deepEqual(rpcLaunch(process.execPath, ['fake.mjs'], { platform: 'linux' }), { command: process.execPath, args: ['fake.mjs', '--headless', '--stdio'], verbatim: false });
 });
 
 test('a batch file receives its arguments unchanged on Windows', { skip: process.platform !== 'win32' && 'needs cmd.exe' }, async () => {
