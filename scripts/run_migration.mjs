@@ -39,7 +39,8 @@ export const usage = `Usage: node migration-kit/scripts/run_migration.mjs COMMAN
   status [--format json|markdown|todo|checklist] [--wait SECONDS] [--fast]
                               --fast shows recorded progress without scanning source files; gates still revalidate
                               Read-only evidence; todo = host task-list items, checklist = chat progress.
-                              --wait (1-1800) returns once a running runner makes progress, stops or the time is up
+                              --wait (1-1800) returns once a running runner makes progress, stops or the time is up;
+                              it watches recorded progress only and builds the status asked for once, when it returns
   guidance --message TEXT [--format json|markdown]
                               Explain a failure: cause, impact and choices with a recommendation
   models list [--format json|markdown]
@@ -291,21 +292,24 @@ export async function doctor(root, config, { checkCLI = false, command = 'copilo
 // A long translate or build-loop runs in a background terminal. Each status
 // poll by the parent agent is a model turn over its whole conversation, so the
 // runner waits here instead and answers once something changed.
+// It watches the recorded progress only (statusSnapshot: no source walk or
+// hash) and reads the status asked for once, when it answers. A full status
+// every five seconds read every source file again, at about 6 s a pass on a
+// Windows PC on 2026-11-02, while the runner was reading them too.
 const progressKey = report => JSON.stringify([report.ok, report.running, report.lock?.runId, report.done, report.total,
   report.units?.filter(u => u.status === 'blocked').length, report.buildLoop && [report.buildLoop.stage, report.buildLoop.rounds, report.buildLoop.agentCalls],
   report.survey && [report.survey.runId, report.survey.done, report.survey.activeScopes, report.survey.agentCalls, report.survey.parts, report.survey.state]]);
 export async function waitForProgress(root, seconds, { intervalMs = 5000, fast = false } = {}) {
   if (!Number.isInteger(seconds) || seconds < 1 || seconds > 1800) throw new Error('--wait must be a number of seconds from 1 to 1800');
   const deadline = Date.now() + seconds * 1000;
-  const read = fast ? statusSnapshot : migrationStatus;
-  let report = read(root);
+  let report = statusSnapshot(root);
   const start = progressKey(report);
   while ((report.running || report.buildLoop) && Date.now() < deadline) {
     await new Promise(resolve => setTimeout(resolve, Math.min(intervalMs, Math.max(0, deadline - Date.now()))));
-    report = read(root);
+    report = statusSnapshot(root);
     if (progressKey(report) !== start) break;
   }
-  return report;
+  return fast ? report : migrationStatus(root);
 }
 export async function main(argv = process.argv.slice(2)) {
   const args = parseCommandLine(argv, specs.run_migration), cmd = args._[0];

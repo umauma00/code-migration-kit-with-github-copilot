@@ -1,6 +1,17 @@
-# Upgrading (0.42.1 and earlier releases)
+# Upgrading (0.43.0 and earlier releases)
 
 [日本語](UPGRADING.md) | English
+
+## 0.43.0 (phase 04 no longer reads every source again for each AI call)
+
+On 2026-11-02 phase 04 on Windows (kit 0.42.0, source-only, 554 source files, two workers at a time) had finished 25 units in 2 h 37 min. Before and after every AI call the runner checks that its inputs have not changed (about 8 checks per unit, 12 with findings), and each check read every source file again (about 6 s per pass on that PC, estimated from its phase 03 pilot). The checks run one at a time, so they also held back the other unit in flight.
+
+1. A translation run now keeps each file's content hash with the file's identity (drive and file number), size, modification time and change time (mtime, ctime), and reads again only a file where one of them changed. Each check still lists the folders and looks at every file, so a file added, removed, renamed or rewritten is seen at the next check as before. A file changed less than 3 s before it was read is read again at every check until it has settled (a coarse file system clock, FAT's 2 s times or a network share's own clock may not show a second change). The cache lasts for one run only. Approvals and phase gates, phase commands, `status` and the next run read the files themselves as before, so a rewrite that put back a file's size and both its times (a check of the times cannot see it) still makes the records out of date there. In a test fixture with the installed settings (two units, one with a finding) a source outside the units was read 21 times, now once, and a unit's source 23 times, now 3 (the text given to the AI). In a pilot, the production project's files are kept the same way.
+2. The evidence given to each AI call uses the review dependency map (review-dependencies.json) read at the start of the run; each call read it again and checked every file it names. Every input check still reads the map, so a change to it during the run still stops the run. In the fixture above it was read 48 times, now 23.
+3. `status --wait` now watches the recorded progress (what `status --fast` shows) while it waits, and builds the status asked for once, when it returns. Without `--fast` it built the full `status` every 5 s, reading every source file while the runner was reading them too (in a one-second test wait with no progress, 39 reads of a source file, now one). The orchestrator's `status --root ROOT --wait 600` is now as light while it waits as `status --fast --wait 600`.
+4. `status --fast` and `status --wait` no longer show a lock written on another computer as running, and name it in `foreignLock`, as the full `status` already did. With a process of the same number on this computer, `--fast` showed it running and `--wait` waited until its time was up.
+5. What is checked and recorded does not change. The kit's code is not an input, so from 0.40.1 or later, approvals, completion records, phase records, prepared pilots and finished units are kept (from 0.40.0, see 0.40.1). It can go in during phase 04: stop the runner, update, and run `translate` again; it goes on with the units not finished.
+6. In a copy install, replace all of `migration-kit/` with the temporary install's contents. A plugin install takes it with the update.
 
 ## 0.42.1 (phase commands and status read each source file once)
 

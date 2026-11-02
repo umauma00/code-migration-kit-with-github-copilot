@@ -1,3 +1,52 @@
+# 0.43.0 — 2026-11-02
+
+Phase 04 no longer reads every source file again before and after each worker
+call. On 2026-11-02 (Windows, kit 0.42.0, source-only, 554 source files, two
+workers at a time) translation had finished 25 units in 2 h 37 min. The
+runner checks before and after every worker call that its inputs have not
+changed (about 8 checks per unit, 12 with findings), and each check read
+every source file again, about 6 s a pass on that PC (estimated from its
+phase 03 pilot). The checks run one at a time, so they also held back the
+other unit in flight.
+
+- A translation run keeps each input file's content hash with the file's
+  identity (device and file number), size, modification time and change
+  time, and reads a file again only when one of them changed (`hashCache`
+  in `lib/core.mjs`). Each check still lists the folders and looks at every
+  file, so an added, removed, renamed or rewritten file is seen at the next
+  check as before. A file changed less than 3 s before it was read is read
+  again at every check until it has settled: a coarse clock, FAT's 2 s
+  times or a network share's own clock could hide a second change. The
+  cache lasts for one run. Gates, phase commands, `status` and the next run
+  hash the files themselves, so a rewrite that put back a file's size and
+  both its times (which a check of the times cannot see) still makes the
+  records out of date there. In a test fixture with the installed policies
+  (two units, one with a finding) a run read a source outside the units 21
+  times, now once, and a unit's source 23 times, now 3 (the text sent to
+  its workers). In a pilot the production project's files are kept the same
+  way.
+- The evidence for each worker call uses the review dependency map the run
+  read at its start; each call read it again and checked every file it
+  names. Every input check still reads the map, so a change to it during the
+  run still stops the run. In the fixture above the map was read 48 times,
+  now 23.
+- `status --wait` watches the recorded progress (as `status --fast`) while
+  it waits and builds the status asked for once, when it returns. Without
+  `--fast` it built the full status every 5 s, reading every source file
+  each time while the runner read them too: in a one-second test wait with
+  no progress, 39 reads of a source file, now one. The orchestrator's
+  `status --root ROOT --wait 600` is now as light while it waits as
+  `status --fast --wait 600`.
+- `status --fast` and `status --wait` no longer show a lock written on
+  another host as running, and name it in `foreignLock`, as the full status
+  already did: with a process of the same number on this host, `--fast`
+  showed it running and `--wait` waited out its whole time.
+- What is checked and recorded does not change, and the kit's code is not
+  an input: from 0.40.1 or later, approvals, completion records, phase
+  records, prepared pilots and finished units are kept. The update can go
+  in during phase 04: stop the runner, update, and run `translate` again;
+  it goes on with the units not finished.
+
 # 0.42.1 — 2026-11-02
 
 Phase commands and status read each source file once. On 2026-11-02 (Windows,
