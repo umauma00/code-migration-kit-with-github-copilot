@@ -193,12 +193,20 @@ when a run that started work ends (after an interrupt or another failure
 too), or when the text given to a worker differs from the run's first read of
 that file ("Migration inputs changed before worker invocation"; an accepted
 RULEBOOK amendment keeps its identity, as in the context). Once a run finds
-its inputs changed, at any check, the units it marked done since its last
-passing full check go back to review (`blocked`, "…; its reviews are made
-again by the next run") even if the change is undone, because a worker that
-reads files itself may have seen it, and no unit is marked done after that.
-A run killed without a stop signal makes no last check. Gates, phase
-commands, status and the next run always hash the files' content.
+its inputs changed, at any check, every unit it took a worker's answer for or
+marked done since its last passing full check goes back to review (`blocked`
+at stage `review`, without its reviews, arbitration or single-pass fix: "…;
+its reviews are made again by the next run") even if the change is undone,
+because a worker that reads files with its tools (the implementer, fixer and
+arbiter at any input size, a tool-assisted reviewer) may have seen it, and no
+unit is marked done after that; a unit whose record cannot be written back is
+named in the run's errors. A check that cannot read an input (an error code
+other than a missing file or a folder in its place) stops the run without
+sending units back; the last check sends back those it cannot confirm. Such a
+change undone before the next full check, and before a worker is given that
+file's text, is not found. A run that ends without its last check (killed, a
+second Ctrl+C, its terminal closed) keeps its last finished units. Gates,
+phase commands, status and the next run always hash the files' content.
 
 Optional `buildArtifactRoots` (default `[]`) declares repository-relative
 directories containing generated objects, binaries and reports. Command paths

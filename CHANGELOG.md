@@ -33,24 +33,37 @@ unit in flight.
     before any worker sees it ("Migration inputs changed before worker
     invocation"). An accepted RULEBOOK amendment passes, as in the context.
   - Every ten minutes, and once when a run that started work ends (after
-    an interrupt or another failure too), a check reads and checks every
-    input again (at the end: "Migration inputs changed during the run;
-    fresh approval required").
-  - Workers that read files themselves (the arbiter, a tool-assisted
-    reviewer, an implementer or fixer over the input limit) may have seen
-    such a change before a check found it. So when a run finds its inputs
-    changed, at any check, the units it finished since its last full check
-    (at most about ten minutes of work) go back to review ("…; its reviews
-    are made again by the next run"), also if the change is then undone,
-    and no unit finishes after that. Before, the run stopped at the next
-    check and the units finished before it stayed done. The run then
-    neither counts its scope as complete, retires a phase 04 waiver, nor
-    tells the build loop it ran out of calls.
+    an interrupt or another failure too, when the progress says "checking
+    every input once more"), a check reads and checks every input again (at
+    the end: "Migration inputs changed during the run; fresh approval
+    required").
+  - Workers that read files with their tools (the implementer, the fixer
+    and the arbiter can at any input size; a tool-assisted reviewer does)
+    may have seen such a change before a check found it. So when a run
+    finds its inputs changed, at any check, every unit it took a worker's
+    answer for or finished since its last full check (at most about ten
+    minutes of work) goes back to review ("…; its reviews are made again by
+    the next run"), also if the change is then undone: its reviews, and an
+    arbitration or single-pass fix made from them, are made again, and its
+    candidate is reviewed again. No unit finishes after that. Before, the
+    run stopped at the next check; the units finished before it stayed done
+    and the others kept their reviews. The run then neither counts its
+    scope as complete, retires a phase 04 waiver, nor tells the build loop
+    it ran out of calls. A unit whose record cannot be written back is
+    named in the run's errors, with the file to delete.
 
-  Gates, phase commands, `status` and the next run always read the files
-  themselves. A run that is killed (not stopped with Ctrl+C or a stop
-  signal) makes no last check, so its last finished units are kept as they
-  are.
+  A check that cannot read an input (busy, locked, too many open files)
+  stops the run, as before, but sends no unit back: the run's last check
+  tries again, and the units it cannot confirm go back to review. Gates,
+  phase commands, `status` and the next run always read the files
+  themselves. Two limits remain:
+  - Such a change that is undone before the next full check, and before a
+    worker is given that file's text, is not found, and what a worker made
+    meanwhile from the file with its tools is kept. Before, the check after
+    that worker's call found it.
+  - A run that ends without its last check (killed, stopped with a second
+    Ctrl+C, or its terminal closed) keeps its last finished units as they
+    are.
 - The evidence for each worker call uses the review dependency map from
   the run's first read of its inputs; each call read the map again and
   checked every file it names.
