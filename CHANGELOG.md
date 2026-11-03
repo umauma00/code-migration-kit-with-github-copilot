@@ -1,3 +1,220 @@
+# 0.44.0 — 2026-11-02
+
+The runner stops and retries a worker call that shows no sign of progress. On
+2026-11-02 (Windows, kit 0.42.0, the Copilot app, a company VPN) phase 04
+stayed at 96 of 554 for 11 h 43 min: one review call never returned. The
+computer did not sleep, but its connection dropped after the screen was
+locked, and the VPN's posture check (Cisco Secure Client ISE Posture) often
+gets lost. A connection lost that way gives the CLI no error: Copilot CLI
+1.0.105 waited on a stalled answer from a loopback provider for at least
+400 s without ending it (also with `COPILOT_NATIVE_HTTP_TIMEOUT_MS` set). In
+continuous mode the runner has no time limit and the orchestrator never stops
+it, so the run waited on that one call for good.
+
+- Workers stream: `--stream on` (before, `off`). With JSON output, CLI
+  1.0.105 then writes an `assistant.message_delta` or
+  `assistant.reasoning_delta` line for each piece of text or reasoning the
+  model sends, and still ends with the complete `assistant.message` the
+  runner reads. A provider that answers a stream request without a stream
+  still works (both checked against a loopback provider).
+- A worker call that writes nothing at all, on stdout or stderr, for
+  `workerSilenceSeconds` (new, 600 s by default) is stopped with its child
+  processes ("Process showed no sign of progress for 600s ...") and the same
+  call is retried after the usual short wait, in a new CLI session. It is
+  not a deadline and CPU is not looked at: a call that keeps writing runs as
+  long as it needs. Each retry of the same call doubles the wait, up to four
+  times the setting (10, 20, 40, 40, 40, 40 minutes by default), so a call
+  that only thinks long without a word gets more room each time. The CLI
+  version check before a call is watched with the same wait: a `--version`
+  that hangs without a word is stopped and the call goes on with the warning
+  "Copilot CLI version unknown before this call" (before, every call waited
+  on it). A process outside the call's tree (one that left the process
+  group) that keeps the call's pipes open no longer keeps the call from
+  ending: 5 s after the CLI is gone, killed or ended by itself, the runner
+  lets the pipes go (a call that ended by itself keeps its answer, and is
+  not taken for a silent call or one past its deadline meanwhile). This
+  holds for build and comparison commands too; on macOS and Linux, when
+  something a command that ended by itself left still holds its output (a
+  server a smoke command started in the background and did not stop), what
+  is left of the command's process group is stopped first, SIGTERM then
+  SIGKILL, as a deadline stops it, so it cannot answer the next run's checks
+  in place of the new build. When nothing holds its output, what it left
+  keeps running, and on Windows it always does: a command should stop what
+  it starts. On Windows a taskkill that has not finished after 10 s no
+  longer holds the call: the runner stops the CLI itself.
+- A silent call is retried at most 5 times (about 190 minutes in all by
+  default), counted with the CLI's event stall, its lock wait, a network
+  error next to the sign-in help, a connection taken over, and a call the
+  CLI gave up on, a token check or a list of models it could not get, for a
+  reason other than a network error, a rate limit or a 5xx (below); in
+  bounded mode `transientRetries` caps the total, as before. A file whose
+  call stays silent through them is blocked with the files that use it, and
+  the others go on. Surveys retry each part the same way. The review
+  benchmark has no retry: a silent call ends there with the error, and
+  running it again retries it.
+- Translation gives every file blocked by a temporary failure that used up
+  its retries (silence, the CLI's event stall or lock wait, a call the CLI
+  gave up on, a token check or a list of models it could not get, a
+  connection taken over, a network error next to the sign-in help; in
+  bounded mode any transient failure) one more pass at the end of the run,
+  as to a file blocked by a slip in an answer ("one more pass for N unit(s)
+  blocked by a call that showed no sign of progress", "... by a temporary
+  failure"): a network that came back meanwhile finishes it without a
+  person. A repair run does not add it, nor a run whose call budget ran out
+  (`maxAgentCalls`, `--max-calls`), also while a call waited to be retried.
+- Preparation audits (`audit_inputs.mjs run` and `run-pending`) retry a
+  transient failure as translation does: a silent call, a rate limit, a 5xx
+  or a network error retries the same request after a short wait, in a new
+  session, after checking that the request is still current and unsubmitted.
+  Before, the audit failed at once (and a silent call was waited on
+  forever); a failure that is not transient, or that stops the run, still
+  ends it at once. Ctrl+C on `audit_inputs.mjs` now stops its worker CLIs,
+  which run in a process group of their own (before, they went on running).
+- Silence is counted from the last output in steps of a twentieth of the
+  wait (20 ms to 30 s). A step that comes much later than planned (the
+  computer slept, the runner was busy or paused) counts as two at most, and
+  output that came meanwhile is read before the decision, so a call that
+  answers right after the computer wakes up is not stopped.
+- `workerSilenceSeconds` is 0 (off: workers stream nothing and calls are
+  waited on until they return, as up to 0.43.1) or a whole number from 300
+  to 86400: CLI 1.0.105 waits out a rate limit's Retry-After of up to 180 s
+  without a word. It is a run setting: changing it keeps approvals and
+  reviewed work.
+- More network errors are retried instead of blocking a file at once: a name
+  that does not resolve (ENOTFOUND, getaddrinfo, "dns error", "failed to
+  lookup address", "No such host is known", os error 11001 and 11002), an
+  unreachable network or host (ENETUNREACH, ENETDOWN, EHOSTUNREACH,
+  EHOSTDOWN, "network is unreachable", "host is unreachable", "host is
+  down", "no route to host"), a connection this computer dropped, reset or
+  refused (ECONNABORTED, "connection refused", "connection reset by peer",
+  "forcibly closed by the remote host", "connected party did not properly
+  respond", "target machine actively refused", "established connection was
+  aborted", os error 10050 to 10054, 10060, 10061, 10064 and 10065), an
+  answer cut off in the middle ("error reading a body from connection",
+  "error writing a body to connection", "end of file before message length
+  reached", "connection closed before message completed") and undici's
+  socket and timeout codes. So are the CLI's native connect-stage timeouts
+  ("connect-stage timed out", "connect error: deadline has elapsed"), a TLS connection
+  closed without close_notify or during its handshake ("tls handshake eof"),
+  an I/O error or a timeout on the proxy's tunnel ("proxy CONNECT I/O
+  error", "tunnel I/O error", "proxy CONNECT did not complete within"), and
+  an organization's IP allow list refusing this computer ("IP allow list
+  enabled", "IP address is not permitted": off the company network until the
+  VPN is back). They are what a VPN that reconnects or rechecks
+  the computer, or a network that slept, leaves behind. Like ETIMEDOUT they
+  are retried with no count limit in continuous mode; next to the CLI's
+  sign-in help, 5 times at most, as before. The CLI's own wrapper "error
+  sending request" is not one of them: a certificate, a proxy that refuses
+  the tunnel or a wrong address comes in it too (on a model call, a tunnel
+  the proxy refuses comes as a call the CLI gave up on, below).
+- A call the CLI gave up on after its own retries ("Failed to get response
+  from the AI model; retried N times ... Last error: ...", or "... because
+  the slow-stream retry limit was reached") is retried: with no count limit
+  when its last error is a network error, a rate limit or a 5xx, otherwise 5
+  times at most (guidance `cli-gave-up`). Before, it blocked the file at once
+  unless its last error was a transient failure the kit knew. The real CLI
+  reports a connection cut in the middle of an answer this way ("error
+  reading a body from connection: unexpected EOF during chunk size line").
+- A connection taken over on the way (a certificate the computer does not
+  trust, "does not appear to originate from GitHub", or, where the CLI
+  checks its token, a 4xx page that is not GitHub's error body: "Failed to
+  fetch PAT user login (403): Failed to fetch Copilot user info: 403
+  Forbidden: <html>...", or a page that came with a 200: "Invalid Copilot
+  user response"; where it loads the models, a page without GitHub's request
+  ID: the CLI's line "Error: Access denied by policy settings" with no
+  "(Request ID: ...)", or a page that came with a 200: "Error: expected
+  value at line 1 column 1"), a
+  proxy asking for its own sign-in inside the tunnel ("407 Proxy
+  Authentication Required", or "Error: 407" where the CLI loads the models)
+  or one the CLI could not give ("proxy Negotiate authentication failed:
+  failed to acquire proxy credentials: ..." for Kerberos, "tunnel error:
+  proxy authorization required"), or a network that asks for a sign-in on
+  its own page (a captive portal: "511 Network Authentication Required", or
+  "Error: 511" where the CLI loads the models) is retried 5 times at most,
+  never with no limit: a proxy, VPN or security software that inspects HTTPS
+  lets nothing through until a setting changes, while a VPN rechecking the
+  computer can cause it for a while. Until 0.43.1 the Negotiate failure and
+  the 511 page stopped the run as a sign-in problem. Guidance
+  `cli-intercepted` (for a proxy's sign-in, an unlocked computer and the
+  VPN, since `copilot login` cannot fix it, then the proxy settings with an
+  administrator; `NODE_EXTRA_CA_CERTS` for a company certificate). Where the
+  CLI checks its token it otherwise hides the cause: an untrusted
+  certificate, a refused proxy and a proxy name that does not resolve all
+  read "network fetch failed: request failed: error sending request for url
+  (...)", which cannot be told from a network that is down, so there they
+  are retried as a network error, with no count limit.
+- "Authentication token found but could not be validated ... Your token may
+  still be valid. Check your network connection" is the network, not a
+  sign-in in doubt: with a network error, a rate limit (a 429, or a 403 that
+  says "rate limit") or a 5xx it is retried with no count limit (before, 5
+  times with a network error, and a 5xx stopped the run), otherwise 5 times
+  at most, and it never moves workers to the person's CLI home. When GitHub
+  answered the check with a refusal in its own error form ("Failed to fetch
+  PAT user login (403): GitHub returned: ...", any 4xx but a rate limit: a
+  token without access, no SAML authorization, Copilot not enabled), it is a
+  sign-in problem and stops the run, as up to 0.43.1 (with
+  `workerCopilotHome` "separate", after one more try in the person's CLI
+  home). An organization's IP allow list is a network error (above), and a
+  4xx page in another form is a connection taken over (above), unless it is
+  a 401 page or says "Authentication Required" without "Proxy" or "Network"
+  before it: that still stops the run as a sign-in problem.
+- A list of models the CLI could not load as it started ("Error: Failed to
+  load models ... Copilot could not retrieve the list of available models.",
+  then its sign-in help) is read the same way. Up to 0.43.1 it stopped the
+  run as a sign-in problem (with a network error in it, 5 times as a sign-in
+  in doubt). Every worker call starts with it, and CLI 1.0.105 keeps the
+  result of a token check that passed, so a VPN that drops shows here first:
+  a company proxy the computer no longer reaches ("tunnel error: failed to
+  create underlying connection: tcp connect error: Connection refused"), a
+  tunnel the proxy refused or closed, a 5xx or a rate limit. With a network
+  error, a rate limit or a 5xx it is retried with no count limit, otherwise
+  5 times at most (guidance `cli-network`), and it never moves workers to
+  the person's CLI home. GitHub's refusals there come in other words and
+  keep their rules: a 401 ("Authentication failed") stops the run, a 403
+  ("Access denied by policy settings (Request ID: ...)") blocks the file,
+  and a 402 ("Error: 402 Payment Required": AI Credits, a budget or the
+  plan) stops the run, as before, now with the guidance `credits` instead
+  of the sign-in's (retried, every file would have waited out its retries
+  in turn). The CLI's own heading for a paused trial, "Error: Copilot Pro
+  trial paused" (GitHub's 403 that says so), stops the run with the same
+  guidance; up to 0.43.1 it left each file unfinished with the advice for a
+  worker's answer. The same words as the 403 without GitHub's request ID
+  are a proxy's page (so a proxy that passes GitHub's 403 on without its
+  request ID gets the few retries and the last pass before the file is left
+  unfinished), a 407 there is a proxy's sign-in, and a 511 or a page that
+  came with a 200 ("expected value at line 1 column 1") is a portal's: a
+  connection taken over (above). Checked with the real CLI through an
+  inspecting proxy with a test CA.
+- `status` names a call being retried after silence ("a call that showed no
+  sign of progress, most likely a connection lost without an error") and
+  asks to keep the computer connected, never to stop the runner. After a
+  network error it advises checking the VPN, the proxy settings and a
+  company certificate (`NODE_EXTRA_CA_CERTS`), and after 30 minutes says how
+  long the longest retry has lasted. A connection taken over gets the VPN,
+  the company certificate and, for a proxy's own sign-in, an unlocked
+  computer to check, and the last pass, and a list of models the CLI could
+  not load is named as such, with the advice for a network error, instead of
+  "consider lowering concurrency"; status reads the kind of failure the run
+  recorded with each retry from the whole error, the CLI's stderr included,
+  not from the 300 characters it shows. The failure guidance `cli-silent`
+  offers a rerun, a connection check, a longer wait (or 0 to turn the check
+  off) and a pause.
+- A call stopped for silence just as Ctrl+C stops the run is recorded as
+  "Interrupted; ...": no retry, no last pass, no network advice.
+- Streamed pieces are kept nowhere (runProcess `dropLine`: not in memory, a
+  log spilled to disk or a record), only how many came (`streamedDeltas`, on
+  successful and failed calls); every other event is kept, and a line over
+  64 KiB is never dropped.
+- The orchestrator's instructions do not change, so a copy install keeps its
+  approvals; the skill, the operating manual and the phase handoff say that
+  the runner retries such a call itself and that it is never a reason to stop
+  or relaunch the run.
+- What is checked and the records' format do not change: from 0.40.1 or
+  later, approvals, completion records, phase records, prepared pilots and
+  finished units are kept. The update can go in during phase 04: stop the
+  runner, update, and run `translate` again; it goes on with the units not
+  finished.
+
 # 0.43.1 — 2026-11-02
 
 `pilot prepare` works in a source-as-spec project. It stopped with "Missing

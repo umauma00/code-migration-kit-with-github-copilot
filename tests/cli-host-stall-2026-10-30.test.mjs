@@ -57,20 +57,23 @@ console.log(JSON.stringify({ type: 'result', exitCode: 0 }));
   catch (e) { e.root = f.root; throw e; }
 }
 
-for (const rateLimited of [0, 5]) test(`a stall that never clears blocks the unit after ${hostStallRetries} stall retries (after ${rateLimited} rate-limit retries)`, async t => {
+for (const rateLimited of [0, 5]) test(`a stall that never clears blocks the unit after ${hostStallRetries} stall retries, and again on the run's last pass (after ${rateLimited} rate-limit retries)`, async t => {
   // Continuous mode has no retry-count limit for other transient failures;
   // earlier rate-limit retries on the same call do not use up the stall cap.
+  // Since 0.44.0 the unit gets the run's last pass, with a cap of its own.
   const failure = await stallFixture(t, Infinity, 'continuous', rateLimited).then(() => null, e => e);
   assert.ok(failure, 'the run reports the blocked unit');
   assert.match(failure.message, /did not acknowledge 'assistant\.reasoning' delivery/);
-  assert.equal(Number(fs.readFileSync(safePath(failure.root, 'calls.txt'), 'utf8')), rateLimited + hostStallRetries + 1);
+  assert.equal(Number(fs.readFileSync(safePath(failure.root, 'calls.txt'), 'utf8')), rateLimited + 2 * (hostStallRetries + 1));
+  assert.deepEqual(failure.report.selfRepairs.repass, { units: 1, done: 0 });
   assert.equal(failureGuidance(failure, { language: 'ja' }).id, 'cli-host-stall');
 });
 
-test('bounded mode keeps its own retry limit for stalls (default 2)', async t => {
+test('bounded mode keeps its own retry limit for stalls (default 2), on the last pass too', async t => {
   const failure = await stallFixture(t, Infinity, 'bounded').then(() => null, e => e);
   assert.ok(failure);
-  assert.equal(Number(fs.readFileSync(safePath(failure.root, 'calls.txt'), 'utf8')), 3);
+  assert.equal(Number(fs.readFileSync(safePath(failure.root, 'calls.txt'), 'utf8')), 2 * 3);
+  assert.deepEqual(failure.report.selfRepairs.repass, { units: 1, done: 0 });
 });
 
 test('surveys count stall retries apart from other transient retries too', () => {

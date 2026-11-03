@@ -246,7 +246,8 @@ instruction. Do not create a question merely to end the conversation.
 ## When a step fails
 
 First apply bounded recovery already authorized by the current phase: the
-runner's transient retry and single survey correction, preserving validated
+runner's transient retry (also of a worker call it stopped itself for writing
+nothing for `workerSilenceSeconds`) and single survey correction, preserving validated
 rows, read-only diagnostics and resuming the same authorized process. Report
 what is happening; these operations do not need a new decision after each
 attempt. Never kill, cancel or relaunch work solely for CPU at 100%, low CPU,

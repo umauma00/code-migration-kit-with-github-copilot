@@ -408,6 +408,9 @@ wait/poll it. Normal execution is continuous, including legacy configurations;
 never add a finite timeout or call/round budget without the person's choice.
 Respect explicit user cancellation and actual input/permission failures.
 `status --wait 600` returning is only the end of that status wait, not the job.
+A worker call that writes nothing for `workerSilenceSeconds` (600 s by default)
+is stopped and retried by the runner itself, with a longer wait each time
+(status shows it as retrying): it is never a reason to stop or relaunch anything.
 A phase recorded earlier can go out of date when a file it recorded changes
 (a pilot or repair fix, a kit update). `status --fast` does not revalidate;
 `phase next` does and then returns `stale` with what changed, `action`
@@ -557,8 +560,10 @@ saying what was wrong (not one JSON object or the wrong shape, an answer that
 ended without a final message, arbitration references, a PORT STATUS trailer in
 the wrong place or with the wrong count, a single-pass fix that changed
 nothing), sends a wrong trailer left on a written file back to the fixer (twice
-per run, not counted as fix rounds), and gives units still blocked by a slip
-one more pass before the run ends. The run summary's `selfRepairs` counts them:
+per run, not counted as fix rounds), and gives units still blocked by a slip,
+or by a temporary failure that used up its retries (silence, the CLI's stall or
+lock wait, a dropped or intercepted connection), one more pass before the run
+ends. The run summary's `selfRepairs` counts them:
 mention the counts in the report. `selfRepairs.flagged` lists the findings a
 single-pass fix left unfixed, as `TODO(port)` lines no review checked: name them
 in the report as open items for the person, not as a stop. A unit still blocked after translation

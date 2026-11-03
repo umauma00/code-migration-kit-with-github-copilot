@@ -226,9 +226,14 @@ Run the request with `node migration-kit/scripts/audit_inputs.mjs run --director
 migration/audits/REQUEST_ID`: a fresh Copilot CLI process on migration-preparation-auditor
 (or the plugin equivalent) with no tools and `--model` set to the requested
 phaseModels entry; the result records the model the CLI reported, the CLI
-version, session ID and usage. `audit_inputs.mjs run-pending` does the same for
+version, session ID and usage. A transient failure (rate limit, 5xx, network,
+a call that writes nothing for `workerSilenceSeconds`) retries the same request
+in a fresh session, as translation does (since 0.44.0). `audit_inputs.mjs run-pending` does the same for
 every request directory without result.json, config.concurrency at a time, and
 exits non-zero if any request failed; rerun it to retry only the remaining ones.
+Ctrl+C stops `run` and `run-pending` together with the Copilot CLI processes
+they started (since 0.44.0; before, on macOS and Linux those processes, in a
+process group of their own, went on after the script ended).
 
 A request whose inputs, configuration or auditor profile changed fails with
 "inputs changed" and can never be submitted. Freeze a replacement, then retire

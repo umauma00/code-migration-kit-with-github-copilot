@@ -13,6 +13,9 @@ import { fileURLToPath } from 'node:url';
 import { parseCommandLine, specs, usageText } from '../lib/cli.mjs';
 import { loadConfig, safePath, hash, fileHash, treeHash, readJSON, writeJSON, lockRun, semanticConfig, stamp } from '../lib/core.mjs';
 import { recordSession } from '../lib/sessions.mjs';
+import { isTransientFailure, isSystemicFailure, isLimitedRetry, isSilentCall, hostStallRetries, retryDelayMs, stoppedWithRun } from '../lib/failures.mjs';
+import { executionLimits } from '../lib/execution-policy.mjs';
+import { setTimeout as sleep } from 'node:timers/promises';
 import { createCopilotAdapter } from './copilot_adapter.mjs';
 import { readReviewText, readReviewSource, validatePreparationProfile } from '../lib/review.mjs';
 const models = { judge: 'judgeAudit', dependencies: 'dependencyAudit', inventory: 'inventoryAudit', design: 'designAudit' };
@@ -65,11 +68,30 @@ function currentRequest(root, config, directory) {
 export async function runAudit(root, config, adapter, { directory, signal } = {}) {
   const request = currentRequest(root, config, directory);
   if (fileHash(safePath(root, `${directory}/result.json`))) throw new Error('Audit result already submitted; freeze a new request for another independent audit');
-  // A fresh session per request; the journal lets sessions status/prune cover it.
-  const sessionId = recordSession(root, `audit-${request.task}`, { role: 'preparation-auditor', target: directory });
   const unit = { source: null, target: `${directory}/request.json` };
   const frozen = JSON.stringify({ task: request.task, type: request.type, inputHash: request.inputHash, input: request.input, responseContract: request.responseContract });
-  const response = await adapter({ root, config, role: 'preparation-auditor', unit, extra: {}, signal, reviewInput: frozen, runId: `audit-${request.task}`, sessionId, model: request.requestedModel });
+  // Transient failures (rate limits, 5xx, network, a call that showed no sign
+  // of progress) retry the same request after a short wait, as translation
+  // does (since 0.44.0; before, the audit failed at once and a silent call
+  // was waited on forever). A silent call gets a longer wait each time. The
+  // request must still be current, and unsubmitted, before each retry.
+  const limits = executionLimits(config);
+  let response, sessionId;
+  for (let retry = 0, stalls = 0, silences = 0; ; retry++) {
+    // A fresh session per attempt; the journal lets sessions status/prune cover it.
+    sessionId = recordSession(root, `audit-${request.task}`, { role: 'preparation-auditor', target: directory });
+    try { response = await adapter({ root, config, role: 'preparation-auditor', unit, extra: {}, signal, reviewInput: frozen, runId: `audit-${request.task}`, sessionId, model: request.requestedModel, silentAttempts: silences }); break; }
+    catch (e) {
+      stoppedWithRun(e, signal);
+      if (isSystemicFailure(e) || !isTransientFailure(e) || retry >= limits.retries || (isLimitedRetry(e) && stalls++ >= hostStallRetries) || signal?.aborted) throw e;
+      const silent = isSilentCall(e);
+      if (silent) silences++;
+      console.error(`Preparation audit ${directory}: retry ${retry + 1} after ${silent ? 'a call that showed no sign of progress' : 'transient failure'}: ${e.message.slice(0, 300)}`);
+      await sleep(retryDelayMs(config, retry), undefined, { signal }).catch(() => { throw new Error('Interrupted'); });
+      currentRequest(root, config, directory);
+      if (fileHash(safePath(root, `${directory}/result.json`))) throw new Error('Audit result already submitted; freeze a new request for another independent audit');
+    }
+  }
   const { target, ...result } = response.result;
   writeJSON(safePath(root, `${directory}/response.json`), result);
   return submitAudit(root, config, { directory, response: `${directory}/response.json`, execution: {
@@ -135,16 +157,21 @@ export function submitAudit(root, config, { directory, response, execution } = {
   } finally { release(); }
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  // Ctrl+C stops the audit workers with their child processes (they run in a
+  // process group of their own, which the terminal's Ctrl+C does not reach).
+  const controller = new AbortController(), abort = () => controller.abort(), signal = controller.signal;
+  process.once('SIGINT', abort); process.once('SIGTERM', abort);
   try {
     const args = parseCommandLine(process.argv.slice(2), specs.audit_inputs);
     if (args.help) { console.log(usageText(specs.audit_inputs)); process.exit(0); }
     const root = fs.realpathSync(path.resolve(args.root ?? '.')), config = loadConfig(root);
     const result = args._[0] === 'freeze' ? freezeAudit(root, config, { type: args.type, files: args.files?.split(','), out: args.out })
-      : args._[0] === 'run' ? await runAudit(root, config, createCopilotAdapter({ command: args.copilot }), { directory: args.directory })
-      : args._[0] === 'run-pending' ? await runPendingAudits(root, config, createCopilotAdapter({ command: args.copilot }))
+      : args._[0] === 'run' ? await runAudit(root, config, createCopilotAdapter({ command: args.copilot }), { directory: args.directory, signal })
+      : args._[0] === 'run-pending' ? await runPendingAudits(root, config, createCopilotAdapter({ command: args.copilot }), { signal })
       : args._[0] === 'retire' ? retireAudit(root, config, { directory: args.directory, supersededBy: args['superseded-by'], reason: args.reason })
       : args._[0] === 'submit' ? submitAudit(root, config, { directory: args.directory, response: args.response }) : (() => { throw new Error('Use freeze --type TYPE --files LIST | run --directory PATH [--copilot PATH] | run-pending [--copilot PATH] | retire --directory PATH [--superseded-by PATH] --reason TEXT | submit --directory PATH --response PATH'); })();
     console.log(JSON.stringify(result, null, 2));
     if (result.failed) process.exitCode = 1;
   } catch (e) { console.error(`ERROR: ${e.message}`); process.exitCode = 1; }
+  finally { process.removeListener('SIGINT', abort); process.removeListener('SIGTERM', abort); }
 }

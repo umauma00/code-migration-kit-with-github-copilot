@@ -141,8 +141,13 @@ fields, so existing receipts still match.
 A worker answer that is not one JSON object or has the wrong shape, one that
 ended without a final message ("Copilot JSONL is incomplete"), and an
 arbitration with miswritten references, is asked once more with a `correction`
-saying what was wrong. Units still blocked by such a slip, or by an unchanged
-single-pass fix, get one more pass before a translate run ends (not a repair
+saying what was wrong. Units still blocked by such a slip, by an unchanged
+single-pass fix, or (since 0.44.0) by a temporary failure that used up its
+retries (a call that wrote nothing for `workerSilenceSeconds`, the CLI's event
+stall or lock wait, a call the CLI gave up on, a connection taken over, a
+network error next to the sign-in help, a token check or a list of models the
+CLI could not get for a reason other than a network error, a rate limit or a
+5xx; in bounded mode any transient failure), get one more pass before a translate run ends (not a repair
 run, and not after a tripped circuit breaker, a used-up call budget, a
 systemic failure or an interruption), resuming where they stopped; the circuit breaker counts that pass
 afresh, and a unit the pass never restarts keeps its error. The run summary
