@@ -2,15 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { prepare, ready, fake, result, finding, cliOutput, nodeCli } from './helpers.mjs';
-import { safePath, atomicWrite, writeJSON, readJSON, loadConfig, readManifest, contextHash, done, roles } from '../lib/core.mjs';
+import { prepare, ready, fake, result, finding, cliOutput, nodeCli, scopesOf } from './helpers.mjs';
+import { safePath, atomicWrite, writeJSON, readJSON, loadConfig, readManifest, inputContext, done, roles } from '../lib/core.mjs';
 import { approve, runStage, translate } from '../lib/pipeline.mjs';
 import { runProcess } from '../lib/process.mjs';
 import { requiredCopilotFlags } from '../scripts/copilot_adapter.mjs';
 import { doctor } from '../scripts/run_migration.mjs';
 
 const write = (f, name, content) => atomicWrite(safePath(f.root, name), content);
-const persist = f => writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+const persist = f => writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
 
 // Model directory aliases without requiring a particular host filesystem.
 // Real-filesystem coverage for the same assertions is still needed on macOS.
@@ -107,7 +107,7 @@ test('normal CLI resume fails if a previously completed output changes while ano
     if (args.unit.target === f.units[1].target && args.role === 'reviewer-semantics') throw new Error('Transient reviewer failure');
     return fake(args);
   }), /Transient reviewer failure/);
-  const context = contextHash(f.root, f.config);
+  const context = inputContext(f.root, f.config), scopes = scopesOf(f.root, f.config);
   assert.equal(done(f.root, f.units[0], context), true);
   assert.equal(done(f.root, f.units[1], context), false);
   const command = nodeCli(safePath(f.root, 'resume-cli.mjs'), `import fs from 'node:fs';
@@ -133,7 +133,7 @@ console.log(responses[process.env.MIGRATION_KIT_ROLE]);
   } finally { controller.abort(); await running; }
   assert.equal(outcome.code, 1, outcome.stderr);
   assert.match(outcome.stderr, /Reviewed receipts incomplete/);
-  assert.equal(contextHash(f.root, f.config), context);
+  assert.equal(scopesOf(f.root, f.config), scopes);
   assert.equal(done(f.root, f.units[0], context), false);
   assert.equal(done(f.root, f.units[1], context), true);
   const summaries = fs.readdirSync(safePath(f.root, 'migration/runs')).filter(run => /^\d+-[0-9a-f]{8}$/.test(run)).map(run => readJSON(safePath(f.root, `migration/runs/${run}/summary.json`)));

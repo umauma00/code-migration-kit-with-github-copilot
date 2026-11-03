@@ -28,11 +28,11 @@ const timer = async action => { const before=performance.now(); const value=awai
 
 function setup(root) {
   fs.mkdirSync(root, { recursive: true });
-  if (fs.existsSync(safePath(root,'migration/config.json'))) throw new Error(`Verification output already exists at ${root}; prepare a fresh corpus to preserve previous results`);
+  if (fs.existsSync(safePath(root,'migration/state/config.json'))) throw new Error(`Verification output already exists at ${root}; prepare a fresh corpus to preserve previous results`);
   install(root, { apply: true, layout: 'plugin', model: 'test-double-transport-only', preparationProfile: 'source-as-spec' });
-  const config=readJSON(safePath(root,'migration/config.json'));
+  const config=readJSON(safePath(root,'migration/state/config.json'));
   Object.assign(config,{sourceLanguage:'C#',targetLanguage:'Java',sourceRoots:['source'],outputRoots:['ported'],verificationRoots:['checks'],maxReviewInputBytes:inputLimit,executionMode:'continuous',concurrency:2,phasePolicy:'strict'});
-  writeJSON(safePath(root,'migration/config.json'),config);
+  writeJSON(safePath(root,'migration/state/config.json'),config);
   atomicWrite(safePath(root,'checks/README.md'),`${warning}\n`);
   initSourceSpec(root,config,{apply:true});
   return config;

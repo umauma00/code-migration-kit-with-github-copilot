@@ -6,8 +6,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { install, kitRoot } from '../scripts/install.mjs';
 import { mini, python } from './helpers.mjs';
-import { loadConfig, safePath, readJSON, atomicWrite } from '../lib/core.mjs';
-import { runStage } from '../lib/pipeline.mjs';
+import { loadConfig, safePath, readJSON, atomicWrite, inputContext } from '../lib/core.mjs';
+import { runStage, currentRecord } from '../lib/pipeline.mjs';
 import { phaseCommand } from '../scripts/phase_cli.mjs';
 import { migrationStatus, statusTodo, statusChecklist } from '../lib/status.mjs';
 import { initSourceSpec, sourceSpecReadiness, sourcesFile, contractsFile, legacyContractsSkeleton } from '../lib/source-spec.mjs';
@@ -42,24 +42,24 @@ function draftPackage(root) {
 
 test('installer profile implies source-only and rejects runtime', t => {
   const root = project(t, { preparationProfile: 'source-as-spec' });
-  const config = readJSON(safePath(root, 'migration/config.json'));
+  const config = readJSON(safePath(root, 'migration/state/config.json'));
   assert.equal(config.verificationMode, 'source-only');
   assert.equal(config.preparationProfile, 'source-as-spec');
   assert.throws(() => install(fs.mkdtempSync(path.join(os.tmpdir(), 'sas-bad-')), { model: 'm', preparationProfile: 'source-as-spec', verificationMode: 'runtime' }), /source-only/);
-  const file = safePath(root, 'migration/config.json');
+  const file = safePath(root, 'migration/state/config.json');
   fs.writeFileSync(file, JSON.stringify({ ...config, verificationMode: 'runtime' }));
   assert.throws(() => loadConfig(root), /requires verificationMode source-only/);
 });
 
 test('source-spec init previews, then switches an existing runtime project and drafts only missing files', t => {
   const root = project(t);
-  const config = loadConfig(root), before = fs.readFileSync(safePath(root, 'migration/config.json'), 'utf8');
+  const config = loadConfig(root), before = fs.readFileSync(safePath(root, 'migration/state/config.json'), 'utf8');
   const preview = initSourceSpec(root, config);
   assert.equal(preview.applied, false);
-  assert.deepEqual(preview.changes.map(c => c.path), ['migration/config.json', 'migration/judge-plan.json', sourcesFile]);
-  assert.equal(fs.readFileSync(safePath(root, 'migration/config.json'), 'utf8'), before, 'preview never writes');
+  assert.deepEqual(preview.changes.map(c => c.path), ['migration/state/config.json', 'migration/judge-plan.json', sourcesFile]);
+  assert.equal(fs.readFileSync(safePath(root, 'migration/state/config.json'), 'utf8'), before, 'preview never writes');
   const applied = initSourceSpec(root, config, { apply: true });
-  assert.match(applied.warning, /verification mode invalidates every phase record from 00/);
+  assert.match(applied.warning, /^Changing the verification mode sends back every phase record from 00 \(those phases are reviewed again\), the judge and every run after it, and every approval\. The finished units are kept\.$/);
   const saved = loadConfig(root);
   assert.equal(saved.preparationProfile, 'source-as-spec');
   const plan = readJSON(safePath(root, 'migration/judge-plan.json'));
@@ -215,9 +215,9 @@ test('review fixes: guidance does not misroute file/diagnostic errors and never 
 
 test('review fixes: an invalid config never reads as "all phases complete"', t => {
   const root = project(t);
-  fs.writeFileSync(safePath(root, 'migration/config.json'), '{bad');
+  fs.writeFileSync(safePath(root, 'migration/state/config.json'), '{bad');
   const report = migrationStatus(root);
-  assert.match(statusChecklist(report, 'en'), /^Migration flow: progress cannot be determined\. Cause: migration\/config\.json/);
+  assert.match(statusChecklist(report, 'en'), /^Migration flow: progress cannot be determined\. Cause: migration\/state\/config\.json/);
   const todo = statusTodo(report, 'ja');
   assert.ok(todo.blocked && todo.todoList.every(i => i.status !== 'completed' && i.description.startsWith('判定不能')));
 });
@@ -237,29 +237,39 @@ test('review fixes: the bundle records nothing when a later phase is incomplete'
   assert.throws(() => phaseCommand(root, config, 'complete', '02,03', { note: 'x' }), /00 through 02/);
 });
 
-test('review fixes: TODO(spec) only blocks source-as-spec; a profile-only switch keeps 00-01 valid', t => {
+test('review fixes: TODO(spec) only blocks source-as-spec; a profile-only switch keeps 00-02 valid', async t => {
   const root = project(t, { verificationMode: 'source-only' });
   const config = loadConfig(root);
   phaseCommand(root, config, 'init');
   atomicWrite(safePath(root, 'migration/feasibility.md'), 'Feasible.\n');
   phaseCommand(root, config, 'complete', '00', { note: 'Reviewed' });
+  draftPackage(root);
   atomicWrite(safePath(root, 'tests/scenarios.md'), 'Scenario notes; the literal TODO(spec) is allowed here.\n');
   writeJSONFile(root, 'migration/judge-plan.json', { schemaVersion: 1, verificationMode: 'source-only', method: 'Source review', sources: ['src/main.py'],
     scenarios: [{ path: 'tests/scenarios.md', contract: 'main prints results', expectationBasis: 'source-inferred' }], unverified: ['Original not executed'] });
   atomicWrite(safePath(root, 'migration/judge-report.md'), 'Judge plan reviewed.\n');
   phaseCommand(root, config, 'complete', '00b', { note: 'Reviewed plan' });
+  phaseCommand(root, config, 'complete', '01', { note: 'Reviewed dependencies' });
+  phaseCommand(root, config, 'complete', '02', { note: 'Reviewed rules' });
+  assert.equal((await runStage(root, config, 'judge')).success, true);
+  assert.ok(currentRecord(root, config, 'judge', inputContext(root, config), false));
   const preview = initSourceSpec(root, config);
-  assert.match(preview.warning, /phase 02 onward/);
+  assert.match(preview.warning, /phase 03 is recorded again once the judge has run\. The records of phases 00 to 02 and the finished units are kept\./);
   initSourceSpec(root, config, { apply: true });
-  const after = migrationStatus(root).workflow;
-  assert.equal(after.phases.find(p => p.id === '00b').complete, true, 'profile switch keeps 00b');
+  // What the warning says, on an already source-only project: phases 00 to 02
+  // stay recorded, and the judge goes back.
+  const switched = loadConfig(root), after = migrationStatus(root).workflow;
+  assert.equal(switched.preparationProfile, 'source-as-spec');
+  for (const id of ['00', '00b', '01', '02']) assert.equal(after.phases.find(p => p.id === id).complete, true, `profile switch keeps ${id}`);
+  assert.equal(currentRecord(root, switched, 'judge', inputContext(root, switched), false), false, 'the judge runs again');
+  assert.equal(after.next, '03');
 });
 
 test('review fixes: python depmap keeps a real migration package; manifest --include keeps only source roots', async t => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'depmap-migration-'));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   for (const [p, text] of [['src/app/__init__.py', ''], ['src/app/migration/__init__.py', ''], ['src/app/migration/step.py', 'X = 1\n'],
-    ['tests/test_app.py', 'import app\n'], ['migration/config.json', '{}'], ['migration/x.py', '']]) {
+    ['tests/test_app.py', 'import app\n'], ['migration/state/config.json', '{}'], ['migration/x.py', '']]) {
     fs.mkdirSync(path.dirname(path.join(dir, p)), { recursive: true }); fs.writeFileSync(path.join(dir, p), text);
   }
   const map = await runProcess(python, ['-I', path.join(kitRoot, 'scripts/depmap_python.py'), '--root', '.', '--out', 'migration/depmap'], { cwd: dir });

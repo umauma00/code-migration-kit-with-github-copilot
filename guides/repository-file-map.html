@@ -46,17 +46,16 @@ skills/      プラグイン用のスキル</pre></div>
 ├─ .github/       Copilotの入口・役割
 ├─ migration-kit/ キットの実行コード・文書
 ├─ migration/
-│  ├─ run-settings.json 最初に選んだ設定
-│  ├─ config.json 設定
+│  ├─ settings.json 設定（変えるのはここだけ）
 │  ├─ guardrails.json 禁止するコマンド
 │  ├─ RULEBOOK.md 移植ルール
 │  ├─ inventory.tsv 意味の差の一覧
 │  ├─ manifest.tsv 元→先の対応
-│  ├─ state/      各ファイルの進捗・完了記録
+│  ├─ state/      進捗・完了記録と、キットが写した設定
 │  ├─ runs/       AI呼び出し・レビュー記録
 │  ├─ gates/      工程の承認記録
 │  └─ results/    検証工程の結果
-└─ 変換後ソース   configで場所を指定</pre></div>
+└─ 変換後ソース   settings.json で場所を指定</pre></div>
 </div><figcaption><span class="mono">Fig. C</span><code>migration/</code> は案件ごとの設定・成果物の領域です。一部は導入時に、残りは工程を進めると作成されます。</figcaption></figure>
 </section>
 <section><h2>最初に読むなら、この順番</h2>
@@ -126,8 +125,8 @@ const groups=[
 ['05c-parity.md','新旧の振る舞いを比較','元テストと比較ケースで動作の一致を確認します。',[]],
 ['06-post-parity.md','比較合格後の整理','残課題、採否、引き継ぎを整理します。',[]]
 ]},
-{name:'templates/',role:'設定とルールのひな形',desc:'導入先に作る設定やルールの出発点です。案件に合わせて編集します。',items:[
-['migration-config.json','ランナーの設定','元・出力・検証のルート、言語、モデル、同時実行数、修正回数、ビルド・比較コマンドを指定します。',[]],
+{name:'templates/',role:'設定とルールのひな形',desc:'導入先に作る設定やルールの出発点です。',items:[
+['migration-config.json','キットの記録のひな形','導入時に migration/state/config.json になります。元・出力・検証のルート、言語、モデル、同時実行数、修正回数、ビルド・比較コマンドの初期値です（変えるのは migration/settings.json）。',[]],
 ['RULEBOOK.md','移植方針のひな形','言語間の意味の差について、統一した移植方針を記述します。',[]],
 ['inventory.tsv','意味の差の一覧','各ファイルの意味上の問題、参照するルール、根拠などを整理する表です。',[]],
 ['hooks.copilot.json','Copilot CLI用hooks','標準の導入で使うhooks設定です。',[]],

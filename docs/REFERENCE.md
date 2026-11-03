@@ -6,7 +6,7 @@
 
 ## モデル・エフォート・コンテキストサイズ
 
-**モデル・エフォート・コンテキストサイズは利用者が選びます。** `--model` を省略して導入し、対象リポジトリで次を実行すると、利用するアカウントで使えるモデルと、モデルごとに選べるエフォート（既定値）・コンテキストサイズ（入力上限）・料金をCLIから取得して表示します。導入直後は、AIがこの一覧から全担当のモデルを**1回の質問**で聞き、`models set --role all` で記録します（利用者が選んだ内容なので、ホストの確認は出ません）。担当ごとのエフォート・コンテキストは下の実行設定ファイルで変えます。あとからチャットでモデルを変えるときは、全担当のモデル・エフォート・コンテキストを1回の質問で聞き、1回の `models set --assign` で記録します。`models set` と `preferences` で変えた値は、実行設定ファイルにも反映されます。
+**モデル・エフォート・コンテキストサイズは利用者が選びます。** `--model` を省略して導入し、対象リポジトリで次を実行すると、利用するアカウントで使えるモデルと、モデルごとに選べるエフォート（既定値）・コンテキストサイズ（入力上限）・料金をCLIから取得して表示します。導入直後は、AIがこの一覧から全担当のモデルを**1回の質問**で聞き、`models set --role all` で記録します（利用者が選んだ内容なので、ホストの確認は出ません）。担当ごとのエフォート・コンテキストは下の設定ファイルで変えます。あとからチャットでモデルを変えるときは、全担当のモデル・エフォート・コンテキストを1回の質問で聞き、1回の `models set --assign` で記録します。`models set` と `preferences` で変えた値は、設定ファイルにも反映されます。
 
 ```bash
 node migration-kit/scripts/run_migration.mjs models list --format markdown
@@ -16,13 +16,13 @@ node migration-kit/scripts/run_migration.mjs models set --role reviewers --model
 
 `--assign` は `担当=モデルID:エフォート` をカンマで並べた1つの回答です（エフォートを省くと既定、`all=ID` を先に書くと全担当をまとめて指定し、後ろの担当で上書き）。全項目を確認してから書き込むので、1つでも不正なら何も変わりません。`--role` は担当名、`reviewers`（2人のレビュー担当）、`all`（全担当。surveyor は個別設定を解除して implementer と同じ設定に戻す）。surveyor は自分のモデルを持たない間だけ implementer のモデルとエフォートを引き継ぎ、自分のモデルを選んだ後は引き継ぎません。料金はCLIが公開する単価を、AI Credits の100万トークンあたりに換算して表示します。`--effort default` でモデルの既定に戻します。一覧にない・組織の設定で無効なモデルや、そのモデルが対応しないエフォートは記録しません。
 
-コンテキストサイズは、エフォートの後ろに `:long_context` を付けた担当だけ長いコンテキスト（Copilot CLI の `--context long_context`）になります。付けられるのは、一覧のコンテキスト列に long_context があるモデルだけです。料金が上がるので、必要な担当に限ってください。付けなければ既定のコンテキストで、ワーカーに `--context` は渡しません（CLI 自身の設定 `contextTier` に従います）。1人の担当だけなら `--role 担当 --model ID --context long_context|default` も使えます。モデル・エフォートと同じく、変えるとレビュー済みの単位は次の実行で再レビューされます。一覧の取得にはCopilot CLIのサインインが必要です。
+コンテキストサイズは、エフォートの後ろに `:long_context` を付けた担当だけ長いコンテキスト（Copilot CLI の `--context long_context`）になります。付けられるのは、一覧のコンテキスト列に long_context があるモデルだけです。料金が上がるので、必要な担当に限ってください。付けなければ既定のコンテキストで、ワーカーに `--context` は渡しません（CLI 自身の設定 `contextTier` に従います）。1人の担当だけなら `--role 担当 --model ID --context long_context|default` も使えます。モデル・エフォートと同じく、変えてもレビュー済みの単位と承認は残り、これからの作業に使われます。一覧の取得にはCopilot CLIのサインインが必要です。
 
 従来どおり `--models implementer=ID,reviewers=ID,arbiter=ID,fixer=ID` で担当ごとのモデルを指定することもできます（未指定の担当は `--model`）。上流キットのモデル計画と同じく、影響範囲で選びます：レビュー担当は最大または中規模、大量に動く実装担当は中または小規模、修正・裁定担当は中規模。
 
-## 実行設定ファイル（run-settings.json）
+## 設定ファイル（settings.json）
 
-**最初の選択はすべて AI が質問で聞き、答えを `migration/run-settings.json` に書きます。** 利用者にファイルを直接書かせることはありません。初期設定の質問は次の順です（それぞれ1問）。
+**最初の選択はすべて AI が質問で聞き、答えを `migration/settings.json` に書きます。** 設定を変えるのはこのファイルだけです（0.9.0〜0.44.x の名前は `migration/run-settings.json` で、次に作業をするキットのコマンドを始めたときに名前が変わります）。 利用者にファイルを直接書かせることはありません。初期設定の質問は次の順です（それぞれ1問）。
 
 1. **全担当のモデル**：アカウントで使えるモデルから選びます（`models set --role all` で記録）。
 2. **移行先の言語**：移行元の言語はキットがファイルの拡張子から判定し、「移行元は C#（src 配下、120 ファイル）と判定しました。移行先はどの言語にしますか？」と聞きます（判定が違うときは自由記入で訂正。`settings init --source C# --target TypeScript` で記録し、移行元のフォルダーも判定結果で埋まります）。移行できる移行元の言語は1つです。同じくらいの量の別の言語があれば質問で知らせ、主言語を選んでもらいます。少しだけ混ざる言語（SQL など）は移行元の言語として扱いません。
@@ -32,7 +32,7 @@ node migration-kit/scripts/run_migration.mjs models set --role reviewers --model
 
 サンドボックスがプロジェクトの外への書き込みを止める環境では、03 で必要になるため、初期設定のうちにその旨も質問します。自動モードを選んだ場合、初期設定の質問には毎回「まだ手動です・残り◯回ほど」の1行が付き、初期設定が終わると 00 を始める前に一度止まります。autopilot モードに切り替えて「続けて」と送ると 00 から進みます。
 
-ファイルは、後から設定を変える（全担当のエフォートをまとめて変えるなど）ときと、別のセッションで再開するとき、どの条件で実行したかの記録のためにあります。移行元・移行先の言語、フォルダー、検証方式、元のコードが動くか、実行モード、同時実行数、各段階のコマンド、担当ごとのモデル・エフォート・コンテキストサイズが値だけで並び、各欄の説明と選択肢、使えるモデル・エフォート・コンテキストは隣の `migration/run-settings.help.md` にあります。まだ決まっていない欄は `FILL_IN` で、初期設定の質問で埋まります。書き換えたら、AI の「記入しましたか？それとも質問がありますか？」に答えます。「記入した」と答えると `settings apply` が全項目をまとめて確かめ、1つでも誤りがあれば何も書き込まずに誤りを全部返します（記入した内容が答えなので、ホストの確認は出ません。自動モードへ切り替える内容のときだけ確認します）。モデルを確かめるため、反映には Copilot CLI のサインインが必要です。
+ファイルは、後から設定を変える（全担当のエフォートをまとめて変えるなど）ときと、別のセッションで再開するとき、どの条件で実行したかの記録のためにあります。移行元・移行先の言語、フォルダー、検証方式、元のコードが動くか、実行モード、同時実行数、各段階のコマンド、担当ごとのモデル・エフォート・コンテキストサイズが値だけで並び、各欄の説明と選択肢、使えるモデル・エフォート・コンテキストは隣の `migration/settings.help.md` にあります。まだ決まっていない欄は `FILL_IN` で、初期設定の質問で埋まります。書き換えたら、AI の「記入しましたか？それとも質問がありますか？」に答えます。「記入した」と答えると `settings apply` が全項目をまとめて確かめ、1つでも誤りがあれば何も書き込まずに誤りを全部返します（記入した内容が答えなので、ホストの確認は出ません。自動モードへ切り替える内容のときだけ確認します）。モデルを確かめるため、反映には Copilot CLI のサインインが必要です。
 
 ```bash
 node migration-kit/scripts/run_migration.mjs settings init
@@ -40,15 +40,28 @@ node migration-kit/scripts/run_migration.mjs settings check
 node migration-kit/scripts/run_migration.mjs settings apply
 ```
 
-値は従来どおり `migration/config.json`（言語・フォルダー・モデルなど）と `migration/preferences.json`（報告言語・元のコードが動くか）に記録され、報告言語を変えても承認は失効しません。ファイルはどの条件で実行したかの記録として残ります。書き換えて反映していない間は、`status` が「未反映の変更あり」と表示します。
+反映した値は、キット自身の記録 `migration/state/config.json`（言語・フォルダー・モデルなど）と `migration/state/preferences.json`（報告言語・元のコードが動くか）に書かれます。この2つはキットが書くもので、手では編集しません。0.44.x までは `migration/config.json`・`migration/preferences.json` にあり、次に作業をするキットのコマンドを始めたとき、中身を変えずに移ります（それまでの記録・承認はそのまま有効です）。ファイルを書き換えたあとは、`settings apply` を待たずに、次にキットのコマンドを始めたときにも反映されます（`status` など読むだけのコマンドでは反映せず、「変更あり」と表示します）。チャットで `models set` などを使って変えた値は、ファイルにも書き戻されます。ファイルはどの条件で実行したかの記録として残ります。
+
+### 変えたときにやり直しになるもの
+
+0.45.0 から、変えた設定が影響する作業だけをやり直します（0.44.x までは、どの設定を変えても完了済みの単位がすべて再レビューでした）。
+
+| 変えたもの | やり直しになるもの |
+|---|---|
+| 移行の中身：移行元のファイル、ルールブック、移行元・移行先の言語、`preserve`／`redesign`、フォルダー、パッケージ対応表、文字コードなど | 完了済みの単位は次の実行で再レビュー。承認と工程の記録も取り直し（どの工程からかは `phase next` が案内） |
+| テストの設定（`verificationMode`・`verificationRoots`・`verificationInputs`・`buildArtifactRoots`）とテストのファイル | 比較器（judge）とその後の build・smoke・parity。工程を確かめて記録し直し（`verificationMode`・`verificationRoots` は工程00から、`verificationInputs` とテストのファイルは00bの判定材料から。`buildArtifactRoots` では00〜02の記録はそのままで、03をjudgeの後に記録し直し）、翻訳を承認し直す。完了済みの単位は残る |
+| 段階のコマンド（`original`・`mutation`・`build`・`smoke`・`parity`） | そのコマンドを使う実行と、その後の実行だけ（どれも承認から）。例：build のコマンドなら build・smoke・parity を承認し直して実行し直す。比較器が使うコマンド（`original`・`mutation`・`parity`）なら工程00bの判定材料も確かめ、00b から後の工程を記録し直し、`original`・`mutation` なら judge を実行し直して翻訳を承認し直す。source-only の案件は `original`・`mutation`・`parity` を実行しないので、変えても何もやり直さない。コマンドに書いたファイル（ビルドのスクリプトなど）を変えたときも、そのコマンドを変えたのと同じ。完了済みの単位は残る |
+| モデル・エフォート・コンテキスト、レビューの進め方（`fixPolicy`・`reviewFocus`・`dependencyOrder`・`maxReviewInputBytes`）、単位ごとの `typecheck`、実行の上限（`concurrency` など）、報告の言語、工程の進め方 | なし。これからの作業に使われる |
+
+移行元のファイルは全体で1つとして扱うため、1ファイルを変えても完了済みの単位はすべて再レビューになります（0.44.x と同じ）。
 
 ## 報告の言語
 
-`--language ja|en` は、工程報告・質問・`status --format markdown` の言語です。`migration/preferences.json` に保存され、承認・完了判定には影響しません。省略した場合は、スキルが開始時に日本語・英語のどちらにするかを質問します。後から `run_migration.mjs preferences --language en` で変更できます。言語が未設定の間、フックは言語以外の質問を止めます。`ja` のときは、質問ごとに本文と選択肢を確かめ、日本語で書き直させます（`ask_user` と VS Code の askQuestions）。見出しや別の質問、\`バッククォート\` 内の日本語は数えません。ひらがなを含む文は日本語として通します（`src/main.pyを移行しますか？` のようにパスと続けて書いても構いません）。ひらがながない文では、空白で区切られたパス・ファイル名を除いてから判定するため、`Should we migrate 売上集計.java next?` は止まります。選択肢は、英単語2語以上で日本語を含まないものを止めます（`Java` のような1語の名前は通します）。文字種による簡易判定で、言語判定ではありません。ひらがなを含む名前を入れた英文はすり抜けます。
+`--language ja|en` は、工程報告・質問・`status --format markdown` の言語です。キットの記録 `migration/state/preferences.json` に保存され、承認・完了判定には影響しません。省略した場合は、スキルが開始時に日本語・英語のどちらにするかを質問します。後から `run_migration.mjs preferences --language en` で変更できます。言語が未設定の間、フックは言語以外の質問を止めます。`ja` のときは、質問ごとに本文と選択肢を確かめ、日本語で書き直させます（`ask_user` と VS Code の askQuestions）。見出しや別の質問、\`バッククォート\` 内の日本語は数えません。ひらがなを含む文は日本語として通します（`src/main.pyを移行しますか？` のようにパスと続けて書いても構いません）。ひらがながない文では、空白で区切られたパス・ファイル名を除いてから判定するため、`Should we migrate 売上集計.java next?` は止まります。選択肢は、英単語2語以上で日本語を含まないものを止めます（`Java` のような1語の名前は通します）。文字種による簡易判定で、言語判定ではありません。ひらがなを含む名前を入れた英文はすり抜けます。
 
 ## コピー導入で置かれるもの
 
-スクリプト・文書は対象の `migration-kit/`、Copilotの入口は `.github/` に入ります。既存のCopilot指示には管理ブロックを追記します。内容が異なる既存ファイルは上書きせず停止し、既存の `migration/config.json` は保持します。同じ内容での再実行は変更を作りません。
+スクリプト・文書は対象の `migration-kit/`、Copilotの入口は `.github/` に入ります。既存のCopilot指示には管理ブロックを追記します。内容が異なる既存ファイルは上書きせず停止し、既存のキットの記録（`migration/state/config.json`、0.44.x までは `migration/config.json`）は保持します。同じ内容での再実行は変更を作りません。
 
 VS Code **Local** のhooksを使う場合は、両方のコマンドに `--harness vscode-local` を付けます。標準の `copilot` 設定とはイベント形式が異なります。この指定は配置するhooksの形式を選ぶもので、VS Codeのセッションは切り替えません。チャットの実行方式（Session Target）で **Local** を選んでください。VS Code 1.144 では Local は既定で表示されず（表示する設定は [VS Code の文書](https://code.visualstudio.com/docs/agents/run/agent-harnesses)）、Agents window では使えません。プラグイン導入は Copilot 実行方式（既定）で使います。CLIで実行するワーカーはコマンドラインでもツールを制限します。
 
@@ -62,9 +75,9 @@ node migration-kit/scripts/run_migration.mjs doctor --check-cli
 
 `doctor` は設定、プロファイル、CLIバージョンと必要なオプションに加え、ワーカーと同じ引数・環境変数でCLIを起動し、全担当エージェントを実際に解決できるかを確認します（AI呼び出しなし）。phase 01で作る依存宣言は、phase 01を記録するまでは未作成でも失敗にせず `pending` と表示します（記録後に欠けていれば失敗します）。さらに、ローカルの疑似モデル（loopback、アカウント・通信・AI利用なし）で実CLIを動かし、ツール付きレビューのワーカーがhookにより `migration/runs` を読めないことを実際に確認します。このhookの読み込みは非公開の環境変数 `GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS` に依存するため、CLIの更新で効かなくなった場合はここで失敗します（CLI 1.0.98・1.0.100-1で確認）。モデルの利用可否や対話セッションでのhookの実動作を保証するものではありません。
 
-## migration/config.json の項目
+## 設定の項目
 
-`migration/config.json` の最低限の設定は次のとおりです。
+主な設定は次のとおりです。`migration/settings.json` で変え、キットが自分の記録 `migration/state/config.json` に写して使います。`phasePolicy`・`markerPolicy`・`workerBackend`・`reviewDependencyMap` など、ファイルに出ない項目はキットのコマンドが決めます。
 
 | 設定 | 内容 |
 |---|---|
@@ -80,7 +93,7 @@ node migration-kit/scripts/run_migration.mjs doctor --check-cli
 | `mode` | 自動ファイル変換は `preserve`。`redesign` は設計・試行プロンプトまで対応 |
 | `phasePolicy` | 新規は`strict`。既存の未設定は従来互換。スキル入口で`phase init`すると既存設定を保って工程順序を有効化 |
 | `models` | implementer、reviewer-semantics、reviewer-rules、arbiter、fixerの各ID。利用者が `models list` の一覧から選び、`models set` で記録する |
-| `reasoningEfforts` | 任意。担当ごとのエフォート（`low`〜`max` のうちモデルが対応するもの）。未指定はモデルの既定。ワーカーに `--reasoning-effort` として渡す。モデルと同じく、変更するとレビュー済みの単位は再レビュー |
+| `reasoningEfforts` | 任意。担当ごとのエフォート（`low`〜`max` のうちモデルが対応するもの）。未指定はモデルの既定。ワーカーに `--reasoning-effort` として渡す。モデルと同じく、変更してもレビュー済みの単位と承認は残る |
 | `phaseModels` | rulebook、judgeAudit、dependencyAudit、inventoryAudit、stressA/B、stressInspector、designAuditの明示的なhost model指定。準備監査は親が実行し、自動runnerへの暗黙継承はしない |
 | `designInputs` | 全文を固定入力へ含め、保護する設計文書のパス配列。リンクだけでは本文を渡した扱いにしない。redesignのmodule runnerを有効化する設定ではない |
 | `packageMap` | 任意のsource→target package宣言JSON。指定時は01で別のpackage cycle監査を記録 |
@@ -149,7 +162,7 @@ node migration-kit/scripts/make_review_dependencies.mjs \
 python3 migration-kit/scripts/depmap_python.py --root . --out migration/depmap
 node migration-kit/scripts/make_review_dependencies.mjs \
   --source-root pkg --depmap-root . --edges migration/depmap/edges.tsv
-# 複数のソースルートをまたぐ依存がある場合（config.sourceRootsも同じ範囲に設定）
+# 複数のソースルートをまたぐ依存がある場合（settings.json の sourceRoots も同じ範囲に設定）
 node migration-kit/scripts/make_review_dependencies.mjs \
   --source-roots pkg,shared --depmap-root . --edges migration/depmap/edges.tsv
 ```
@@ -207,7 +220,7 @@ node migration-kit/scripts/run_migration.mjs repair \
   --target ported/example.mjs --evidence migration/diagnostic-slice.txt
 ```
 
-修正はレビュー→裁定→確認された指摘の修正を通ります（再レビューは `fixPolicy: rereview` のときだけ）。出力が変わると古いビルド以降の承認は無効になるため、改めて確認・承認してください。元ソース、設定、ルール、比較器が変わった場合は、judgeから再検証し、事前試行の更新を確認してtranslationを再承認します。02の後にルールだけを変えた場合は、`rulebook changes` で変更点と関係しそうなファイルを確かめ、`rulebook accept --note TEXT --redo listed|all|none|PATH,...` で受け入れると、工程記録・承認・ほかの完了済み単位はそのままで、選んだ単位だけをレビューし直します（[手順](ORDERED-WORKFLOW.md#rulebook-amendment)）。キット（プラグイン）の更新も、承認と完了記録を失効させません。ただし実行上限（`concurrency`、`maxAgentCalls`、`maxFixRounds`、各タイムアウト・再試行、`maxRunInputBytes`、`maxAiCreditsPerCall`）、文書・工程プロンプト・スキル・Copilot指示の変更はワーカーの出力に影響しないため、レビュー済みの単位・工程記録・承認を失効させません。
+修正はレビュー→裁定→確認された指摘の修正を通ります（再レビューは `fixPolicy: rereview` のときだけ）。出力が変わると古いビルド以降の承認は無効になるため、改めて確認・承認してください。元ソース、移行の中身やテストに関わる設定（[変えたときにやり直しになるもの](#変えたときにやり直しになるもの)）、ルール、比較器が変わった場合は、judgeから再検証し、事前試行の更新を確認してtranslationを再承認します。02の後にルールだけを変えた場合は、`rulebook changes` で変更点と関係しそうなファイルを確かめ、`rulebook accept --note TEXT --redo listed|all|none|PATH,...` で受け入れると、工程記録・承認・ほかの完了済み単位はそのままで、選んだ単位だけをレビューし直します（[手順](ORDERED-WORKFLOW.md#rulebook-amendment)）。キット（プラグイン）の更新も、承認と完了記録を失効させません。ただし実行上限（`concurrency`、`maxAgentCalls`、`maxFixRounds`、各タイムアウト・再試行、`maxRunInputBytes`、`maxAiCreditsPerCall`）、文書・工程プロンプト・スキル・Copilot指示の変更はワーカーの出力に影響しないため、レビュー済みの単位・工程記録・承認を失効させません。
 
 smoke・parityの失敗も同じ経路で修正します（上流Step 6）。元の実装で同じ入力を実行して分類したうえで、`repair-round --stage smoke|parity` を使うと、変換後ファイルを指す出力行がレビュー付き修正のキューになります。比較器がケース単位でしか報告しない場合は、確認した退行を `file<TAB>module<TAB>code<TAB>message` 形式で書き、`diagnostic_queue.mjs --stage parity --diagnostics migration/PATH.tsv` → `repair --queue` を実行します。元テスト（original）の失敗は継承・環境の問題なので、runnerはキューにしません。修正後はbuild・smoke・parityを改めて承認・実行します。
 

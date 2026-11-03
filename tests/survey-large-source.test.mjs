@@ -10,7 +10,7 @@ function fixture(t, source) {
   const f = prepare(t);
   Object.assign(f.config, { sourceRoots: ['huge'], concurrency: 1, executionMode: 'continuous', maxReviewInputBytes: 4096, maxAgentCalls: 1 });
   atomicWrite(safePath(f.root, 'huge/Large.cs'), source);
-  writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   return f;
 }
 function answer(args) {

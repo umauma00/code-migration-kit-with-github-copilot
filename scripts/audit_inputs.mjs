@@ -11,13 +11,15 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { parseCommandLine, specs, usageText } from '../lib/cli.mjs';
-import { loadConfig, safePath, hash, fileHash, treeHash, readJSON, writeJSON, lockRun, semanticConfig, stamp } from '../lib/core.mjs';
+import { loadConfig, safePath, hash, fileHash, treeHash, readJSON, writeJSON, lockRun, semanticConfig, stamp, readConfigFile } from '../lib/core.mjs';
 import { recordSession } from '../lib/sessions.mjs';
 import { isTransientFailure, isSystemicFailure, isLimitedRetry, isSilentCall, hostStallRetries, retryDelayMs, stoppedWithRun } from '../lib/failures.mjs';
 import { executionLimits } from '../lib/execution-policy.mjs';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { createCopilotAdapter } from './copilot_adapter.mjs';
 import { readReviewText, readReviewSource, validatePreparationProfile } from '../lib/review.mjs';
+import { settingsAtStart, settingsNotice } from '../lib/settings.mjs';
+import { listAtStart } from '../lib/models.mjs';
 const models = { judge: 'judgeAudit', dependencies: 'dependencyAudit', inventory: 'inventoryAudit', design: 'designAudit' };
 // The person's phaseModels entry when they set one; otherwise the model they
 // chose for the semantic reviewer, an auditor's closest role. No kit setter
@@ -27,7 +29,7 @@ const auditModel = (config, type) => config.phaseModels?.[models[type]] ?? confi
 // loaded at the start, and a model or rule change meanwhile must void the result.
 // Run limits (semanticConfig) may change.
 function snapshot(root, config) { return hash(JSON.stringify({ source: treeHash(root, config.sourceRoots), verification: treeHash(root, config.verificationRoots),
-  config: hash(JSON.stringify(semanticConfig(config))), configFile: hash(JSON.stringify(semanticConfig(readJSON(safePath(root, 'migration/config.json'))))), profile: validatePreparationProfile(root, config) })); }
+  config: hash(JSON.stringify(semanticConfig(config))), configFile: hash(JSON.stringify(semanticConfig(readConfigFile(root)))), profile: validatePreparationProfile(root, config) })); }
 export function freezeAudit(root, config, { type, files, out } = {}) {
   if (!Object.hasOwn(models, type) || !Array.isArray(files) || !files.length || new Set(files).size !== files.length) throw new Error('Select judge|dependencies|inventory|design and explicit unique input files');
   const model = auditModel(config, type);
@@ -164,7 +166,11 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   try {
     const args = parseCommandLine(process.argv.slice(2), specs.audit_inputs);
     if (args.help) { console.log(usageText(specs.audit_inputs)); process.exit(0); }
-    const root = fs.realpathSync(path.resolve(args.root ?? '.')), config = loadConfig(root);
+    const root = fs.realpathSync(path.resolve(args.root ?? '.'));
+    // An edit of the settings file is applied first, as by the runner's commands.
+    const notice = settingsNotice(await settingsAtStart(root, listAtStart(args.copilot ?? 'copilot', root)));
+    if (notice) console.error(notice);
+    const config = loadConfig(root);
     const result = args._[0] === 'freeze' ? freezeAudit(root, config, { type: args.type, files: args.files?.split(','), out: args.out })
       : args._[0] === 'run' ? await runAudit(root, config, createCopilotAdapter({ command: args.copilot }), { directory: args.directory, signal })
       : args._[0] === 'run-pending' ? await runPendingAudits(root, config, createCopilotAdapter({ command: args.copilot }), { signal })

@@ -11,8 +11,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { prepare, ready, fake, result, nodeCli } from './helpers.mjs';
-import { safePath, writeJSON, readJSON, atomicWrite, loadConfig, contextHash, readMemo, roles } from '../lib/core.mjs';
+import { prepare, ready, fake, result, nodeCli, scopesOf } from './helpers.mjs';
+import { safePath, writeJSON, readJSON, atomicWrite, loadConfig, inputContext, readMemo, roles } from '../lib/core.mjs';
 import { runStage, runPilot, translate } from '../lib/pipeline.mjs';
 import { preparePilot, requirePilot } from '../lib/pilot.mjs';
 import { currentPhase } from '../lib/phases.mjs';
@@ -62,7 +62,7 @@ test('the CLI\'s lock waits are retried a few times, never a stop or a reason to
 
 async function lockedRun(t, executionMode) {
   const f = await ready(t, { executionMode });
-  f.config.transientRetryDelayMs = 1; writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  f.config.transientRetryDelayMs = 1; writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   return f;
 }
 
@@ -118,7 +118,7 @@ test('guidance for a lock that stayed busy: from the kit\'s own home go back to 
   for (const [home, order] of [[undefined, fromShared], ['shared', fromShared], ['separate', fromSeparate]]) {
     const config = { ...f.config };
     if (home) config.workerCopilotHome = home; else delete config.workerCopilotHome;
-    writeJSON(safePath(f.root, 'migration/config.json'), config);
+    writeJSON(safePath(f.root, 'migration/state/config.json'), config);
     for (const language of ['ja', 'en']) {
       const g = failureGuidance(new Error(lockError), { root: f.root, language });
       assert.equal(g.id, 'cli-lock', `${home} ${language}`);
@@ -133,10 +133,10 @@ test('guidance for a lock that stayed busy: from the kit\'s own home go back to 
   assert.notEqual(failureGuidance(new Error(lockError)).id, 'timeout');
   assert.notEqual(failureGuidance(new Error(`Interrupted; ${lockError}`)).id, 'cli-lock');
   // The choice is a run setting: the inputs approvals bind to stay the same.
-  const config = loadConfig(f.root), before = contextHash(f.root, config);
+  const config = loadConfig(f.root), before = scopesOf(f.root, config);
   for (const value of ['shared', 'separate']) {
-    writeJSON(safePath(f.root, 'migration/config.json'), { ...config, workerCopilotHome: value });
-    assert.equal(contextHash(f.root, loadConfig(f.root)), before, value);
+    writeJSON(safePath(f.root, 'migration/state/config.json'), { ...config, workerCopilotHome: value });
+    assert.equal(scopesOf(f.root, loadConfig(f.root)), before, value);
   }
 });
 
@@ -242,7 +242,7 @@ test('sessions status names the session folder of the current setting first', t 
 // A production project with phases 00 to 02 recorded and its judge run.
 async function reviewedPreparation(t) {
   const f = prepare(t, { realCommands: true, count: 3, executionMode: 'continuous' });
-  f.config.phasePolicy = 'strict'; f.config.concurrency = 1; writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  f.config.phasePolicy = 'strict'; f.config.concurrency = 1; writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   fs.rmSync(safePath(f.root, 'migration/stress-test/report.md'));
   for (const p of ['migration/judge-report.md', 'migration/depmap/report.md', 'migration/gap-report.md']) atomicWrite(safePath(f.root, p), 'Disposable preparation fixture; not actual AI review or human signoff.\n');
   for (const id of ['00', '00b', '01', '02']) phaseCommand(f.root, f.config, 'complete', id, { note: 'Synthetic preparation review for a regression test only' });
@@ -269,17 +269,17 @@ test('one input check hashes each file once, and the shared read gives the same 
   const f = await reviewedPreparation(t), source = safePath(f.root, 'src/math_ops.py');
   // math_ops.py is in the source tree, the manifest and the dependency map.
   const reads = readCounter([source]);
-  try { contextHash(f.root, f.config); } finally { reads.stop(); }
+  try { inputContext(f.root, f.config); } finally { reads.stop(); }
   assert.deepEqual(reads.counts, [1]);
-  const context = contextHash(f.root, f.config), memo = readMemo();
-  assert.equal(contextHash(f.root, f.config, memo), context);
+  const context = inputContext(f.root, f.config), memo = readMemo();
+  assert.equal(scopesOf(f.root, f.config, memo), scopesOf(f.root, f.config));
   assert.equal(judgeInputHash(f.root, f.config, memo), judgeInputHash(f.root, f.config));
   assert.ok(currentPhase(f.root, f.config, '02'));
   assert.deepEqual(currentPhase(f.root, f.config, '02', { contextKnown: true, context, memo }), currentPhase(f.root, f.config, '02'));
   // A changed source makes both reads stale alike.
   fs.appendFileSync(source, '\n# changed\n');
-  const changed = contextHash(f.root, f.config);
-  assert.notEqual(changed, context);
+  const changed = inputContext(f.root, f.config);
+  assert.notEqual(changed.content, context.content);
   assert.equal(currentPhase(f.root, f.config, '02', { contextKnown: true, context: changed, memo: readMemo() }), false);
   assert.equal(currentPhase(f.root, f.config, '02'), false);
 });

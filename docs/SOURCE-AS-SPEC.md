@@ -35,7 +35,7 @@ node migration-kit/scripts/run_migration.mjs source-spec init          # 変更�
 node migration-kit/scripts/run_migration.mjs source-spec init --apply  # ユーザーの同意後に適用
 ```
 
-`init --apply` は、`migration/config.json` を `verificationMode: "source-only"`・
+`init --apply` は、設定（`migration/settings.json` とキットの記録）を `verificationMode: "source-only"`・
 `preparationProfile: "source-as-spec"` に切り替え、まだないファイルだけを作ります。
 
 - `migration/judge-plan.json`：sourceRoots配下の全ソースを列挙した準備記録
@@ -44,7 +44,7 @@ node migration-kit/scripts/run_migration.mjs source-spec init --apply  # ユー�
 0.10.0 から、ファイルごとの契約メモ（`contracts.md`）は作りません。ソースそのものが仕様なので、
 メモを作る調査とメモの正しさの確認の両方に時間がかかるだけだったためです。レビュー担当はソースの行を直接読みます。
 
-方式の切り替えは設定変更なので、以前の承認・記録は失効します（00bから確認し直し）。
+方式を切り替えると、比較器（judge）以降の実行とその承認（変換の承認も）、工程の記録がやり直しになります。工程の記録は00から、すでに source-only だった案件は、judge を実行し直した後の03だけです。0.45.0 から、完了済みの単位は残ります。
 
 最初から source-as-spec で導入した案件では、設定は変わらないので `source-spec init`（`--apply` なし）がそのまま下書きを作ります。キットが用意する下書きのために利用者へ同意を求めることはありません。
 00b〜02 は一括で記録するので、00b の記録前でも `phase start 01`・`phase start 02` を実行でき、`phase check 00b,01,02` でまとめて確認できます（記録は `phase complete 00b,01,02` で順番どおりに行います）。

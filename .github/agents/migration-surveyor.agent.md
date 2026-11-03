@@ -10,4 +10,4 @@ Survey one scope of source files for migration preparation using only the frozen
 
 For human setup: [operating manual](../../docs/OPERATING-MANUAL.md) and
 [preparation surveys](../../docs/SURVEYS.md). The coordinator supplies the response contract inline. Model selection belongs to
-`migration/config.json` (phaseModels.survey, else the implementer model); do not add a `model` frontmatter override.
+`migration/settings.json` (phaseModels.survey, else the implementer model); do not add a `model` frontmatter override.

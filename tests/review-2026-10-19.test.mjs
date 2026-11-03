@@ -5,40 +5,44 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { prepare, ready, fake, cliDouble, result, importable } from './helpers.mjs';
+import { prepare, ready, fake, cliDouble, result, importable, scopesOf } from './helpers.mjs';
 import { approve, runStage, translate } from '../lib/pipeline.mjs';
-import { contextHash, safePath, writeJSON, readJSON, atomicWrite, done, loadConfig, operationalConfigKeys } from '../lib/core.mjs';
+import { inputContext, safePath, writeJSON, readJSON, atomicWrite, done, loadConfig, operationalConfigKeys } from '../lib/core.mjs';
 import { createCopilotAdapter, copilotArgs, readUsageFile } from '../scripts/copilot_adapter.mjs';
 import { waitForProgress } from '../scripts/run_migration.mjs';
 import { freezeAudit, runAudit, runPendingAudits, retireAudit, submitAudit } from '../scripts/audit_inputs.mjs';
 import { diagnoseBuild, makeRepairQueue } from '../scripts/diagnostic_queue.mjs';
 import { decide } from '../scripts/migration_hook.mjs';
 
-const persist = f => writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+const persist = f => writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
 
-test('run limits, timeouts, documents and Copilot instructions do not revoke reviewed work', async t => {
+test('run limits, timeouts, documents, Copilot instructions, models and worker profiles do not revoke reviewed work', async t => {
   const f = await ready(t, { count: 2 });
   await translate(f.root, f.config, fake);
-  const context = contextHash(f.root, f.config);
+  const context = inputContext(f.root, f.config), scopes = scopesOf(f.root, f.config);
   const changed = { ...f.config, executionMode: 'continuous', concurrency: 1, maxAgentCalls: 500, maxFixRounds: 3, timeoutSeconds: 900, commandTimeoutSeconds: 900,
     transientRetries: 4, transientRetryDelayMs: 100, maxConsecutiveFailures: 5, maxRunInputBytes: 4096, maxAiCreditsPerCall: 30, workerCopilotHome: 'shared', workerSilenceSeconds: 1200 };
   assert.deepEqual(Object.keys(changed).filter(k => changed[k] !== f.config[k]).sort(), [...operationalConfigKeys].sort());
-  writeJSON(safePath(f.root, 'migration/config.json'), changed);
+  writeJSON(safePath(f.root, 'migration/state/config.json'), changed);
   fs.appendFileSync(safePath(f.root, '.github/copilot-instructions.md'), '\nTeam note.\n');
   fs.appendFileSync(safePath(f.root, 'migration-kit/docs/OPERATING-MANUAL.md'), '\n');
   fs.appendFileSync(safePath(f.root, 'migration-kit/prompts/04-translation-kickoff.md'), '\n');
   fs.mkdirSync(safePath(f.root, '.github/skills/other'), { recursive: true });
   atomicWrite(safePath(f.root, '.github/skills/other/SKILL.md'), '---\nname: other\ndescription: unrelated\n---\n');
   const config = loadConfig(f.root);
-  assert.equal(contextHash(f.root, config), context);
+  assert.equal(scopesOf(f.root, config), scopes);
   assert.ok(f.units.every(u => done(f.root, u, context)));
   assert.equal((await translate(f.root, config, fake)).agentCalls, 0);
-  // What reaches workers still invalidates: models, worker profiles and runner code.
-  writeJSON(safePath(f.root, 'migration/config.json'), { ...changed, models: { ...changed.models, fixer: 'another-model' } });
-  assert.notEqual(contextHash(f.root, loadConfig(f.root)), context);
-  writeJSON(safePath(f.root, 'migration/config.json'), changed);
+  // 0.45.0: how the workers do the work (their models and profiles) is not
+  // what a finished unit is, so it keeps the reviewed work too.
+  writeJSON(safePath(f.root, 'migration/state/config.json'), { ...changed, models: { ...changed.models, fixer: 'another-model' } });
+  const other = loadConfig(f.root);
+  assert.equal(scopesOf(f.root, other), scopes);
+  assert.ok(f.units.every(u => done(f.root, u, inputContext(f.root, other))));
+  writeJSON(safePath(f.root, 'migration/state/config.json'), changed);
   fs.appendFileSync(safePath(f.root, '.github/agents/migration-fixer.agent.md'), '\n');
-  assert.notEqual(contextHash(f.root, config), context);
+  assert.equal(scopesOf(f.root, config), scopes);
+  assert.equal((await translate(f.root, config, fake)).agentCalls, 0);
 });
 
 test('translate --max-calls sets one run\'s budget without editing the configuration', async t => {
@@ -200,7 +204,7 @@ test('a failed parity run becomes a reviewed repair queue; an original-suite fai
 });
 
 test('maxAiCreditsPerCall follows the CLI minimum of 30', t => {
-  const f = prepare(t), file = safePath(f.root, 'migration/config.json');
+  const f = prepare(t), file = safePath(f.root, 'migration/state/config.json');
   for (const value of [29, 0, -1, '30', Infinity]) {
     writeJSON(file, { ...f.config, maxAiCreditsPerCall: value });
     assert.throws(() => loadConfig(f.root), /at least 30/, String(value));
@@ -212,7 +216,7 @@ test('maxAiCreditsPerCall follows the CLI minimum of 30', t => {
 });
 
 test('a semantic configuration change during a preparation audit voids its result; a run limit does not', async t => {
-  const f = prepare(t), file = safePath(f.root, 'migration/config.json');
+  const f = prepare(t), file = safePath(f.root, 'migration/state/config.json');
   f.config.phaseModels = { inventoryAudit: 'model-a' }; persist(f);
   const answer = args => { const q = JSON.parse(args.reviewInput);
     return { result: { schemaVersion: 1, kind: 'preparation-audit', task: q.task, inputHash: q.inputHash, target: args.unit.target, verdict: 'pass', findings: [] }, observedModel: 'model-a' }; };

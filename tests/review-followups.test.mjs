@@ -21,7 +21,7 @@ import { migrationStatus, statusMarkdown } from '../lib/status.mjs';
 import { decide } from '../scripts/migration_hook.mjs';
 import { runProcess } from '../lib/process.mjs';
 
-const persist = f => writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+const persist = f => writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
 // Configure before the translation approval: the approval binds the config.
 async function approvedWith(t, options, change) {
   const f = prepare(t, options);
@@ -87,7 +87,7 @@ test('shared review focus asks each reviewer for both checks; specialized keeps 
   assert.doesNotMatch(specialized, /two independent full reviewers/);
   assert.equal(loadConfig(f.root).reviewFocus, undefined, 'fixture removes the new-install default');
   assert.equal(JSON.parse(fs.readFileSync(path.join(kitRoot, 'templates/migration-config.json'), 'utf8')).reviewFocus, 'shared');
-  writeJSON(safePath(f.root, 'migration/config.json'), { ...f.config, reviewFocus: 'both' });
+  writeJSON(safePath(f.root, 'migration/state/config.json'), { ...f.config, reviewFocus: 'both' });
   assert.throws(() => loadConfig(f.root), /reviewFocus/);
 });
 

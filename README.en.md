@@ -48,7 +48,7 @@ copilot plugin install code-migration-kit@code-migration-kit-marketplace
 
 In VS Code and the GitHub Copilot app, add the same source (`umauma00/code-migration-kit-with-github-copilot`) as a marketplace and install `code-migration-kit`. VS Code also finds plugins the CLI installed. Each app's screens, updates and installing from an internal Git server are in [PLUGIN.en.md](docs/PLUGIN.en.md).
 
-**Do not update from a release before 0.40.0 to 0.40.1 in the middle of a migration.** That one update revokes approvals once and sends every finished file back to review (from 0.40.0, phases 00b to 03 are only checked and recorded again). From 0.40.1 on, a plugin update keeps phase records, approvals and completion records (each version's effect is in [UPGRADING.en.md](docs/UPGRADING.en.md)).
+**Do not update from a release before 0.40.0 to 0.40.1 in the middle of a migration.** That one update revokes approvals once and sends every finished file back to review (from 0.40.0, phases 00b to 03 are only checked and recorded again). From 0.40.1 on, a plugin update keeps phase records, approvals and completion records. Updating to 0.45.0 in the middle of a migration is fine too: the settings files get a new name and place, and the records stay valid. When you move to 0.45.0, update the kit on every host (another PC, VS Code and the CLI...) before you run it on any of them: an older kit does not find the moved records, its hooks stop checking, and its commands stop as if the project were not initialized (each version's effect is in [UPGRADING.en.md](docs/UPGRADING.en.md)).
 
 ### As a copy in the repository
 
@@ -73,7 +73,7 @@ You never type commands. The AI runs them and reports in chat. Your part is thre
 
 ### What you are asked first
 
-First the report language (Japanese or English), then, after installation, one question each. The answers go into `migration/run-settings.json`, which is used when you change settings later or resume in another session.
+First the report language (Japanese or English), then, after installation, one question each. The answers go into `migration/settings.json`, which is used when you change settings later or resume in another session. It is the only file to change settings in (the `migration/run-settings.json` of 0.44.x and earlier is renamed by the next command).
 
 1. Every role's model (from the models your account offers)
 2. The target language (the kit detects the source language from the files)
@@ -81,7 +81,7 @@ First the report language (Japanese or English), then, after installation, one q
 4. Whether the original program can be built and run here
 5. (Only if it cannot) whether a specification or a test suite the target can use exists
 
-Per-role models and efforts, output folders, build and test commands and so on are changed in that file. Every entry is described in [detailed usage](docs/REFERENCE.en.md).
+Per-role models and efforts, output folders, build and test commands and so on are changed in that file. Changing a model or how reviews run keeps the finished files and the approvals; changing a command or a test redoes only that command's result and what follows it. Every entry is described in [detailed usage](docs/REFERENCE.en.md).
 
 ## The ten phases
 
@@ -111,7 +111,7 @@ Before 03, guardrails (`migration/guardrails.json`) are installed with your conf
 
 - **The original source is never rewritten.** Workers only read files; the kit itself writes only the target files.
 - **Reviews are independent.** Both reviewers receive the same frozen input and never see each other's results. Only when the input is too large do they get a file list with hashes and read it with read-only tools, which is recorded. The input limit `maxReviewInputBytes` is 1048576 bytes (1 MiB) for new installs.
-- **"Done" is checked against records.** A file merely existing is never done; hashes of inputs, outputs and reviews are kept. When the source or the rules change, the related approvals and completions are revoked automatically.
+- **"Done" is checked against records.** A file merely existing is never done; hashes of inputs, outputs and reviews are kept. When the source or the rules change, the related approvals and completions are revoked automatically (a model or review-procedure change revokes none).
 - **The RULEBOOK is protected.** After phase 01, an AI edit of `migration/RULEBOOK.md` first keeps the current text in `migration/rulebook-history/`. Once translation has started, the edit asks for confirmation (in auto mode the edit is refused and the file is repaired instead). After phase 02, `rulebook changes` shows a change and the files it may touch, and `rulebook accept` keeps everything else, so only the files you choose are redone.
 - **Work is not cut short.** Normally nothing stops on time or call counts, and transient network errors are retried after a wait ([every stop condition](docs/INTERRUPTION-POLICY.en.md)).
 

@@ -20,9 +20,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { prepare, ready, fake, result, finding } from './helpers.mjs';
+import { prepare, ready, fake, result, finding, scopesOf } from './helpers.mjs';
 import { kitRoot } from '../scripts/install.mjs';
-import { safePath, writeJSON, atomicWrite, readJSON, loadConfig, readMemo, memoFileHash, runCache, fileHash, hash, loadReviewDependencies, contextHash } from '../lib/core.mjs';
+import { safePath, writeJSON, atomicWrite, readJSON, loadConfig, readMemo, memoFileHash, runCache, fileHash, hash, loadReviewDependencies, inputContext } from '../lib/core.mjs';
 import { reviewEvidence, legacySources } from '../lib/review.mjs';
 import { renameRetry } from '../lib/text.mjs';
 import { translate, runStage, runPilot, approve } from '../lib/pipeline.mjs';
@@ -170,7 +170,7 @@ async function production(t, count) {
   for (const key of ['markerPolicy', 'fixPolicy', 'dependencyOrder', 'reviewFocus']) f.config[key] = template[key];
   f.config.concurrency = 2;
   delete f.config.commands.typecheck;
-  writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   const config = loadConfig(f.root);
   await runStage(f.root, config, 'judge');
   approve(f.root, config, 'translation', 'Automated fixture approval for tests only');
@@ -187,7 +187,7 @@ const answer = async call => {
 // in tests/pilot-lock-2026-11-01.test.mjs, and a pilot of it.
 async function reviewedPreparation(t) {
   const f = prepare(t, { realCommands: true, count: 3, executionMode: 'continuous' });
-  f.config.phasePolicy = 'strict'; f.config.concurrency = 1; writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  f.config.phasePolicy = 'strict'; f.config.concurrency = 1; writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   fs.rmSync(safePath(f.root, 'migration/stress-test/report.md'));
   for (const p of ['migration/judge-report.md', 'migration/depmap/report.md', 'migration/gap-report.md']) atomicWrite(safePath(f.root, p), 'Disposable preparation fixture; not actual AI review or human signoff.\n');
   for (const id of ['00', '00b', '01', '02']) phaseCommand(f.root, f.config, 'complete', id, { note: 'Synthetic preparation review for a regression test only' });
@@ -212,7 +212,7 @@ async function toolAssisted(t) {
   const f = prepare(t, { count: 1 });
   f.config.maxReviewInputBytes = 1024;
   fs.appendFileSync(safePath(f.root, f.units[0].source), `\n# ${'x'.repeat(1500)}\n`);
-  writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   const config = loadConfig(f.root);
   await runStage(f.root, config, 'judge');
   approve(f.root, config, 'translation', 'Automated fixture approval for tests only');
@@ -222,7 +222,7 @@ async function toolAssisted(t) {
 async function oneAtATime(t) {
   const f = prepare(t, { count: 2 });
   f.config.concurrency = 1;
-  writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   const config = loadConfig(f.root);
   await runStage(f.root, config, 'judge');
   approve(f.root, config, 'translation', 'Automated fixture approval for tests only');
@@ -744,18 +744,18 @@ test('a run keeps the dependency map checked for its text, but looks again at ev
   }
   writeJSON(mapFile, { ...map, dependencies: { ...map.dependencies, 'src/extra.py': [walked, vendored] } });
   const cache = runCache({ settleMs: 0 }), first = loadReviewDependencies(f.root, f.config, readMemo(cache));
-  const context = contextHash(f.root, f.config, readMemo(cache));
+  const context = inputContext(f.root, f.config, readMemo(cache));
   assert.equal(loadReviewDependencies(f.root, f.config, readMemo(cache)), first, 'the same text: the checked graph is kept');
   // A removed file the walk enters: the kept graph is used, and the walk sees the change.
   fs.rmSync(safePath(f.root, walked));
   assert.equal(loadReviewDependencies(f.root, f.config, readMemo(cache)), first);
-  assert.notEqual(contextHash(f.root, f.config, readMemo(cache)), context);
+  assert.notEqual(scopesOf(f.root, f.config, readMemo(cache)), context);
   assert.throws(() => loadReviewDependencies(f.root, f.config, readMemo()), /Review dependency file missing: src\/other\.py/, 'without a run cache (gates, status) the map is checked whole');
   fs.writeFileSync(safePath(f.root, walked), 'x = 1\n');
   // A removed file the walk skips is seen at the next check, as before 0.43.0.
   fs.rmSync(safePath(f.root, vendored));
   assert.throws(() => loadReviewDependencies(f.root, f.config, readMemo(cache)), /Review dependency file missing: src\/node_modules\/helper\.py/);
-  assert.throws(() => contextHash(f.root, f.config, readMemo(cache)), /Review dependency file missing: src\/node_modules\/helper\.py/);
+  assert.throws(() => inputContext(f.root, f.config, readMemo(cache)), /Review dependency file missing: src\/node_modules\/helper\.py/);
 });
 
 test('status --wait watches the recorded progress and reads the sources once, when it answers', async t => {

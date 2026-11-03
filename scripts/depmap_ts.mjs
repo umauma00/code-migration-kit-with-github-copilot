@@ -47,7 +47,7 @@ function walk(dir, root, acc, sourceRoots) {
   for (const entry of entries) {
     const name = entry.name;
     if (name.startsWith(".") || SKIP_DIRS.has(name)) continue;
-    if (dir === root && ((name === 'migration-kit' && existsSync(join(root, name, 'scripts/run_migration.mjs'))) || (name === 'migration' && existsSync(join(root, name, 'config.json'))))) continue;
+    if (dir === root && ((name === 'migration-kit' && existsSync(join(root, name, 'scripts/run_migration.mjs'))) || (name === 'migration' && (existsSync(join(root, name, 'state', 'config.json')) || existsSync(join(root, name, 'config.json')))))) continue;
     if (entry.isSymbolicLink()) continue; // never follow symlinks: no cycles, no escapes outside --root
     const p = join(dir, name);
     const rel = relative(root, p).split(sep).join('/');

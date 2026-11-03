@@ -3,8 +3,10 @@ import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { install, kitRoot } from '../scripts/install.mjs';
-import { loadConfig, roles, writeJSON, safePath, atomicWrite, readManifest } from '../lib/core.mjs';
-import { approve, runStage } from '../lib/pipeline.mjs';
+import { loadConfig, roles, writeJSON, safePath, atomicWrite, readManifest, inputContext, done } from '../lib/core.mjs';
+import { approve, runStage, translate, requireGate, currentRecord } from '../lib/pipeline.mjs';
+import { currentPhase } from '../lib/phases.mjs';
+import { phaseCommand } from '../scripts/phase_cli.mjs';
 
 export const mini = path.join(kitRoot, 'fixtures/mini');
 // Python on PATH: Windows installs (python.org, setup-python) name it python.
@@ -21,6 +23,9 @@ export function nodeCli(file, body) {
 }
 // import() of an absolute path inside a generated script needs a file URL on Windows.
 export const importable = file => pathToFileURL(file).href;
+// Every hash a record can be bound to (0.45.0: the content and each run),
+// as one value that changes when any of them does.
+export const scopesOf = (root, config, memo) => { const c = inputContext(root, config, memo); return JSON.stringify({ content: c.content, stages: c.stages }); };
 export function prepare(t, { realCommands = false, count = 1, model = 'test-double', root, workflow = false, layout = 'repository', executionMode = 'bounded' } = {}) {
   root ??= fs.mkdtempSync(path.join(os.tmpdir(), 'copilot-migration-test-'));
   t?.after(() => fs.rmSync(root, { recursive: true, force: true }));
@@ -45,7 +50,7 @@ export function prepare(t, { realCommands = false, count = 1, model = 'test-doub
     config.commands[name] = realCommands ? [python, '-B', 'tests/judge.py', name] : [process.execPath, '-e', 'console.log("test command OK")'];
   }
   config.commands.typecheck = ['node', '--check', '{target}'];
-  writeJSON(safePath(root, 'migration/config.json'), config);
+  writeJSON(safePath(root, 'migration/state/config.json'), config);
   const names = ['math_ops', 'text_ops', 'main'].slice(0, count);
   atomicWrite(safePath(root, 'migration/manifest.tsv'), 'source\ttarget\n' + names.map(n => `src/${n}.py\tported/${n}.mjs\n`).join(''));
   atomicWrite(safePath(root, 'migration/RULEBOOK.md'), '# Fixture rules\nPreserve floor division, remainder signs, zero-division errors and Unicode code-point lengths. Keep one-to-one filenames; use .mjs imports. Inputs are safe-range integers and Unicode strings. End each file with a PORT STATUS comment.\n');
@@ -63,6 +68,34 @@ export async function ready(t, options) {
   approve(fixture.root, fixture.config, 'translation', 'Automated fixture approval for tests only');
   return fixture;
 }
+// A strict project: phases 00 to 03 recorded, the judge run, translation
+// approved and finished, build and smoke approved and run.
+export async function throughSmoke(t, { count = 2 } = {}) {
+  const f = prepare(t, { count });
+  f.config.phasePolicy = 'strict';
+  writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
+  for (const name of ['migration/judge-report.md', 'migration/depmap/report.md', 'migration/gap-report.md']) atomicWrite(safePath(f.root, name), 'Synthetic preparation evidence; not actual AI review or human approval.\n');
+  for (const id of ['00', '00b', '01', '02']) phaseCommand(f.root, f.config, 'complete', id, { note: 'Test fixture reviewed preparation only' });
+  await runStage(f.root, f.config, 'judge');
+  phaseCommand(f.root, f.config, 'complete', '03', { note: 'Synthetic stress fixture only' });
+  fs.copyFileSync(path.join(kitRoot, 'templates/guardrails.json'), safePath(f.root, 'migration/guardrails.json'));
+  approve(f.root, f.config, 'translation', 'Fixture authorizes these exact outputs');
+  await translate(f.root, f.config, fake);
+  for (const stage of ['build', 'smoke']) { approve(f.root, f.config, stage, 'Fixture snapshot'); await runStage(f.root, f.config, stage); }
+  return f;
+}
+// What holds now: each finished unit, each approval, each run's record and
+// each phase record (true, or the reason an approval does not hold).
+export function holding(f, config = loadConfig(f.root)) {
+  const context = inputContext(f.root, config);
+  const gate = stage => { try { requireGate(f.root, config, stage, context); return true; } catch (e) { return e.message; } };
+  return { units: f.units.map(u => done(f.root, u, context)),
+    gates: Object.fromEntries(['translation', 'build', 'smoke'].map(s => [s, gate(s)])),
+    records: Object.fromEntries(['judge', 'build', 'smoke'].map(s => [s, Boolean(currentRecord(f.root, config, s, context, s !== 'judge'))])),
+    phases: Object.fromEntries(['00', '00b', '01', '02', '03'].map(p => [p, Boolean(currentPhase(f.root, config, p))])) };
+}
+export const allHolding = count => ({ units: Array(count).fill(true), gates: { translation: true, build: true, smoke: true },
+  records: { judge: true, build: true, smoke: true }, phases: { '00': true, '00b': true, '01': true, '02': true, '03': true } });
 export function result(role, unit, { findings = [], decisions = [], content } = {}) {
   const common = { schemaVersion: 1, target: unit.target };
   if (role === 'implementer' || role === 'fixer') return { ...common, kind: 'implementation', content: content ?? fs.readFileSync(path.join(mini, 'expected', path.basename(unit.target)), 'utf8'), summary: 'Canned test implementation, not AI output' };

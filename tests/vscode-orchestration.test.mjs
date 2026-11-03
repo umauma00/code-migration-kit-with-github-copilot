@@ -4,9 +4,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { prepare, ready, fake, result } from './helpers.mjs';
+import { prepare, ready, fake, result, scopesOf } from './helpers.mjs';
 import { install } from '../scripts/install.mjs';
-import { loadConfig, writeJSON, safePath, contextHash, done, readJSON, lockRun, statePath, atomicWrite } from '../lib/core.mjs';
+import { loadConfig, writeJSON, safePath, inputContext, done, readJSON, lockRun, statePath, atomicWrite } from '../lib/core.mjs';
 import { approve, runStage, translate, requireGate, currentRecord } from '../lib/pipeline.mjs';
 import { migrationStatus, statusMarkdown } from '../lib/status.mjs';
 
@@ -15,7 +15,7 @@ function sourceFixture(t) {
   f.config.verificationMode = 'source-only';
   f.config.commands.original = f.config.commands.mutation = [process.execPath, '-e', 'process.exit(77)'];
   f.config.commands.parity = null;
-  writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   writeJSON(safePath(f.root, 'migration/judge-plan.json'), {
     schemaVersion: 1, verificationMode: 'source-only', method: 'Inspect public arithmetic contracts',
     sources: ['src/math_ops.py'], scenarios: [{path: 'tests/judge.py', contract: 'Floor division and zero errors', expectationBasis: 'source-inferred'}],
@@ -46,8 +46,8 @@ test('source-only executes reviewed implementation/build/smoke/handoff without o
   assert.equal(report.equivalence, 'unverified'); assert.match(report.outcome, /equivalence unverified/);
   assert.equal(report.phases.find(p => p.id === '05c').status, 'unverified (not run in this mode)');
   atomicWrite(safePath(f.root, 'migration/handoff.md'), 'Changed handoff');
-  assert.throws(() => requireGate(f.root, f.config, 'handoff', contextHash(f.root, f.config)), /stale/);
-  assert.equal(currentRecord(f.root, f.config, 'handoff', contextHash(f.root, f.config)), false);
+  assert.throws(() => requireGate(f.root, f.config, 'handoff', inputContext(f.root, f.config)), /stale/);
+  assert.equal(currentRecord(f.root, f.config, 'handoff', inputContext(f.root, f.config)), false);
 });
 
 test('source-only rejects empty, inferred-as-observed, missing and protected plan evidence', async t => {
@@ -71,17 +71,22 @@ test('source-only rejects empty, inferred-as-observed, missing and protected pla
   assert.equal(fs.existsSync(safePath(f.root, 'migration/run.lock')), false);
 });
 
-test('plan references and mode changes invalidate source-only approvals and reviewed units', async t => {
+test('plan references and mode changes send source-only runs and approvals back; reviewed units stay', async t => {
   const f = await approvedSource(t); await translate(f.root, f.config, fake);
-  const before = contextHash(f.root, f.config);
-  assert.equal(done(f.root, f.units[0], before), true);
+  const before = scopesOf(f.root, f.config);
+  assert.equal(done(f.root, f.units[0], inputContext(f.root, f.config)), true);
   fs.appendFileSync(safePath(f.root, 'tests/judge.py'), '\n# Changed contract\n');
-  const after = contextHash(f.root, f.config); assert.notEqual(before, after);
-  assert.equal(done(f.root, f.units[0], after), false);
-  assert.throws(() => requireGate(f.root, f.config, 'translation', after), /stale/);
+  const after = scopesOf(f.root, f.config); assert.notEqual(before, after);
+  // A scenario of the plan is what the judge checks against, not what a
+  // unit is made from (0.45.0): the judge runs again and translation is
+  // approved again; the finished units stay.
+  const context = inputContext(f.root, f.config);
+  assert.equal(done(f.root, f.units[0], context), true);
+  assert.equal(currentRecord(f.root, f.config, 'judge', context, false), false);
+  assert.throws(() => requireGate(f.root, f.config, 'translation', context), /Run judge successfully for the current inputs first/);
   f.config.verificationMode = 'runtime';
-  writeJSON(safePath(f.root, 'migration/config.json'), f.config);
-  assert.notEqual(contextHash(f.root, f.config), after);
+  writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
+  assert.notEqual(scopesOf(f.root, f.config), after);
   assert.throws(() => approve(f.root, f.config, 'handoff', 'Invalid runtime bypass'), /runtime requires parity/);
 });
 
@@ -94,14 +99,14 @@ test('handoff requires nonempty report and current smoke; rerun smoke invalidate
   for (const stage of ['build', 'smoke']) { approve(f.root, f.config, stage, 'Current reviewed output'); await runStage(f.root, f.config, stage); }
   approve(f.root, f.config, 'handoff', 'Reviewed handoff'); await runStage(f.root, f.config, 'handoff');
   await runStage(f.root, f.config, 'smoke');
-  assert.equal(currentRecord(f.root, f.config, 'handoff', contextHash(f.root, f.config)), false);
-  assert.throws(() => requireGate(f.root, f.config, 'handoff', contextHash(f.root, f.config)), /No handoff/);
+  assert.equal(currentRecord(f.root, f.config, 'handoff', inputContext(f.root, f.config)), false);
+  assert.throws(() => requireGate(f.root, f.config, 'handoff', inputContext(f.root, f.config)), /No handoff/);
 });
 
 test('status after initialization reads candidates and blockers without dispatch or mutation', t => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'migration-status-')); t.after(() => fs.rmSync(root, {recursive:true, force:true}));
   install(root, {apply:true, model:'test-double'});
-  const before = fs.readFileSync(safePath(root, 'migration/config.json'));
+  const before = fs.readFileSync(safePath(root, 'migration/state/config.json'));
   const report = migrationStatus(root);
   assert.equal(report.total, 0); assert.equal(report.running, false); assert.equal(report.implementationReady, false);
   // Artifacts the current or later phases write are pending work, not
@@ -111,9 +116,9 @@ test('status after initialization reads candidates and blockers without dispatch
   assert.match(report.inputsPending, /Required artifact missing: migration\/manifest\.tsv/);
   assert.match(statusMarkdown(report), /time not calculated/);
   assert.match(statusMarkdown(report), /Not written yet \(produced by the current or a later phase; not a problem\)/);
-  assert.deepEqual(fs.readFileSync(safePath(root, 'migration/config.json')), before);
+  assert.deepEqual(fs.readFileSync(safePath(root, 'migration/state/config.json')), before);
   assert.equal(fs.existsSync(safePath(root, 'migration/run.lock')), false);
-  atomicWrite(safePath(root, 'migration/config.json'), '{');
+  atomicWrite(safePath(root, 'migration/state/config.json'), '{');
   assert.match(migrationStatus(root).blockers[0].reason, /JSON|property/i);
 });
 
@@ -154,7 +159,7 @@ test('scheduler refills an independent slot before the slow unit finishes and re
 test('manifest dependencies run after reviewed predecessors; external source is not a nonexistent job', async t => {
   const f = await ready(t, {count:3}); const events = [];
   await translate(f.root, f.config, async call => {
-    if (call.unit.target === 'ported/main.mjs') assert.ok(f.units.slice(0,2).every(u => done(f.root, u, contextHash(f.root, f.config))));
+    if (call.unit.target === 'ported/main.mjs') assert.ok(f.units.slice(0,2).every(u => done(f.root, u, inputContext(f.root, f.config))));
     events.push(call.unit.target); return fake(call);
   });
   assert.ok(events.includes('ported/main.mjs'));
@@ -170,7 +175,7 @@ test('cycles cannot hang: typecheck gives actionable rejection, fixed-source cyc
   await runStage(f.root, f.config, 'judge'); approve(f.root, f.config, 'translation', 'Cycle fixture');
   let calls = 0; await assert.rejects(translate(f.root, f.config, async c => { calls++; return fake(c); }), /Cyclic.*atomic unit/);
   assert.equal(calls, 0); assert.equal(fs.existsSync(safePath(f.root, 'migration/run.lock')), false);
-  f.config.commands.typecheck = null; writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  f.config.commands.typecheck = null; writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   await runStage(f.root, f.config, 'judge'); approve(f.root, f.config, 'translation', 'Deferred unit check for fixed-source cycle');
   assert.equal((await translate(f.root, f.config, fake)).done, 2);
 });
@@ -193,7 +198,7 @@ test('explicit installer mode is retained on reinstall and legacy absent mode st
     assert.equal(loadConfig(root).verificationMode, 'source-only');
     install(root, {apply:true, model:'test-double', layout, verificationMode:'runtime'});
     assert.equal(loadConfig(root).verificationMode, 'source-only');
-    const c = loadConfig(root); delete c.verificationMode; writeJSON(safePath(root, 'migration/config.json'), c);
+    const c = loadConfig(root); delete c.verificationMode; writeJSON(safePath(root, 'migration/state/config.json'), c);
     assert.equal(loadConfig(root).verificationMode, undefined);
     assert.equal(migrationStatus(root).verificationMode, 'runtime');
   }
@@ -202,7 +207,7 @@ test('explicit installer mode is retained on reinstall and legacy absent mode st
 test('active validation stage matches lock execution identity and gives monitor advice, not a blocker', async t => {
   const f = prepare(t);
   f.config.commands.build = [process.execPath, '-e', "const fs=require('node:fs');fs.writeFileSync('migration/build-entered','ready');const t=setInterval(()=>{if(fs.existsSync('migration/build-release')){clearInterval(t)}},10)"];
-  writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   await runStage(f.root, f.config, 'judge'); approve(f.root, f.config, 'translation', 'Held build fixture');
   await translate(f.root, f.config, fake); approve(f.root, f.config, 'build', 'Reviewed output');
   const controller = new AbortController();
@@ -253,7 +258,7 @@ test('active coordinator attempt collection ignores unrelated native answers and
 
 test('a systemic reviewer failure stops the queued review and new unit while preserving the original cause', async t => {
   const f = prepare(t, {count:2}); f.config.concurrency = 1;
-  writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   await runStage(f.root, f.config, 'judge'); approve(f.root, f.config, 'translation', 'Serial failure fixture');
   const calls = [];
   // Sign-in failures hit every call alike, so the whole run stops at once.
@@ -269,14 +274,14 @@ test('a systemic reviewer failure stops the queued review and new unit while pre
 
 test('a unit-specific reviewer failure blocks only its unit; independent units still finish', async t => {
   const f = prepare(t, {count:2}); f.config.concurrency = 1;
-  writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   await runStage(f.root, f.config, 'judge'); approve(f.root, f.config, 'translation', 'Isolated failure fixture');
   const error = await translate(f.root, f.config, async c => {
     if (c.role === 'reviewer-semantics' && c.unit.target === 'ported/math_ops.mjs') throw new Error('Concrete reviewer transport failure');
     return fake(c);
   }).catch(e => e);
   assert.match(error.message, /ported\/math_ops\.mjs: Concrete reviewer transport failure/);
-  assert.equal(done(f.root, f.units[1], contextHash(f.root, f.config)), true, 'the independent unit completed');
+  assert.equal(done(f.root, f.units[1], inputContext(f.root, f.config)), true, 'the independent unit completed');
   assert.equal(fs.existsSync(safePath(f.root, 'migration/run.lock')), false);
 });
 
@@ -293,7 +298,7 @@ test('pre-aborted source-only stage preserves prior evidence without lock or inv
 
 test('actual calls exclude a reserved review stopped by reviewer failure', async t => {
   const f = await ready(t); f.config.concurrency = 1;
-  writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   await runStage(f.root, f.config, 'judge'); approve(f.root, f.config, 'translation', 'Serial failure fixture');
   let calls = 0;
   await assert.rejects(translate(f.root, f.config, async call => {
@@ -307,7 +312,7 @@ test('actual calls exclude a reserved review stopped by reviewer failure', async
 for (const corruption of ['missing rulebook', 'malformed dependencies']) test(`fatal scheduler input ${corruption} drains held worker under lock`, async t => {
   const f = await ready(t, {count:3}); f.config.commands.typecheck = null;
   writeJSON(safePath(f.root, 'migration/review-dependencies.json'), {schemaVersion:1, dependencies: Object.fromEntries(f.units.map(u => [u.source, []]))});
-  writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   await runStage(f.root, f.config, 'judge'); approve(f.root, f.config, 'translation', 'Independent held workers');
   const held = defer(), entered = defer(), detected = defer(); let returned = false, thirdCalls = 0, damageScheduled = false;
   const running = translate(f.root, f.config, async call => {
@@ -348,7 +353,7 @@ for (const corruption of ['missing rulebook', 'malformed dependencies']) test(`f
 
 test('single-target cycle repair uses full graph and leaves other candidate untouched', async t => {
   const f = await ready(t, {count:2}); f.config.commands.typecheck = null; f.config.maxAgentCalls = 2;
-  writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   writeJSON(safePath(f.root, 'migration/review-dependencies.json'), {schemaVersion:1, dependencies: {'src/math_ops.py':['src/text_ops.py'], 'src/text_ops.py':['src/math_ops.py']}});
   await runStage(f.root, f.config, 'judge'); approve(f.root, f.config, 'translation', 'Cycle candidates');
   await assert.rejects(translate(f.root, f.config, fake), /Translation stopped/);
@@ -379,7 +384,7 @@ test('runtime cleanup reports current approval without asserting completion', as
 
 test('cycle repair retains incomplete external prerequisite and unrelated cycles do not reject repairs', async t => {
   const f = await ready(t, {count:3}); f.config.commands.typecheck = null;
-  writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   writeJSON(safePath(f.root, 'migration/review-dependencies.json'), {schemaVersion:1, dependencies: {
     'src/math_ops.py':['src/text_ops.py','src/main.py'], 'src/text_ops.py':['src/math_ops.py'], 'src/main.py':[]
   }});
@@ -396,7 +401,7 @@ test('cycle repair retains incomplete external prerequisite and unrelated cycles
   await runStage(f.root, f.config, 'judge'); approve(f.root, f.config, 'translation', 'Separate cycle fixture');
   await translate(f.root, f.config, fake);
   f.config.commands.typecheck = ['node','--check','{target}'];
-  writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   await runStage(f.root, f.config, 'judge'); approve(f.root, f.config, 'translation', 'Independent repair');
   const report = await translate(f.root, f.config, fake, {onlyTarget:f.units[2].target,evidence:'migration/repair-evidence.md'});
   assert.equal(report.agentCalls, 2);

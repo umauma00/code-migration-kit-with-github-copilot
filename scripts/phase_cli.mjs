@@ -4,7 +4,7 @@ import { currentRecord, requireGate } from '../lib/pipeline.mjs';
 import { initializePhases, checkPreparation, startPhase, completePhase, requirePhase, orderedPhases, currentPhase, phaseWaiver, gateError, waivePhase, phaseStaleness, inputRead, readContext } from '../lib/phases.mjs';
 import { migrationStatus } from '../lib/status.mjs';
 import { requireGuardrails } from '../lib/guardrails.mjs';
-import { setupBlocker } from '../lib/run-settings.mjs';
+import { setupBlocker } from '../lib/settings.mjs';
 
 // read: the inputRead of the phase command (see phaseCommand).
 function validate(root, config, phase, completing = false, read = inputRead()) {

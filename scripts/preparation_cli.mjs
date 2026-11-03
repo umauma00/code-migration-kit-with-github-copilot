@@ -8,6 +8,8 @@ import { parseCommandLine, specs, usageText } from '../lib/cli.mjs';
 import { previewInventory, mergeInventory, packageCycles, dependencySamples, dependencyTargets, compareDependencyAudit } from '../lib/preparation.mjs';
 import { generatedFilesCommand } from '../lib/generated.mjs';
 import { policyQuestions, recordPolicy, rulebookCoverage } from '../lib/policy.mjs';
+import { settingsAtStart, settingsNotice } from '../lib/settings.mjs';
+import { listAtStart } from '../lib/models.mjs';
 export function preparationCommand(root, config, action, options = {}) {
   if (action === 'inventory-preview') return previewInventory(root, config, { shards: options.shards?.split(','), sites: options.sites, out: options.out });
   if (action === 'inventory-merge') return mergeInventory(root, config, { shards: options.shards?.split(','), sites: options.sites, expectedHash: options['expected-hash'] });
@@ -34,6 +36,12 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   try {
     const args = parseCommandLine(process.argv.slice(2), specs.preparation_cli);
     if (args.help) console.log(usageText(specs.preparation_cli));
-    else { const root = fs.realpathSync(path.resolve(args.root ?? '.')); console.log(JSON.stringify(preparationCommand(root, loadConfig(root), args._[0], args), null, 2)); }
+    else {
+      const root = fs.realpathSync(path.resolve(args.root ?? '.'));
+      // An edit of the settings file is applied first, as by the runner's commands.
+      const notice = settingsNotice(await settingsAtStart(root, listAtStart('copilot', root)));
+      if (notice) console.error(notice);
+      console.log(JSON.stringify(preparationCommand(root, loadConfig(root), args._[0], args), null, 2));
+    }
   } catch (e) { console.error(`ERROR: ${e.message}`); process.exitCode = 1; }
 }

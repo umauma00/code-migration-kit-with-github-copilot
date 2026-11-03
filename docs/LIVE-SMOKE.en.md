@@ -55,11 +55,11 @@ Automated tests and the loopback checks cover prompt-mode workers only. Check th
 Screen behaviour cannot be checked by automated tests, so check it in a real VS Code or Copilot app.
 
 - Take a small verification repository to the end from chat alone. Confirm that the AI checks for and installs the Copilot CLI, starts `copilot login` and relays its code, proposes a deny list and runs `guardrails install`, and that a confirmation appears before every command for the person's own decisions (not for `models set` and `settings apply`, which record the person's choice). Confirm the person never has to type a command.
-- Confirm that the setup questions (models, target language, how phases advance, whether the original can run, whether a specification exists) come through `ask_user` and that the answers go into `migration/run-settings.json`.
+- Confirm that the setup questions (models, target language, how phases advance, whether the original can run, whether a specification exists) come through `ask_user` and that the answers go into `migration/settings.json`.
 - Confirm that the ten phases and their progress are visible before long work, and that progress keeps showing and the chat stays responsive during long commands such as translate.
 - During translate, confirm that freed slots are refilled, the cap on concurrent reviewers, and the CLI-reported models in the run summary.
 - Press the chat's stop button during an implementation and between the two reviews, and check whether the runner and worker processes remain. If they do, stop the runner and confirm that the lock is released and that late results are rejected.
-- Re-run translate: completed units reuse valid records and only missing reviews run again; changed inputs require fresh approval.
+- Re-run translate: completed units reuse valid records and only missing reviews run again; a change of what the migration produces (sources, rules...) requires fresh approval, while a model change keeps the finished units and the approvals.
 - In source-only mode, walk through the comparator, approval, reviewed implementation, a real build/smoke and handoff without ever starting the original; parity is never treated as passed and final equivalence is written as unverified.
 
 The repository's automated tests do not claim these live checks have passed.

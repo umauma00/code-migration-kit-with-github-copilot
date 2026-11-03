@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { prepare, ready, result, fake, finding, nodeCli } from './helpers.mjs';
-import { safePath, atomicWrite, writeJSON, readJSON, contextHash, done, loadConfig, loadReviewDependencies, reviewSources, unitState } from '../lib/core.mjs';
+import { prepare, ready, result, fake, finding, nodeCli, scopesOf } from './helpers.mjs';
+import { safePath, atomicWrite, writeJSON, readJSON, inputContext, done, loadConfig, loadReviewDependencies, reviewSources, unitState } from '../lib/core.mjs';
 import { reviewInput, validateWorkerProfile } from '../lib/review.mjs';
 import { translate, runStage, approve } from '../lib/pipeline.mjs';
 import { parseCopilotOutput, createCopilotAdapter, copilotArgs } from '../scripts/copilot_adapter.mjs';
@@ -96,12 +96,12 @@ test('C2: graph and excluded-directory dependency changes invalidate completed r
   map(f, { [unit.source]: ['src/node_modules/helper.py'], 'src/node_modules/helper.py': [] });
   await runStage(f.root, f.config, 'judge'); approve(f.root, f.config, 'translation', 'Explicit dependency');
   await translate(f.root, f.config, fake);
-  const before = contextHash(f.root, f.config); assert.equal(done(f.root, unit, before), true);
+  const before = inputContext(f.root, f.config); assert.equal(done(f.root, unit, before), true);
   write(f, 'src/node_modules/helper.py', 'VALUE = 2\n');
-  assert.notEqual(contextHash(f.root, f.config), before); assert.equal(done(f.root, unit, contextHash(f.root, f.config)), false);
-  const changed = contextHash(f.root, f.config);
+  assert.notEqual(inputContext(f.root, f.config).content, before.content); assert.equal(done(f.root, unit, inputContext(f.root, f.config)), false);
+  const changed = scopesOf(f.root, f.config);
   map(f, { [unit.source]: [], 'src/node_modules/helper.py': [] });
-  assert.notEqual(contextHash(f.root, f.config), changed);
+  assert.notEqual(scopesOf(f.root, f.config), changed);
 });
 
 test('C2: missing declarations, missing files and unsafe dependency paths fail closed', t => {
@@ -115,9 +115,9 @@ test('C2: missing declarations, missing files and unsafe dependency paths fail c
   map(f, { [unit.source]: ['src/link.py'], 'src/link.py': [] });
   assert.throws(() => loadReviewDependencies(f.root, f.config), /Symlinks/);
   fs.rmSync(safePath(f.root, 'migration/review-dependencies.json'));
-  assert.throws(() => contextHash(f.root, f.config), /dependency map missing/);
+  assert.throws(() => inputContext(f.root, f.config), /dependency map missing/);
   for (const p of ['ported/map.json', 'migration/state/map.json']) {
-    f.config.reviewDependencyMap = p; writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+    f.config.reviewDependencyMap = p; writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
     assert.throws(() => loadConfig(f.root), /reviewDependencyMap/);
   }
 });
@@ -136,7 +136,7 @@ test('C2: escaped-byte overflow switches CLI reviewers to identical hash-bound t
   const f = prepare(t), calls = [], inputs = [];
   f.config.maxReviewInputBytes = 4096;
   write(f, f.units[0].source, '"'.repeat(2500));
-  writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   await runStage(f.root, f.config, 'judge'); approve(f.root, f.config, 'translation', 'Escaped byte fixture');
   const report = await translate(f.root, f.config, args => {
     calls.push(`${args.role}:${args.reviewMode ?? 'none'}`); if (args.reviewInput) inputs.push(args.reviewInput); return fake(args);
@@ -149,9 +149,9 @@ test('C2: escaped-byte overflow switches CLI reviewers to identical hash-bound t
   assert.equal(listed.mode, 'tool-assisted'); assert.ok(listed.files.every(file => /^[a-f0-9]{64}$/.test(file.sha256)));
   assert.ok(listed.files.some(file => file.path === f.units[0].source));
   assert.equal(unitState(f.root, f.units[0]).reviewInputMode, 'tool-assisted');
-  assert.equal(done(f.root, f.units[0], contextHash(f.root, f.config)), true);
+  assert.equal(done(f.root, f.units[0], inputContext(f.root, f.config)), true);
   const g = prepare(t), candidateCalls = []; g.config.maxReviewInputBytes = 2048; g.config.commands.typecheck = null;
-  writeJSON(safePath(g.root, 'migration/config.json'), g.config);
+  writeJSON(safePath(g.root, 'migration/state/config.json'), g.config);
   await runStage(g.root, g.config, 'judge'); approve(g.root, g.config, 'translation', 'Candidate limit fixture');
   const candidate = await translate(g.root, g.config, args => { candidateCalls.push(args.reviewMode ?? args.role); return { result: result(args.role, args.unit, { content: 'X'.repeat(5000) }) }; });
   assert.equal(candidate.done, 1); assert.deepEqual(candidateCalls.sort(), ['implementer', 'tool-assisted', 'tool-assisted']);

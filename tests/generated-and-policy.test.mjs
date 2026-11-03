@@ -7,8 +7,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { prepare, fake } from './helpers.mjs';
-import { safePath, atomicWrite, writeJSON, readJSON, readManifest, readGeneratedFiles, contextHash } from '../lib/core.mjs';
+import { prepare, fake, scopesOf } from './helpers.mjs';
+import { safePath, atomicWrite, writeJSON, readJSON, readManifest, readGeneratedFiles } from '../lib/core.mjs';
 import { detectGeneratedFiles, generatedFilesCommand, pendingRegeneration, globRegex } from '../lib/generated.mjs';
 import { policyQuestions, recordPolicy, rulebookCoverage } from '../lib/policy.mjs';
 import { runSurvey, mergeSurvey, planSurvey } from '../lib/survey.mjs';
@@ -85,12 +85,12 @@ test('a regenerated file leaves the manifest and holds build approval until its 
   map.dependencies['src/Data.designer.cs'] = [];
   writeJSON(safePath(f.root, 'migration/review-dependencies.json'), map);
   assert.equal(readManifest(f.root, f.config).length, 2, 'translated by default');
-  const before = contextHash(f.root, f.config);
+  const before = scopesOf(f.root, f.config);
   generatedFilesCommand(f.root, f.config, { write: true });
   generatedFilesCommand(f.root, f.config, { regenerate: 'src/Data.designer.cs', how: 'dotnet ef dbcontext scaffold' });
   assert.equal(readGeneratedFiles(f.root).find(e => e.file === 'src/Data.designer.cs').target, 'ported/Data.mjs', 'the manifest target is used');
   assert.deepEqual(readManifest(f.root, f.config).map(u => u.source), ['src/math_ops.py']);
-  assert.notEqual(contextHash(f.root, f.config), before, 'the decision is part of the approved inputs');
+  assert.notEqual(scopesOf(f.root, f.config), before, 'the decision is part of the approved inputs');
   await runStage(f.root, f.config, 'judge');
   approve(f.root, f.config, 'translation', 'Fixture authorizes these exact outputs');
   await translate(f.root, f.config, fake);
@@ -107,7 +107,7 @@ test('a regenerated file leaves the manifest and holds build approval until its 
 test('the inventory survey classifies generated-file sites without a model and reports counts only', async t => {
   const f = generatedProject(t);
   Object.assign(f.config, { transientRetryDelayMs: 1 });
-  writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   generatedFilesCommand(f.root, f.config, { write: true });
   const census = 'migration/inventory-sites.tsv';
   write(f, census, 'file\tsymbol\tsource_construct\nsrc/math_ops.py\tdivide\tfloor division\nsrc/Data.designer.cs\tDataContext\tdata-query\nsrc/Data.designer.cs\tTable\tdata-query\n');
@@ -134,7 +134,7 @@ test('the inventory survey classifies generated-file sites without a model and r
 test('survey run --trial tries a few sites per construct in its own store and reports UNKNOWN per construct', async t => {
   const f = generatedProject(t, { count: 3 });
   Object.assign(f.config, { transientRetryDelayMs: 1 });
-  writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   generatedFilesCommand(f.root, f.config, { write: true });
   const census = 'migration/inventory-sites.tsv';
   write(f, census, 'file\tsymbol\tsource_construct\nsrc/math_ops.py\tdivide\tfloor division\nsrc/math_ops.py\tmod\tremainder\nsrc/text_ops.py\tlength\tlen()\nsrc/main.py\tmain\tlen()\nsrc/Data.designer.cs\tT\tdata-query\n');

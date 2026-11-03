@@ -24,7 +24,7 @@ import { migrationStatus } from '../lib/status.mjs';
 import { setPreferences } from '../lib/preferences.mjs';
 
 const planFile = 'migration/judge-plan.json';
-const editConfig = (root, fn) => { const c = readJSON(safePath(root, 'migration/config.json')); fn(c); writeJSON(safePath(root, 'migration/config.json'), c); };
+const editConfig = (root, fn) => { const c = readJSON(safePath(root, 'migration/state/config.json')); fn(c); writeJSON(safePath(root, 'migration/state/config.json'), c); };
 // A source-only source-as-spec project with no original runtime: 00 recorded,
 // the specification package 00b to 02 recorded together, the formal judge run.
 // legacy: the plan was made before 0.10.0 and names only a filled contract

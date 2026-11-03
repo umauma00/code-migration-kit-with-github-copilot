@@ -1,14 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { prepare, fake, result, finding } from './helpers.mjs';
-import { approve, runStage, translate } from '../lib/pipeline.mjs';
-import { safePath, atomicWrite, writeJSON, readJSON, contextHash, readManifest, done, loadConfig, unitState } from '../lib/core.mjs';
+import { prepare, fake, result, finding, scopesOf } from './helpers.mjs';
+import { approve, runStage, translate, currentRecord } from '../lib/pipeline.mjs';
+import { safePath, atomicWrite, writeJSON, readJSON, inputContext, readManifest, done, loadConfig, unitState } from '../lib/core.mjs';
 import { reviewInput, reviewEvidence } from '../lib/review.mjs';
 import { agentPrompt } from '../scripts/copilot_adapter.mjs';
 
 const write = (root, name, content) => atomicWrite(safePath(root, name), content);
-const persist = f => writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+const persist = f => writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
 async function start(f) {
   persist(f);
   f.config = loadConfig(f.root);
@@ -21,29 +21,40 @@ async function build(f) {
   await runStage(f.root, f.config, 'build');
 }
 
-test('RR1: changing a command script under migration invalidates receipts and downstream approval', async t => {
+test('RR1: changing a command script under migration sends that run back and blocks downstream approval; reviewed units stay', async t => {
   const f = prepare(t);
   write(f.root, 'migration/build.mjs', 'process.exit(0);\n');
   f.config.commands.build = [process.execPath, 'migration/build.mjs'];
   await start(f); await build(f);
-  const unit = readManifest(f.root, f.config)[0], before = contextHash(f.root, f.config);
-  assert.ok(done(f.root, unit, before));
+  const unit = readManifest(f.root, f.config)[0], before = scopesOf(f.root, f.config);
+  assert.ok(done(f.root, unit, inputContext(f.root, f.config)));
   write(f.root, 'migration/build.mjs', 'process.exit(9);\n');
-  assert.notEqual(contextHash(f.root, f.config), before);
-  assert.equal(done(f.root, unit, contextHash(f.root, f.config)), false);
-  assert.throws(() => approve(f.root, f.config, 'smoke', 'Old build must be rejected'), /current reviewed receipts/);
-  await assert.rejects(runStage(f.root, f.config, 'build'), /stale/);
+  assert.notEqual(scopesOf(f.root, f.config), before);
+  // A file of the build command only (0.45.0): the reviewed unit holds; the
+  // build record and the build approval (bound to what the build runs) do
+  // not, and nothing after them.
+  const context = inputContext(f.root, f.config);
+  assert.equal(done(f.root, unit, context), true);
+  assert.equal(currentRecord(f.root, f.config, 'build', context), false);
+  assert.ok(currentRecord(f.root, f.config, 'judge', context, false), 'the judge does not run the build script');
+  assert.throws(() => approve(f.root, f.config, 'smoke', 'Old build must be rejected'), /Run build successfully for the current inputs first/);
+  await assert.rejects(runStage(f.root, f.config, 'build'), /build approval is stale/);
+  approve(f.root, f.config, 'build', 'The changed build script was reviewed');
+  await assert.rejects(runStage(f.root, f.config, 'build'), /build failed \(exit/);
 });
 
-test('RR1: explicit verification inputs under migration are accepted and invalidate approval when changed', async t => {
+test('RR1: explicit verification inputs under migration are accepted and send every run back when changed', async t => {
   const f = prepare(t);
   write(f.root, 'migration/build-settings.json', '{"mode":"a"}\n');
   f.config.verificationInputs = ['migration/build-settings.json'];
   await start(f); await build(f);
-  const before = contextHash(f.root, f.config);
+  const before = scopesOf(f.root, f.config), unit = readManifest(f.root, f.config)[0];
   write(f.root, 'migration/build-settings.json', '{"mode":"b"}\n');
-  assert.notEqual(contextHash(f.root, f.config), before);
-  assert.throws(() => approve(f.root, f.config, 'smoke', 'Changed input must revoke old results'), /current reviewed receipts/);
+  assert.notEqual(scopesOf(f.root, f.config), before);
+  const context = inputContext(f.root, f.config);
+  assert.equal(done(f.root, unit, context), true, 'what the units are made from did not change');
+  for (const stage of ['judge', 'build']) assert.equal(currentRecord(f.root, f.config, stage, context, stage !== 'judge'), false, stage);
+  assert.throws(() => approve(f.root, f.config, 'smoke', 'Changed input must revoke old results'), /Run judge successfully for the current inputs first/);
 });
 
 test('RR1: generated runtime paths cannot become command files or explicit verification inputs', async t => {
@@ -66,14 +77,14 @@ test('RR2: validation fails if any explicitly mapped output under an excluded di
     f.config.commands.build = [process.execPath, '-e', `require('node:fs').appendFileSync(${JSON.stringify(target)}, '\\nthrow new Error("Changed during validation");\\n');`];
     await start(f);
     const unit = readManifest(f.root, f.config)[0];
-    assert.ok(done(f.root, unit, contextHash(f.root, f.config)));
+    assert.ok(done(f.root, unit, inputContext(f.root, f.config)));
     approve(f.root, f.config, 'build', 'Mapped source outputs must not change');
     await assert.rejects(runStage(f.root, f.config, 'build'), /Output source tree changed/, directory);
     const record = readJSON(safePath(f.root, 'migration/results/build.json'));
     assert.equal(record.success, false);
     assert.equal(record.commands[0].code, 0, 'Command succeeds but validation must fail');
     assert.match(record.error, /Output source tree changed/);
-    assert.equal(done(f.root, unit, contextHash(f.root, f.config)), false);
+    assert.equal(done(f.root, unit, inputContext(f.root, f.config)), false);
     assert.throws(() => approve(f.root, f.config, 'smoke', 'Invalid build must not advance'), /current reviewed receipts/);
   }
 });
@@ -99,7 +110,7 @@ test('RR3: a non-UTF-8 source is decoded for workers, names its encoding and doe
   assert.equal(decoded.encoding, 'windows-1252');
   assert.match(decoded.content, /café/);
   assert.match(file.content, /value = 'café'/);
-  assert.equal(done(f.root, unit, contextHash(f.root, f.config)), true);
+  assert.equal(done(f.root, unit, inputContext(f.root, f.config)), true);
   assert.equal(fs.readFileSync(safePath(f.root, unit.source)).includes(0xe9), true, 'the original bytes are untouched');
 });
 

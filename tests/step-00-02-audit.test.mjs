@@ -17,9 +17,9 @@ import { doctor } from '../scripts/run_migration.mjs';
 
 test('doctor reports unchosen worker models as a check and still runs the rest', async t => {
   const f = prepare(t);
-  const config = readJSON(safePath(f.root, 'migration/config.json'));
+  const config = readJSON(safePath(f.root, 'migration/state/config.json'));
   config.models.implementer = 'SELECT_MODEL';
-  writeJSON(safePath(f.root, 'migration/config.json'), config);
+  writeJSON(safePath(f.root, 'migration/state/config.json'), config);
   assert.throws(() => loadConfig(f.root), /Set an available model ID for models\.implementer/);
   const loaded = loadConfig(f.root, { requireModels: false });
   const report = await doctor(f.root, loaded);

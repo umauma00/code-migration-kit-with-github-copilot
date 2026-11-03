@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { prepare, ready, fake, result, mini, finding } from './helpers.mjs';
 import { kitRoot } from '../scripts/install.mjs';
-import { safePath, atomicWrite, writeJSON, readJSON, fileHash, loadConfig, contextHash, done, unitState } from '../lib/core.mjs';
+import { safePath, atomicWrite, writeJSON, readJSON, fileHash, loadConfig, inputContext, done, unitState } from '../lib/core.mjs';
 import { approve, runStage, translate, runPilot, runJudgePreparation, currentRecord } from '../lib/pipeline.mjs';
 import { preparePilot, requirePilot, planPilot } from '../lib/pilot.mjs';
 import { currentPhase } from '../lib/phases.mjs';
@@ -21,7 +21,7 @@ const write = (f, name, text) => atomicWrite(safePath(f.root, name), text);
 const wrap = r => ({ result: r, requestedModel: 'test-double', observedModel: null, tokens: null });
 async function reviewedPreparation(t, options = {}) {
   const f = prepare(t, { realCommands: true, ...options });
-  f.config.phasePolicy = 'strict'; writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  f.config.phasePolicy = 'strict'; writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   fs.rmSync(safePath(f.root, 'migration/stress-test/report.md'));
   for (const p of ['migration/judge-report.md', 'migration/depmap/report.md', 'migration/gap-report.md']) write(f, p, 'Disposable preparation fixture; not actual AI review or human signoff.\n');
   for (const id of ['00', '00b', '01', '02']) phaseCommand(f.root, f.config, 'complete', id, { note: 'Synthetic preparation review for boundary tests only' });
@@ -103,9 +103,9 @@ test('strict phase-03 pilot uses the shared pipeline before production approval 
   }
   assert.equal(fs.existsSync(safePath(f.root, 'migration/gates/translation.json')), false);
   fs.cpSync(safePath(child, 'migration/state'), safePath(f.root, 'migration/state'), { recursive: true });
-  for (const unit of f.units) assert.equal(done(f.root, unit, contextHash(f.root, f.config)), false);
+  for (const unit of f.units) assert.equal(done(f.root, unit, inputContext(f.root, f.config)), false);
   const changed = { ...config, executionPurpose: 'production' };
-  writeJSON(safePath(child, 'migration/config.json'), changed);
+  writeJSON(safePath(child, 'migration/state/config.json'), changed);
   assert.throws(() => approve(child, changed, 'translation', 'Cannot convert a pilot grant to production'), /Phase 03/);
 });
 
@@ -138,7 +138,7 @@ test('a stale parent never publishes a production completion', async t => {
 
 test('early judge runs before rules/map exist, is reused after preparation, and input changes revoke validation', async t => {
   const f = prepare(t, { realCommands: true });
-  f.config.phasePolicy = 'strict'; writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  f.config.phasePolicy = 'strict'; writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   const saved = new Map(['migration/RULEBOOK.md', 'migration/inventory.tsv', 'migration/manifest.tsv', 'migration/review-dependencies.json'].map(p => [p, fs.readFileSync(safePath(f.root, p))]));
   for (const p of saved.keys()) fs.rmSync(safePath(f.root, p));
   phaseCommand(f.root, f.config, 'complete', '00', { note: 'Fixture feasibility review' });
@@ -154,7 +154,7 @@ test('early judge runs before rules/map exist, is reused after preparation, and 
   assert.ok(formal.commands.every(c => c.reusedFrom === early.executionId));
   fs.appendFileSync(safePath(f.root, 'tests/judge.py'), '\n# judge identity change\n');
   assert.equal(currentPhase(f.root, f.config, '00b'), false);
-  assert.equal(currentRecord(f.root, f.config, 'judge', contextHash(f.root, f.config), false), false);
+  assert.equal(currentRecord(f.root, f.config, 'judge', inputContext(f.root, f.config), false), false);
 });
 
 test('explicit unit batches stop, retain reviewed work and cannot grant build before all units finish', async t => {
@@ -176,7 +176,7 @@ test('explicit unit batches stop, retain reviewed work and cannot grant build be
 
 test('count policy gives both reviewers identical measured evidence and rejects missed count mismatches', async t => {
   const f = prepare(t);
-  f.config.markerPolicy = 'todo-lines-v1'; writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  f.config.markerPolicy = 'todo-lines-v1'; writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   write(f, 'migration/RULEBOOK.md', fs.readFileSync(safePath(f.root, 'migration/RULEBOOK.md'), 'utf8') + 'Count literal TODO(port) lines; one final confidence/todos trailer.\n');
   await runStage(f.root, f.config, 'judge'); approve(f.root, f.config, 'translation', 'Fixture count convention');
   const body = fs.readFileSync(path.join(mini, 'expected/math_ops.mjs'), 'utf8').replace(/^\/\/ PORT STATUS:.*$/m, '').trimEnd();
@@ -187,7 +187,7 @@ test('count policy gives both reviewers identical measured evidence and rejects 
   await assert.rejects(translate(f.root, f.config, call => {
     assert.ok(call.role === 'fixer', call.role); return fake(call);
   }), /PORT STATUS count/);
-  assert.equal(done(f.root, f.units[0], contextHash(f.root, f.config)), false);
+  assert.equal(done(f.root, f.units[0], inputContext(f.root, f.config)), false);
   write(f, 'migration/count-diagnostic.txt', 'One literal TODO(port) line; declared todos=0. Correct only the numeric trailer.\n');
   let first = true;
   const inputs = [];
@@ -199,7 +199,7 @@ test('count policy gives both reviewers identical measured evidence and rejects 
   }, { onlyTarget: f.units[0].target, evidence: 'migration/count-diagnostic.txt' });
   // Both reviewers get the same measured count (literal lines, not occurrences).
   assert.equal(inputs[0], inputs[1]); assert.equal(JSON.parse(inputs[0]).markerEvidence.actual, 1);
-  assert.equal(done(f.root, f.units[0], contextHash(f.root, f.config)), true);
+  assert.equal(done(f.root, f.units[0], inputContext(f.root, f.config)), true);
   assert.equal(unitState(f.root, f.units[0]).markerEvidence.actual, 1);
 });
 
@@ -262,10 +262,10 @@ test('map audit finds both missed and invented edges and package cycles in a cle
 test('a configuration from the removed native backend stops with migration instructions', t => {
   const f = prepare(t);
   for (const patch of [{ workerBackend: 'native', nativeHarness: 'vscode-local' }, { nativeModelVerification: 'requested-unverified' }, { nativeInput: 'file' }]) {
-    writeJSON(safePath(f.root, 'migration/config.json'), { ...f.config, ...patch });
+    writeJSON(safePath(f.root, 'migration/state/config.json'), { ...f.config, ...patch });
     assert.throws(() => loadConfig(f.root), /native\) worker backend was removed[\s\S]*"workerBackend": "copilot-cli"/);
   }
-  writeJSON(safePath(f.root, 'migration/config.json'), { ...f.config, workerBackend: 'copilot-cli' });
+  writeJSON(safePath(f.root, 'migration/state/config.json'), { ...f.config, workerBackend: 'copilot-cli' });
   assert.equal(loadConfig(f.root).workerBackend, 'copilot-cli');
 });
 
@@ -284,7 +284,7 @@ test('pilot cancellation rejects late work and resumes only its isolated grant',
 
 test('preparation auditors receive frozen bodies without other findings and stale submissions are rejected', t => {
   const f = prepare(t); f.config.phaseModels = { inventoryAudit: 'test-explicit-model' };
-  writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   const options = { type: 'inventory', files: ['migration/RULEBOOK.md', 'migration/inventory.tsv', 'src/math_ops.py'] };
   const a = freezeAudit(f.root, f.config, options), b = freezeAudit(f.root, f.config, options);
   assert.notEqual(a.request.task, b.request.task); assert.equal(a.request.inputHash, b.request.inputHash);
@@ -305,13 +305,13 @@ test('preparation auditors receive frozen bodies without other findings and stal
 test('design bodies are frozen for both reviewers, protected during execution and invalidate completion', async t => {
   const f = prepare(t); f.config.designInputs = ['migration/ARCHITECTURE.md'];
   write(f, 'migration/ARCHITECTURE.md', 'Explicit module contract: math exports floor_divide.\n');
-  writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   await runStage(f.root, f.config, 'judge'); approve(f.root, f.config, 'translation', 'Reviewed fixed design body');
   const inputs = []; await translate(f.root, f.config, call => { if (call.reviewInput) inputs.push(call.reviewInput); return fake(call); });
   assert.equal(inputs[0], inputs[1]); assert.ok(inputs[0].includes('Explicit module contract'));
-  assert.equal(done(f.root, f.units[0], contextHash(f.root, f.config)), true);
+  assert.equal(done(f.root, f.units[0], inputContext(f.root, f.config)), true);
   fs.appendFileSync(safePath(f.root, 'migration/ARCHITECTURE.md'), 'Contract changed.\n');
-  assert.equal(done(f.root, f.units[0], contextHash(f.root, f.config)), false);
+  assert.equal(done(f.root, f.units[0], inputContext(f.root, f.config)), false);
   assert.throws(() => approve(f.root, f.config, 'build', 'Old design'), /judge|translation/);
 });
 
@@ -345,7 +345,7 @@ test('dependent repair slices wait for a fresh reviewed predecessor from the sam
     if (call.unit.target === 'ported/main.mjs') {
       const state = unitState(f.root, math);
       assert.equal(state.runId, call.runId); assert.equal(state.status, 'done');
-      assert.equal(done(f.root, math, contextHash(f.root, f.config)), true);
+      assert.equal(done(f.root, math, inputContext(f.root, f.config)), true);
     }
     seen.push(call.unit.target); await new Promise(resolve => setTimeout(resolve, 10)); return fake(call);
   }, { repairQueue: 'migration/repair-queue.json' });
@@ -356,7 +356,7 @@ test('dependent repair slices wait for a fresh reviewed predecessor from the sam
 test('source-only pilot validates its plan and stops at smoke with equivalence unverified', async t => {
   const f = prepare(t); f.config.phasePolicy = 'strict'; f.config.verificationMode = 'source-only';
   f.config.commands.original = f.config.commands.mutation = [process.execPath, '-e', 'process.exit(77)']; f.config.commands.parity = null;
-  writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   writeJSON(safePath(f.root, 'migration/judge-plan.json'), { schemaVersion: 1, verificationMode: 'source-only', method: 'Fixture source inspection',
     sources: ['src/math_ops.py'], scenarios: [{ path: 'tests/judge.py', contract: 'Floor division and zero errors', expectationBasis: 'source-inferred' }], unverified: ['No observed original or parity'] });
   for (const p of ['migration/judge-report.md', 'migration/depmap/report.md', 'migration/gap-report.md']) write(f, p, 'Disposable source-only preparation fixture\n');

@@ -38,7 +38,7 @@ Write all user-facing text in that language, including the RULEBOOK's prose; wor
 Re-read the report language after every compaction; English docs and tool output never switch it.
 The hook rejects a question before the language is recorded, and a Japanese
 report's question with no Japanese text.
-After initialization, decide the other settings through `migration/run-settings.json`
+After initialization, decide the other settings through `migration/settings.json`
 (`settings init`, one question for the target language with the guessed source
 shown, `settings init --source --target`, one question for the phase mode
 (normal recommended, relaxed, or auto for autopilot) recorded with `preferences --phase-mode`, one
@@ -46,7 +46,7 @@ question whether the original runs (`originalRuntimeQuestion`) recorded with `pr
 only when it does not run, one question whether a specification exists (`specificationQuestion`)
 recorded with `preferences --specification`; then one question "filled in, or a question?",
 `settings apply`, and, without a specification, `source-spec init --apply` before phase 00),
-not one question per setting; see the skill's run settings section. First choices
+not one question per setting; see the skill's settings file section. First choices
 are always questions: never tell the person to type one into the file (the file is
 for later changes and resuming).
 In relaxed mode a gate failure that names `phase waive ID` is a question for the
@@ -94,7 +94,7 @@ artifacts/receipts, and a TODO check never grants approval.
 
 Read [the operating manual](../../docs/OPERATING-MANUAL.md) and
 [JSON contracts](../../docs/CONTRACTS.md). Model selection belongs to
-`migration/config.json`; do not add a `model` frontmatter override.
+`migration/settings.json`; do not add a `model` frontmatter override.
 
 Resolve runner and prompt paths from this plugin directory; execute commands with the migration target repository as cwd. Project configuration and artifacts belong in migration/.
 

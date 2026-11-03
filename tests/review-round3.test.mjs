@@ -9,7 +9,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { prepare, ready, fake, result, finding, mini } from './helpers.mjs';
 import { install, kitRoot } from '../scripts/install.mjs';
-import { loadConfig, safePath, writeJSON, readJSON, atomicWrite, done, contextHash, unitState } from '../lib/core.mjs';
+import { loadConfig, safePath, writeJSON, readJSON, atomicWrite, done, inputContext, unitState } from '../lib/core.mjs';
 import { approve, runStage, translate } from '../lib/pipeline.mjs';
 import { phaseCommand } from '../scripts/phase_cli.mjs';
 import { migrationStatus, statusChecklist } from '../lib/status.mjs';
@@ -25,7 +25,7 @@ import { runProcess } from '../lib/process.mjs';
 const fixture = (t, options) => {
   const f = prepare(t, options);
   Object.assign(f.config, { transientRetryDelayMs: 1 });
-  writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   return f;
 };
 const approved = async f => { await runStage(f.root, f.config, 'judge'); approve(f.root, f.config, 'translation', 'Round-3 fixture'); };
@@ -81,7 +81,7 @@ test('hook: agents cannot write guardrails.json; approvals and phase records ask
 
 test('phase 01 refuses an all-empty dependency map unless independence is confirmed; 02 refuses untouched templates', t => {
   const f = prepare(t, { count: 3 });
-  Object.assign(f.config, { phasePolicy: 'strict' }); writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  Object.assign(f.config, { phasePolicy: 'strict' }); writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   for (const [p, text] of [['migration/judge-report.md', 'judge'], ['migration/depmap/report.md', 'map'], ['migration/gap-report.md', 'gap']]) atomicWrite(safePath(f.root, p), `${text}\n`);
   phaseCommand(f.root, f.config, 'init');
   phaseCommand(f.root, f.config, 'complete', '00', { note: 'reviewed' });
@@ -140,7 +140,7 @@ test('findings at the same source line still go to the arbiter, which keeps one 
   assert.deepEqual(arbiterInputs[0].findings.map(x => x.reference), ['reviewer-semantics:F1', 'reviewer-rules:R1']);
   assert.deepEqual(arbiterInputs[0].samePlace, [['reviewer-semantics:F1', 'reviewer-rules:R1']]);
   assert.deepEqual(fixerInputs, [['reviewer-semantics:F1']], 'only the confirmed side reaches the fixer');
-  assert.ok(done(f.root, f.units[0], contextHash(f.root, f.config)));
+  assert.ok(done(f.root, f.units[0], inputContext(f.root, f.config)));
   const pair = pairFindings({ 'reviewer-semantics': { result: { findings: [finding, { ...finding, id: 'F2', evidence: 'src/math_ops.py:9 other' }] } },
     'reviewer-rules': { result: { findings: [{ ...finding, evidence: 'see ./src/math_ops.py:4' }] } } });
   assert.deepEqual(pair.findings.map(x => x.reference), ['reviewer-semantics:F1', 'reviewer-semantics:F2', 'reviewer-rules:F1']);
@@ -166,14 +166,14 @@ test('transient failures retry; unit failures stay isolated; systemic failures a
   assert.equal(isTransientFailure(new Error('Copilot worker timed out after 600 s')), false);
   assert.equal(isSystemicFailure(new Error('Copilot reviewer-rules failed (exit 1): To authenticate, you can use any of the following methods')), true);
   const f = fixture(t, { count: 3 }); f.config.concurrency = 3; f.config.commands.typecheck = null;
-  writeJSON(safePath(f.root, 'migration/config.json'), f.config); await approved(f);
+  writeJSON(safePath(f.root, 'migration/state/config.json'), f.config); await approved(f);
   let flaky = 0;
   const error = await translate(f.root, f.config, async args => {
     if (args.unit.target.includes('text_ops') && args.role === 'implementer' && flaky++ < 2) throw new Error('Copilot implementer failed (exit 1): 503 Service Unavailable');
     if (args.unit.target.includes('math_ops') && args.role === 'reviewer-rules') throw new Error('Agent did not return one valid JSON object');
     return fake(args);
   }).catch(e => e);
-  const context = contextHash(f.root, f.config);
+  const context = inputContext(f.root, f.config);
   assert.equal(done(f.root, f.units[1], context), true, 'text_ops finished after two retries');
   assert.match(error.message, /ported\/math_ops\.mjs: Agent did not return/);
   assert.match(error.message, /ported\/main\.mjs: Waiting on unfinished dependencies \(ported\/math_ops\.mjs\)/);
@@ -184,7 +184,7 @@ test('transient failures retry; unit failures stay isolated; systemic failures a
   // Streak breaker: three independent units failing in a row stop dispatching.
   const g = fixture(t, { count: 3 }); Object.assign(g.config, { concurrency: 1, maxConsecutiveFailures: 2 }); g.config.commands.typecheck = null;
   writeJSON(safePath(g.root, 'migration/review-dependencies.json'), { schemaVersion: 1, dependencies: Object.fromEntries(g.units.map(u => [u.source, []])) });
-  writeJSON(safePath(g.root, 'migration/config.json'), g.config); await approved(g);
+  writeJSON(safePath(g.root, 'migration/state/config.json'), g.config); await approved(g);
   const implemented = [];
   const streak = await translate(g.root, g.config, async args => { if (args.role === 'implementer') { implemented.push(args.unit.target); throw new Error('Agent did not return one valid JSON object'); } return fake(args); }).catch(e => e);
   assert.equal(new Set(implemented).size, 2, 'the third unit is not dispatched');
@@ -205,7 +205,7 @@ test('status estimates the rest from finished runs and names what the current ph
   assert.equal(report.timeEstimate.remainingUnits, 1);
   assert.ok(report.timeEstimate.agentCalls >= 1);
   assert.match(report.timeEstimate.basis, /1 units completed in 1 runs/);
-  const fresh = prepare(t); fresh.config.phasePolicy = 'strict'; writeJSON(safePath(fresh.root, 'migration/config.json'), fresh.config);
+  const fresh = prepare(t); fresh.config.phasePolicy = 'strict'; writeJSON(safePath(fresh.root, 'migration/state/config.json'), fresh.config);
   phaseCommand(fresh.root, fresh.config, 'init');
   const start = migrationStatus(fresh.root);
   assert.equal(start.currentState, 'awaiting-review', 'feasibility.md exists, so 00 waits for review');
@@ -237,7 +237,7 @@ test('installer maps the upstream model plan per role', t => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'models-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   install(root, { apply: true, model: 'mid', models: 'reviewers=large,implementer=small' });
-  assert.deepEqual(readJSON(safePath(root, 'migration/config.json')).models,
+  assert.deepEqual(readJSON(safePath(root, 'migration/state/config.json')).models,
     { implementer: 'small', 'reviewer-semantics': 'large', 'reviewer-rules': 'large', arbiter: 'mid', fixer: 'mid' });
   assert.throws(() => install(root, { model: 'm', models: 'judge=x' }), /role=MODEL_ID/);
 });

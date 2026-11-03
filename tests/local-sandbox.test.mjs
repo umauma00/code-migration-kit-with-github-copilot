@@ -15,7 +15,7 @@ import { readJSON, writeJSON, safePath } from '../lib/core.mjs';
 import { localSandboxProbe, sandboxCheck, sandboxCheckName, sandboxQuestion, outsideDirs } from '../lib/sandbox.mjs';
 import { doctor } from '../scripts/run_migration.mjs';
 import { doctorGuidance } from '../lib/guidance.mjs';
-import { runSettingsFile } from '../lib/run-settings.mjs';
+import { settingsFile } from '../lib/settings.mjs';
 
 // A path below a regular file cannot hold a directory on any platform.
 function blockedDir(t) {
@@ -110,11 +110,11 @@ function setupProject(t, phaseMode) {
     { cwd: root, encoding: 'utf8', env: { ...process.env, ...env } });
   const sandboxed = { TMPDIR: blocked, TMP: blocked, TEMP: blocked };
   assert.equal(run({}, 'settings', 'init').status, 0);
-  const s = readJSON(safePath(root, runSettingsFile));
+  const s = readJSON(safePath(root, settingsFile));
   Object.assign(s, { reportLanguage: 'ja', originalRuntime: 'available', sourceLanguage: 'C#', targetLanguage: 'TypeScript' });
   for (const role of Object.keys(s.models)) if (role !== 'surveyor') s.models[role] = { model: 'small-model', effort: 'default' };
   s.phaseMode = phaseMode;
-  writeJSON(safePath(root, runSettingsFile), s);
+  writeJSON(safePath(root, settingsFile), s);
   return { root, run, sandboxed };
 }
 // The subprocess cases use the real probe for the unrestricted runs, so they

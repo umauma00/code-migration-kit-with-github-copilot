@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { prepare, fake } from './helpers.mjs';
 import { kitRoot } from '../scripts/install.mjs';
-import { safePath, atomicWrite, writeJSON, fileHash, loadConfig, contextHash, done, unitState, statePath, readRepairIntent, repairIntentPath } from '../lib/core.mjs';
+import { safePath, atomicWrite, writeJSON, fileHash, loadConfig, inputContext, done, unitState, statePath, readRepairIntent, repairIntentPath } from '../lib/core.mjs';
 import { approve, runStage, translate, requireGate } from '../lib/pipeline.mjs';
 import { phaseCommand } from '../scripts/phase_cli.mjs';
 import { makeRepairQueue } from '../scripts/diagnostic_queue.mjs';
@@ -17,7 +17,7 @@ const write = (f, name, value) => atomicWrite(safePath(f.root, name), value);
 async function repairFixture(t, { count = 3, concurrency = 2 } = {}) {
   const f = prepare(t, { count });
   f.config.phasePolicy = 'strict'; f.config.concurrency = concurrency;
-  writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   for (const name of ['migration/judge-report.md', 'migration/depmap/report.md', 'migration/gap-report.md']) write(f, name, 'Synthetic preparation evidence; not actual AI review or human approval.\n');
   for (const id of ['00', '00b', '01', '02']) phaseCommand(f.root, f.config, 'complete', id, { note: 'Test fixture reviewed preparation only' });
   await runStage(f.root, f.config, 'judge');
@@ -37,7 +37,7 @@ test('Astra F1: interrupted dependent repair retains every diagnostic, blocks bu
   const main = f.units.find(u => u.target === 'ported/main.mjs'), oldReceipt = fs.readFileSync(statePath(f.root, main));
   await assert.rejects(translate(f.root, f.config, call => { controller.abort(); return fake(call); },
     { repairQueue: 'migration/repair-queue.json', signal: controller.signal }), /Interrupted/);
-  const context = contextHash(f.root, f.config), status = migrationStatus(f.root);
+  const context = inputContext(f.root, f.config), status = migrationStatus(f.root);
   assert.equal(unitState(f.root, main).status, 'done'); // Never started, but its old receipt cannot satisfy the admitted repair.
   assert.equal(done(f.root, main, context), false);
   assert.deepEqual(status.pendingRepairs.sort(), ['ported/main.mjs', 'ported/math_ops.mjs']);
@@ -70,7 +70,7 @@ test('Astra F1: a stop before the first worker persists the whole repair intent'
     repairQueue: 'migration/repair-queue.json', onProgress: e => { if (e.stage === 'repair-planned') throw new Error('Simulated coordinator stop before worker dispatch'); }
   }), /before worker dispatch/);
   assert.equal(calls, 0);
-  const context = contextHash(f.root, f.config), intent = readRepairIntent(f.root, context);
+  const context = inputContext(f.root, f.config), intent = readRepairIntent(f.root, context);
   assert.equal(intent.jobs.length, 2); assert.equal(migrationStatus(f.root).done, 0);
   assert.throws(() => requireGate(f.root, f.config, 'build', context), /missing or stale/);
   const report = await translate(f.root, f.config, fake);
@@ -97,7 +97,7 @@ test('Astra F1: completed independent repairs survive Stop while untouched slice
 test('Astra F1: immutable repair proof changes cannot be counted as reviewed completion', async t => {
   const f = await repairFixture(t, { count: 2 });
   await translate(f.root, f.config, fake, { repairQueue: 'migration/repair-queue.json' });
-  const context = contextHash(f.root, f.config), intent = readRepairIntent(f.root, context);
+  const context = inputContext(f.root, f.config), intent = readRepairIntent(f.root, context);
   const archive = repairIntentPath(f.root, intent.id), original = fs.readFileSync(archive);
   fs.appendFileSync(archive, '\n');
   assert.equal(done(f.root, f.units[0], context), false);
@@ -116,7 +116,7 @@ test('repair completion is published only after final candidate checks, includin
       if (e.stage === 'validating') {
         observed = true;
         const unit = f.units.find(u => u.target === e.unit);
-        assert.equal(done(f.root, unit, contextHash(f.root, f.config)), false);
+        assert.equal(done(f.root, unit, inputContext(f.root, f.config)), false);
         controller.abort();
       }
     }
@@ -133,7 +133,7 @@ test('Astra F2: fixed merge receipts cannot overwrite configured inputs, includi
       const alias = 'migration/ARCHITECTURE.md'; fs.linkSync(safePath(f.root, receipt), safePath(f.root, alias));
       f.config.designInputs = [alias];
     } else f.config[kind] = kind === 'reviewDependencyMap' ? receipt : [receipt];
-    writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+    writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
     const inputHash = fileHash(safePath(f.root, receipt)), inventoryHash = fileHash(safePath(f.root, 'migration/inventory.tsv'));
     assert.throws(() => loadConfig(f.root), /runtime state/);
     assert.throws(() => mergeInventory(f.root, f.config, { shards: ['migration/inventory-shards/a.tsv'], sites: 'migration/inventory-sites.tsv' }), /protected/);
@@ -143,7 +143,7 @@ test('Astra F2: fixed merge receipts cannot overwrite configured inputs, includi
 });
 
 test('Astra F3: published translate and queue commands reach the real phase gate without argument errors', async t => {
-  const f = prepare(t); f.config.phasePolicy = 'strict'; writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  const f = prepare(t); f.config.phasePolicy = 'strict'; writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   const commands = fs.readFileSync(path.join(kitRoot, 'docs/EXECUTION-SCOPES.md'), 'utf8').split('\n')
     .filter(line => /^node migration-kit\/scripts\/run_migration\.mjs (translate|repair)\b/.test(line));
   assert.equal(commands.length, 2);

@@ -24,7 +24,7 @@ test('new and legacy configurations default to continuous execution; old 600s/ca
   const legacy = { ...installed, timeoutSeconds: 600, commandTimeoutSeconds: 600, maxAgentCalls: 1, maxFixRounds: 0,
     maxRunInputBytes: 1024, transientRetries: 0, maxConsecutiveFailures: 1, maxAiCreditsPerCall: 30 };
   delete legacy.executionMode;
-  writeJSON(safePath(root, 'migration/config.json'), legacy);
+  writeJSON(safePath(root, 'migration/state/config.json'), legacy);
   const config = loadConfig(root), limits = executionLimits(config);
   for (const key of ['calls', 'fixRounds', 'inputBytes', 'retries', 'consecutiveFailures']) assert.equal(limits[key], Infinity);
   assert.equal(limits.aiCredits, undefined);
@@ -151,7 +151,7 @@ process.stderr.write('finished successfully\\n');
   assert.equal(diagnostics.rows.length, 1); assert.match(diagnostics.rows[0].message, /middle diagnostic/);
   fs.appendFileSync(r.stdoutFile, 'altered log\n');
   assert.throws(() => [...processOutputLines(r, 'stdout', f.root)], /log changed/);
-  assert.throws(() => [...processOutputLines({ ...r, stdoutFile: safePath(f.root, 'migration/config.json') }, 'stdout', f.root)], /outside runner log directory/);
+  assert.throws(() => [...processOutputLines({ ...r, stdoutFile: safePath(f.root, 'migration/state/config.json') }, 'stdout', f.root)], /outside runner log directory/);
 });
 
 test('a large Copilot JSONL stream is parsed from its full spool and retains terminal result and model facts', async t => {

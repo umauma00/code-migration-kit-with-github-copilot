@@ -15,7 +15,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { prepare, mini } from './helpers.mjs';
-import { safePath, atomicWrite, writeJSON, readJSON, contextHash, loadConfig, phaseReports as coreReports } from '../lib/core.mjs';
+import { safePath, atomicWrite, writeJSON, readJSON, inputContext, loadConfig, phaseReports as coreReports } from '../lib/core.mjs';
 import { phaseCommand } from '../scripts/phase_cli.mjs';
 import { install } from '../scripts/install.mjs';
 import { phaseStaleness, phaseReports, requirePhase } from '../lib/phases.mjs';
@@ -41,7 +41,7 @@ const removeFirst = /first remove exactly what you added \(git diff of those fil
 async function atPhase03(t) {
   const f = prepare(t, { count: 3 });
   f.config.phasePolicy = 'strict';
-  writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   fs.rmSync(safePath(f.root, 'migration/stress-test/report.md'));
   atomicWrite(safePath(f.root, report), deferred);
   for (const name of ['migration/depmap/report.md', 'migration/gap-report.md']) atomicWrite(safePath(f.root, name), 'Synthetic preparation evidence; not actual AI review or human approval.\n');
@@ -50,7 +50,7 @@ async function atPhase03(t) {
   assert.equal(phaseCommand(f.root, f.config, 'next').next, '03');
   return f;
 }
-const judgeCurrent = f => Boolean(currentRecord(f.root, f.config, 'judge', contextHash(f.root, f.config), false));
+const judgeCurrent = f => Boolean(currentRecord(f.root, f.config, 'judge', inputContext(f.root, f.config), false));
 const receipts = (root, ids) => ids.map(id => fs.readFileSync(safePath(root, `migration/phases/${id}.json`), 'utf8'));
 const gateError = fn => { try { fn(); } catch (e) { return e; } assert.fail('the gate let it through'); };
 // Written a few seconds after the record, as a real edit is (the fast view

@@ -17,8 +17,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { prepare, ready, fake, result } from './helpers.mjs';
-import { safePath, writeJSON, readJSON, atomicWrite, loadConfig, contextHash, roles } from '../lib/core.mjs';
+import { prepare, ready, fake, result, scopesOf } from './helpers.mjs';
+import { safePath, writeJSON, readJSON, atomicWrite, loadConfig, roles } from '../lib/core.mjs';
 import { translate } from '../lib/pipeline.mjs';
 import { runProcess, silentProcessMessage, silenceWatch, processOutputLines } from '../lib/process.mjs';
 import { workerSilenceMs, silenceWait, defaultWorkerSilenceSeconds } from '../lib/execution-policy.mjs';
@@ -349,10 +349,10 @@ test('workerSilenceSeconds is 0 or 300 to 86400 seconds, and a run setting that 
   // Below 300 s a rate limit's Retry-After, which the CLI waits out without a word, could stop a call.
   for (const value of [0, 300, 600, 86400]) assert.doesNotThrow(() => loadConfig(f.root, { config: { ...f.config, workerSilenceSeconds: value } }), String(value));
   for (const value of [299, 180, 60, 1, -1, 86401, 1.5, '600', null]) assert.throws(() => loadConfig(f.root, { config: { ...f.config, workerSilenceSeconds: value } }), /workerSilenceSeconds must be 0 \(off\) or a whole number of seconds from 300 to 86400/, String(value));
-  const config = loadConfig(f.root), before = contextHash(f.root, config);
+  const config = loadConfig(f.root), before = scopesOf(f.root, config);
   for (const value of [0, 1200]) {
-    writeJSON(safePath(f.root, 'migration/config.json'), { ...config, workerSilenceSeconds: value });
-    assert.equal(contextHash(f.root, loadConfig(f.root)), before, String(value));
+    writeJSON(safePath(f.root, 'migration/state/config.json'), { ...config, workerSilenceSeconds: value });
+    assert.equal(scopesOf(f.root, loadConfig(f.root)), before, String(value));
   }
 });
 
@@ -738,7 +738,7 @@ test('a proxy or a network that asks for its own sign-in (Negotiate, Basic, a ca
 
 const continuous = async t => {
   const f = await ready(t, { executionMode: 'continuous' });
-  f.config.transientRetryDelayMs = 1; writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  f.config.transientRetryDelayMs = 1; writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   return f;
 };
 const attempts = (f, report) => {
@@ -769,7 +769,7 @@ test('a silent call is retried with a longer wait each time, the file completes,
 
 for (const [mode, calls] of [['continuous', hostStallRetries + 1], ['bounded', 3]]) test(`a call that stays silent blocks its file after ${calls} calls in ${mode} mode, and the run tries it once more at its end`, async t => {
   const f = mode === 'continuous' ? await continuous(t) : await ready(t);
-  if (mode === 'bounded') { f.config.transientRetryDelayMs = 1; writeJSON(safePath(f.root, 'migration/config.json'), f.config); }
+  if (mode === 'bounded') { f.config.transientRetryDelayMs = 1; writeJSON(safePath(f.root, 'migration/state/config.json'), f.config); }
   let count = 0;
   const stages = [];
   const failure = await translate(f.root, f.config, async () => { count++; throw silentError(); }, { onProgress: e => stages.push(e.stage) }).then(() => null, e => e);
@@ -910,7 +910,7 @@ for (const [name, error, mode] of [
   ['a network error in bounded mode', 'Copilot implementer failed (exit 1): connect ETIMEDOUT 140.82.112.21:443', 'bounded']])
   test(`a file blocked by ${name} gets the last pass, which finishes it once the failure is gone`, async t => {
     const f = mode === 'continuous' ? await continuous(t) : await ready(t);
-    if (mode === 'bounded') { f.config.transientRetryDelayMs = 1; writeJSON(safePath(f.root, 'migration/config.json'), f.config); }
+    if (mode === 'bounded') { f.config.transientRetryDelayMs = 1; writeJSON(safePath(f.root, 'migration/state/config.json'), f.config); }
     const calls = mode === 'continuous' ? hostStallRetries + 1 : 3;
     let implementer = 0;
     const stages = [];
@@ -926,7 +926,7 @@ for (const [name, error, mode] of [
 
 for (const mode of ['continuous', 'bounded']) test(`a retry with no call left in the budget ends the run there, with no last pass (${mode})`, async t => {
   const f = mode === 'continuous' ? await continuous(t) : await ready(t);
-  if (mode === 'bounded') { f.config.transientRetryDelayMs = 1; f.config.maxAgentCalls = 1; writeJSON(safePath(f.root, 'migration/config.json'), f.config); }
+  if (mode === 'bounded') { f.config.transientRetryDelayMs = 1; f.config.maxAgentCalls = 1; writeJSON(safePath(f.root, 'migration/state/config.json'), f.config); }
   let count = 0;
   const stages = [];
   const failure = await translate(f.root, f.config, async () => { count++; throw new Error(lockError); },
@@ -972,7 +972,7 @@ test('a call stopped for silence just as the person stops the run ends as interr
 
 test('a preparation audit retries a silent call with a longer wait, each attempt in a fresh session; other failures stay as they were', async t => {
   const f = prepare(t, { executionMode: 'continuous' });
-  f.config.transientRetryDelayMs = 1; writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  f.config.transientRetryDelayMs = 1; writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   const files = ['migration/RULEBOOK.md', 'migration/inventory.tsv'];
   const answer = args => {
     const request = JSON.parse(args.reviewInput);
@@ -1007,7 +1007,7 @@ test('a preparation audit retries a silent call with a longer wait, each attempt
   await assert.rejects(runAudit(f.root, f.config, async () => { silentCalls++; throw silentError(); }, { directory: stuck.directory }), isSilentCall);
   assert.equal(silentCalls, hostStallRetries + 1);
   // Bounded mode: transientRetries caps the retries.
-  f.config.executionMode = 'bounded'; f.config.transientRetries = 1; writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  f.config.executionMode = 'bounded'; f.config.transientRetries = 1; writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   const bounded = freezeAudit(f.root, f.config, { type: 'inventory', files });
   let boundedCalls = 0;
   await assert.rejects(runAudit(f.root, f.config, async () => { boundedCalls++; throw silentError(); }, { directory: bounded.directory }), isSilentCall);
@@ -1016,7 +1016,7 @@ test('a preparation audit retries a silent call with a longer wait, each attempt
 
 test('a preparation audit whose inputs changed while it waited to retry stops instead of auditing the old text', async t => {
   const f = prepare(t, { executionMode: 'continuous' });
-  f.config.transientRetryDelayMs = 1; writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  f.config.transientRetryDelayMs = 1; writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   const frozen = freezeAudit(f.root, f.config, { type: 'inventory', files: ['migration/RULEBOOK.md', 'migration/inventory.tsv'] });
   let calls = 0;
   await assert.rejects(runAudit(f.root, f.config, async () => {

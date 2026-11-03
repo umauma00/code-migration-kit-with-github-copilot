@@ -14,7 +14,7 @@ import { createCopilotAdapter, agentPrompt } from '../scripts/copilot_adapter.mj
 import { reviewEvidence } from '../lib/review.mjs';
 
 async function approved(f) {
-  writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   await runStage(f.root, f.config, 'judge');
   approve(f.root, f.config, 'translation', 'Regression fixture only');
 }

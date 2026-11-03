@@ -14,7 +14,7 @@ GitHub Copilot CLI・VS Code・GitHub Copilot app の3つとも、同じマー�
 umauma00/code-migration-kit-with-github-copilot
 ```
 
-同じプラグインは一つの導入元で管理してください。複数の方法（マーケットプレイス・ローカルcheckout・`chat.pluginLocations`）で同時に登録すると、オーケストレーターが2つ並び、先に見つかった方が使われます。旧コピー導入の `.github/skills/code-migration/` も同名スキルとして優先されます。移行する場合は既存データを保存し、旧スキルを明示的に外して `migration/config.json` に `"runtime": "plugin"` を設定してください。既存の承認・完了記録は再確認が必要です。
+同じプラグインは一つの導入元で管理してください。複数の方法（マーケットプレイス・ローカルcheckout・`chat.pluginLocations`）で同時に登録すると、オーケストレーターが2つ並び、先に見つかった方が使われます。旧コピー導入の `.github/skills/code-migration/` も同名スキルとして優先されます。移行する場合は既存データを保存し、旧スキルを明示的に外して、キットの記録 `migration/state/config.json`（0.44.x までは `migration/config.json`）に `"runtime": "plugin"` を設定してください。0.45.0 からは、この切り替えで承認・完了記録は失効しません（0.44.x までは再確認が必要でした）。0.44.x から使っている案件では、切り替える前に `doctor` など 0.45.0 のキットのコマンドを1回実行してください。
 
 ### GitHub Copilot CLI
 
@@ -110,7 +110,7 @@ node /path/to/code-migration-kit/scripts/install.mjs --target . --layout plugin 
 
 VS Code・Copilot CLI・GitHub Copilot appのどれから開始する場合も、親エージェントがターミナルでrunnerを動かし、runnerがCopilot CLIのワーカーを起動します。これらのコマンドもAIがチャットから実行します。
 
-作成するのは `migration/config.json`、`migration/RULEBOOK.md`、`migration/inventory.tsv` の3ファイルと、`--language` を指定した場合の `migration/preferences.json`（報告の言語）です。設定済みの案件ではモデルやルールを上書きしません。初期化は工程を承認しません。モデル、言語、元ソースの場所、工程の進め方、元のコードが動くかは AI が質問で聞き、`run_migration.mjs settings init` が作る `migration/run-settings.json` に書き込みます。出力・テストの場所や検証コマンドなど残りの欄と後からの変更はこのファイルで行い、`settings apply` で反映します。
+作成するのは `migration/state/config.json`（設定のキット側の記録）、`migration/RULEBOOK.md`、`migration/inventory.tsv` の3ファイルと、`--language` を指定した場合の `migration/state/preferences.json`（報告の言語）です。設定済みの案件ではモデルやルールを上書きしません。初期化は工程を承認しません。モデル、言語、元ソースの場所、工程の進め方、元のコードが動くかは AI が質問で聞き、`run_migration.mjs settings init` が作る `migration/settings.json` に書き込みます。出力・テストの場所や検証コマンドなど残りの欄と後からの変更はこのファイルだけで行い、`settings apply` で反映します（次にキットのコマンドを始めたときにも反映されます）。
 
 プラグイン内のスクリプトには絶対パスを指定し、実行ディレクトリは対象リポジトリにします。
 
@@ -119,7 +119,7 @@ node /path/to/code-migration-kit/scripts/run_migration.mjs doctor --check-cli
 node /path/to/code-migration-kit/scripts/run_migration.mjs status
 ```
 
-新規案件では、phase 01を記録するまで、doctorは依存宣言を `pending`（まだ不要）と表示します。以降の成果物・実行記録・承認は対象の `migration/`、変換結果は設定した `outputRoots` に保存します。プラグインの更新、案件側の `.github/hooks/`・`.github/agents/`・`.claude/agents/` の変更で、既存の承認と完了判定が失効します。hookが参照する、対象リポジトリ内の追加スクリプト等は `verificationInputs` に指定して追跡してください。
+新規案件では、phase 01を記録するまで、doctorは依存宣言を `pending`（まだ不要）と表示します。以降の成果物・実行記録・承認は対象の `migration/`、変換結果は設定した `outputRoots` に保存します。プラグインの更新や、案件側の `.github/hooks/`・`.github/agents/`・`.claude/agents/` の変更では、承認と完了判定は失効しません（作業の進め方で、移行の中身ではないため。変えた後の作業から使われます）。キットの担当と同じ名前のエージェントが案件側にあると、ワーカーを起動するときに止めて知らせます。
 
 ## 実行方式と検証範囲
 
@@ -133,6 +133,6 @@ node /path/to/code-migration-kit/scripts/run_migration.mjs status
 
 自動テストでは案件側に `.github/` や `migration-kit/` を置かずに、3ファイルの変換・独立レビュー・build/smoke/parityを確認します。モデル応答はテスト用です。実CLIでのプラグイン認識・ローカルのマーケットプレイスからの導入・担当の名前付きID解決も確認しています（GitHub上のマーケットプレイスからの導入は未確認）。これは `node tests/verify_plugin.mjs /absolute/path/to/copilot` で再確認できます。外部AIは呼びません。`doctor --check-cli` も、ワーカーと同じ条件で全担当IDが解決できるかを確認します。
 
-担当の衝突とhook変更後の失効は、`node tests/verify_plugin_resolution.mjs /absolute/path/to/runtime.node` でCLI 1.0.93の実際の探索・選択・hook APIと照合できます。この内部APIへの依存は検証用スクリプトだけです。
+担当の衝突と、hook を変えた後も承認と完了判定が残ることは、`node tests/verify_plugin_resolution.mjs /absolute/path/to/runtime.node` でCLI 1.0.93の実際の探索・選択・hook APIと照合できます。この内部APIへの依存は検証用スクリプトだけです。
 
 macOSの実CLI（1.0.95・1.0.98）と疑似のモデルの間で、プラグイン方式の変換・独立レビュー（ツール付きレビューを含む）・ガードレールhookによる拒否を確認しました。古いCLI（1.0.40）はプラグインのエージェントを読み込めず、`doctor` が不足する担当IDを報告します。VS Code・GitHub Copilot app の画面での網羅的な動作確認と、最後の工程まで通した実モデルでの移植品質は未検証です。実案件の前に [LIVE-SMOKE.md](LIVE-SMOKE.md) の小規模確認を行い、同文書の `migration-kit/` をプラグインの絶対パスへ読み替えてください。

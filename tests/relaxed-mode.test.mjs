@@ -8,7 +8,7 @@ import path from 'node:path';
 import { prepare, fake } from './helpers.mjs';
 import { safePath, writeJSON, readJSON, atomicWrite, loadConfig } from '../lib/core.mjs';
 import { approve, runStage, translate, currentRecord } from '../lib/pipeline.mjs';
-import { contextHash } from '../lib/core.mjs';
+import { inputContext } from '../lib/core.mjs';
 import { phaseCommand } from '../scripts/phase_cli.mjs';
 import { currentPhase, phaseWaiver, requirePhase } from '../lib/phases.mjs';
 import { migrationStatus, statusChecklist, statusTodo, statusMarkdown } from '../lib/status.mjs';
@@ -16,14 +16,14 @@ import { statusSnapshot } from '../lib/status-snapshot.mjs';
 import { setPreferences, readPreferences } from '../lib/preferences.mjs';
 import { failureGuidance } from '../lib/guidance.mjs';
 import { humanGate, interactiveDecision } from '../lib/guardrails.mjs';
-import { initRunSettings, applyRunSettings, runSettingsState, runSettingsFile, runSettingsHelpFile } from '../lib/run-settings.mjs';
+import { initSettings, applySettings, settingsState, settingsFile, settingsHelpFile } from '../lib/settings.mjs';
 import { setRoleModels } from '../lib/models.mjs';
 import { kitRoot } from '../scripts/install.mjs';
 
 function fixture(t, { mode } = {}) {
   const f = prepare(t);
   Object.assign(f.config, { phasePolicy: 'strict' });
-  writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   fs.copyFileSync(path.join(kitRoot, 'templates/guardrails.json'), safePath(f.root, 'migration/guardrails.json'));
   atomicWrite(safePath(f.root, 'migration/judge-report.md'), 'Reviewed public arithmetic scenarios, commands, normalization and limitations.');
   atomicWrite(safePath(f.root, 'migration/depmap/report.md'), 'Audited parser coverage, isolated files and source dependency map.');
@@ -102,7 +102,7 @@ test('relaxed mode: waive, proceed to translation and build, and every waiver st
   approve(f.root, f.config, 'build', 'Shape build');
   const build = await runStage(f.root, f.config, 'build');
   assert.deepEqual(build.predecessor, { stage: 'judge', waivedPhase: '03', waiverHash: phaseWaiver(f.root, '03').hash });
-  assert.ok(currentRecord(f.root, f.config, 'build', contextHash(f.root, f.config)));
+  assert.ok(currentRecord(f.root, f.config, 'build', inputContext(f.root, f.config)));
   const status = migrationStatus(f.root);
   assert.equal(status.workflow.mode, 'relaxed');
   assert.equal(status.waivers.length, 1);
@@ -151,7 +151,7 @@ test('records made on a waiver are checked again once the phase is done for real
   await translate(f.root, f.config, fake);
   approve(f.root, f.config, 'build', 'Shape build');
   await runStage(f.root, f.config, 'build');
-  const context = contextHash(f.root, f.config);
+  const context = inputContext(f.root, f.config);
   assert.ok(currentRecord(f.root, f.config, 'build', context));
   setPreferences(f.root, { phaseMode: 'normal' });
   assert.equal(currentRecord(f.root, f.config, 'build', context), false, 'without relaxed mode the waived judge no longer stands in');
@@ -160,7 +160,7 @@ test('records made on a waiver are checked again once the phase is done for real
   writeJSON(waiverFile(f, '03'), { ...readJSON(waiverFile(f, '03')), note: 'rewritten' });
   assert.equal(currentRecord(f.root, f.config, 'build', context), false);
   await runStage(f.root, f.config, 'judge');
-  assert.equal(currentRecord(f.root, f.config, 'build', contextHash(f.root, f.config)), false);
+  assert.equal(currentRecord(f.root, f.config, 'build', inputContext(f.root, f.config)), false);
 });
 
 test('waiving 04 lets the build run before every unit is reviewed; the units stay unfinished', async t => {
@@ -196,29 +196,29 @@ test('run settings carry the phase mode; files written before it existed still a
   const f = prepare(t);
   const catalog = [{ id: 'm', name: 'M', state: 'enabled', efforts: [], contexts: [] }];
   setRoleModels(f.root, catalog, { role: 'all', model: 'm' });
-  initRunSettings(f.root, catalog, { source: 'Python', target: 'JavaScript' });
-  const file = safePath(f.root, runSettingsFile);
+  initSettings(f.root, catalog, { source: 'Python', target: 'JavaScript' });
+  const file = safePath(f.root, settingsFile);
   const fill = value => { const s = readJSON(file); Object.assign(s, { reportLanguage: 'en', originalRuntime: 'available' }, value); writeJSON(file, s); };
   assert.equal(readJSON(file).phaseMode, 'FILL_IN');
-  assert.match(fs.readFileSync(safePath(f.root, runSettingsHelpFile), 'utf8'), /`phaseMode`: .*\(choices: `normal`, `relaxed`, `auto`\)/);
+  assert.match(fs.readFileSync(safePath(f.root, settingsHelpFile), 'utf8'), /`phaseMode`: .*\(choices: `normal`, `relaxed`, `auto`\)/);
   fill({ phaseMode: 'loose' });
-  assert.match(applyRunSettings(f.root, catalog).errors.join('\n'), /phaseMode: must be one of normal, relaxed, auto, not "loose"/);
+  assert.match(applySettings(f.root, catalog).errors.join('\n'), /phaseMode: must be one of normal, relaxed, auto, not "loose"/);
   fill({ phaseMode: 'relaxed' });
-  const applied = applyRunSettings(f.root, catalog);
+  const applied = applySettings(f.root, catalog);
   assert.equal(applied.applied, true, applied.errors?.join('\n'));
   assert.ok(applied.changed.includes('phaseMode'));
   assert.equal(applied.note, undefined, 'the mode is not part of the reviewed configuration');
   assert.equal(readPreferences(f.root).phaseMode, 'relaxed');
-  assert.equal(runSettingsState(f.root, loadConfig(f.root)).state, 'applied');
+  assert.equal(settingsState(f.root, loadConfig(f.root)).state, 'applied');
   // A file without the key (written before 0.12.0) applies without touching the mode.
   const old = readJSON(file); delete old.phaseMode; writeJSON(file, old);
-  const again = applyRunSettings(f.root, catalog);
+  const again = applySettings(f.root, catalog);
   assert.equal(again.applied, true, again.errors?.join('\n'));
   assert.ok(!again.changed.includes('phaseMode'));
   assert.equal(readPreferences(f.root).phaseMode, 'relaxed');
-  assert.equal(runSettingsState(f.root, loadConfig(f.root)).state, 'applied');
+  assert.equal(settingsState(f.root, loadConfig(f.root)).state, 'applied');
   // settings init adds it back in place, filled from the preference.
-  initRunSettings(f.root, catalog);
+  initSettings(f.root, catalog);
   const keys = Object.keys(readJSON(file));
   assert.equal(readJSON(file).phaseMode, 'relaxed');
   assert.equal(keys.indexOf('phaseMode'), keys.indexOf('originalRuntime') + 1);
@@ -253,7 +253,7 @@ test('review of 304f781: fast status lists waivers, a waived 04 records what was
   assert.deepEqual(fast.waivers.map(x => x.phase), ['03', '04']);
   assert.equal(fast.workflow.phases.find(p => p.id === '04').waived, true);
   // The stress report written after the approval makes it stale.
-  const context = contextHash(f.root, f.config);
+  const context = inputContext(f.root, f.config);
   const { requireGate } = await import('../lib/pipeline.mjs');
   requireGate(f.root, f.config, 'translation', context);
   atomicWrite(safePath(f.root, 'migration/stress-test/report.md'), 'Written later.');

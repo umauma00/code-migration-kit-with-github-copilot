@@ -24,7 +24,7 @@ const answer = ({ unit, reviewInput }) => {
 const fixture = t => {
   const f = prepare(t, { count: 3 });
   Object.assign(f.config, { transientRetryDelayMs: 1, phaseModels: { survey: 'survey-model' } });
-  writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   return f;
 };
 

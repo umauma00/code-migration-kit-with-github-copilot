@@ -10,11 +10,11 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { prepare, result, finding, fake } from './helpers.mjs';
 import { kitRoot } from '../scripts/install.mjs';
 import { approve, runStage, translate } from '../lib/pipeline.mjs';
-import { loadConfig, contextHash, safePath, writeJSON, readJSON, done, unitState, atomicWrite, waitsForDependencies } from '../lib/core.mjs';
+import { loadConfig, inputContext, safePath, writeJSON, readJSON, done, unitState, atomicWrite, waitsForDependencies } from '../lib/core.mjs';
 import { createCopilotAdapter, copilotEnv, copilotStreamError, copilotStreamFacts, parseCopilotOutput } from '../scripts/copilot_adapter.mjs';
 import { isTransientFailure, isSystemicFailure } from '../lib/failures.mjs';
 
-const persist = f => writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+const persist = f => writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
 async function approved(f) {
   persist(f);
   await runStage(f.root, f.config, 'judge');
@@ -114,10 +114,10 @@ test('configuration rejects unknown scheduling values, none with typecheck and c
   const f = prepare(t);
   for (const [patch, pattern] of [[{ dependencyOrder: 'later' }, /dependencyOrder must be/], [{ dependencyOrder: 'none' }, /cannot be combined with a per-unit typecheck/],
     [{ fixPolicy: 'twice' }, /fixPolicy must be/], [{ concurrency: 65 }, /Invalid concurrency/]]) {
-    writeJSON(safePath(f.root, 'migration/config.json'), { ...f.config, ...patch });
+    writeJSON(safePath(f.root, 'migration/state/config.json'), { ...f.config, ...patch });
     assert.throws(() => loadConfig(f.root), pattern);
   }
-  writeJSON(safePath(f.root, 'migration/config.json'), { ...f.config, concurrency: 64 });
+  writeJSON(safePath(f.root, 'migration/state/config.json'), { ...f.config, concurrency: 64 });
   assert.equal(loadConfig(f.root).concurrency, 64);
 });
 
@@ -134,7 +134,7 @@ test('fixPolicy single-pass: one fix of the confirmed findings completes on the 
   // Two findings at one source line are still arbitrated: the same place is not agreement.
   assert.deepEqual(calls.sort(), ['arbiter', 'fixer', 'implementer', 'reviewer-rules', 'reviewer-semantics']);
   assert.equal(fs.readFileSync(safePath(f.root, unit.target), 'utf8'), fixed);
-  const context = contextHash(f.root, f.config), state = unitState(f.root, unit);
+  const context = inputContext(f.root, f.config), state = unitState(f.root, unit);
   assert.equal(done(f.root, unit, context), true);
   assert.deepEqual(state.singlePass.confirmed, ['reviewer-rules:F1', 'reviewer-semantics:F1']);
   // The receipt binds the fix record: tampering revokes completion.
@@ -176,7 +176,7 @@ test('installer records the chosen fix policy and refuses the removed native bac
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'install-policies-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   install(root, { apply: true, model: 'm', fixPolicy: 'single-pass' });
-  const config = readJSON(path.join(root, 'migration/config.json'));
+  const config = readJSON(path.join(root, 'migration/state/config.json'));
   assert.equal(config.fixPolicy, 'single-pass'); assert.equal(config.dependencyOrder, 'auto'); assert.equal(config.workerBackend, 'copilot-cli');
   assert.equal(fs.readdirSync(path.join(root, '.github/agents')).some(n => n.includes('-native-')), false);
   assert.throws(() => install(root, { model: 'm', workerBackend: 'native' }), /native worker backend was removed/);

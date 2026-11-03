@@ -12,7 +12,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { prepare, fake, result, finding, mini } from './helpers.mjs';
-import { safePath, writeJSON, readJSON, unitState, contextHash, done, fileHash, statePath } from '../lib/core.mjs';
+import { safePath, writeJSON, readJSON, unitState, inputContext, done, fileHash, statePath } from '../lib/core.mjs';
 import { translate, approve, runStage, contractSlip, unitSlip, withoutFlags } from '../lib/pipeline.mjs';
 import { markerEvidence, markerError } from '../lib/markers.mjs';
 import { failureGuidance } from '../lib/guidance.mjs';
@@ -33,7 +33,7 @@ async function setup(t, { single = true, typecheck = null, executionMode, count,
   if (single) f.config.fixPolicy = 'single-pass';
   f.config.commands.typecheck = typecheck;
   Object.assign(f.config, overrides);
-  writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   await runStage(f.root, f.config, 'judge');
   approve(f.root, f.config, 'translation', 'Self-repair fixture only');
   return f;
@@ -116,7 +116,7 @@ test('an implementer whose trailer sits above the closing brace is told where an
   assert.equal(implementers[0].extra.correction, undefined);
   assert.match(implementers[1].extra.correction, /^The PORT STATUS trailer of your content is wrong: the PORT STATUS line is line \d+, but line \d+ "}" follows it: move the trailer below it.*Return the complete file again with this corrected\.$/);
   assert.equal(fs.readFileSync(safePath(f.root, f.units[0].target), 'utf8'), good());
-  assert.equal(done(f.root, f.units[0], contextHash(f.root, f.config)), true);
+  assert.equal(done(f.root, f.units[0], inputContext(f.root, f.config)), true);
   assert.deepEqual(summary(f, report).selfRepairs, { corrections: 1, markerFixes: 0 });
 });
 
@@ -138,7 +138,7 @@ test('a trailer still wrong after its correction goes to the fixer as a finding 
   assert.match(m1.message, /^The PORT STATUS trailer is wrong: the PORT STATUS line is line \d+, but line \d+ "}" follows it/);
   // No review of the file with the wrong trailer: the fixed file has its own reviews.
   assert.deepEqual(roles(calls), ['implementer', 'implementer', 'fixer', 'reviewer', 'reviewer']);
-  const context = contextHash(f.root, f.config), state = unitState(f.root, f.units[0]);
+  const context = inputContext(f.root, f.config), state = unitState(f.root, f.units[0]);
   assert.equal(done(f.root, f.units[0], context), true);
   assert.equal(state.markerEvidence.valid, true); assert.equal(state.markerEvidence.problem, undefined);
   // The trailer fix is not a fix round.
@@ -161,7 +161,7 @@ test('a file left with a wrong trailer by an earlier run goes to the fixer befor
   assert.deepEqual(roles(calls), ['fixer', 'reviewer', 'reviewer']);
   assert.equal(calls[0].extra.confirmedFindings[0].reference, 'marker:M1');
   assert.equal(fs.readFileSync(safePath(f.root, f.units[0].target), 'utf8'), good());
-  assert.equal(done(f.root, f.units[0], contextHash(f.root, f.config)), true);
+  assert.equal(done(f.root, f.units[0], inputContext(f.root, f.config)), true);
   assert.deepEqual(summary(f, report).selfRepairs, { corrections: 0, markerFixes: 1 });
 });
 
@@ -198,7 +198,7 @@ test('a single-pass fixer that returns the file unchanged is told to flag what i
   const fixers = calls.filter(c => c.role === 'fixer');
   assert.equal(fixers.length, 2);
   assert.match(fixers[1].extra.correction, /^You returned the current candidate unchanged, but the findings in extra\.confirmedFindings are still open\..*add a line "TODO\(port\): <its reference>: <what is needed>" where it applies and count it in the PORT STATUS trailer/);
-  const context = contextHash(f.root, f.config), state = unitState(f.root, f.units[0]);
+  const context = inputContext(f.root, f.config), state = unitState(f.root, f.units[0]);
   assert.equal(done(f.root, f.units[0], context), true);
   // The receipt binds the second fixer answer, the one written.
   assert.equal(readJSON(safePath(f.root, state.singlePass.fix.path)).extra, undefined);
@@ -225,7 +225,7 @@ test('a reviewer whose JSON has text after it is asked once more with the parser
   assert.equal(semantics[1].extra.correction, 'Your previous answer was rejected: Agent did not return one valid JSON object; no completion recorded (Unexpected non-whitespace character after JSON at position 3846). Return exactly one JSON object in the contract\'s form, with nothing before or after it.');
   // The corrected review is the one bound to the receipt; both share the frozen input.
   assert.equal(semantics[0].reviewInput, semantics[1].reviewInput);
-  assert.equal(done(f.root, f.units[0], contextHash(f.root, f.config)), true);
+  assert.equal(done(f.root, f.units[0], inputContext(f.root, f.config)), true);
 });
 
 // One finding, rejected, so the unit needs only the arbiter after review.
@@ -256,7 +256,7 @@ test('a unit whose arbiter slips twice gets one more pass before the run ends, a
   assert.ok(progress.some(s => /^one more pass for 1 unit\(s\) blocked by a slip in an answer$/.test(s)));
   // The reference re-ask in the first pass counts as a correction.
   assert.deepEqual(summary(f, report).selfRepairs, { corrections: 1, markerFixes: 0, repass: { units: 1, done: 1 } });
-  assert.equal(done(f.root, f.units[0], contextHash(f.root, f.config)), true);
+  assert.equal(done(f.root, f.units[0], inputContext(f.root, f.config)), true);
 });
 
 test('the extra pass happens once; a unit that slips again stays blocked with its error', async t => {
@@ -284,7 +284,7 @@ test('a repair run does not add the extra pass', async t => {
 test('a unit waiting on a slipped dependency runs once the extra pass finishes it', async t => {
   const f = prepare(t, { count: 3, executionMode: 'continuous' });
   f.config.markerPolicy = 'todo-lines-v1'; f.config.fixPolicy = 'single-pass'; f.config.commands.typecheck = null; f.config.dependencyOrder = 'reviewed';
-  writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   await runStage(f.root, f.config, 'judge'); approve(f.root, f.config, 'translation', 'Self-repair fixture only');
   const main = f.units.find(u => u.target.endsWith('main.mjs')), math = f.units.find(u => u.target.endsWith('math_ops.mjs'));
   let mathArbiters = 0;
@@ -306,7 +306,7 @@ test('a unit waiting on a slipped dependency runs once the extra pass finishes i
   // main.py depends on math_ops.py: it starts only after the last pass finished math_ops.
   assert.ok(order.lastIndexOf('arbiter math_ops.mjs') < order.indexOf('implementer main.mjs'), order.join(' | '));
   assert.equal(mathArbiters, 3);
-  assert.equal(done(f.root, main, contextHash(f.root, f.config)), true);
+  assert.equal(done(f.root, main, inputContext(f.root, f.config)), true);
   assert.deepEqual(summary(f, report).selfRepairs.repass, { units: 1, done: 1 });
 });
 
@@ -338,7 +338,7 @@ test('a trailer fix is not held to maxFixRounds: a bounded unit whose rounds are
   assert.equal(calls.filter(c => c.role === 'fixer')[2].extra.confirmedFindings[0].reference, 'marker:M1');
   const state = unitState(f.root, f.units[0]);
   assert.equal(state.round, 1, 'the trailer fix is not a fix round');
-  assert.equal(done(f.root, f.units[0], contextHash(f.root, f.config)), true);
+  assert.equal(done(f.root, f.units[0], inputContext(f.root, f.config)), true);
   assert.deepEqual(summary(f, report).selfRepairs, { corrections: 1, markerFixes: 1 });
 });
 
@@ -364,7 +364,7 @@ test('with fixPolicy rereview a fix whose trailer is still wrong goes to the fix
   const state = unitState(f.root, f.units[0]);
   assert.equal(state.singlePass, undefined); assert.equal(state.round, 1);
   assert.equal(fs.readFileSync(safePath(f.root, f.units[0].target), 'utf8'), fixedGood());
-  assert.equal(done(f.root, f.units[0], contextHash(f.root, f.config)), true);
+  assert.equal(done(f.root, f.units[0], inputContext(f.root, f.config)), true);
   assert.deepEqual(summary(f, report).selfRepairs, { corrections: 1, markerFixes: 1 });
 });
 
@@ -431,7 +431,7 @@ test('a single-pass fix that only adds an unnamed TODO(port) line is asked to fi
   assert.match(fixers[1].extra.correction, /^Your change fixes no code \(it changes only TODO\(port\) lines or the PORT STATUS trailer\), so reviewer-rules:F1 is neither fixed nor named\. Fix each finding in extra\.confirmedFindings in the code; only when this file cannot fix one, name its reference in its TODO\(port\) line .* and count it in the PORT STATUS trailer\. Return the complete file again with this corrected\.$/);
   const state = unitState(f.root, f.units[0]);
   assert.deepEqual(state.singlePass.flagged, ['reviewer-rules:F1']);
-  assert.equal(done(f.root, f.units[0], contextHash(f.root, f.config)), true);
+  assert.equal(done(f.root, f.units[0], inputContext(f.root, f.config)), true);
   const recorded = summary(f, report);
   assert.deepEqual(recorded.selfRepairs.flagged, [{ target: f.units[0].target, references: ['reviewer-rules:F1'] }]);
   assert.ok(recorded.warnings.some(w => w === `${f.units[0].target}: its single-pass fix left reviewer-rules:F1 unfixed (flagged with TODO(port), or the fix changed only flags); no review follows a single-pass fix`), recorded.warnings);
@@ -565,7 +565,7 @@ test('a forged trailer-fix receipt cannot finish without two fresh reviews', asy
   Object.assign(state, { stage: 'fix', status: 'blocked', reviewEvidence: [], reviews: [], reviewMap: {}, confirmed: [{ id: 'M1', reference: 'marker:M1', message: 'x', evidence: 'y', rule: 'z' }], singlePass: { forged: true } });
   delete state.arbitration;
   writeJSON(statePath(f.root, f.units[0]), state);
-  const context = contextHash(f.root, f.config);
+  const context = inputContext(f.root, f.config);
   assert.equal(done(f.root, f.units[0], context), false);
   const calls = [];
   const report = await translate(f.root, f.config, async call => { calls.push(call); return call.role === 'fixer' ? content(call, good()) : fake(call); });
@@ -612,7 +612,7 @@ test('a single-pass fix with a wrong trailer under a unit typecheck goes to the 
   assert.equal(report.done, 1);
   assert.deepEqual(roles(calls), ['implementer', 'reviewer', 'reviewer', 'arbiter', 'fixer', 'fixer', 'fixer', 'reviewer', 'reviewer']);
   assert.equal(calls.filter(c => c.role === 'fixer')[2].extra.confirmedFindings[0].reference, 'marker:M1');
-  assert.equal(done(f.root, f.units[0], contextHash(f.root, f.config)), true);
+  assert.equal(done(f.root, f.units[0], inputContext(f.root, f.config)), true);
 });
 
 test('in continuous mode trailer fixes stop at two per run even when each later fix breaks the trailer again', async t => {
@@ -672,5 +672,5 @@ test('a unit resumed with one review done, or repaired, on a file with a wrong t
   assert.equal(repaired.done, 1);
   assert.deepEqual(roles(repairs), ['fixer', 'reviewer', 'reviewer']);
   assert.equal(fs.readFileSync(out, 'utf8'), good());
-  assert.equal(done(f.root, f.units[0], contextHash(f.root, f.config)), true);
+  assert.equal(done(f.root, f.units[0], inputContext(f.root, f.config)), true);
 });

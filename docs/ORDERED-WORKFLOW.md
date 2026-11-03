@@ -80,8 +80,8 @@ node migration-kit/scripts/run_migration.mjs rulebook accept --note "変更点�
 <a id="relaxed-mode"></a>
 ## 緩和モード（前提が足りないときに「直す／進む」を選ぶ）
 
-工程の進め方は `migration/preferences.json` の `phaseMode` で決めます。最初の設定で1問だけ聞き、
-`preferences --phase-mode normal|relaxed|auto`（または run-settings.json の `phaseMode`）で記録します。
+工程の進め方は `phaseMode` で決めます（キットの記録 `migration/state/preferences.json`）。最初の設定で1問だけ聞き、
+`preferences --phase-mode normal|relaxed|auto`（または `migration/settings.json` の `phaseMode`）で記録します。
 
 | モード | 前提が足りないとき |
 |---|---|
@@ -99,7 +99,7 @@ node migration-kit/scripts/run_migration.mjs phase waive 03 --note "全体の形
 - 緩めないもの：guardrails、保護パス・元ソースの上書き、承認コマンドそのもの（`relaxed` では `approve` は今までどおり人間の確認つき）、サインイン・残高、pilot。
 - 後で正規に戻す：見送った工程を普通に終えて記録すると（00〜03・05c は phase complete、04 は全単位のレビューが揃ったとき、05・05b・05c は実行の成功）、見送りは `migration/phases/waivers/retired/` へ移り、二度と使われません。その工程が後で失効したときは、もう一度「直す／進む」を聞きます。工程自身の記録（03 の judge など）を見送りで代わりにすることはできません。見送りの上で作った後続の記録（工程記録・ビルド等の実行記録）は、前提が変わったので記録し直しになります。
 - `normal` に戻すと見送りは使われなくなり、見送りの上で作った記録は未完了に戻ります。`relaxed` に戻せば復活します（何も削除しません）。
-- モードは設定の指紋（contextHash）に含めません。切り替えても承認やレビュー済みの記録は失効しません。
+- モードは、記録が結び付く設定（移行の中身や各実行の入力）に含めません。切り替えても承認やレビュー済みの記録は失効しません。
 
 <a id="auto-mode"></a>
 ### 自動モード（`auto`、autopilot 向け）
@@ -110,12 +110,12 @@ autopilot は確認（フックの ask）を自動で拒否するため、`norma
 - 確認なしになるのは、関門コマンドを単独で実行したときだけです（`cd`・`&&`・`;`・パイプ・`$(...)` で他のコマンドとつなぐと確認します）。`--note` に `$` やバッククォートを含めるときは単一引用符で囲みます。
 - 今までどおり確認するもの：`sessions prune`（元に戻せません）、`--add`・`--remove`・`--deny`・`--waiver`・`--replace` 付きか既に設置済みのときの `guardrails install`、読み取れない形のキット呼び出し。`guardrails.json` を直接書くことも拒否のままです。
 - `auto` に切り替える操作（`preferences --phase-mode auto` と、`phaseMode: "auto"` を含む `settings apply`。後者は確認の理由に自動モードへの切り替えと書かれます）は、どのモードでも人の確認が必要です。`--phase-mode` の値が文字どおりの `normal`・`relaxed` 以外（変数・`$(...)` など）のときも確認します。`auto` から抜ける操作は確認なしです。
-- `auto` が効くのは、runner が書く記録 `migration/phases/auto-mode.json` があるときだけです。エージェントがこのファイルを直接書くことはフックが拒否します。`auto` から抜けるとこの記録は `migration/phases/retired/` へ移ります。preferences.json を手で `auto` にしただけでは無効で、関門は緩和モードと同じく確認し、status がその旨を表示します。
+- `auto` が効くのは、runner が書く記録 `migration/phases/auto-mode.json` があるときだけです。エージェントがこのファイルを直接書くことはフックが拒否します。`auto` から抜けるとこの記録は `migration/phases/retired/` へ移ります。キットの記録（preferences.json）を手で `auto` にしただけでは無効で、関門は緩和モードと同じく確認し、status がその旨を表示します。
 - guardrails が未設置なら、03・04・05 の関門でテンプレート（`templates/guardrails.json`）をそのまま設置し、`installedBy: "auto-mode"` を記録します。既にあるファイルは変えません。
-- 上流の規則3（承認ゲートで止まる）からの逸脱として、`auto` を選んだ時刻と内容を `migration/phases/auto-mode.json` に残します（RULEBOOK に書くと contextHash が変わり承認が失効するため、別ファイルです）。工程の中で決めた選択を人に聞かずに RULEBOOK に書くことは、上流の規則1（RULEBOOK の変更は人に回す）からの逸脱でもあり、報告の「人の確認なしで決めたもの」に載せます。RULEBOOK がまだ無い 00b・01 で出た選択は、RULEBOOK を書くときに入れます。変換を始めた後は、自動モードでも AI による RULEBOOK の書き換えをフックが拒否します（ルールの変更は利用者が決めるため）。そのときに見つかったルールの問題は、報告に載せて人の判断に回します。
+- 上流の規則3（承認ゲートで止まる）からの逸脱として、`auto` を選んだ時刻と内容を `migration/phases/auto-mode.json` に残します（RULEBOOK は移行の中身なので、書くと承認が失効します。そのため別ファイルです）。工程の中で決めた選択を人に聞かずに RULEBOOK に書くことは、上流の規則1（RULEBOOK の変更は人に回す）からの逸脱でもあり、報告の「人の確認なしで決めたもの」に載せます。RULEBOOK がまだ無い 00b・01 で出た選択は、RULEBOOK を書くときに入れます。変換を始めた後は、自動モードでも AI による RULEBOOK の書き換えをフックが拒否します（ルールの変更は利用者が決めるため）。そのときに見つかったルールの問題は、報告に載せて人の判断に回します。
 - `auto` で作った工程記録・承認・見送りには `auto: true` が付きます。status は「自動モード：オン」と「自動モードが人の確認なしで記録したもの」を出し、チェックリストでは【自動・人の確認なし】が付きます。見送りと build-loop の許可も一覧に入ります。`normal` や `relaxed` に戻しても一覧は残り、人が完了・承認し直すとその記録は置き換わります（工程を記録し直すと、その上に作った後続の工程も記録し直しになります。費用の記録は増えません）。逆に、人が記録した有効な承認・見送りを `auto` が置き換えることはありません（範囲を指定した翻訳承認と build-loop の承認は、その範囲・回の記録として書き直します）。
 - 限界：フックはコマンドの文字列を読みます。ファイルを直接書く手段をすべて見分けられるわけではないため（変数で組み立てたパスなど）、`auto` の記録や承認ファイルの偽造は、普通モードの承認ファイルと同じく完全には防げません。
 - 初期設定は手動です。自動モードを選んだ後の初期設定の質問には毎回「自動モードを選択済み・まだ手動・残り◯回ほど」の1行（`setupNotice`）が付きます。初期設定が終わると（仕様が無い場合は source-as-spec への切り替えまで済ませてから）、`autoHandoff` の案内を出して 00 を始める前に止まります。autopilot モードに切り替えて「続けて」と送ると 00 から進みます（切り替えなくても、ある程度は自動で進みます）。切り替え方は Copilot CLI・GitHub Copilot app・VS Code で違い、キットはどのアプリかを判別できないため、案内にはキーや操作の場所を書きません。00 の調査で初期設定の答え（元のコードが動くか、仕様があるか）が違うと分かったときは、理由を書いて止まり、autopilot を解除して対話で決めてもらいます。
 - 工程の中でも聞きません。準備監査や独立レビューが `changes` を返したら、1回だけ直して、直した箇所だけを新しい依頼で再監査します（この修正1回の規則はどのモードでも同じです。[準備監査](PREPARATION-AUDITS.md#one-repair-round-all-modes)）。それでも残った指摘、入力上限（`maxReviewInputBytes`）のせいで一部しか見られなかったレビュー、UNKNOWN・引用なしの行は、もう直さずに工程の報告と `phase complete`（または見送り）の note に一覧して先へ進みます。
 - ソースからも RULEBOOK からも決まらない選択（移行先の Web 層の方式、ソース以外の資産の出力先など）は、人が先に指定していない限り、いちばん保守的な案を選びます。元の作りにいちばん近く、新しいフレームワークや依存を足さない案です。inventory の survey を始める前なら `TODO(port)` 付きで RULEBOOK に書きます。始めた後は RULEBOOK を変えず（survey の入力と contextHash に含まれるため、変えると survey のやり直しになり、記録済みの工程も失効します）、変換結果に保守的な表現と `TODO(port)` を残します（上流の規則8）。どちらも報告に「人の確認なしで決めたもの」として載せます。方針が決まっているなら、autopilot の前に伝えておけばそれを使います。
-- 止まるもの：安全系（保護パス・元ソースの上書き・guardrails の拒否）、サインイン・残高、未記入の実行設定。実行設定は autopilot を始める前に対話セッションで質問に答え、run-settings.json を仕上げて `settings apply` しておきます。
+- 止まるもの：安全系（保護パス・元ソースの上書き・guardrails の拒否）、サインイン・残高、未記入の設定。設定は autopilot を始める前に対話セッションで質問に答え、`migration/settings.json` を仕上げて `settings apply` しておきます。

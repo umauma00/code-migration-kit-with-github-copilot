@@ -10,4 +10,4 @@ Compare source semantics, boundaries, exceptions, numbers, nullability and publi
 
 For human setup: [operating manual](../../docs/OPERATING-MANUAL.md) and
 [JSON contracts](../../docs/CONTRACTS.md). The coordinator supplies the response contract inline. Model selection belongs to
-`migration/config.json`; do not add a `model` frontmatter override.
+`migration/settings.json`; do not add a `model` frontmatter override.

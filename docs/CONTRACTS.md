@@ -73,7 +73,7 @@ when that input is over the limit (and for the arbiter) they come in
 within `maxReviewInputBytes`; a file over the budget is named with its encoding
 only).
 Kanji-only Shift_JIS or EUC-JP cannot be told from Latin-1 reliably; set
-`sourceEncoding` (for example `"shift_jis"`) in `migration/config.json` to
+`sourceEncoding` (for example `"shift_jis"`) in `migration/settings.json` to
 name the encoding of non-UTF-8 sources (`cp932` is accepted). It is tried
 first for every non-UTF-8 file, so declare it only when the legacy sources
 share one encoding.

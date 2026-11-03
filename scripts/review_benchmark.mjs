@@ -3,12 +3,12 @@
 // Seeded-defect benchmark for folding workers together (docs/REVIEW-BENCHMARK.md):
 // two reviewers vs one, and the fixer vs the implementer. setup makes a
 // throwaway root from fixtures/mini; plan prints the call bound; run makes
-// real Copilot CLI calls with the models in that root's migration/config.json.
+// real Copilot CLI calls with the models recorded for that root (models set).
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { prepare } from '../tests/helpers.mjs';
-import { loadConfig, safePath, writeJSON, stamp } from '../lib/core.mjs';
+import { loadConfig, safePath, writeJSON, stamp, configFile } from '../lib/core.mjs';
 import { loadCases, benchPlan, runBenchmark, benchMarker, answerLeaks } from '../lib/bench.mjs';
 import { parseCommandLine, specs, usageText } from '../lib/cli.mjs';
 import { createCopilotAdapter } from './copilot_adapter.mjs';
@@ -31,7 +31,7 @@ try {
     // Both variants get full reviewers: dual is the new-install default, and
     // the single reviewer must check both lenses to be a fair fold.
     config.reviewFocus = 'shared';
-    writeJSON(safePath(root, 'migration/config.json'), config);
+    writeJSON(safePath(root, configFile), config);
     // Workers read this root with view/grep/glob. Leave out what names the
     // seeded defects or holds correct code: the benchmark's own docs and code,
     // and the fixture judge's mutant and cases. The benchmark runs from the kit.
@@ -42,7 +42,7 @@ try {
     const leaks = answerLeaks(root);
     if (leaks.length) throw new Error(`Correct fixture code is still readable in the root: ${leaks.join(', ')}`);
     writeJSON(safePath(root, benchMarker), { schemaVersion: 1, kind: 'review-benchmark-root', createdAt: stamp() });
-    console.log(JSON.stringify({ root, models: config.models, next: `Choose models per role if they differ (migration/config.json models), then: node scripts/review_benchmark.mjs plan --root ${root}` }, null, 2));
+    console.log(JSON.stringify({ root, models: config.models, next: `Choose models per role if they differ (node scripts/run_migration.mjs models set --root ${root} --assign ROLE=ID,...), then: node scripts/review_benchmark.mjs plan --root ${root}` }, null, 2));
   } else {
     if (!args.root) throw new Error(`${command} needs --root PATH (a directory made by setup)`);
     const root = path.resolve(args.root), config = loadConfig(root);

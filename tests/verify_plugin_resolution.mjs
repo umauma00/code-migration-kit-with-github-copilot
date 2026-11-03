@@ -6,9 +6,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
-import { prepare, ready, fake } from './helpers.mjs';
+import { prepare, ready, fake, scopesOf } from './helpers.mjs';
 import { pluginRoot, runtimeLayout } from '../lib/runtime.mjs';
-import { contextHash, done } from '../lib/core.mjs';
+import { done, inputContext } from '../lib/core.mjs';
 import { validateWorkerProfile } from '../lib/review.mjs';
 import { translate, requireGate } from '../lib/pipeline.mjs';
 import { doctor } from '../scripts/run_migration.mjs';
@@ -75,15 +75,18 @@ try {
   const completedRoot = path.join(sandbox, 'completed'); fs.mkdirSync(completedRoot);
   const fixture = await ready(null, { root: completedRoot, layout: 'plugin' });
   await translate(fixture.root, fixture.config, fake);
-  const before = contextHash(fixture.root, fixture.config);
-  assert.equal(done(fixture.root, fixture.units[0], before), true);
+  const before = scopesOf(fixture.root, fixture.config);
+  assert.equal(done(fixture.root, fixture.units[0], inputContext(fixture.root, fixture.config)), true);
   write(path.join(fixture.root, '.github/hooks/context.json'), JSON.stringify({ version: 1,
     hooks: { sessionStart: [{ type: 'command', timeoutSec: 5,
       bash: 'node -e "console.log(JSON.stringify({additionalContext:\'HOOK_CONTEXT_CANARY\'}))"' }] } }));
-  const after = contextHash(fixture.root, fixture.config);
-  assert.notEqual(after, before);
-  assert.equal(done(fixture.root, fixture.units[0], after), false);
-  assert.throws(() => requireGate(fixture.root, fixture.config, 'translation', after), /approval|approve|changed/i);
+  // 0.45.0: a project hook decides how the workers run, not what a finished
+  // unit is, so the finished unit and the approval are kept (as after a
+  // model change); the work that remains runs with the hook.
+  assert.equal(scopesOf(fixture.root, fixture.config), before);
+  const context = inputContext(fixture.root, fixture.config);
+  assert.equal(done(fixture.root, fixture.units[0], context), true);
+  requireGate(fixture.root, fixture.config, 'translation', context);
   const sessionId = 'plugin-resolution-hooks';
   await S.hookSessionCreate({ sessionId, cwd: fixture.root, repoRoot: fixture.root,
     settingsJson: '{}', userHooksDir: path.join(sandbox, 'no-user-hooks'), discoverPolicies: false });
@@ -96,7 +99,7 @@ try {
     assert.equal(event.output.additionalContext, 'HOOK_CONTEXT_CANARY');
     assert.deepEqual(event.failures, []);
   } finally { S.hookProcessorDisposeOwned(sessionId, processorId); }
-  emit({ test: 'real project hook is tracked; previous approval and completion are invalidated', pass: true });
+  emit({ test: 'real project hook is loaded; previous approval and completion are kept', pass: true });
   emit({ result: 'All native regressions passed', externalAI: false });
 } finally {
   if (previousHome === undefined) delete process.env.COPILOT_HOME; else process.env.COPILOT_HOME = previousHome;

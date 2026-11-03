@@ -9,7 +9,7 @@ removing preparation or cleanup evidence.
 
 This contract applies to the main interactive migration orchestrator. Automated
 implementers, reviewers, arbiters and fixers keep their JSON contracts and never
-ask the user questions. Use the language recorded in `migration/preferences.json`
+ask the user questions. Use the language recorded in the kit's preferences record
 (`run_migration.mjs preferences`) for reports, questions, TODO labels and next
 instructions; if it is unset, ask 日本語 / English first and record the answer.
 Link `.en.md` documents for English and `.md` documents for Japanese.
@@ -110,9 +110,9 @@ starts with `setupNotice` (setup is still manual), and `autoHandoff` ends setup:
 show it and stop before phase 00 so the person can switch to autopilot. Then
 `settings init` writes the rest (migration languages, roots, verification mode,
 commands, and per-role model, effort and context changes) to
-`migration/run-settings.json`, and one question asks whether the person has
+`migration/settings.json`, and one question asks whether the person has
 filled it in or has a question; "filled in" runs `settings apply` (see the
-skill's run settings section). Only the report language is asked before
+skill's settings file section). Only the report language is asked before
 initialization. A later change of models alone, asked for in chat, is one
 question for every role, answered in the `role=ID:EFFORT[:long_context], ...` form that
 `models list` shows and recorded with one `models set --assign`. A

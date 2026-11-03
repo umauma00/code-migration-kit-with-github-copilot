@@ -11,7 +11,7 @@ import { modelCatalogCli } from './helpers.mjs';
 import { install, kitRoot } from '../scripts/install.mjs';
 import { readJSON, writeJSON, safePath } from '../lib/core.mjs';
 import { normalizeModels, setRoleModels } from '../lib/models.mjs';
-import { initRunSettings, applyRunSettings, syncRunSettings, runSettingsFile, autoHandoff } from '../lib/run-settings.mjs';
+import { initSettings, applySettings, syncSettings, settingsFile, autoHandoff } from '../lib/settings.mjs';
 import { setPreferences, readPreferences, autoModeFile } from '../lib/preferences.mjs';
 import { autoModeOn } from '../lib/auto-mode.mjs';
 import { interactiveDecision } from '../lib/guardrails.mjs';
@@ -26,24 +26,24 @@ function fresh(t, language = 'ja') {
   setRoleModels(root, models, { role: 'all', model: 'm' });
   return root;
 }
-const settingsOf = root => readJSON(safePath(root, runSettingsFile));
+const settingsOf = root => readJSON(safePath(root, settingsFile));
 // Answers the questions up to the phase mode, as the orchestrator would.
 function upToMode(root, mode) {
-  initRunSettings(root, models, { source: 'C#', target: 'TypeScript' });
-  setPreferences(root, { phaseMode: mode }); syncRunSettings(root, { keys: ['phaseMode'] });
+  initSettings(root, models, { source: 'C#', target: 'TypeScript' });
+  setPreferences(root, { phaseMode: mode }); syncSettings(root, { keys: ['phaseMode'] });
 }
-const runtime = (root, value) => { setPreferences(root, { originalRuntime: value }); syncRunSettings(root, { keys: ['originalRuntime'] }); };
+const runtime = (root, value) => { setPreferences(root, { originalRuntime: value }); syncSettings(root, { keys: ['originalRuntime'] }); };
 const cli = (root, ...args) => spawnSync(process.execPath, [path.join(kitRoot, 'scripts/run_migration.mjs'), ...args, '--copilot', modelCatalogCli(root, catalog)], { cwd: root, encoding: 'utf8' });
 
 test('normal mode: an original that runs needs no fifth question, no notice and no handoff', t => {
   const root = fresh(t);
   upToMode(root, 'normal');
   runtime(root, 'available');
-  const init = initRunSettings(root, models);
+  const init = initSettings(root, models);
   assert.equal(init.specificationQuestion, undefined);
   assert.equal(init.setupNotice, undefined);
   assert.match(init.next, /filled in/);
-  const applied = applyRunSettings(root, models);
+  const applied = applySettings(root, models);
   assert.equal(applied.applied, true, JSON.stringify(applied.errors));
   assert.equal(applied.next, undefined);
   assert.equal(applied.autoHandoff, undefined);
@@ -53,47 +53,47 @@ test('no runnable original and no specification: asked fifth, and source-as-spec
   const root = fresh(t);
   upToMode(root, 'normal');
   runtime(root, 'unavailable');
-  const asked = initRunSettings(root, models);
+  const asked = initSettings(root, models);
   assert.match(asked.next, /Ask specificationQuestion as one question.*preferences --specification available\|unavailable/s);
   assert.match(asked.specificationQuestion.question, /仕様書/);
   assert.deepEqual(asked.specificationQuestion.choices.map(c => c.value), ['available', 'unavailable']);
   // Applying before answering points back to the question.
-  assert.match(applyRunSettings(root, models).next, /specificationQuestion before phase 00/);
+  assert.match(applySettings(root, models).next, /specificationQuestion before phase 00/);
   const out = cli(root, 'preferences', '--specification', 'unavailable');
   assert.equal(out.status, 0, out.stderr);
   assert.equal(readPreferences(root).specification, 'unavailable');
-  assert.equal(initRunSettings(root, models).specificationQuestion, undefined, 'answered once');
-  const applied = applyRunSettings(root, models);
+  assert.equal(initSettings(root, models).specificationQuestion, undefined, 'answered once');
+  const applied = applySettings(root, models);
   assert.match(applied.next, /switch to source-as-spec now, before phase 00.*source-spec init --apply/s);
   const switched = cli(root, 'source-spec', 'init', '--apply');
   assert.equal(switched.status, 0, switched.stderr);
   const result = JSON.parse(switched.stdout);
   assert.match(result.next, /Phase 00 comes first/);
   assert.equal(result.autoHandoff, undefined, 'normal mode has no handoff');
-  assert.equal(readJSON(safePath(root, 'migration/config.json')).preparationProfile, 'source-as-spec');
+  assert.equal(readJSON(safePath(root, 'migration/state/config.json')).preparationProfile, 'source-as-spec');
   // A specification that exists keeps the profile as it was.
   const other = fresh(t);
   upToMode(other, 'normal'); runtime(other, 'unavailable');
   setPreferences(other, { specification: 'available' });
-  assert.equal(applyRunSettings(other, models).next, undefined);
+  assert.equal(applySettings(other, models).next, undefined);
   assert.throws(() => setPreferences(other, { specification: 'maybe' }), /available or unavailable/);
 });
 
 test('auto mode: every setup step says it is still manual, and setup ends with the autopilot handoff before phase 00', t => {
   const root = fresh(t);
   upToMode(root, 'auto');
-  const fourth = initRunSettings(root, models);
+  const fourth = initSettings(root, models);
   assert.match(fourth.setupNotice, /自動モードを選択済みです。初期設定が終わるまでは手動.*autopilot はまだ使えません。初期設定の確認は残り\d+回ほど/);
   const before = Number(fourth.setupNotice.match(/残り(\d+)回/)[1]);
   runtime(root, 'unavailable');
-  const fifth = initRunSettings(root, models);
+  const fifth = initSettings(root, models);
   assert.ok(fifth.specificationQuestion);
   assert.ok(Number(fifth.setupNotice.match(/残り(\d+)回/)[1]) < before, 'the count goes down as questions are answered');
   setPreferences(root, { specification: 'unavailable' });
-  const filled = initRunSettings(root, models);
+  const filled = initSettings(root, models);
   assert.match(filled.next, /filled in/);
   assert.ok(filled.setupNotice);
-  const applied = applyRunSettings(root, models);
+  const applied = applySettings(root, models);
   assert.equal(applied.applied, true, JSON.stringify(applied.errors));
   assert.ok(applied.setupNotice, 'the source-as-spec confirmation is still manual');
   assert.equal(applied.autoHandoff, undefined, 'no handoff before the switch');
@@ -103,15 +103,15 @@ test('auto mode: every setup step says it is still manual, and setup ends with t
   // With a runnable original, apply itself hands over.
   const other = fresh(t, 'en');
   upToMode(other, 'auto'); runtime(other, 'available');
-  const done = applyRunSettings(other, models);
+  const done = applySettings(other, models);
   assert.match(done.autoHandoff, /^Setup is done\. Switch to autopilot mode/);
   // Once phase 00 has started, apply never hands over again.
   writeJSON(safePath(other, 'migration/phases/starts/00.json'), { schemaVersion: 1 });
-  assert.equal(applyRunSettings(other, models).autoHandoff, undefined);
+  assert.equal(applySettings(other, models).autoHandoff, undefined);
   // Normal and relaxed mode never carry the notice.
   for (const mode of ['normal', 'relaxed']) {
     const r = fresh(t); upToMode(r, mode);
-    assert.equal(initRunSettings(r, models).setupNotice, undefined, mode);
+    assert.equal(initSettings(r, models).setupNotice, undefined, mode);
   }
 });
 
@@ -120,11 +120,11 @@ test('a mid-run project is past setup: no fifth question, no notice, no handoff'
     const root = fresh(t);
     upToMode(root, 'auto'); runtime(root, 'unavailable');
     writeJSON(safePath(root, record), { schemaVersion: 1 });
-    const init = initRunSettings(root, models);
+    const init = initSettings(root, models);
     assert.equal(init.specificationQuestion, undefined, record);
     assert.equal(init.setupNotice, undefined, record);
     assert.doesNotMatch(init.next, /specificationQuestion/, record);
-    const applied = applyRunSettings(root, models);
+    const applied = applySettings(root, models);
     assert.equal(applied.applied, true, JSON.stringify(applied.errors));
     assert.equal(applied.next, undefined, record);
     assert.equal(applied.autoHandoff, undefined, record);
@@ -139,19 +139,19 @@ test('auto mode hands over once per choice of auto, and counts what is left exac
   const root = fresh(t);
   upToMode(root, 'auto'); runtime(root, 'unavailable');
   // Apply before the specification answer: that question and the switch are left.
-  assert.match(applyRunSettings(root, models).setupNotice, /残り2回/);
+  assert.match(applySettings(root, models).setupNotice, /残り2回/);
   setPreferences(root, { specification: 'unavailable' });
-  assert.match(applyRunSettings(root, models).setupNotice, /残り1回/);
+  assert.match(applySettings(root, models).setupNotice, /残り1回/);
   assert.ok(JSON.parse(cli(root, 'source-spec', 'init', '--apply').stdout).autoHandoff);
   assert.equal(typeof readJSON(safePath(root, autoModeFile)).handedOffAt, 'string');
   assert.equal(autoModeOn(root), true, 'the handoff mark keeps auto mode in effect');
   // A later apply neither repeats the handoff nor says setup is manual.
-  const again = applyRunSettings(root, models);
+  const again = applySettings(root, models);
   assert.equal(again.autoHandoff, undefined);
   assert.equal(again.setupNotice, undefined);
-  assert.equal(initRunSettings(root, models).setupNotice, undefined);
+  assert.equal(initSettings(root, models).setupNotice, undefined);
   // Leaving auto and choosing it again hands over again.
-  setPreferences(root, { phaseMode: 'relaxed' }); syncRunSettings(root, { keys: ['phaseMode'] });
+  setPreferences(root, { phaseMode: 'relaxed' }); syncSettings(root, { keys: ['phaseMode'] });
   const back = JSON.parse(cli(root, 'preferences', '--phase-mode', 'auto').stdout);
   assert.match(back.autoHandoff, /初期設定が完了しました/);
   assert.match(back.next, /end the turn now/);
@@ -159,10 +159,10 @@ test('auto mode hands over once per choice of auto, and counts what is left exac
   assert.equal(JSON.parse(cli(root, 'preferences', '--phase-mode', 'auto').stdout).autoHandoff, undefined);
   // A hand-edited auto has no record and is not in effect; choosing it
   // properly, as status advises, is a new choice and hands over.
-  setPreferences(root, { phaseMode: 'relaxed' }); syncRunSettings(root, { keys: ['phaseMode'] });
-  const file = safePath(root, 'migration/preferences.json');
+  setPreferences(root, { phaseMode: 'relaxed' }); syncSettings(root, { keys: ['phaseMode'] });
+  const file = safePath(root, 'migration/state/preferences.json');
   writeJSON(file, { ...readJSON(file), phaseMode: 'auto' });
-  syncRunSettings(root, { keys: ['phaseMode'] });
+  syncSettings(root, { keys: ['phaseMode'] });
   assert.equal(autoModeOn(root), false);
   assert.match(JSON.parse(cli(root, 'preferences', '--phase-mode', 'auto').stdout).autoHandoff ?? '', /初期設定が完了しました/);
 });
@@ -170,17 +170,17 @@ test('auto mode hands over once per choice of auto, and counts what is left exac
 test('choosing auto after setup is applied hands over at once; during setup or after phase 00 it does not', t => {
   const root = fresh(t, 'en');
   upToMode(root, 'normal'); runtime(root, 'available');
-  assert.equal(applyRunSettings(root, models).applied, true);
+  assert.equal(applySettings(root, models).applied, true);
   const out = cli(root, 'preferences', '--phase-mode', 'auto');
   assert.equal(out.status, 0, out.stderr);
   assert.match(JSON.parse(out.stdout).autoHandoff, /Setup is done/);
   // During setup (the file is not applied yet) the handoff waits for apply.
   const early = fresh(t);
-  initRunSettings(early, models, { source: 'C#', target: 'TypeScript' });
+  initSettings(early, models, { source: 'C#', target: 'TypeScript' });
   assert.equal(JSON.parse(cli(early, 'preferences', '--phase-mode', 'auto').stdout).autoHandoff, undefined);
   // After phase 00 has started it never comes.
   const late = fresh(t);
-  upToMode(late, 'normal'); runtime(late, 'available'); applyRunSettings(late, models);
+  upToMode(late, 'normal'); runtime(late, 'available'); applySettings(late, models);
   writeJSON(safePath(late, 'migration/phases/starts/00.json'), { schemaVersion: 1 });
   assert.equal(JSON.parse(cli(late, 'preferences', '--phase-mode', 'auto').stdout).autoHandoff, undefined);
 });
@@ -198,7 +198,7 @@ test('the specification answer: validated everywhere, recorded unasked, and the 
   assert.notEqual(bad.status, 0);
   assert.match(bad.stderr, /--specification must be one of available, unavailable, not maybe/);
   // A hand-edited invalid answer is rejected by the runner and is never auto mode.
-  const file = safePath(root, 'migration/preferences.json');
+  const file = safePath(root, 'migration/state/preferences.json');
   writeJSON(file, { ...readJSON(file), specification: 'maybe' });
   assert.throws(() => readPreferences(root), /specification must be available or unavailable/);
   assert.equal(autoModeOn(root), false);
@@ -207,27 +207,27 @@ test('the specification answer: validated everywhere, recorded unasked, and the 
 test('a setup answer changed after the handoff still settles the verification method before phase 00', t => {
   const root = fresh(t);
   upToMode(root, 'auto'); runtime(root, 'available');
-  assert.ok(applyRunSettings(root, models).autoHandoff);
+  assert.ok(applySettings(root, models).autoHandoff);
   // The original turns out not to run.
   runtime(root, 'unavailable');
-  const init = initRunSettings(root, models);
+  const init = initSettings(root, models);
   assert.ok(init.specificationQuestion);
   assert.equal(init.setupNotice, undefined, 'handed off already');
-  assert.match(applyRunSettings(root, models).next, /specificationQuestion before phase 00/);
+  assert.match(applySettings(root, models).next, /specificationQuestion before phase 00/);
   setPreferences(root, { specification: 'unavailable' });
-  const applied = applyRunSettings(root, models);
+  const applied = applySettings(root, models);
   assert.match(applied.next, /switch to source-as-spec now, before phase 00/);
   assert.equal(applied.autoHandoff, undefined);
   const switched = JSON.parse(cli(root, 'source-spec', 'init', '--apply').stdout);
   assert.match(switched.next, /Phase 00 comes first/);
   assert.equal(switched.autoHandoff, undefined, 'the handoff is not repeated');
-  assert.equal(readJSON(safePath(root, 'migration/config.json')).preparationProfile, 'source-as-spec');
+  assert.equal(readJSON(safePath(root, 'migration/state/config.json')).preparationProfile, 'source-as-spec');
 });
 
 test('phase 00 cannot start, complete or be waived before setup settles the verification method', t => {
   const root = fresh(t);
   upToMode(root, 'relaxed'); runtime(root, 'unavailable');
-  assert.equal(applyRunSettings(root, models).applied, true);
+  assert.equal(applySettings(root, models).applied, true);
   for (const args of [['phase', 'start', '00'], ['phase', 'complete', '00', '--note', 'Reviewed setup'], ['phase', 'waive', '00', '--note', 'later']]) {
     const out = cli(root, ...args);
     assert.notEqual(out.status, 0, args.join(' '));
@@ -244,7 +244,7 @@ test('phase 00 cannot start, complete or be waived before setup settles the veri
   for (const [rt, spec] of [['unavailable', 'available'], ['available', undefined]]) {
     const r = fresh(t); upToMode(r, 'normal'); runtime(r, rt);
     if (spec) setPreferences(r, { specification: spec });
-    applyRunSettings(r, models);
+    applySettings(r, models);
     const out = cli(r, 'phase', 'start', '00');
     assert.equal(out.status, 0, `${rt}/${spec}: ${out.stderr}`);
   }
@@ -254,7 +254,7 @@ test('source-spec init --apply before settings apply does not end setup', t => {
   const root = fresh(t);
   upToMode(root, 'auto'); runtime(root, 'unavailable'); setPreferences(root, { specification: 'unavailable' });
   // The file is not applied yet (a role still differs from it).
-  const file = safePath(root, runSettingsFile), settings = readJSON(file);
+  const file = safePath(root, settingsFile), settings = readJSON(file);
   settings.models.fixer = { ...settings.models.fixer, effort: 'low' };
   writeJSON(file, settings);
   const out = cli(root, 'source-spec', 'init', '--apply');
@@ -262,7 +262,7 @@ test('source-spec init --apply before settings apply does not end setup', t => {
   const result = JSON.parse(out.stdout);
   assert.equal(result.autoHandoff, undefined);
   assert.match(result.next, /setup, which is not finished: run settings init/);
-  assert.match(applyRunSettings(root, models).autoHandoff, /初期設定が完了しました/);
+  assert.match(applySettings(root, models).autoHandoff, /初期設定が完了しました/);
 });
 
 // Copilot CLI, the Copilot app and VS Code each switch to autopilot their own

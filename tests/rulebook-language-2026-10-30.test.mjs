@@ -44,8 +44,8 @@ test('the installer starts the RULEBOOK in the chosen language for both layouts'
       ['not json', 'ja', 'RULEBOOK.ja.md'], ['{"schemaVersion":1,"userLanguage":null}', 'ja', 'RULEBOOK.ja.md']]) {
       const other = fs.mkdtempSync(path.join(os.tmpdir(), `rulebook-fallback-${layout}-`));
       t.after(() => fs.rmSync(other, { recursive: true, force: true }));
-      fs.mkdirSync(path.join(other, 'migration'));
-      fs.writeFileSync(path.join(other, 'migration/preferences.json'), recorded);
+      fs.mkdirSync(path.join(other, 'migration/state'), { recursive: true });
+      fs.writeFileSync(path.join(other, 'migration/state/preferences.json'), recorded);
       install(other, { apply: true, layout, language: option });
       assert.equal(rulebook(other), template(expected), `${layout} ${recorded}`);
     }

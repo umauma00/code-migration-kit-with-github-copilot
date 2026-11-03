@@ -59,7 +59,7 @@ test('Astra S3: parallel transient retries never exceed maxAgentCalls', async t 
   const f = prepare(t, { count: 3 });
   Object.assign(f.config, { transientRetryDelayMs: 20, concurrency: 2, maxAgentCalls: 3 }); f.config.commands.typecheck = null;
   writeJSON(safePath(f.root, 'migration/review-dependencies.json'), { schemaVersion: 1, dependencies: Object.fromEntries(f.units.map(u => [u.source, []])) });
-  writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   await runStage(f.root, f.config, 'judge'); approve(f.root, f.config, 'translation', 'Astra S3 fixture');
   let calls = 0; const failed = new Set();
   await assert.rejects(translate(f.root, f.config, async args => {

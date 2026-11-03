@@ -77,7 +77,7 @@ test('diagnostics keep errors over warnings, report unmapped paths and resolve u
 test('diagnose turns a failed recorded build into a repair queue and round log; repair completes it', async t => {
 const f = prepare(t, { count: 3 });
   f.config.commands.build = [process.execPath, '-e', 'console.error("ported/math_ops.mjs:3:5: error: boom\\nvendor/lib.c:1:1: error: not ours"); process.exit(1)'];
-  writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   await runStage(f.root, f.config, 'judge'); approve(f.root, f.config, 'translation', 'Fixture translation');
   await translate(f.root, f.config, fake);
   approve(f.root, f.config, 'build', 'Fixture build');
@@ -97,7 +97,7 @@ const f = prepare(t, { count: 3 });
 test('diagnose refuses to guess when a failed build maps to no manifest target', async t => {
 const f = prepare(t);
   f.config.commands.build = [process.execPath, '-e', 'console.error("linker: undefined reference"); process.exit(1)'];
-  writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   await runStage(f.root, f.config, 'judge'); approve(f.root, f.config, 'translation', 'Fixture translation');
   await translate(f.root, f.config, fake);
   approve(f.root, f.config, 'build', 'Fixture build');

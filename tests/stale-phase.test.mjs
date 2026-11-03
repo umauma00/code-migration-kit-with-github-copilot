@@ -17,7 +17,7 @@ const write = (f, name, value) => atomicWrite(safePath(f.root, name), value);
 function recorded(t) {
   const f = prepare(t, { count: 3 });
   f.config.phasePolicy = 'strict';
-  writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   for (const name of ['migration/judge-report.md', 'migration/depmap/report.md', 'migration/gap-report.md']) write(f, name, 'Synthetic preparation evidence; not actual AI review or human approval.\n');
   for (const id of ['00', '00b', '01', '02']) phaseCommand(f.root, f.config, 'complete', id, { note: 'Test fixture reviewed preparation only' });
   assert.equal(phaseCommand(f.root, f.config, 'next').next, '03');
@@ -103,17 +103,22 @@ test('02 names the changed input part; a record without parts still explains its
 test('settings and verification changes mean redo; host guidance still knows the gate', t => {
   const f = recorded(t);
   const changed = { ...f.config, targetLanguage: 'Go' };
-  writeJSON(safePath(f.root, 'migration/config.json'), changed);
+  writeJSON(safePath(f.root, 'migration/state/config.json'), changed);
   const settings = phaseStaleness(f.root, changed, '00');
   assert.equal(settings.action, 'redo');
   assert.ok(settings.reasons.some(r => r.kind === 'settings' && !r.unsure));
-  writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   assert.equal(phaseCommand(f.root, f.config, 'next').next, '03', 'restoring the setting restores the records');
-  // A verification file is part of 02's approved inputs.
+  // A verification file is an input of the judge (phase 00b), not of what
+  // phase 02 says (0.45.0): 00b is redone, and 01 and 02 after it are only
+  // checked and recorded again.
   fs.appendFileSync(safePath(f.root, 'tests/judge.py'), '# changed\n');
+  const judge = phaseStaleness(f.root, f.config, '00b');
+  assert.equal(judge.action, 'redo');
+  assert.ok(judge.reasons.some(r => r.kind === 'judge-inputs'));
   const verification = phaseStaleness(f.root, f.config, '02');
-  assert.equal(verification.action, 'redo');
-  assert.ok(verification.reasons.some(r => r.part === 'judge'));
+  assert.equal(verification.action, 'record-again');
+  assert.deepEqual(verification.reasons.map(r => r.kind), ['predecessor']);
   // The new gate message keeps its phase-order guidance.
   // After 00b is redone for a judge change, 01 only waits on 00b's new record.
   const g0 = recorded(t);

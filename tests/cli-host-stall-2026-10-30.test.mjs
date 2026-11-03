@@ -38,7 +38,7 @@ test('the CLI host stall is a transient failure in the message, on stderr and as
 
 async function stallFixture(t, failures, executionMode = 'bounded', rateLimited = 0) {
   const f = prepare(t, { executionMode }); f.config.transientRetryDelayMs = 1;
-  writeJSON(safePath(f.root, 'migration/config.json'), f.config);
+  writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   await runStage(f.root, f.config, 'judge');
   approve(f.root, f.config, 'translation', 'Regression fixture only');
   const unit = f.units[0], counter = safePath(f.root, 'calls.txt'), script = safePath(f.root, 'stall-cli.mjs');

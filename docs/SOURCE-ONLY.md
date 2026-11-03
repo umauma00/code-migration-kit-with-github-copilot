@@ -8,8 +8,10 @@ or mutation commands. Inference remains distinct from measured equivalence.
 Runtime verification remains the default. For a new project initialize with
 `--verification-mode source-only`; existing config is retained even when this
 option is supplied. For an existing project, explicitly set
-`verificationMode: "source-only"` in migration/config.json at a phase boundary.
-Changing the mode invalidates prior receipts and approvals through the context hash.
+`verificationMode: "source-only"` in migration/settings.json at a phase boundary.
+Changing the mode sends back the phase records from 00, the judge and the runs
+after it, and the translation approval; finished units are kept (since 0.45.0,
+see [what a change sends back](REFERENCE.en.md#what-a-change-sends-back)).
 Models, concurrency, call limits and fix limits remain unchanged.
 
 00 assesses feasibility and scope. 00b prepares source-derived public contracts,
