@@ -113,7 +113,7 @@ apply the UNKNOWN rule, keep moving.
 
 ## 6. Per-file obligations
 
-Every translated file ends with a status trailer:
+Every translated file, except a JSON file, ends with a status trailer:
 
 ```
 // PORT STATUS: confidence=medium todos=2
@@ -123,11 +123,12 @@ This is an example. Write `confidence=` as one of `high`, `medium` or `low`,
 and `todos=` as the plain number of lines containing `TODO(port)` — no
 brackets. Use the target's line-comment syntax and put the trailer after the
 file's last closing brace, never inside a class or function. A format without
-line comments puts the trailer in one comment that ends on that same line,
-after everything else in the file: `<!-- PORT STATUS: confidence=medium todos=2 -->`
+line comments puts the trailer in one comment that opens and ends on that same
+line, after everything else in the file: `<!-- PORT STATUS: confidence=medium todos=2 -->`
 after the closing root tag in XML or HTML, `<%-- PORT STATUS: confidence=medium todos=2 --%>`
-in JSP, `/* PORT STATUS: confidence=medium todos=2 */` in CSS. A JSON file has
-no comments, so it carries no trailer.
+in JSP, `/* PORT STATUS: confidence=medium todos=2 */` in CSS. A JSON file
+(`.json`, `.jsonl` and the other JSON formats) has no comments, so it carries
+no trailer.
 Reviewers check the trailer against the file's actual `TODO(port)` count —
 a trailer that overcounts or undercounts is a finding.
 

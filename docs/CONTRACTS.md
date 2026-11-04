@@ -128,26 +128,34 @@ the unit to the full review loop.
 With `markerPolicy: "todo-lines-v1"` a unit completes only with exactly one
 PORT STATUS trailer, on the last nonempty line, whose `todos` is the number of
 lines containing `TODO(port)`. Only the closer of a comment that ends on that
-line may follow the number (`-->`, `--%>`, `%>`, `*/`, `*@`, `#}`, `*)`), so a
-format without line comments, such as XML, ends the file with
-`<!-- PORT STATUS: confidence=medium todos=2 -->`. A JSON-family file
-(`.json`, `.jsonl`, `.ndjson`, `.geojson`, `.webmanifest`) has no comments and
-completes without a trailer; a trailer there is a `marker:M1` finding to remove
-it. One finished by 0.45.0 or earlier with the trailer those kits asked for
-keeps its receipt while that trailer passes their check. The implementer's
-and the fixer's files are checked before they are written, with one
-correction. A wrong trailer on a
-written file becomes the confirmed finding `marker:M1` for the fixer, and the
-fixed file is reviewed: a file about to be reviewed (a worker's, an earlier
-run's, a resumed unit's) goes to the fixer first, a single-pass fix when the
-unit would complete. A trailer fix is not a fix round (`maxFixRounds` neither
-stops nor counts it) and keeps its stage `fix` with no reviews when resumed;
-before the fixer is called the file is checked again, and one that passes
-goes to review with no fixer call (a fix stopped under an earlier rule);
-after two in one run the unit is blocked with the reason. An invalid `markerEvidence`
-carries `problem` (what is wrong, with line numbers); a valid one keeps its six
-fields, so existing receipts still match. A JSON file valid without a trailer
-adds `noTrailer`.
+line may follow the number (`trailerClosers`: `-->`, `--%>`, `%>`, `*/`, `*@`,
+`#}`, `*)`), so a format without line comments, such as XML, ends the file
+with `<!-- PORT STATUS: confidence=medium todos=2 -->`. A comment the trailer
+line opens before `PORT STATUS:` (`<!--`, `<%--`, `<%#`, `/*`, `{#`, `@*`,
+`(*`) ends there with its own closer; a comment opened on a line above is not
+checked. A JSON-family file (`.json`, `.jsonl`, `.ndjson`, `.geojson`,
+`.topojson`, `.jsonld`, `.webmanifest`, `.ipynb`, `.har`, `.sarif`, `.gltf`)
+has no comments and completes without a trailer; a trailer there is a
+`marker:M1` finding to remove it. These rules hold every new answer. A unit
+finished by an earlier kit keeps its receipt while its file passes the count
+and the place (`finishedMarkerEvidence`, used by `unitDone`): a JSON file
+finished by 0.45.0 or earlier with the trailer those kits asked for, or an XML
+file finished with a comment left open, stays finished, and a receipt holds
+only for the content it was recorded with. The implementer's and the fixer's
+files are checked before they are written, with one correction. A wrong
+trailer on a written file becomes the confirmed finding `marker:M1` for the
+fixer, and the fixed file is reviewed: a file about to be reviewed (a
+worker's, an earlier run's, a resumed unit's) goes to the fixer first, a
+single-pass fix when the unit would complete. A trailer fix is not a fix
+round (`maxFixRounds` neither stops nor counts it) and keeps its stage `fix`
+with no reviews when resumed; before the fixer is called the file is checked
+again, and one that passes now goes to review with no fixer call and no
+review records (a fix stopped under an earlier rule), while one that still
+fails gives the fixer the problem as this kit finds it. After two in one run
+the unit is blocked with the reason. An invalid `markerEvidence` carries
+`problem` (what is wrong, with line numbers); a valid one keeps its six
+fields, so existing receipts still match. The evidence of a JSON-family file
+adds `noTrailer: true`, valid or not.
 
 A worker answer that is not one JSON object or has the wrong shape, one that
 ended without a final message ("Copilot JSONL is incomplete"), and an

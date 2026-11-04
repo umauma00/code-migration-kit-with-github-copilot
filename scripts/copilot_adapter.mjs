@@ -12,6 +12,7 @@ import { isReviewer, isToolFree, toolAssistedRole, assistedReviewerRoles, valida
 import { runtimeLayout } from '../lib/runtime.mjs';
 import { sessionIdPattern } from '../lib/sessions.mjs';
 import { recordCallUsage } from '../lib/usage.mjs';
+import { trailerClosers, commentlessExtensions } from '../lib/markers.mjs';
 import { prepareWorkerHome, workerCopilotHome as workerHomeOf } from '../lib/worker-home.mjs';
 import { isSignedOut, isHomeStateFailure } from '../lib/failures.mjs';
 
@@ -326,13 +327,16 @@ export const usesWorkInput = (role, workMode) => implementationRoles.includes(ro
 // not plain digits on the last nonempty line. Workers copied the template's
 // `todos=[N]` brackets and put the trailer inside the class, which blocked
 // finished units, so the writing roles get the exact form.
-const trailerRule = ' The LAST nonempty line of content is exactly one status trailer in the target\'s line-comment syntax, after the final closing brace (never inside a class or function), for example `// PORT STATUS: confidence=medium todos=2`: confidence is your own high, medium or low, and todos is the plain decimal number of lines containing TODO(port) in YOUR content, counted, not copied from this example, without brackets.' +
-  // 2026-11-04: XML had no form that passed (lib/markers.mjs).
-  ' A format without line comments puts the trailer in one comment that ends on that last line, after everything else: `<!-- PORT STATUS: confidence=medium todos=2 -->` in XML or HTML (after the closing root tag), `<%-- PORT STATUS: confidence=medium todos=2 --%>` in JSP, `/* PORT STATUS: confidence=medium todos=2 */` in CSS. A JSON file has no comments: it carries no trailer.';
+// 2026-11-04: XML had no form that passed, and a JSON file none it could carry
+// (lib/markers.mjs); the existing RULEBOOK asks every file for a trailer.
+const jsonFiles = `a JSON file (${commentlessExtensions}), which has no comments`;
+const trailerRule = ` Unless the target is ${jsonFiles} and carries no trailer, the LAST nonempty line of content is exactly one status trailer in the target's line-comment syntax, after the final closing brace (never inside a class or function), for example \`// PORT STATUS: confidence=medium todos=2\`: confidence is your own high, medium or low, and todos is the plain decimal number of lines containing TODO(port) in YOUR content, counted, not copied from this example, without brackets.` +
+  ' A format without line comments puts the trailer in one comment that opens and ends on that last line, after everything else: `<!-- PORT STATUS: confidence=medium todos=2 -->` in XML or HTML (after the closing root tag, also in an HTML template such as Handlebars), `<%-- PORT STATUS: confidence=medium todos=2 --%>` in JSP, `/* PORT STATUS: confidence=medium todos=2 */` in CSS;' +
+  ` only these closers end it: ${trailerClosers.join(' ')}.`;
 // Reviewers and the arbiter hear the same forms, so a trailer the coordinator
 // accepts is not reported, confirmed and sent to the fixer for a form no file
 // of that format can have.
-const trailerForms = 'In a format without line comments the PORT STATUS trailer is one comment that ends on the last line, such as `<!-- PORT STATUS: confidence=medium todos=2 -->` in XML or HTML, and a JSON file carries none';
+const trailerForms = `In a format without line comments the PORT STATUS trailer is one comment that ends on the last line, such as \`<!-- PORT STATUS: confidence=medium todos=2 -->\` in XML or HTML, and ${jsonFiles}, carries none`;
 export function agentPrompt({ role, unit, extra = {}, reviewInput, frozenInput, reviewMode = 'frozen', reviewFocus, workInput, workMode, markerPolicy }) {
   const trailer = markerPolicy === 'todo-lines-v1' ? trailerRule : '';
   const forms = markerPolicy !== 'todo-lines-v1' ? '' : isReviewer(role) ? ` ${trailerForms}: report neither form as a defect (markerEvidence in the input is the coordinator's own count).`

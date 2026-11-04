@@ -99,8 +99,11 @@ comments, like grep -c rather than syntax parsing. Two markers on one line count
 as one. Exactly one PORT STATUS line must be the final nonempty line, ending in
 `PORT STATUS: confidence=high|medium|low todos=N` using the target's comment syntax.
 A format without line comments ends that line with the closer of its comment
-(`<!-- PORT STATUS: confidence=medium todos=2 -->` in XML or HTML); a JSON-family
-file, which has no comments, carries none.
+(`<!-- PORT STATUS: confidence=medium todos=2 -->` in XML or HTML), and a comment
+the line opens before PORT STATUS closes on it; a JSON-family file (`.json`,
+`.jsonl` and the other formats `carriesNoTrailer` names), which has no
+comments, carries none. A unit finished by an earlier kit keeps its receipt
+while the count and the place still match (docs/CONTRACTS.md).
 
 The coordinator gives both reviewers identical measured candidate-bound evidence.
 After successful independent review it rejects mismatched/missing counts instead
