@@ -12,8 +12,10 @@
 // holds for the content it was recorded with.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { prepare, fake, result, mini } from './helpers.mjs';
 import { safePath, writeJSON, atomicWrite, readManifest, readJSON, unitState, statePath, fileHash, inputContext, done } from '../lib/core.mjs';
@@ -429,4 +431,75 @@ test('a JSON file\'s fixer is not told to count a TODO(port) line in the trailer
   assert.equal(fixers.length, 2);
   assert.equal(fixers[1].extra.correction, 'You returned the current candidate unchanged, but the findings in extra.confirmedFindings are still open. Change the file for each one. When one cannot be fixed in this file (it needs an inventory or RULEBOOK change, or a change in another file), add a line "TODO(port): <its reference>: <what is needed>" where it applies, instead of returning the file unchanged. Return the complete file again with this corrected.');
   assert.equal(done(f.root, f.json, inputContext(f.root, f.config)), true);
+});
+
+// UPGRADING (0.45.1, item 4) gives two searches a person pastes into a shell
+// to find what a strict reader rejects in finished files. They run here as
+// the documents print them: in this platform's shell (cmd on Windows, sh
+// elsewhere), in PowerShell on Windows, and in an interactive bash elsewhere,
+// whose history expansion stopped an earlier draft (`<!--`) before it ran.
+test('the searches in UPGRADING list what a strict reader rejects and nothing else, pasted into each shell', t => {
+  const doc = name => fs.readFileSync(path.join(import.meta.dirname, '..', 'docs', name), 'utf8');
+  const searches = text => text.split('\n').map(line => line.trim()).filter(line => line.startsWith('git -c core.quotepath=off grep --no-index '));
+  const commands = searches(doc('UPGRADING.md'));
+  assert.equal(commands.length, 2);
+  assert.deepEqual(searches(doc('UPGRADING.en.md')), commands);
+  // `!` expands history in an interactive bash or zsh, `%` a variable in a
+  // batch file, and a backtick escapes in PowerShell.
+  for (const command of commands) assert.doesNotMatch(command, /[!%`]/);
+  if (spawnSync('git', ['--version']).status !== 0) { t.skip('git is not installed'); return; }
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'upgrading-search-')), project = path.join(root, 'project');
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const put = (name, ...lines) => { const target = path.join(project, name); fs.mkdirSync(path.dirname(target), { recursive: true }); fs.writeFileSync(target, file(...lines)); };
+  // Listed: JSON trailers (in any case of the extension), comments left open
+  // (also after code, and with CRLF), bare lines.
+  put('ported/a.json', '{"a": 1}', '// PORT STATUS: confidence=high todos=0');
+  put('ported/B.JSON', '{"b": 1}', 'PORT STATUS: confidence=high todos=0');
+  put('ported/c.ipynb', '{}', '# PORT STATUS: confidence=high todos=0');
+  put('ported/open.xml', '<r/>', '<!-- PORT STATUS: confidence=low todos=0');
+  put('ported/after.xml', '<r>', '</r><!-- PORT STATUS: confidence=low todos=0');
+  fs.writeFileSync(path.join(project, 'ported/crlf.xml'), '<r/>\r\n<!-- PORT STATUS: confidence=low todos=[2]\r\n');
+  put('ported/bare.xml', '<r/>', '<!--', 'PORT STATUS: confidence=low todos=0');
+  put('ported/bare.jsp', '<p/>', 'PORT STATUS: confidence=high todos=0');
+  put('ported/open.jsp', '<p/>', '<%-- PORT STATUS: confidence=high todos=0');
+  put('ported/open.erb', '<p/>', '<%# PORT STATUS: confidence=high todos=0');
+  put('ported/code.java', 'class A {}', 'int x; /* PORT STATUS: confidence=high todos=0');
+  put('ported/razor.cshtml', '<p/>', '@* PORT STATUS: confidence=high todos=0');
+  put('ported/jinja.html', '<p/>', '{# PORT STATUS: confidence=high todos=0');
+  put('ported/pascal.pas', 'end.', '(** PORT STATUS: confidence=high todos=0');
+  put('ported/日本語.xml', '<r/>', '<!-- PORT STATUS: confidence=low todos=0');
+  // Not listed: trailers that are right, and the kit's records.
+  put('ported/ok.xml', '<r/>', '<!-- PORT STATUS: confidence=medium todos=2 -->');
+  put('ported/above.html', '<p/>', '<!--', 'PORT STATUS: confidence=high todos=0 -->');
+  put('ported/ok.java', 'class B {}', '// PORT STATUS: confidence=high todos=0');
+  put('ported/ok.cs', 'class C {}', '/// PORT STATUS: confidence=high todos=0');
+  put('ported/ok.py', 'x = 1', '# PORT STATUS: confidence=high todos=0');
+  put('ported/ok.sql', 'select 1;', '-- PORT STATUS: confidence=high todos=0');
+  put('ported/ok.css', 'p {}', '/* PORT STATUS: confidence=high todos=0 */');
+  put('ported/ok.erb', '<p/>', '<%# PORT STATUS: confidence=high todos=0 --%>');
+  put('migration/runs/answer.json', '{}', 'PORT STATUS: confidence=high todos=0');
+  put('migration/state/units/u.xml', '<!-- PORT STATUS: confidence=low todos=0');
+  put('migration-kit/templates/RULEBOOK.md', '<!-- PORT STATUS: confidence=medium todos=2');
+  put('migration-kit/x.json', '{}', 'PORT STATUS: confidence=high todos=0');
+  const json = ['ported/B.JSON:2', 'ported/a.json:2', 'ported/c.ipynb:2'].sort();
+  const open = ['ported/B.JSON:2', 'ported/after.xml:2', 'ported/bare.jsp:2', 'ported/bare.xml:3', 'ported/code.java:2', 'ported/crlf.xml:2', 'ported/jinja.html:2',
+    'ported/open.erb:2', 'ported/open.jsp:2', 'ported/open.xml:2', 'ported/pascal.pas:2', 'ported/razor.cshtml:2', 'ported/日本語.xml:2'].sort();
+  const hits = output => output.replace(/\r/g, '').split('\n').flatMap(line => { const hit = line.match(/^(.+?):(\d+):/); return hit ? [`${hit[1]}:${hit[2]}`] : []; }).sort();
+  const shells = [{ name: process.platform === 'win32' ? 'cmd' : 'sh', run: command => spawnSync(command, { cwd: project, shell: true, encoding: 'utf8' }) }];
+  if (process.platform === 'win32') {
+    // As typed at a PowerShell prompt: the script is the command itself. The
+    // output reaches this test through PowerShell, which may re-encode it, so
+    // a name outside ASCII is left to the cmd run (at a prompt git writes it
+    // to the console itself).
+    for (const exe of ['powershell.exe', 'pwsh.exe']) if (spawnSync(exe, ['-NoProfile', '-Command', 'exit 0']).status === 0)
+      shells.push({ name: exe, ascii: true, run: command => spawnSync(exe, ['-NoProfile', '-NonInteractive', '-EncodedCommand', Buffer.from(command, 'utf16le').toString('base64')], { cwd: project, encoding: 'utf8' }) });
+  } else if (spawnSync('bash', ['--version']).status === 0)
+    shells.push({ name: 'interactive bash', run: command => spawnSync('bash', ['--norc', '--noprofile', '-i'], { cwd: project, input: `${command}\n`, encoding: 'utf8', env: { ...process.env, HISTFILE: path.join(root, 'history') } }) });
+  const named = (list, ascii) => ascii ? list.filter(hit => /^ported\/[A-Za-z.]+:\d+$/.test(hit)) : list;
+  for (const shell of shells) {
+    const [first, second] = commands.map(command => shell.run(command));
+    assert.deepEqual(named(hits(first.stdout), shell.ascii), named(json, shell.ascii), `${shell.name}: ${first.stderr}`);
+    assert.deepEqual(named(hits(second.stdout), shell.ascii), named(open, shell.ascii), `${shell.name}: ${second.stderr}`);
+    assert.ok(second.stdout.replace(/\r/g, '').includes('ported/bare.xml-2-<!--\n'), `${shell.name}: the line above a bare line`);
+  }
 });

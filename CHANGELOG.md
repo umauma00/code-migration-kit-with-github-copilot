@@ -71,27 +71,33 @@ trailer.
   in a finished file (a JSON trailer, an open comment, a bare line) without
   touching the kit's records under `migration/`, whose copies of worker
   answers carry trailers too.
-- Test: `tests/trailer-formats-2026-11-04.test.mjs`, fifteen tests. 144
+- Test: `tests/trailer-formats-2026-11-04.test.mjs`, sixteen tests. 144
   trailers that passed 0.45.0, against five kinds of target (720
   comparisons): every receipt holds, and a new answer records the same
   fields except for a comment left open and in JSON. The forms of XML, HTML,
   JSP, CSS, Razor, Jinja, ERB and OCaml, a comment opened above and one
   inside a line comment pass with the same six fields; a comment the trailer
   opens and leaves open, or closes with another comment's closer, fails
-  (`<%# ... --%>` passes), and a unit finished with one keeps its receipt; braces and parentheses after the
-  count still fail; a comment closed below the trailer; JSON with and
-  without a trailer, its extensions, a JSON receipt of 0.45.0 and no other;
-  flags in the new comment forms, and `{#` after code; the prompts of every
-  role; the templates. Runs: Database.xml and a JSON file finishing on their
-  first answer with no fixer call, both review inputs carrying the
-  coordinator's count; a JSON file finished with a trailer by 0.45.0 staying
-  finished, and reviewed once when the trailer is removed by hand; trailer
-  fixes stopped under 0.45.0, two reviewed with no fixer call and one fixed
-  with today's problem; Database.xml blocked by 0.45.0 after two fixes,
-  reviewed with no fixer call, and a JSON file 0.45.0 reviewed with a
-  trailer, fixed once; a JSON answer with a trailer fixed once; a JSON
-  file's fixer not told to count. All fifteen fail on 0.45.0 (given
-  stand-ins for the names it does not export). In
+  (`<%# ... --%>` passes), and a unit finished with one keeps its receipt;
+  braces and parentheses after the count still fail; a comment closed below
+  the trailer; JSON with and without a trailer, its extensions, a JSON
+  receipt of 0.45.0 and no other; flags in the new comment forms, and `{#`
+  after code; the prompts of every role; the templates. Runs: Database.xml
+  and a JSON file finishing on their first answer with no fixer call, both
+  review inputs carrying the coordinator's count; a JSON file finished with a
+  trailer by 0.45.0 staying finished, and reviewed once when the trailer is
+  removed by hand; trailer fixes stopped under 0.45.0, two reviewed with no
+  fixer call and one fixed with today's problem; Database.xml blocked by
+  0.45.0 after two fixes, reviewed with no fixer call, and a JSON file 0.45.0
+  reviewed with a trailer, fixed once; a JSON answer with a trailer fixed
+  once; a JSON file's fixer not told to count. All fifteen fail on 0.45.0
+  (given stand-ins for the names it does not export). The sixteenth runs the
+  two searches of UPGRADING as the documents print them, in this platform's
+  shell (cmd on Windows, sh elsewhere), in PowerShell on Windows and in an
+  interactive bash elsewhere: they list the JSON trailers (in any case of the
+  extension), comments left open (also after code, and with CRLF) and bare
+  lines, and no trailer that is right and nothing under `migration/` or
+  `migration-kit/`. In
   `tests/self-repair-2026-11-01.test.mjs` a forged trailer-fix receipt whose
   trailer passes now gets two fresh reviews with no fixer call, and one whose
   file is wrong still goes to the fixer first.

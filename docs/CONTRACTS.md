@@ -133,9 +133,10 @@ line may follow the number (`trailerClosers`: `-->`, `--%>`, `%>`, `*/`, `*@`,
 with `<!-- PORT STATUS: confidence=medium todos=2 -->`. A comment opened
 right before `PORT STATUS:` (`<!--`, `<%--`, `<%#`, `/*`, `{#`, `@*`, `(*`;
 spaces aside) ends on the trailer line with its own closer; one opened earlier
-on the line or on a line above is not checked. A JSON-family file (`.json`, `.jsonl`, `.ndjson`, `.geojson`,
-`.topojson`, `.jsonld`, `.webmanifest`, `.ipynb`, `.har`, `.sarif`, `.gltf`)
-has no comments and completes without a trailer; a trailer there is a
+on the line or on a line above is not checked. A JSON-family file (`.json`,
+`.jsonl`, `.ndjson`, `.geojson`, `.topojson`, `.jsonld`, `.webmanifest`,
+`.ipynb`, `.har`, `.sarif`, `.gltf`) has no comments and completes without a
+trailer; a trailer there is a
 `marker:M1` finding to remove it. These rules hold every new answer. A unit
 finished by an earlier kit keeps its receipt while its file passes the count
 and the place (`finishedMarkerEvidence`, used by `unitDone`): a JSON file
