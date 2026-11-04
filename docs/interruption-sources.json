@@ -3512,7 +3512,7 @@
     },
     {
       "path": "lib/trailer-repair.mjs",
-      "sha256": "69ee443b409092ed0f315775456132e345593b852e4e824d4c9bc59033688b88",
+      "sha256": "4a5b21ab992911ac0b24c115c1ddfd00c0a472e7a585103380d8a7f25d730efc",
       "entries": [
         {
           "line": 106,

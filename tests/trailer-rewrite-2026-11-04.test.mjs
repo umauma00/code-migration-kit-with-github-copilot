@@ -50,6 +50,7 @@ test('the runner rewrites a trailer wrong only in its form or place, and nothing
     ['SQL above END;', 'ported/a.sql', 'BEGIN\n  x;\n-- PORT STATUS: confidence=high todos=0\nEND;\n', 'BEGIN\n  x;\nEND;\n-- PORT STATUS: confidence=high todos=0\n'],
     ['YAML, the form alone at the end', 'ported/a.yml', 'a: 1\n# PORT STATUS: Confidence=High todos=0\n', 'a: 1\n# PORT STATUS: confidence=high todos=0\n'],
     ['YAML, a blank line above the trailer stays above it', 'ported/a.yml', 'script: |+\n  echo hi\n\n# PORT STATUS: Confidence=High todos=0\n', 'script: |+\n  echo hi\n\n# PORT STATUS: confidence=high todos=0\n'],
+    ['YAML, two trailers with a blank line between', 'ported/a.yml', 'a: |+\n  x\n\n# PORT STATUS: confidence=High todos=0\n\n# PORT STATUS: confidence=High todos=0\n', 'a: |+\n  x\n\n# PORT STATUS: confidence=high todos=0\n\n'],
     ['a shift is no heredoc', 'ported/a.cpp', 'int f() {\n  return 1 << 2;\n// PORT STATUS: confidence=high todos=0\n}\n', 'int f() {\n  return 1 << 2;\n}\n// PORT STATUS: confidence=high todos=0\n'],
     ['HTML above its body and html tags', 'ported/a.html', '<body>\n<p/>\n<!-- PORT STATUS: confidence=high todos=0 -->\n</body>\n</html>\n', '<body>\n<p/>\n</body>\n</html>\n<!-- PORT STATUS: confidence=high todos=0 -->\n'],
     ['no final newline, the form alone', 'ported/a.mjs', 'x();\n// PORT STATUS: Confidence=HIGH todos=0', 'x();\n// PORT STATUS: confidence=high todos=0'],
@@ -108,6 +109,7 @@ test('a trailer only a worker can settle, or one the runner cannot move safely, 
     ['inside a quoted shell heredoc that ends with fi', 'ported/a.sh', 'cat <<-"fi"\n# PORT STATUS: confidence=high todos=0\nfi\n'],
     ['inside a shell heredoc that ends with a brace', 'ported/a.sh', 'cat <<"}"\n# PORT STATUS: confidence=High todos=0\n}\n'],
     ['inside a shell heredoc that ends with a brace, a space before it', 'ported/a.sh', 'cat << "}"\n# PORT STATUS: confidence=High todos=0\n}\n'],
+    ['inside a shell heredoc whose end is a brace after a backslash', 'ported/a.sh', 'cat <<-\\}\ntext\n# PORT STATUS: confidence=High todos=0\n\t}\n'],
     ['a line a backslash continues into the trailer', 'ported/a.sh', 'f() {\n  echo hi \\\n# PORT STATUS: confidence=High todos=0\n}\n'],
     ['inside a textarea', 'ported/a.html', '<textarea>\n<!-- PORT STATUS: confidence=high todos=0 -->\n</textarea>\n'],
     ['inside a pre element', 'ported/a.html', '<pre>\n<!-- PORT STATUS: confidence=high todos=0 -->\n</pre>\n'],
@@ -185,6 +187,14 @@ test('a long line after the trailer, and many words after << above many closers,
   const started = Date.now();
   assert.notEqual(repairTrailer(policy, `void f() {\n${shifts}// PORT STATUS: confidence=High todos=0\n${closers}`, 'ported/a.cpp'), null);
   assert.ok(Date.now() - started < 2000, `heredoc words: ${Date.now() - started} ms`);
+  // Very many trailers (a worker repeating itself) are rewritten in place.
+  const many = Date.now();
+  assert.equal(repairTrailer(policy, `x();\n${'// PORT STATUS: confidence=high todos=0\n'.repeat(50000)}`, 'ported/a.mjs'), 'x();\n// PORT STATUS: confidence=high todos=0\n');
+  assert.ok(Date.now() - many < 2000, `many trailers: ${Date.now() - many} ms`);
+  // So are very many left open, each closed on the line below.
+  const open = Date.now();
+  assert.equal(repairTrailer(policy, `x();\n${'/* PORT STATUS: confidence=high todos=0\n*/\n'.repeat(30000)}`, 'ported/a.c'), 'x();\n/* PORT STATUS: confidence=high todos=0 */\n');
+  assert.ok(Date.now() - open < 2000, `many trailers left open: ${Date.now() - open} ms`);
 });
 
 test('a change of the trailer alone is told apart from any other change', () => {

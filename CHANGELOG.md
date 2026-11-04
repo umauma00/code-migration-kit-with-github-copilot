@@ -42,25 +42,27 @@ the line above the final closing brace, the same trailer twice.
   a comment the trailer is in. So does a line that starts with the word
   ending a heredoc opened above the trailer (`<<<END` … `END;`, `<<~end`,
   `<<"END OF TEXT"`, and an end of other characters quoted right after the
-  `<<`, as `<<"}"`, or after spaces below a `#` trailer), and a line a
+  `<<`, as `<<"}"`, or after spaces below a `#` trailer, and an end that
+  looks like a closer, bare or after a backslash, as `<<-\}`), and a line a
   backslash continues into the trailer. A block-comment trailer does not
   move while a comment of its kind is open above it (its closer may end that
-  comment). The trailer is not moved in YAML, nor below code in Razor, MDX,
-  Astro or Svelte files (after a code block comes page text; Razor's `@*`
-  and markup comments still move), nor in Markdown unless it is a markup
-  comment (a `#` line there is a heading), nor below a line with a bracket
-  in Ruby, Perl, Elixir, Crystal, Pascal or Tcl files (a bracket may end
-  `%w[ ]`, `qw( )`, a `{ }` comment or a Tcl `{ }` string); an indented
+  comment; an opener in a string or a line comment counts too, and nested
+  ones are counted). The trailer is not moved in YAML, nor below code in
+  Razor, MDX, Astro or Svelte files (after a code block comes page text;
+  Razor's `@*` and markup comments still move), nor in Markdown unless it is
+  a markup comment (a `#` line there is a heading), nor below a line with a
+  bracket in Ruby, Perl, Elixir, Crystal, Pascal or Tcl files (a bracket may
+  end `%w[ ]`, `qw( )`, a `{ }` comment or a Tcl `{ }` string); an indented
   trailer in YAML or Markdown is left alone. The rewrite keeps the comment's
   opener (the worker chose the syntax), adds a missing closer, writes
   `<opener> PORT STATUS: confidence=<c> todos=<n>` (and the closer) after
-  the last nonempty line (where it was, when nothing nonempty follows it, so
-  blank lines above it stay above), and keeps the line endings (CRLF or LF),
-  the file's last line ending (or its lack of one) and the byte order mark.
-  A JSON-family file loses its whole-line trailer comments, unless one holds
-  a `TODO(port)` note. The rewrite is used only when it passes the marker
-  check and differs from what was there in nothing but its whole-line PORT
-  STATUS comments (`sameButTrailer`).
+  the last nonempty line (where its first line was, when nothing nonempty
+  follows it, so blank lines above it stay above), and keeps the line
+  endings (CRLF or LF), the file's last line ending (or its lack of one) and
+  the byte order mark. A JSON-family file loses its whole-line trailer
+  comments, unless one holds a `TODO(port)` note. The rewrite is used only
+  when it passes the marker check and differs from what was there in nothing
+  but its whole-line PORT STATUS comments (`sameButTrailer`).
 - Still left to a worker: a count that differs from the `TODO(port)` lines
   (a `TODO(port)` line may be left out), a missing trailer (its confidence
   is the worker's), trailers that disagree, a trailer with any other word,
@@ -108,7 +110,7 @@ the line above the final closing brace, the same trailer twice.
 - The run summary's `selfRepairs` shows `markerRewrites` and `reviewsKept`
   only when they happened; the progress lines are new. The prompts, the
   RULEBOOK templates and the rules for a valid trailer do not change.
-- Test: `tests/trailer-rewrite-2026-11-04.test.mjs`, fifteen tests. 37
+- Test: `tests/trailer-rewrite-2026-11-04.test.mjs`, fifteen tests. 38
   trailers the runner rewrites (above a closing brace, above closers with a
   comment after them, above closers with a block comment after them and a
   line of one, no final line ending, CRLF, a byte order mark, blank lines at
@@ -118,41 +120,42 @@ the line above the final closing brace, the same trailer twice.
   heredoc, XML above the closing root tag, an XML comment left open or
   closed on the line below, HTML above `</body>` and `</html>`, JSP, Razor's
   `@*` and an HTML comment in Razor, an HTML comment in Markdown above a
-  closing tag, OCaml's `**)`, CSS left open, YAML's form alone and with a
-  blank line above it kept, JSON), each passing after and changing nothing
-  else; 85 left to the worker (a count that differs, no trailer, trailers
-  that disagree, other words, code after the trailer; strings, template
-  literals, Lua long strings (also of level one), heredocs of shell (also
-  ones that end with a brace), Ruby, PHP and Perl, a Makefile `define`,
-  Ruby's `%w[ ]` and `%q{ }`, Perl's `qw( )`, a quote or a bracket left over
-  on the trailer's own line or after a closer; PHP's `?>`, `</script>`,
-  `<textarea>` and `<pre>`; C# comments in Razor, cshtml and vbhtml code
-  blocks, MDX and Svelte code; a comment left open that hides code, a
-  trailer on a line of code, backslash continuations, block comments of XML,
-  Jinja, C (also one open above a header guard), PowerShell, Lua (also of
-  level two), CoffeeScript, MATLAB, Pascal, Haskell and Julia, a quote in a
-  block comment after a brace, a block-comment trailer that closes a C or an
-  HTML comment open above, PHP's `?>` in a brace's comment, an HTML comment
-  closed inside a block comment of a PHP page, Ruby's `%w[ ]` in a jbuilder
-  file, a Tcl braced string, YAML block scalars and indented YAML or
-  Markdown, a Markdown heading, `end_time`, `done;` below `//`, JSON values
-  and a JSON trailer with a `TODO(port)` note); a long line after the
-  trailer, and many words after `<<` above many closers, read in linear
-  time; the changes `sameButTrailer` takes as the trailer alone and the ones
-  it does not (code, a `TODO(port)` line, a blank line, the line endings,
-  the byte order mark, a string). Runs: an answer rewritten with no call,
-  both reviewers seeing the rewritten file; no rewrite without the marker
-  policy; a single-pass fix rewritten, its receipt binding the fix's code
-  and its note; a trailer fix after a single-pass fix keeping the reviews;
-  fixes that change more (a `TODO(port)` line, code, the single-pass fix
-  undone) reviewed again; a run stopped before the trailer fix resuming at
-  the fix with the reviews kept; `fixPolicy: "rereview"` reviewing as
-  before; a Latin-1 target never rewritten; a trailer fix and a single-pass
-  fix at `verify-fix` left by an earlier kit, finished with no call; a
-  trailer the fixer leaves wrong keeping the reviews uncounted, blocked
-  after two fixes and finished by one fixer call in the next run; a switch
-  to `fixPolicy: "rereview"` reviewing the trailer fix. The six runs of new
-  behavior fail on 0.45.1. In `tests/self-repair-2026-11-01.test.mjs` and
+  closing tag, OCaml's `**)`, CSS left open, YAML's form alone and with
+  blank lines above it kept (one trailer or two), JSON), each passing after
+  and changing nothing else; 86 left to the worker (a count that differs, no
+  trailer, trailers that disagree, other words, code after the trailer;
+  strings, template literals, Lua long strings (also of level one), heredocs
+  of shell (also ones that end with a brace), Ruby, PHP and Perl, a Makefile
+  `define`, Ruby's `%w[ ]` and `%q{ }`, Perl's `qw( )`, a quote or a bracket
+  left over on the trailer's own line or after a closer; PHP's `?>`,
+  `</script>`, `<textarea>` and `<pre>`; C# comments in Razor, cshtml and
+  vbhtml code blocks, MDX and Svelte code; a comment left open that hides
+  code, a trailer on a line of code, backslash continuations, block comments
+  of XML, Jinja, C (also one open above a header guard), PowerShell, Lua
+  (also of level two), CoffeeScript, MATLAB, Pascal, Haskell and Julia, a
+  quote in a block comment after a brace, a block-comment trailer that
+  closes a C or an HTML comment open above, PHP's `?>` in a brace's comment,
+  an HTML comment closed inside a block comment of a PHP page, Ruby's
+  `%w[ ]` in a jbuilder file, a Tcl braced string, YAML block scalars and
+  indented YAML or Markdown, a Markdown heading, `end_time`, `done;` below
+  `//`, JSON values and a JSON trailer with a `TODO(port)` note); a long
+  line after the trailer, many words after `<<` above many closers, and very
+  many trailers, read in linear time; the changes `sameButTrailer` takes as
+  the trailer alone and the ones it does not (code, a `TODO(port)` line, a
+  blank line, the line endings, the byte order mark, a string). Runs: an
+  answer rewritten with no call, both reviewers seeing the rewritten file;
+  no rewrite without the marker policy; a single-pass fix rewritten, its
+  receipt binding the fix's code and its note; a trailer fix after a
+  single-pass fix keeping the reviews; fixes that change more (a
+  `TODO(port)` line, code, the single-pass fix undone) reviewed again; a run
+  stopped before the trailer fix resuming at the fix with the reviews kept;
+  `fixPolicy: "rereview"` reviewing as before; a Latin-1 target never
+  rewritten; a trailer fix and a single-pass fix at `verify-fix` left by an
+  earlier kit, finished with no call; a trailer the fixer leaves wrong
+  keeping the reviews uncounted, blocked after two fixes and finished by one
+  fixer call in the next run; a switch to `fixPolicy: "rereview"` reviewing
+  the trailer fix. The six runs of new behavior fail on 0.45.1. In
+  `tests/self-repair-2026-11-01.test.mjs` and
   `tests/trailer-formats-2026-11-04.test.mjs` the cases whose trailer sat
   above the closing brace (or in a JSON file) now expect the rewrite with no
   call, and the worker paths are kept with a count that differs.
