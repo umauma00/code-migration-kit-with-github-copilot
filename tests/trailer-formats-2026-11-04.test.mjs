@@ -372,7 +372,7 @@ test('a trailer fix stopped under an earlier kit is checked again: what passes n
   for (const unit of f.units) assert.equal(done(f.root, unit, context), true, unit.target);
 });
 
-test('units an earlier kit left unfinished resume under these rules: Database.xml blocked after two trailer fixes is reviewed, a JSON file reviewed with a trailer is fixed once', async t => {
+test('units an earlier kit left unfinished resume under these rules: Database.xml blocked after two trailer fixes is reviewed, a JSON file reviewed with a trailer loses it once', async t => {
   const f = await formats(t);
   await finish(f);
   // Database.xml as 0.45.0 blocked it: its third wrong trailer in one run
@@ -394,28 +394,40 @@ test('units an earlier kit left unfinished resume under these rules: Database.xm
   });
   assert.equal(report.done, 3); assert.deepEqual(report.errors, []);
   assert.deepEqual(calls.filter(c => c.endsWith(' ported/Database.xml')).sort(), ['reviewer-rules ported/Database.xml', 'reviewer-semantics ported/Database.xml']);
-  assert.deepEqual(calls.filter(c => c.endsWith(' ported/app.json')).map(c => c.startsWith('reviewer-') ? 'reviewer' : c), ['fixer ported/app.json', 'reviewer', 'reviewer']);
+  // 0.46.0: the runner takes the trailer comment out itself, with no fixer call.
+  assert.deepEqual(calls.filter(c => c.endsWith(' ported/app.json')).map(c => c.startsWith('reviewer-') ? 'reviewer' : c), ['reviewer', 'reviewer']);
   assert.deepEqual(calls.filter(c => c.endsWith(' ported/math_ops.mjs')), []);
-  assert.equal(fixes[0][0].message, removeIt);
-  assert.equal(report.selfRepairs.markerFixes, 1);
+  assert.deepEqual(fixes, []);
+  assert.equal(fs.readFileSync(safePath(f.root, f.json.target), 'utf8'), written['ported/app.json']());
+  assert.deepEqual(report.selfRepairs, { corrections: 0, markerFixes: 0, markerRewrites: 1 });
   const context = inputContext(f.root, f.config);
   for (const unit of f.units) assert.equal(done(f.root, unit, context), true, unit.target);
   assert.equal(unitState(f.root, f.json).markerEvidence.noTrailer, true);
 });
 
 test('a JSON file with a trailer is sent to the fixer to remove it, then finishes', async t => {
-  const f = await formats(t);
-  const fixes = [];
-  const report = await translate(f.root, f.config, async call => {
-    if (call.role === 'fixer') { fixes.push(call.extra.confirmedFindings); return writes(call); }
-    if (call.role === 'implementer') return answer(call, result(call.role, call.unit, { content: call.unit.target === 'ported/app.json' ? '{\n  "name": "area"\n}\n// PORT STATUS: confidence=high todos=0\n' : written[call.unit.target]() }));
-    return fake(call);
-  });
-  assert.equal(report.done, 3); assert.deepEqual(report.errors, []);
-  assert.equal(fixes.length, 1);
-  assert.equal(fixes[0][0].reference, 'marker:M1');
-  assert.equal(fixes[0][0].message, removeIt);
-  assert.match(fixes[0][0].rule, /a format without line comments ends it with the closer of its comment; a JSON file carries none/);
+  // 0.46.0: a trailer comment on a line of its own is taken out by the runner;
+  // one after JSON on the same line is not a line the runner can drop.
+  for (const [trailer, fixers] of [['}\n// PORT STATUS: confidence=high todos=0', 0], ['} // PORT STATUS: confidence=high todos=0', 1]]) {
+    const f = await formats(t);
+    const fixes = [], implementers = [];
+    const report = await translate(f.root, f.config, async call => {
+      if (call.role === 'fixer') { fixes.push(call.extra.confirmedFindings); return writes(call); }
+      if (call.role === 'implementer') { implementers.push(call); return answer(call, result(call.role, call.unit, { content: call.unit.target === 'ported/app.json' ? `{\n  "name": "area"\n${trailer}\n` : written[call.unit.target]() })); }
+      return fake(call);
+    });
+    assert.equal(report.done, 3, trailer); assert.deepEqual(report.errors, []);
+    assert.equal(fixes.length, fixers, trailer);
+    assert.equal(fs.readFileSync(safePath(f.root, f.json.target), 'utf8'), written['ported/app.json'](), trailer);
+    if (!fixers) {
+      assert.equal(implementers.length, 3, 'no answer asked again');
+      assert.deepEqual(report.selfRepairs, { corrections: 0, markerFixes: 0, markerRewrites: 1 });
+      continue;
+    }
+    assert.equal(fixes[0][0].reference, 'marker:M1');
+    assert.equal(fixes[0][0].message, removeIt.replace('(line 4)', '(line 3)'));
+    assert.match(fixes[0][0].rule, /a format without line comments ends it with the closer of its comment; a JSON file carries none/);
+  }
 });
 
 test('a JSON file\'s fixer is not told to count a TODO(port) line in the trailer it does not have', async t => {

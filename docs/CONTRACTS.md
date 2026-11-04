@@ -107,8 +107,17 @@ after one fix. Its receipt keeps both reviews of the earlier candidate and adds
 sorted `confirmed` finding references and whether an arbitration applied. The
 receipt is valid only while the fixer record's content is exactly the current
 target, every unrejected finding is in `confirmed`, and the records keep their
-hashes. A fixer that returns the reviewed candidate unchanged is asked once more
-to change the file or record what this file cannot fix as a
+hashes. Since 0.46.0, when the trailer was fixed after the fix
+(`singlePass.trailerFixedBy`: `runner` when the runner rewrote it, `fixer`
+when a fix of `marker:M1` changed it alone), the content may differ from the
+target in nothing but its whole-line PORT STATUS comments and whether the
+text before them ends with a line ending (`sameButTrailer` in
+`lib/trailer-repair.mjs`); the trailer itself passes the marker check.
+`sameButTrailer` reads lines, not the language: a comment-looking PORT STATUS
+line inside a multi-line string counts as a trailer line too, as `withoutFlags`
+reads quotes only on their own line (the marker check still counts every line
+with `PORT STATUS:`). A fixer that returns the reviewed candidate unchanged
+is asked once more to change the file or record what this file cannot fix as a
 `TODO(port): <reference>: <what is needed>` line; unchanged again, it fails the
 unit without using up a fix round. A fix that changes nothing but the kit's
 flags (TODO(port) comments and the PORT STATUS trailer, after a comment opener
@@ -142,21 +151,77 @@ finished by an earlier kit keeps its receipt while its file passes the count
 and the place (`finishedMarkerEvidence`, used by `unitDone`): a JSON file
 finished by 0.45.0 or earlier with the trailer those kits asked for, or an XML
 file finished with a comment left open, stays finished, and a receipt holds
-only for the content it was recorded with. The implementer's and the fixer's
-files are checked before they are written, with one correction. A wrong
-trailer on a written file becomes the confirmed finding `marker:M1` for the
-fixer, and the fixed file is reviewed: a file about to be reviewed (a
+only for the content it was recorded with. Since 0.46.0 a trailer wrong only
+in its form or its place is rewritten by the runner with no worker call
+(`lib/trailer-repair.mjs`): every PORT STATUS line is a whole-line comment,
+they all say the same confidence and count (read leniently: either order,
+capitals, `=`, `:` or a space, `todo` or `todos`, quotes or brackets around a
+value, brackets around the whole; a quote, a backtick or a bracket left over
+is not read, since the line may end a string opened above it), the count
+matches the `TODO(port)` lines, and every nonempty line after the first
+trailer closes a block: a closing brace, bracket or parenthesis, an end
+keyword (`end` or a word of lowercase letters that starts with it, not
+`endef`; not a bare `END` or `End`, nor a name such as `end_time`), below a
+`#` comment `fi`/`done`/`esac`, `#endif`/`#endregion`, or a line comment of
+the trailer's own kind, each with no quote or backtick on its line (VB's `'`
+is its comment) and ending no block comment or long string (`-->`, `*/`, `*)`,
+`#>`, `]]`, `]=]`, `-}`, `%}`, PHP's `?>` and the like, or a line of nothing
+but CoffeeScript's `###`); below a `//` or `/*` trailer with no block comment
+open above it (a `/*` in a string or a line comment counts too), whole
+`/* … */` comments with no quote or other closer in them are read away first
+on such a line (`#endif /* A_H */`), and a line of nothing but such comments
+passes too; below a markup comment only closing tags and HTML comments, not
+the end of an element whose text is kept as written (`</pre>`, `</textarea>`,
+`</script>` and the like). No such line may start with the word that ends a
+heredoc opened above the trailer (`<<END`, `<<<END`, `<<~end`, or an end of
+other characters quoted right after the `<<`, as `<<"}"`, or after spaces
+below a `#` trailer, and an end that looks like a closer, bare or after a
+backslash, as `<<-\}`), and no line a backslash continues may run into a
+trailer line. A block-comment trailer does not move while a comment of its
+kind is open above it (its closer may end that comment; an opener in a string
+or a line comment counts too, and nested ones are counted). The trailer is not
+moved in YAML, nor below code in Razor, MDX, Astro or Svelte files (after a
+code block comes page text; Razor's `@*` and markup comments still move), nor
+in Markdown unless it is a markup comment (a `#` line there is a heading), nor
+below a line with a bracket in Ruby, Perl, Elixir, Crystal, Pascal or Tcl
+files (a bracket may end `%w[ ]`, `qw( )`, a `{ }` comment or a Tcl `{ }`
+string); an indented trailer in YAML or Markdown is left alone. The rewrite
+keeps the comment's opener, adds a missing closer, puts the trailer after the
+last nonempty line (where its first line was, when nothing nonempty follows
+it), keeps the line endings, the file's last line ending (or its lack of one)
+and the byte order mark, removes a JSON-family file's trailer comments unless
+one holds a `TODO(port)` note, and is used only when it passes and nothing but
+the trailer changed; a target the review stage does not read as UTF-8 is never
+rewritten. Answers are rewritten before they are written (the worker's record
+keeps its answer), and a written file at the review, fix and done stages
+before its trailer would go to the fixer; `selfRepairs.markerRewrites` counts
+them. The implementer's and the fixer's files are checked before they are
+written, as they would be written, with one correction. A trailer the runner
+cannot rewrite on a written file becomes the confirmed finding `marker:M1` for
+the fixer, and the fixed file is reviewed: a file about to be reviewed (a
 worker's, an earlier run's, a resumed unit's) goes to the fixer first, a
-single-pass fix when the unit would complete. A trailer fix is not a fix
-round (`maxFixRounds` neither stops nor counts it) and keeps its stage `fix`
-with no reviews when resumed; before the fixer is called the file is checked
-again, and one that passes now goes to review with no fixer call and no
-review records (a fix stopped under an earlier rule), while one that still
-fails gives the fixer the problem as this kit finds it. After two in one run
-the unit is blocked with the reason. An invalid `markerEvidence` carries
-`problem` (what is wrong, with line numbers); a valid one keeps its six
-fields, so existing receipts still match. The evidence of a JSON-family file
-adds `noTrailer: true`, valid or not.
+single-pass fix when the unit would complete. After a single-pass fix
+(0.46.0), while `fixPolicy` is `single-pass`, the fix keeps its reviews and
+receipt when the fixer changed nothing but the trailer
+(`trailerFixedBy: "fixer"`, counted in `selfRepairs.reviewsKept` once the
+trailer passes; one still wrong goes back to the fixer with the reviews kept);
+a fix that changed more (a `TODO(port)` line included) or returned the
+reviewed candidate is reviewed as before, and a rewrite by the runner there
+keeps them too (`trailerFixedBy: "runner"`). Under `fixPolicy: "rereview"`,
+also after a switch from `single-pass`, every trailer fix is reviewed. A
+trailer the runner rewrites on any other file already reviewed sends it to
+review again. A trailer fix is not a fix round (`maxFixRounds` neither stops
+nor counts it) and keeps its stage `fix` when resumed, with no reviews (after
+a single-pass fix, with that fix's reviews); before the fixer is called the
+file is checked again, and one that passes now, or that the runner rewrites,
+needs no fixer call: it goes to review with no review records (a fix stopped
+under an earlier rule), or after a single-pass fix keeps that fix's reviews,
+while one that still fails gives the fixer the problem as this kit finds it.
+After two in one run the unit is blocked with the reason; after a single-pass
+fix it keeps that fix's reviews and the next run starts at the fix. An invalid
+`markerEvidence` carries `problem` (what is wrong, with line numbers); a valid
+one keeps its six fields, so existing receipts still match. The evidence of a
+JSON-family file adds `noTrailer: true`, valid or not.
 
 A worker answer that is not one JSON object or has the wrong shape, one that
 ended without a final message ("Copilot JSONL is incomplete"), and an
@@ -172,7 +237,8 @@ run, and not after a tripped circuit breaker, a used-up call budget, a
 systemic failure or an interruption), resuming where they stopped; the circuit breaker counts that pass
 afresh, and a unit the pass never restarts keeps its error. The run summary
 counts these in `selfRepairs` (`corrections`, the arbiter's reference re-ask
-included, `markerFixes`, `repass`, `flagged`).
+included, `markerFixes`, `repass`, `flagged`, and since 0.46.0, when they
+happened, `markerRewrites` and `reviewsKept`).
 
 Before every worker call (retries included) the runner appends `{id, role,
 target, at}` to `migration/runs/<run>/cli-sessions.jsonl` and passes that `id` as
