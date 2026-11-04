@@ -15,14 +15,17 @@ trailer.
 - The trailer may end with the closer of a comment that ends on its line
   (`trailerClosers`: `-->`, `--%>`, `%>`, `*/`, `*@`, `#}`, `*)`) in
   `lib/markers.mjs`. A closing brace, bracket or parenthesis is not one: a
-  trailer before it sits inside code. A trailer that passed before passes
-  with exactly the fields it recorded (no new field on a valid trailer), so
-  `unitDone`'s comparison of every recorded field still holds for finished
-  units.
-- A comment the trailer line opens before `PORT STATUS:` (`<!--`, `<%--`,
-  `<%#`, `/*`, `{#`, `@*`, `(*`) ends on that line with its own closer:
+  trailer before it sits inside code. A trailer that passed before and
+  passes now records exactly the fields it did (no new field on a valid
+  trailer), so `unitDone`'s comparison of every recorded field still holds;
+  a finished unit whose trailer the rules below refuse keeps its receipt
+  through `finishedMarkerEvidence`.
+- A comment opened right before `PORT STATUS:` (`<!--`, `<%--`, `<%#`, `/*`,
+  `{#`, `@*`, `(*`; spaces aside) ends on the trailer line with its own
+  closer (`<%# ... --%>` ends with `%>`, as ERB and EJS read it):
   `<!-- PORT STATUS: ... todos=2`, which 0.45.0 passed, left an XML file
-  inside a comment. A comment opened on a line above is not checked.
+  inside a comment. One opened earlier on the line or on a line above is not
+  checked.
 - `markerEvidence` takes the unit's target (`carriesNoTrailer`: `.json`,
   `.jsonl`, `.ndjson`, `.geojson`, `.topojson`, `.jsonld`, `.webmanifest`,
   `.ipynb`, `.har`, `.sarif`, `.gltf`, in any case). Such a file is valid with
@@ -65,15 +68,17 @@ trailer.
   installs and that a JSON file carries none; an existing RULEBOOK is not
   changed. CONTRACTS, EXECUTION-SCOPES, REFERENCE and UPGRADING say the same,
   and UPGRADING says how to find and fix by hand what a strict reader rejects
-  in a finished file: a JSON trailer, an open comment, a bare line.
+  in a finished file (a JSON trailer, an open comment, a bare line) without
+  touching the kit's records under `migration/`, whose copies of worker
+  answers carry trailers too.
 - Test: `tests/trailer-formats-2026-11-04.test.mjs`, fifteen tests. 144
   trailers that passed 0.45.0, against five kinds of target (720
   comparisons): every receipt holds, and a new answer records the same
   fields except for a comment left open and in JSON. The forms of XML, HTML,
   JSP, CSS, Razor, Jinja, ERB and OCaml, a comment opened above and one
   inside a line comment pass with the same six fields; a comment the trailer
-  opens and leaves open, or closes with another closer, fails, and a unit
-  finished with one keeps its receipt; braces and parentheses after the
+  opens and leaves open, or closes with another comment's closer, fails
+  (`<%# ... --%>` passes), and a unit finished with one keeps its receipt; braces and parentheses after the
   count still fail; a comment closed below the trailer; JSON with and
   without a trailer, its extensions, a JSON receipt of 0.45.0 and no other;
   flags in the new comment forms, and `{#` after code; the prompts of every

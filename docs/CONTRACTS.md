@@ -130,10 +130,10 @@ PORT STATUS trailer, on the last nonempty line, whose `todos` is the number of
 lines containing `TODO(port)`. Only the closer of a comment that ends on that
 line may follow the number (`trailerClosers`: `-->`, `--%>`, `%>`, `*/`, `*@`,
 `#}`, `*)`), so a format without line comments, such as XML, ends the file
-with `<!-- PORT STATUS: confidence=medium todos=2 -->`. A comment the trailer
-line opens before `PORT STATUS:` (`<!--`, `<%--`, `<%#`, `/*`, `{#`, `@*`,
-`(*`) ends there with its own closer; a comment opened on a line above is not
-checked. A JSON-family file (`.json`, `.jsonl`, `.ndjson`, `.geojson`,
+with `<!-- PORT STATUS: confidence=medium todos=2 -->`. A comment opened
+right before `PORT STATUS:` (`<!--`, `<%--`, `<%#`, `/*`, `{#`, `@*`, `(*`;
+spaces aside) ends on the trailer line with its own closer; one opened earlier
+on the line or on a line above is not checked. A JSON-family file (`.json`, `.jsonl`, `.ndjson`, `.geojson`,
 `.topojson`, `.jsonld`, `.webmanifest`, `.ipynb`, `.har`, `.sarif`, `.gltf`)
 has no comments and completes without a trailer; a trailer there is a
 `marker:M1` finding to remove it. These rules hold every new answer. A unit

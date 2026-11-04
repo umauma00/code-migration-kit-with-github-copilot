@@ -1324,15 +1324,15 @@
     },
     {
       "path": "lib/markers.mjs",
-      "sha256": "ffc7fc4e3de50ad868355147a03d169d217fa8c0bc27ffb6422e0ff8a960fb6e",
+      "sha256": "a3c48914233f564df2a48e39dde8071bacd2a83e0bb06e1ec3aed89fc10d098e",
       "entries": [
         {
-          "line": 50,
+          "line": 51,
           "kind": "error-or-exit-candidate",
           "code": "if (config.markerPolicy !== 'todo-lines-v1') throw new Error('Unsupported markerPolicy');"
         },
         {
-          "line": 104,
+          "line": 105,
           "kind": "error-or-exit-candidate",
           "code": "if (evidence && !evidence.valid) throw new Error(markerError(evidence));"
         }

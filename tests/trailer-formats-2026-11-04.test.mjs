@@ -113,7 +113,13 @@ test('a trailer line that opens a comment closes it on that line; a finished uni
     assert.equal(markerEvidence(policy, file('x', `${open} PORT STATUS: confidence=low todos=0 ${close}`), 'ported/a.txt').valid, true, open);
     for (const other of trailerClosers.filter(c => c !== close && !c.endsWith(close)))
       assert.match(markerEvidence(policy, file('x', `${open} PORT STATUS: confidence=low todos=0 ${other}`), 'ported/a.txt').problem, new RegExp(`end the line with "${close.replace(/[*()]/g, '\\$&')}"$`), `${open} ${other}`);
+    // A closer that ends with its own closes it: ERB reads <%# ... --%> as closed at %>.
+    for (const other of trailerClosers.filter(c => c !== close && c.endsWith(close)))
+      assert.equal(markerEvidence(policy, file('x', `${open} PORT STATUS: confidence=low todos=0 ${other}`), 'ported/a.txt').valid, true, `${open} ${other}`);
   }
+  assert.equal(markerEvidence(policy, file('<p><%= name %></p>', '<%# PORT STATUS: confidence=low todos=0 --%>'), 'ported/a.html.erb').valid, true);
+  for (const line of ['<%-- PORT STATUS: confidence=low todos=0 %>', '<!-- PORT STATUS: confidence=low todos=0 --%>'])
+    assert.equal(markerEvidence(policy, file('<p/>', line), 'ported/a.jsp').valid, false, line);
   // With other problems, each is named.
   assert.equal(markerEvidence(policy, file('<r>', '<!-- PORT STATUS: confidence=low todos=3', '</r>'), 'a.xml').problem,
     'the PORT STATUS line (line 2) opens a comment with "<!--" that does not end on that line: end the line with "-->"; the PORT STATUS line is line 2, but line 3 "</r>" follows it: move the trailer below it, after the final closing brace or tag, so it is the last nonempty line; it says todos=3 but 0 lines contain TODO(port): make the number 0, or change the TODO(port) lines');
