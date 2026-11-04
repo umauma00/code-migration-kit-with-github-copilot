@@ -484,7 +484,9 @@ test('the searches in UPGRADING list what a strict reader rejects and nothing el
   const json = ['ported/B.JSON:2', 'ported/a.json:2', 'ported/c.ipynb:2'].sort();
   const open = ['ported/B.JSON:2', 'ported/after.xml:2', 'ported/bare.jsp:2', 'ported/bare.xml:3', 'ported/code.java:2', 'ported/crlf.xml:2', 'ported/jinja.html:2',
     'ported/open.erb:2', 'ported/open.jsp:2', 'ported/open.xml:2', 'ported/pascal.pas:2', 'ported/razor.cshtml:2', 'ported/日本語.xml:2'].sort();
-  const hits = output => output.replace(/\r/g, '').split('\n').flatMap(line => { const hit = line.match(/^(.+?):(\d+):/); return hit ? [`${hit[1]}:${hit[2]}`] : []; }).sort();
+  // Colors too, for a git set to color.ui = always.
+  const plain = output => output.replace(/\x1b\[[0-9;]*m/g, '').replace(/\r/g, '');
+  const hits = output => plain(output).split('\n').flatMap(line => { const hit = line.match(/^(.+?):(\d+):/); return hit ? [`${hit[1]}:${hit[2]}`] : []; }).sort();
   const shells = [{ name: process.platform === 'win32' ? 'cmd' : 'sh', run: command => spawnSync(command, { cwd: project, shell: true, encoding: 'utf8' }) }];
   if (process.platform === 'win32') {
     // As typed at a PowerShell prompt: the script is the command itself. The
@@ -500,6 +502,6 @@ test('the searches in UPGRADING list what a strict reader rejects and nothing el
     const [first, second] = commands.map(command => shell.run(command));
     assert.deepEqual(named(hits(first.stdout), shell.ascii), named(json, shell.ascii), `${shell.name}: ${first.stderr}`);
     assert.deepEqual(named(hits(second.stdout), shell.ascii), named(open, shell.ascii), `${shell.name}: ${second.stderr}`);
-    assert.ok(second.stdout.replace(/\r/g, '').includes('ported/bare.xml-2-<!--\n'), `${shell.name}: the line above a bare line`);
+    assert.ok(plain(second.stdout).includes('ported/bare.xml-2-<!--\n'), `${shell.name}: the line above a bare line`);
   }
 });
