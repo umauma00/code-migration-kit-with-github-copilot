@@ -39,8 +39,10 @@ import { resetPreparedWorkerHomes } from '../lib/worker-home.mjs';
 // code every write goes as it really does: it fails only when the input does
 // not fit in the pipe and the child is gone first. seen collects each failed
 // write's code, hit the arguments of each child whose write was made to fail,
-// and settled() waits until every such child's input is closed (a real write
-// fails on its own, in no fixed order with the call's end).
+// and settled() waits until every such child's input is closed. A real write
+// fails on its own time: reported before the child's exit, it reaches seen
+// and the runner alike (both listen on the same input); after the exit, Node
+// has already destroyed the input and reports nothing.
 async function writes(code, run, times = Infinity) {
   const original = cp.spawn, seen = [], hit = [], closed = [];
   cp.spawn = function (...args) {
@@ -61,19 +63,22 @@ async function writes(code, run, times = Infinity) {
 const node = (code, options) => runProcess(process.execPath, ['-e', code], options);
 // The one write made to fail was a worker CLI's, started for that role.
 const workerHit = (hit, role) => { assert.equal(hit.length, 1, 'one write made to fail'); assert.match(hit[0].join(' '), new RegExp(`--agent \\S*${role}\\b`)); };
+// What a real failed write was called on this platform, for the test's output.
+const reported = seen => seen.length ? `this platform reports the failed write as ${[...new Set(seen)].join(', ')}`
+  : 'no failed write was reported: the exit came first (Node destroys the input on exit, and the write\'s error is then not reported)';
 
 test('a child that exits without reading its input is read like any other child, whatever this platform calls the failed write', async t => {
   await writes(null, async ({ seen, settled }) => {
     // Far more than a pipe holds: most of the write still waits when the child is gone.
     const r = await node('process.stderr.write("cannot start\\n"); process.exit(3)', { input: 'x'.repeat(8 * 1024 * 1024) });
     await settled();
+    t.diagnostic(`${reported(seen)}; the result keeps ${r.stdinError ?? 'nothing'}`);
     assert.equal(r.code, 3);
     assert.equal(r.stderr, 'cannot start\n');
     assert.equal(r.error, undefined);
-    assert.ok(seen.length > 0, 'the write failed');
+    assert.ok(seen.length > 0, 'the write\'s failure came before the exit');
     for (const code of seen) assert.ok(code === 'EPIPE' || code === 'EOF', code);
-    t.diagnostic(`this platform reports the failed write as ${[...new Set(seen)].join(', ')}; the result ${r.stdinError ? `keeps ${r.stdinError}` : 'has no stdinError (the write failed after the call ended)'}`);
-    if (r.stdinError) assert.ok(seen.includes(r.stdinError), r.stdinError);
+    assert.equal(r.stdinError, seen[0], 'the result keeps the failed write');
   });
 });
 
@@ -168,13 +173,14 @@ test('a worker CLI that exits before it reads a prompt larger than the pipe repo
     // 4 MiB of padding in the prompt: far more than a pipe holds.
     const e = await implement(cli, f, { padding: 'x'.repeat(4 * 1024 * 1024) });
     await settled();
-    t.diagnostic(`this platform reports the failed write as ${[...new Set(seen)].join(', ') || 'nothing'}; the record ${e?.result?.stdinError ? `keeps ${e.result.stdinError}` : 'has no stdinError'}`);
-    assert.ok(seen.length > 0, 'the write failed');
+    t.diagnostic(`${reported(seen)}; the record keeps ${e?.result?.stdinError ?? 'nothing'}`);
+    assert.ok(seen.length > 0, 'the write\'s failure came before the exit');
     for (const code of seen) assert.ok(code === 'EPIPE' || code === 'EOF', code);
+    assert.equal(e?.result?.stdinError, seen[0], 'the record keeps the failed write');
     return e;
   });
   assert.ok(error, 'the call failed');
-  assert.match(error.message, /^Copilot implementer failed \(exit 1\)(?: before it had read its whole prompt)?: The shared writer lock timed out\./);
+  assert.match(error.message, /^Copilot implementer failed \(exit 1\) before it had read its whole prompt: The shared writer lock timed out\./);
   assert.equal(error.result.code, 1);
   assert.equal(isTransientFailure(error), true);
   assert.equal(failureGuidance(error, { root: f.root }).id, 'cli-lock');

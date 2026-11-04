@@ -1227,7 +1227,7 @@
     },
     {
       "path": "lib/guidance.mjs",
-      "sha256": "7a3bec7d2ccf677e1d69bf5c190ced9306c6f1b4e3243ff13b5b5bd5487c1290",
+      "sha256": "40810e5d254bf4e952d5e33a053e5812796e0b31342d94c5fe8937b4a3b4a315",
       "entries": [
         {
           "line": 81,
@@ -2527,7 +2527,7 @@
     },
     {
       "path": "lib/process.mjs",
-      "sha256": "5755393d1ed2208ea5debcc5ce9eec87bb49b79cb0c2998bc63b3fc7ab611a67",
+      "sha256": "7cbdd6eae1cb2fbec9aafc48bbb2ed66fcd510917c39fe4c1558c13929b2a6ef",
       "entries": [
         {
           "line": 90,

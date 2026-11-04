@@ -1,4 +1,4 @@
-# 0.45.2 — 2026-11-04
+# 0.46.1 — 2026-11-04
 
 A worker CLI that fails before it has read its whole prompt reports its own
 error on Windows too. On 2026-11-04 phase 04 on Windows left two files
@@ -12,49 +12,53 @@ for the CLI's own exit. Windows reports EOF for a write still waiting when
 the CLI went (libuv's word for ERROR_BROKEN_PIPE), and the runner failed the
 call itself: it tried to stop a CLI that was already gone (taskkill's exit
 128: no such process) and reported the write. This release does not change
-why a CLI ends early; it shows the CLI's own reason.
+why a CLI ends early; it shows the CLI's own reason. On every platform, an
+answer the CLI gave before it had read its whole prompt is no longer used.
 
 - EOF is read like EPIPE: on every platform the call ends with the child's
   own exit status and output. The adapter then does what it does with any
   CLI that failed. Its message carries the CLI's exit status, the error in
   its stream (`session.error`, which the CLI writes on stdout with stderr
   empty) and the end of its stderr, and the status and the guidance show it.
-  Up to 0.45.1 on Windows a reason on stderr (the CLI's lock wait, a network
+  Up to 0.46.0 on Windows a reason on stderr (the CLI's lock wait, a network
   error, its sign-in help) already decided between a retry and a stop, while
   the status and the guidance showed the write. A reason in the stream (a
   rate limit, a server error, used-up credits) reached neither, and left the
   file unfinished. Both now decide.
 - A CLI that is not signed in, or cannot start its MCP servers or its
   storage, in the kit's worker home (`workerCopilotHome` `separate`) is tried
-  in the person's home, as on Linux and macOS. Up to 0.45.1 on Windows the
+  in the person's home, as on Linux and macOS. Up to 0.46.0 on Windows the
   sign-in case stopped the whole run with the guidance of an unexpected
   error, and the others failed the call.
 - The call's record keeps the failed write's word (`stdinError`, EPIPE or
   EOF), and the message of a CLI that failed says it failed "before it had
-  read its whole prompt". A CLI that answered all the same (exit status 0)
-  answered a prompt cut short: the answer is not used, and the call fails
-  with the guidance for a worker's answer. Up to 0.45.1 Windows failed such a
+  read its whole prompt"; what follows is the CLI's own reason. A CLI that
+  answered all the same (exit status 0) answered a prompt cut short: the
+  answer is not used, and the call fails with the guidance for a worker's
+  answer, which now names this case too. Up to 0.46.0 Windows failed such a
   call with the write's error, and Linux and macOS used the answer. The kit
   can tell only when the prompt does not fit in the pipe.
 - Any other failed write (EIO and the rest) still fails the call.
-- Records keep their form (a failed call's record may carry `stdinError`):
-  approvals, completion records, phase records, a prepared pilot and
-  finished units stay valid, and the update can go in during phase 04 (stop
-  the runner, update, run `translate` again in the same folder). A file left
+- Records keep their form (a failed call's record may carry `stdinError`).
+  From 0.46.0, approvals, completion records, phase records, a prepared
+  pilot and finished units stay valid (from an earlier release, see the
+  notes in between), and the update can go in during phase 04 (stop the
+  runner, update, run `translate` again in the same folder). A file left
   unfinished by a write EOF is tried again by the next `translate`, as every
   unfinished file is.
 - Test: `tests/write-eof-2026-11-04.test.mjs`, eight tests. Two let a real
   write fail with an input larger than the pipe (EPIPE on Linux and macOS,
-  EOF on Windows): the call ends with the child's exit status and output, and
-  a worker CLI's lock error reaches the message and the guidance. The others
-  give the write Windows' EOF on every platform: the call is left to the
-  child as with EPIPE and keeps the word, another failed write still fails
-  it, and a child that goes silent after it is still stopped; a worker CLI's
-  lock error and its stream's rate limit reach the message and the guidance
-  and are retried; an answer given before the prompt was read is not used; a
-  CLI signed out in the worker home is tried in the person's home; a file
-  whose first call failed this way is retried and completes. These six fail
-  on 0.45.1.
+  EOF on Windows): the call ends with the child's exit status and output and
+  keeps the word, and a worker CLI's lock error reaches the message and the
+  guidance. The others give the write Windows' EOF on every platform: the
+  call is left to the child as with EPIPE and keeps the word, another failed
+  write still fails it, and a child that goes silent after it is still
+  stopped; a worker CLI's lock error and its stream's rate limit reach the
+  message and the guidance and are retried; an answer given before the
+  prompt was read is not used; a CLI signed out in the worker home is tried
+  in the person's home; a file whose first call failed this way is retried
+  and completes. All eight fail on 0.46.0 (on Linux and macOS the two with a
+  real write only for the word the record now keeps).
 
 # 0.46.0 — 2026-11-04
 
