@@ -12,8 +12,10 @@ for the CLI's own exit. Windows reports EOF for a write still waiting when
 the CLI went (libuv's word for ERROR_BROKEN_PIPE), and the runner failed the
 call itself: it tried to stop a CLI that was already gone (taskkill's exit
 128: no such process) and reported the write. This release does not change
-why a CLI ends early; it shows the CLI's own reason. On every platform, an
-answer the CLI gave before it had read its whole prompt is no longer used.
+why a CLI ends early; it shows the CLI's own reason. An answer a CLI gave
+before it had read its whole prompt is not used on any platform (Linux and
+macOS used it up to 0.46.0; the kit can tell only when the prompt does not
+fit in the pipe).
 
 - EOF is read like EPIPE: on every platform the call ends with the child's
   own exit status and output. The adapter then does what it does with any
