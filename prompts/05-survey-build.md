@@ -34,8 +34,9 @@ The coordinator admits every queued job durably before dispatch. On Stop, inspec
 status pendingRepairs and resume translate within the existing approval; unfinished
 jobs cannot reuse their old done receipts. Keep the immutable intent archives.
 Do not replay a stale queue, drop its unstarted jobs, or replace frozen diagnostics.
-Count TODO(port) lines mechanically against the final PORT STATUS todos value;
-with todo-lines-v1 the measured check is also bound to Node's completion receipt.
+Count TODO(port) lines mechanically against the final PORT STATUS todos value
+(a JSON file has no comments and carries no trailer); with todo-lines-v1 the
+measured check is also bound to Node's completion receipt.
 
 Reviewers verify the evidence against the code; the arbiter confirms findings;
 fixers apply confirmed changes and receive no compiler tool. Review again.

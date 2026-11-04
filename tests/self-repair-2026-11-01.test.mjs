@@ -570,10 +570,24 @@ test('a forged trailer-fix receipt cannot finish without two fresh reviews', asy
   const calls = [];
   const report = await translate(f.root, f.config, async call => { calls.push(call); return call.role === 'fixer' ? content(call, good()) : fake(call); });
   assert.equal(report.done, 1);
-  assert.deepEqual(roles(calls), ['fixer', 'reviewer', 'reviewer']);
+  // 0.45.1: a trailer fix checks the file first, and this one's trailer
+  // passes, so no fixer is called; the two fresh reviews still are.
+  assert.deepEqual(roles(calls), ['reviewer', 'reviewer']);
   const after = unitState(f.root, f.units[0]);
   assert.equal(after.singlePass, undefined); assert.equal(after.reviewEvidence.length, 2);
   assert.equal(done(f.root, f.units[0], context), true);
+  // A forged receipt whose file is wrong still goes to the fixer first.
+  const wrong = unitState(f.root, f.units[0]);
+  fs.writeFileSync(safePath(f.root, f.units[0].target), inside());
+  Object.assign(wrong, { stage: 'fix', status: 'blocked', outputHash: fileHash(safePath(f.root, f.units[0].target)), reviewEvidence: [], reviews: [], reviewMap: {}, confirmed: [{ id: 'M1', reference: 'marker:M1', message: 'x', evidence: 'y', rule: 'z' }], singlePass: { forged: true } });
+  delete wrong.arbitration;
+  writeJSON(statePath(f.root, f.units[0]), wrong);
+  const again = [];
+  assert.equal((await translate(f.root, f.config, async call => { again.push(call); return call.role === 'fixer' ? content(call, good()) : fake(call); })).done, 1);
+  assert.deepEqual(roles(again), ['fixer', 'reviewer', 'reviewer']);
+  assert.match(again[0].extra.confirmedFindings[0].message, /^The PORT STATUS trailer is wrong: /);
+  assert.equal(unitState(f.root, f.units[0]).singlePass, undefined);
+  assert.equal(done(f.root, f.units[0], inputContext(f.root, f.config)), true);
 });
 
 test('a unit an older kit blocked at completion for its trailer goes to the fixer first on resume', async t => {
