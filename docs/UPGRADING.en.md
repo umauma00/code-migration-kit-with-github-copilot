@@ -1,6 +1,21 @@
-# Upgrading (0.45.0 and earlier releases)
+# Upgrading (0.45.1 and earlier releases)
 
 [日本語](UPGRADING.md) | English
+
+## 0.45.1 (the trailer of XML and other formats without a line comment; JSON files)
+
+On 2026-11-04 phase 04 on Windows (98 of 554) sent Database.xml back to the fixer on every run and left it unfinished. Under `markerPolicy` `todo-lines-v1` the trailer line had to end with the `todos=` count, and XML has no line comment. `<!-- PORT STATUS: confidence=medium todos=2 -->`, which keeps the file valid XML, failed; only a file that was no longer XML (a comment left open, a bare line) passed. Each run spent up to four fixer calls rewriting the whole file (two trailer fixes, each with one correction), left it unfinished, and the next run did the same. Every format without a line comment, such as HTML, JSP and CSS, was the same, and JSON, which has no comments, was broken by any trailer.
+
+1. After the count, the trailer line may end with the closer of a comment that ends on that line (`-->`, `--%>`, `%>`, `*/`, `*@`, `#}`, `*)`). XML and HTML pass with `<!-- PORT STATUS: confidence=medium todos=2 -->` after the closing root tag, JSP with `<%-- PORT STATUS: confidence=medium todos=2 --%>`, CSS with `/* PORT STATUS: confidence=medium todos=2 */`. A closing brace or parenthesis of code, such as `}` or `)`, still fails (the trailer would sit inside code).
+2. A JSON-family file (`.json`, `.jsonl`, `.ndjson`, `.geojson`, `.webmanifest`) has no comments and completes without a trailer. An answer with one is asked again to remove it, and one left on a written file goes to the fixer as the confirmed finding `marker:M1`.
+3. A JSON file finished with a trailer by 0.45.0 or earlier stays finished while that trailer passes the rule of those kits (its receipt holds). A strict JSON reader rejects that line, though: remove it by hand from a file that is read as JSON. Like any other edit, that sends the file to review once at the next `translate` (it is not translated again).
+4. A trailer fix (`marker:M1` alone) checks the file again before the fixer is called. A file whose trailer fix was stopped under an earlier kit (such as the Windows run's Database.xml) goes to review with no fixer call when its trailer passes now; otherwise the fixer is told the problem as this kit finds it, not in the earlier kit's words ("does not read ...", which no XML comment could satisfy).
+5. The trailer problem now says how to fix a comment closed on the line below the trailer (`<!--`, then the trailer, then `-->`).
+6. The writing roles (implementer and fixer) are told the forms for a format without line comments and that a JSON file carries none, and both reviewers and the arbiter are told not to treat either as a defect. The check of whether a fix changed only flags (`TODO(port)` lines and the trailer) also takes flags written in JSP, ERB, Razor, Jinja and OCaml comments as flags.
+7. The RULEBOOK templates (English and Japanese) for new installs show the same forms. An existing `migration/RULEBOOK.md` is not changed and needs no change (the kit tells the workers the forms). Do not change the RULEBOOK during phase 04: without `rulebook accept`, that sends every finished unit back to review.
+8. The records' format does not change. A trailer that passed up to 0.45.0 records the same fields with the same values, so from 0.40.1 or later, approvals, completion records, phase records, prepared pilots and finished units are kept (from 0.40.0, see 0.40.1). It can go in during phase 04: stop the runner (in the Copilot app, Stop on the running command), update, and run `translate` again in the same folder; it goes on with the units not finished. An XML file left unfinished by its trailer goes on to review at the next run.
+9. A file this release newly finishes (a trailer that closes a comment, a JSON file without a trailer) looks unfinished to a kit of 0.45.0 or earlier, which sends it back to the fixer. When several hosts (another PC, VS Code and the CLI) run the same project, update the kit on all of them to 0.45.1 before running it.
+10. In a copy install replace all of `migration-kit/` with the temporary install's contents (the orchestrator's instructions and the skill do not change, so approvals are kept). A plugin install takes it with the update.
 
 ## 0.45.0 (settings.json is the one file for settings; a settings change sends back only what it affects)
 

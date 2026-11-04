@@ -1,3 +1,69 @@
+# 0.45.1 — 2026-11-04
+
+A file of a format without line comments, such as XML, can finish with its
+PORT STATUS trailer, and a JSON file finishes without one. On 2026-11-04
+phase 04 on Windows (98 of 554) sent Database.xml back to the fixer on every
+run. Under `markerPolicy` `todo-lines-v1` the trailer line had to end with
+its `todos=` count, so `<!-- PORT STATUS: confidence=medium todos=2 -->`
+failed and only a file that was no longer XML (a comment left open, a bare
+line) passed. Each run spent up to four fixer calls rewriting the whole file
+(`trailerToFixer` twice, each with one correction), then left it unfinished,
+and the next run did the same. HTML, JSP, CSS and every other format without
+a line comment were the same; JSON, which has no comments, was broken by any
+trailer.
+
+- The trailer may end with the closer of a comment that ends on its line
+  (`trailerClosers`: `-->`, `--%>`, `%>`, `*/`, `*@`, `#}`, `*)`) in
+  `lib/markers.mjs`. A closing brace, bracket or parenthesis is not one: a
+  trailer before it sits inside code. A trailer that passed before passes
+  with exactly the fields it recorded (no new field on a valid trailer), so
+  `unitDone`'s comparison of every recorded field still holds for finished
+  units.
+- `markerEvidence` takes the unit's target (`carriesNoTrailer`: `.json`,
+  `.jsonl`, `.ndjson`, `.geojson`, `.webmanifest`). Such a file is valid with
+  no trailer (the evidence adds `noTrailer`, a field no earlier receipt has),
+  and any trailer in it is a problem that says to remove it; the error then
+  leaves out "Return one final confidence/todos trailer". Every caller passes
+  the target: the implementer's and fixer's answers, the review and done
+  stages, both review inputs and `unitDone`.
+- `finishedMarkerEvidence` (used by `unitDone`) keeps the receipt of a JSON
+  file finished by 0.45.0 or earlier: a receipt that is valid without
+  `noTrailer` is checked by the rule of those kits (nothing after the count),
+  so a JSON file finished with `// PORT STATUS: ...` stays finished. Any new
+  answer is held to the new rule.
+- A trailer fix (`marker:M1` alone) checks the file again before the fixer
+  is called. One stopped under an earlier kit, as the Windows run's
+  Database.xml was, goes to review with no fixer call when its trailer
+  passes now, and otherwise the fixer gets the problem as this kit finds it
+  (before, the earlier kit's words: "does not read ...", which no XML
+  comment could satisfy).
+- The problem names a comment closed on the line below the trailer ("end the
+  PORT STATUS line itself with "-->" and remove line N"), says "after the
+  final closing brace or tag", lists the closers when the line does not read
+  as a trailer, and shows the XML form when the trailer is missing.
+- The writing roles' `trailerRule` adds the XML or HTML, JSP and CSS forms and
+  that a JSON file carries none; both reviewers and the arbiter are told not
+  to report or confirm either form as a defect. The `marker:M1` rule says the
+  same. `flagComment` (the check of whether a fix changed only flags) also
+  takes `<%-- --%>`, `<%# %>`, `@* *@`, `{# #}` and `(* *)` as the comments a
+  flag is written in.
+- The RULEBOOK templates (English and Japanese) show the forms for new
+  installs; an existing RULEBOOK is not changed. CONTRACTS, EXECUTION-SCOPES
+  and REFERENCE say the same.
+- Test: `tests/trailer-formats-2026-11-04.test.mjs` (720 trailers that passed
+  0.45.0 record the same fields for five kinds of target, and a finished
+  unit's receipt holds for each; the forms of XML, HTML, JSP, CSS, Razor,
+  Jinja, ERB and OCaml, and a comment opened above, pass, with the same six
+  fields; braces and parentheses after the count still fail; a comment closed
+  below the trailer; JSON with and without a trailer, a JSON receipt of
+  0.45.0 and no other; flags in the new comment forms; the prompts of every
+  role; the templates; Database.xml and a JSON file finishing on their first
+  answer with no fixer call, and staying finished; a JSON file finished with
+  a trailer by 0.45.0 staying finished through a run, and reviewed once when
+  the trailer is removed by hand; trailer fixes stopped under 0.45.0 resumed,
+  two reviewed with no fixer call and one fixed with today's problem; a JSON
+  answer with a trailer fixed once). All twelve fail on 0.45.0.
+
 # 0.45.0 — 2026-11-02
 
 `migration/settings.json` is the one file for changing settings, and a

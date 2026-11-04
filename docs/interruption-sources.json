@@ -405,7 +405,7 @@
     },
     {
       "path": "lib/core.mjs",
-      "sha256": "12b5f5ebd0a25c17471437055ea1a609609acd66679fa829d347409fe698a381",
+      "sha256": "c1edbd6736a2e164d57405269491870fd7b20646ef33fd153ac09e9b2937e5b0",
       "entries": [
         {
           "line": 26,
@@ -1324,15 +1324,15 @@
     },
     {
       "path": "lib/markers.mjs",
-      "sha256": "3fdf68020e4643223d539cbd96042aa89c709a14da0e5d807f06a8ebfb260634",
+      "sha256": "acd9ae8b434d53af9505775012ef75fb8ba73711e7154cbd41264d2549183a13",
       "entries": [
         {
-          "line": 9,
+          "line": 45,
           "kind": "error-or-exit-candidate",
           "code": "if (config.markerPolicy !== 'todo-lines-v1') throw new Error('Unsupported markerPolicy');"
         },
         {
-          "line": 46,
+          "line": 95,
           "kind": "error-or-exit-candidate",
           "code": "if (evidence && !evidence.valid) throw new Error(markerError(evidence));"
         }
@@ -1758,7 +1758,7 @@
     },
     {
       "path": "lib/pipeline.mjs",
-      "sha256": "ead3338b9364c69ac3d0b8d398626a0c4c6d2eabae037a2d9e9f372f46db4736",
+      "sha256": "84365514060c77196cbc6236fc4df659e56ba6f66c5f0fa03a598d84e8110949",
       "entries": [
         {
           "line": 20,
@@ -1986,332 +1986,332 @@
           "code": "} catch (e) { if (result) result.error = e.message; throw e; }"
         },
         {
-          "line": 377,
+          "line": 386,
           "kind": "loop-exit-candidate",
           "code": "if (!Number.isFinite(at)) break;"
         },
         {
-          "line": 421,
+          "line": 430,
           "kind": "error-or-exit-candidate",
           "code": "if (runCalls !== undefined && (!Number.isInteger(runCalls) || runCalls < 1 || runCalls > 10000)) throw new Error('--max-calls must be an integer from 1 to 10000');"
         },
         {
-          "line": 422,
+          "line": 431,
           "kind": "error-or-exit-candidate",
           "code": "const limits = executionLimits(config);"
         },
         {
-          "line": 423,
+          "line": 432,
           "kind": "error-or-exit-candidate",
           "code": "const maxCalls = Math.min(runCalls ?? limits.calls, callLimit ?? Infinity);"
         },
         {
-          "line": 424,
+          "line": 433,
           "kind": "error-or-exit-candidate",
           "code": "const maxInputBytes = Math.min(limits.inputBytes, inputLimit ?? Infinity);"
         },
         {
-          "line": 467,
+          "line": 476,
           "kind": "cancellation",
           "code": "const fatal = e => { dispatchError ??= e; cancellation.abort(); return e; };"
         },
         {
-          "line": 533,
+          "line": 542,
           "kind": "error-or-exit-candidate",
           "code": "if (!full) try { contentHash(root, config, readMemo()); } catch (e) { throw changed(unreadable(e) ? new Error(message) : e); }"
         },
         {
-          "line": 534,
+          "line": 543,
           "kind": "error-or-exit-candidate",
           "code": "throw changed(new Error(message));"
         },
         {
-          "line": 539,
+          "line": 548,
           "kind": "error-or-exit-candidate",
           "code": "if (repairIntent && readRepairIntent(root, context)?.checksum !== repairIntent.checksum) throw new Error('Repair intent changed during execution');"
         },
         {
-          "line": 545,
+          "line": 554,
           "kind": "error-or-exit-candidate",
           "code": "if (readAgain && unreadable(e)) throw e;"
         },
         {
-          "line": 546,
+          "line": 555,
           "kind": "error-or-exit-candidate",
           "code": "throw unreadable(e) && !final ? fatal(e) : inputsChanged(e);"
         },
         {
-          "line": 559,
+          "line": 568,
           "kind": "error-or-exit-candidate",
           "code": "if (config.mode !== 'preserve') throw new Error('Automated file runner supports preserve mode; redesign needs a module adapter. Use the redesign phase prompts meanwhile.');"
         },
         {
-          "line": 565,
+          "line": 574,
           "kind": "error-or-exit-candidate",
           "code": "if (!units.length) throw new Error('Manifest is empty; refusing an empty translation run');"
         },
         {
-          "line": 581,
+          "line": 590,
           "kind": "error-or-exit-candidate",
           "code": "throw inputsChanged(new Error('Migration inputs changed before worker invocation'));"
         },
         {
-          "line": 583,
+          "line": 592,
           "kind": "error-or-exit-candidate",
           "code": "if (onlyTarget && !units.some(u => u.target === onlyTarget)) throw new Error('Repair target is not in manifest');"
         },
         {
-          "line": 584,
+          "line": 593,
           "kind": "error-or-exit-candidate",
           "code": "if (onlyTarget && repairQueue) throw new Error('Choose one --target or a --queue, not both');"
         },
         {
-          "line": 587,
+          "line": 596,
           "kind": "error-or-exit-candidate",
           "code": "if ((onlyTarget && !scope.has(onlyTarget)) || (queueInput && [...queueInput.jobs.keys()].some(target => !scope.has(target)))) throw new Error('Repair exceeds the current translation approval scope');"
         },
         {
-          "line": 590,
+          "line": 599,
           "kind": "error-or-exit-candidate",
           "code": "if (!evidence?.startsWith('migration/')) throw new Error('Repair requires an evidence file under migration/');"
         },
         {
-          "line": 592,
+          "line": 601,
           "kind": "error-or-exit-candidate",
           "code": "if (diagnostic.length > 16000) throw new Error('Select a diagnostic slice of at most 16000 characters');"
         },
         {
-          "line": 596,
+          "line": 605,
           "kind": "error-or-exit-candidate",
           "code": "if (unfinishedRepairs.some(j => !scope.has(j.target))) throw new Error('Current approval omits unfinished repair targets');"
         },
         {
-          "line": 599,
+          "line": 608,
           "kind": "error-or-exit-candidate",
           "code": "if (!unfinishedRepairs.some(j => j.target === onlyTarget && j.diagnostic === diagnostic)) throw new Error('Resume the unfinished repair with its frozen diagnostic before starting a new repair');"
         },
         {
-          "line": 654,
+          "line": 663,
           "kind": "error-or-exit-candidate",
           "code": "if (!currentHash || !fs.statSync(out).size) throw new Error('Repair requires an existing nonempty target; translate missing units first');"
         },
         {
-          "line": 659,
+          "line": 668,
           "kind": "error-or-exit-candidate",
           "code": "if (!currentHash || !fs.statSync(out).size) throw new Error('Repair requires an existing nonempty target; restore its candidate before resuming');"
         },
         {
-          "line": 666,
+          "line": 675,
           "kind": "error-or-exit-candidate",
           "code": "if (signal?.aborted) throw new Error('Interrupted');"
         },
         {
-          "line": 667,
+          "line": 676,
           "kind": "error-or-exit-candidate",
           "code": "if (dispatchError) throw dispatchError;"
         },
         {
-          "line": 679,
+          "line": 688,
           "kind": "error-or-exit-candidate",
           "code": "if (Number.isFinite(maxInputBytes) && inputBytes >= maxInputBytes) { budgetExhausted = true; throw inputBudgetError; }"
         },
         {
-          "line": 680,
+          "line": 689,
           "kind": "error-or-exit-candidate",
           "code": "if (budgetExhausted || reservations >= maxCalls) { budgetExhausted = true; throw callLimitError; }"
         },
         {
-          "line": 690,
+          "line": 699,
           "kind": "error-or-exit-candidate",
           "code": "if (signal?.aborted) throw new Error('Interrupted');"
         },
         {
-          "line": 691,
+          "line": 700,
           "kind": "error-or-exit-candidate",
           "code": "if (dispatchError) throw dispatchError;"
         },
         {
-          "line": 700,
+          "line": 709,
           "kind": "loop-exit-candidate",
           "code": "try { response = await adapter({ root, config, role, unit, extra, signal, reviewInput: review?.text, reviewMode: review?.mode, ...(work ? { workInput: work.text, workMode: work.mode } : {}), context, runId, sessionId, silentAttempts: silences }); break; }"
         },
         {
-          "line": 703,
+          "line": 712,
           "kind": "error-or-exit-candidate",
           "code": "if (isSystemicFailure(e) || !isTransientFailure(e) || retry >= limits.retries || (isLimitedRetry(e) && stalls++ >= hostStallRetries) || signal?.aborted || dispatchError) throw e;"
         },
         {
-          "line": 706,
+          "line": 715,
           "kind": "error-or-exit-candidate",
           "code": "if (reservations >= maxCalls) { budgetExhausted = true; throw e; }"
         },
         {
-          "line": 714,
+          "line": 723,
           "kind": "error-or-exit-candidate",
           "code": "await sleep(retryDelayMs(config, retry), undefined, { signal }).catch(() => { throw new Error('Interrupted'); });"
         },
         {
-          "line": 718,
+          "line": 727,
           "kind": "error-or-exit-candidate",
           "code": "if (dispatchError) throw e;"
         },
         {
-          "line": 719,
+          "line": 728,
           "kind": "error-or-exit-candidate",
           "code": "if (reservations >= maxCalls) { budgetExhausted = true; throw e; }"
         },
         {
-          "line": 731,
+          "line": 740,
           "kind": "error-or-exit-candidate",
           "code": "if (signal?.aborted) throw new Error('Interrupted');"
         },
         {
-          "line": 733,
+          "line": 742,
           "kind": "error-or-exit-candidate",
           "code": "if (fileHash(out) !== state.outputHash) throw new Error('Output changed during worker invocation; refusing to overwrite');"
         },
         {
-          "line": 750,
+          "line": 759,
           "kind": "error-or-exit-candidate",
           "code": "writeJSON(safePath(root, rel), attempt); throw e;"
         },
         {
-          "line": 762,
+          "line": 771,
           "kind": "error-or-exit-candidate",
           "code": "if (!contractSlip(e)) throw e;"
         },
         {
-          "line": 796,
+          "line": 805,
           "kind": "error-or-exit-candidate",
           "code": "if (fileHash(destination) !== state.outputHash) throw new Error('Output changed concurrently; refusing to overwrite');"
         },
         {
-          "line": 807,
+          "line": 816,
           "kind": "error-or-exit-candidate",
           "code": "if (fileHash(destination) !== state.outputHash) throw new Error('Output changed concurrently; refusing to overwrite');"
         },
         {
-          "line": 810,
+          "line": 819,
           "kind": "error-or-exit-candidate",
           "code": "if (hash(response.result.content) === reviewedOutputHash) throw new Error('Fixer returned the reviewed candidate unchanged; confirmed findings remain open (fixPolicy single-pass)');"
         },
         {
-          "line": 826,
+          "line": 838,
           "kind": "error-or-exit-candidate",
           "code": "if (tries >= 2) throw new Error(markerError(evidence));"
         },
         {
-          "line": 837,
+          "line": 847,
           "kind": "error-or-exit-candidate",
           "code": "if (signal?.aborted) throw new Error('Interrupted');"
         },
         {
-          "line": 854,
+          "line": 864,
           "kind": "error-or-exit-candidate",
           "code": "catch (e) { state.typecheck = e.result ?? { error: e.message }; throw e; }"
         },
         {
-          "line": 860,
+          "line": 870,
           "kind": "error-or-exit-candidate",
           "code": "state.confirmed = [{ id: 'TC1', reference: 'typecheck:TC1', message: `Unit typecheck failed (exit ${check.code})`,"
         },
         {
-          "line": 876,
+          "line": 886,
           "kind": "error-or-exit-candidate",
           "code": "const failed = results.find(r => r.status === 'rejected'); if (failed) throw failed.reason;"
         },
         {
-          "line": 898,
+          "line": 908,
           "kind": "error-or-exit-candidate",
           "code": "if (problem) throw new Error(problem.error);"
         },
         {
-          "line": 905,
+          "line": 924,
           "kind": "error-or-exit-candidate",
           "code": "if (!trailerOnly && state.round >= limits.fixRounds) throw new Error('Fix-round limit reached; review recurring problems and propose a rule amendment');"
         },
         {
-          "line": 913,
+          "line": 932,
           "kind": "error-or-exit-candidate",
           "code": "catch (e) { if (state.outputHash === candidate) state.round = round; throw e; }"
         },
         {
-          "line": 917,
+          "line": 936,
           "kind": "error-or-exit-candidate",
           "code": "catch (e) { state.typecheck = e.result ?? { error: e.message }; throw e; }"
         },
         {
-          "line": 933,
+          "line": 952,
           "kind": "error-or-exit-candidate",
           "code": "catch (e) { state.typecheck = e.result ?? { error: e.message }; throw e; }"
         },
         {
-          "line": 935,
+          "line": 954,
           "kind": "error-or-exit-candidate",
           "code": "if (check.code !== 0) throw new Error('Repair reviewers found no actionable issue but typecheck still fails');"
         },
         {
-          "line": 940,
+          "line": 959,
           "kind": "error-or-exit-candidate",
           "code": "if (changeFound) throw new Error('Migration inputs changed; receipts need fresh approval');"
         },
         {
-          "line": 941,
+          "line": 960,
           "kind": "error-or-exit-candidate",
           "code": "if (fileHash(safePath(root, unit.target)) !== state.outputHash) throw new Error('Output changed during review');"
         },
         {
-          "line": 942,
+          "line": 961,
           "kind": "loop-exit-candidate",
           "code": "state.status = 'done'; delete state.error; save(); unconfirmed.add(unit); onProgress({ unit: unit.target, stage: 'done', calls }); break;"
         },
         {
-          "line": 943,
+          "line": 962,
           "kind": "error-or-exit-candidate",
           "code": "} else throw new Error(`Unknown unit stage: ${state.stage}`);"
         },
         {
-          "line": 960,
+          "line": 979,
           "kind": "error-or-exit-candidate",
           "code": "if (cycles.length && config.commands?.typecheck) throw new Error(`Cyclic translation dependencies with unit typecheck: ${cycles.map(u => u.source).join(', ')}. Audit the dependency map; group the cycle into an atomic unit or explicitly defer unit typecheck until the target graph exists and use build/smoke validation.`);"
         },
         {
-          "line": 969,
+          "line": 988,
           "kind": "error-or-exit-candidate",
           "code": "const maxConsecutive = limits.consecutiveFailures;"
         },
         {
-          "line": 995,
+          "line": 1014,
           "kind": "loop-exit-candidate",
           "code": "if (index < 0) break;"
         },
         {
-          "line": 1010,
+          "line": 1029,
           "kind": "loop-exit-candidate",
           "code": "break;"
         },
         {
-          "line": 1040,
+          "line": 1059,
           "kind": "loop-exit-candidate",
           "code": "try { checkInputs('Migration inputs changed during the run; fresh approval required', { full: true, final: true, readAgain: wait !== null }); break; }"
         },
         {
-          "line": 1044,
+          "line": 1063,
           "kind": "loop-exit-candidate",
           "code": "break;"
         },
         {
-          "line": 1071,
+          "line": 1090,
           "kind": "error-or-exit-candidate",
           "code": "executionMode: config.executionMode ?? 'continuous', ...(ignoredLimits(config).length ? { ignoredLimits: ignoredLimits(config) } : {}), ...(Number.isFinite(maxInputBytes) ? { maxRunInputBytes: maxInputBytes } : {}) };"
         },
         {
-          "line": 1079,
+          "line": 1098,
           "kind": "error-or-exit-candidate",
           "code": "if (errors.length || signal?.aborted || required.some(u => !completed.has(u))) throw Object.assign(new Error(`Translation stopped: ${errors.map(e => `${e.target}: ${e.error}`).join('; ') || (signal?.aborted ? 'Interrupted' : 'Reviewed receipts incomplete')}`), { report, budgetStop: budgetExhausted && !dispatchError });"
         },
         {
-          "line": 1088,
+          "line": 1107,
           "kind": "error-or-exit-candidate",
           "code": "if (!grant) throw new Error('pilot run requires an authorized isolated pilot project');"
         }
@@ -2745,7 +2745,7 @@
     },
     {
       "path": "lib/review.mjs",
-      "sha256": "0aa9dad0dc666d1a5a3ba0c9b61e5afe85bfe0b311f4b5932655982becf49996",
+      "sha256": "8f8f24ac68293caf505b89e14aeb93ba6a38c2e7c8452a3146ab569958ecbc2f",
       "entries": [
         {
           "line": 22,
@@ -3756,7 +3756,7 @@
     },
     {
       "path": "scripts/copilot_adapter.mjs",
-      "sha256": "fdb1e91ed1b11c4680cbfd266ce2cc5729d012be2a8a646e9b12968a91ae6c22",
+      "sha256": "9e7773608de2432e9c44d5ff4df9048ff6059f7acae95a4d60c4eaee14a54a78",
       "entries": [
         {
           "line": 9,
@@ -3934,67 +3934,67 @@
           "code": "// independent reviewers with a different first lens, so a finding both raise is"
         },
         {
-          "line": 350,
+          "line": 358,
           "kind": "error-or-exit-candidate",
           "code": "if (isReviewer(role) && typeof reviewInput !== 'string') throw new Error('Reviewer requires a frozen review input');"
         },
         {
-          "line": 403,
+          "line": 411,
           "kind": "deadline-or-observation",
           "code": "const currentVersion = (root, signal, timeoutMs, home, silenceMs) => {"
         },
         {
-          "line": 404,
+          "line": 412,
           "kind": "deadline-or-observation",
           "code": "if (!check || check.timeoutMs !== timeoutMs || check.home !== home || check.silenceMs !== silenceMs || Date.now() - check.at >= versionRecheckMs) {"
         },
         {
-          "line": 405,
+          "line": 413,
           "kind": "deadline-or-observation",
           "code": "check = { at: Date.now(), timeoutMs, home, silenceMs, result: copilotVersion(command, prefixArgs, { cwd: root, signal, timeoutMs, silenceMs, home }).then(version => ({ version }), error => ({ error })) };"
         },
         {
-          "line": 434,
+          "line": 442,
           "kind": "error-or-exit-candidate",
           "code": "if (signal?.aborted) throw new Error('Interrupted');"
         },
         {
-          "line": 467,
+          "line": 475,
           "kind": "error-or-exit-candidate",
           "code": "argv = [...prefixArgs, ...copilotArgs(worker, model, undefined, layout, session, { usageFile, maxAiCredits: executionLimits(config).aiCredits, effort, context, toolFree: isToolFree(worker) || (usesWorkInput(role, workMode) && workMode === 'frozen' && typeof workInput === 'string'), stream: silenceMs > 0 })];"
         },
         {
-          "line": 468,
+          "line": 476,
           "kind": "deadline-or-observation",
           "code": "options = { cwd: root, signal, input: prompt, timeoutMs: processTimeout(config, 'timeoutSeconds'), silenceMs, ...(silenceMs > 0 ? { dropLine: isStreamedDelta } : {}), outputDir: safePath(root, 'migration/runs/process-output'), env: copilotEnv(worker, home) };"
         },
         {
-          "line": 469,
+          "line": 477,
           "kind": "error-or-exit-candidate",
           "code": "} catch (e) { fs.rmSync(usageDir, { recursive: true, force: true }); throw e; }"
         },
         {
-          "line": 502,
+          "line": 510,
           "kind": "error-or-exit-candidate",
           "code": "Object.assign(e, versionFields, usageFields(usage)); throw e;"
         },
         {
-          "line": 506,
+          "line": 514,
           "kind": "error-or-exit-candidate",
           "code": "if (result.code !== 0) throw new Error(`Copilot ${role} failed (exit ${result.code}): ${[copilotStreamError(processOutputLines(result)), result.stderr.slice(-2000)].filter(Boolean).join('\\n')}`);"
         },
         {
-          "line": 512,
+          "line": 520,
           "kind": "error-or-exit-candidate",
           "code": "throw e;"
         },
         {
-          "line": 517,
+          "line": 525,
           "kind": "error-or-exit-candidate",
           "code": "throw e;"
         },
         {
-          "line": 530,
+          "line": 538,
           "kind": "error-or-exit-candidate",
           "code": "ledger(false, reportedModelOf(result)); e.result = recordedOutput(result, root); Object.assign(e, versionFields, usageFields(usage)); throw e; }"
         }

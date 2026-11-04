@@ -122,13 +122,19 @@ Every translated file ends with a status trailer:
 This is an example. Write `confidence=` as one of `high`, `medium` or `low`,
 and `todos=` as the plain number of lines containing `TODO(port)` — no
 brackets. Use the target's line-comment syntax and put the trailer after the
-file's last closing brace, never inside a class or function.
+file's last closing brace, never inside a class or function. A format without
+line comments puts the trailer in one comment that ends on that same line,
+after everything else in the file: `<!-- PORT STATUS: confidence=medium todos=2 -->`
+after the closing root tag in XML or HTML, `<%-- PORT STATUS: confidence=medium todos=2 --%>`
+in JSP, `/* PORT STATUS: confidence=medium todos=2 */` in CSS. A JSON file has
+no comments, so it carries no trailer.
 Reviewers check the trailer against the file's actual `TODO(port)` count —
 a trailer that overcounts or undercounts is a finding.
 
 For config.markerPolicy `todo-lines-v1`, count literal lines containing the marker
 (two occurrences on one line count once). Keep exactly one PORT STATUS trailer
-on the final nonempty line, with the numeric count matching this measurement.
+on the final nonempty line, with the numeric count matching this measurement
+(a JSON file keeps none).
 Both reviewers receive measured evidence; the coordinator additionally rejects
 a mismatch before done. Existing projects without this policy retain their
 explicitly agreed convention. See the kit's docs/EXECUTION-SCOPES.md.

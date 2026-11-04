@@ -127,16 +127,27 @@ the unit to the full review loop.
 
 With `markerPolicy: "todo-lines-v1"` a unit completes only with exactly one
 PORT STATUS trailer, on the last nonempty line, whose `todos` is the number of
-lines containing `TODO(port)`. The implementer's and the fixer's files are
-checked before they are written, with one correction. A wrong trailer on a
+lines containing `TODO(port)`. Only the closer of a comment that ends on that
+line may follow the number (`-->`, `--%>`, `%>`, `*/`, `*@`, `#}`, `*)`), so a
+format without line comments, such as XML, ends the file with
+`<!-- PORT STATUS: confidence=medium todos=2 -->`. A JSON-family file
+(`.json`, `.jsonl`, `.ndjson`, `.geojson`, `.webmanifest`) has no comments and
+completes without a trailer; a trailer there is a `marker:M1` finding to remove
+it. One finished by 0.45.0 or earlier with the trailer those kits asked for
+keeps its receipt while that trailer passes their check. The implementer's
+and the fixer's files are checked before they are written, with one
+correction. A wrong trailer on a
 written file becomes the confirmed finding `marker:M1` for the fixer, and the
 fixed file is reviewed: a file about to be reviewed (a worker's, an earlier
 run's, a resumed unit's) goes to the fixer first, a single-pass fix when the
 unit would complete. A trailer fix is not a fix round (`maxFixRounds` neither
 stops nor counts it) and keeps its stage `fix` with no reviews when resumed;
+before the fixer is called the file is checked again, and one that passes
+goes to review with no fixer call (a fix stopped under an earlier rule);
 after two in one run the unit is blocked with the reason. An invalid `markerEvidence`
 carries `problem` (what is wrong, with line numbers); a valid one keeps its six
-fields, so existing receipts still match.
+fields, so existing receipts still match. A JSON file valid without a trailer
+adds `noTrailer`.
 
 A worker answer that is not one JSON object or has the wrong shape, one that
 ended without a final message ("Copilot JSONL is incomplete"), and an
