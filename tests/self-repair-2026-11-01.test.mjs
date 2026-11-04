@@ -23,7 +23,11 @@ const policy = { markerPolicy: 'todo-lines-v1' };
 const body = () => fs.readFileSync(path.join(mini, 'expected/math_ops.mjs'), 'utf8').replace(/^\/\/ PORT STATUS:.*$/m, '').trimEnd();
 const good = () => `${body()}\n// PORT STATUS: confidence=high todos=0\n`;
 // The trailer above the final closing brace, as the 0.31.0 fixers wrote it.
+// Since 0.46.0 the runner moves it itself (tests/trailer-rewrite-2026-11-04.test.mjs).
 const inside = () => { const b = body(), i = b.lastIndexOf('}'); return `${b.slice(0, i)}// PORT STATUS: confidence=high todos=0\n}\n`; };
+// A count only a worker can settle (no TODO(port) line, todos=1): it may be a
+// TODO(port) line left out, so it still goes to the worker.
+const miscounted = () => `${body()}\n// PORT STATUS: confidence=high todos=1\n`;
 const answer = (call, value) => ({ result: value, requestedModel: 'test-double', observedModel: null, tokens: null, aiCredits: null });
 const content = (call, text) => answer(call, result(call.role, call.unit, { content: text }));
 
@@ -102,31 +106,39 @@ test('prompts: the fixer flags what this file cannot fix; a correction reaches e
     /\nCorrection: Your previous answer was rejected: Text followed the JSON object\.\nSet target to "ported\/A\.java"\.$/);
 });
 
-test('an implementer whose trailer sits above the closing brace is told where and asked once more', async t => {
+test('an implementer whose trailer count is wrong is told why and asked once more', async t => {
   const f = await setup(t);
   const calls = [];
   const report = await translate(f.root, f.config, async call => {
     calls.push(call);
-    if (call.role === 'implementer') return content(call, call.extra.correction ? good() : inside());
+    if (call.role === 'implementer') return content(call, call.extra.correction ? good() : miscounted());
     return fake(call);
   });
   assert.equal(report.done, 1);
   const implementers = calls.filter(c => c.role === 'implementer');
   assert.equal(implementers.length, 2);
   assert.equal(implementers[0].extra.correction, undefined);
-  assert.match(implementers[1].extra.correction, /^The PORT STATUS trailer of your content is wrong: the PORT STATUS line is line \d+, but line \d+ "}" follows it: move the trailer below it.*Return the complete file again with this corrected\.$/);
+  assert.match(implementers[1].extra.correction, /^The PORT STATUS trailer of your content is wrong: it says todos=1 but 0 lines contain TODO\(port\): make the number 0, or change the TODO\(port\) lines\. Return the complete file again with this corrected\.$/);
   assert.equal(fs.readFileSync(safePath(f.root, f.units[0].target), 'utf8'), good());
   assert.equal(done(f.root, f.units[0], inputContext(f.root, f.config)), true);
   assert.deepEqual(summary(f, report).selfRepairs, { corrections: 1, markerFixes: 0 });
+  // A trailer above the closing brace is moved by the runner (0.46.0): no call.
+  const g = await setup(t);
+  const moved = [];
+  const again = await translate(g.root, g.config, async call => { moved.push(call); return call.role === 'implementer' ? content(call, inside()) : fake(call); });
+  assert.equal(again.done, 1);
+  assert.deepEqual(roles(moved), ['implementer', 'reviewer', 'reviewer']);
+  assert.equal(fs.readFileSync(safePath(g.root, g.units[0].target), 'utf8'), good());
+  assert.deepEqual(summary(g, again).selfRepairs, { corrections: 0, markerFixes: 0, markerRewrites: 1 });
 });
 
 test('a trailer still wrong after its correction goes to the fixer as a finding at once; only the fixed file is reviewed', async t => {
   const f = await setup(t);
   const calls = [];
-  // The implementer keeps the trailer inside the function, also after the correction.
+  // The implementer keeps the count wrong, also after the correction.
   const report = await translate(f.root, f.config, async call => {
     calls.push(call);
-    if (call.role === 'implementer') return content(call, inside());
+    if (call.role === 'implementer') return content(call, miscounted());
     if (call.role === 'fixer') return content(call, good());
     return fake(call);
   });
@@ -135,7 +147,7 @@ test('a trailer still wrong after its correction goes to the fixer as a finding 
   assert.equal(fixers.length, 1);
   const [m1] = fixers[0].extra.confirmedFindings;
   assert.equal(m1.reference, 'marker:M1');
-  assert.match(m1.message, /^The PORT STATUS trailer is wrong: the PORT STATUS line is line \d+, but line \d+ "}" follows it/);
+  assert.match(m1.message, /^The PORT STATUS trailer is wrong: it says todos=1 but 0 lines contain TODO\(port\)/);
   // No review of the file with the wrong trailer: the fixed file has its own reviews.
   assert.deepEqual(roles(calls), ['implementer', 'implementer', 'fixer', 'reviewer', 'reviewer']);
   const context = inputContext(f.root, f.config), state = unitState(f.root, f.units[0]);
@@ -147,33 +159,36 @@ test('a trailer still wrong after its correction goes to the fixer as a finding 
 });
 
 test('a file left with a wrong trailer by an earlier run goes to the fixer before any review', async t => {
-  const f = await setup(t);
-  // The 0.31.0 runs left such files behind: reviewed, then looping review -> done.
-  fs.mkdirSync(path.dirname(safePath(f.root, f.units[0].target)), { recursive: true });
-  fs.writeFileSync(safePath(f.root, f.units[0].target), inside());
-  const calls = [];
-  const report = await translate(f.root, f.config, async call => {
-    calls.push(call);
-    if (call.role === 'fixer') return content(call, good());
-    return fake(call);
-  });
-  assert.equal(report.done, 1);
-  assert.deepEqual(roles(calls), ['fixer', 'reviewer', 'reviewer']);
-  assert.equal(calls[0].extra.confirmedFindings[0].reference, 'marker:M1');
-  assert.equal(fs.readFileSync(safePath(f.root, f.units[0].target), 'utf8'), good());
-  assert.equal(done(f.root, f.units[0], inputContext(f.root, f.config)), true);
-  assert.deepEqual(summary(f, report).selfRepairs, { corrections: 0, markerFixes: 1 });
+  for (const [left, expected, repairs] of [[miscounted, ['fixer', 'reviewer', 'reviewer'], { corrections: 0, markerFixes: 1 }],
+    // The 0.31.0 runs left trailers above the brace: since 0.46.0 the runner moves them, and only the reviews run.
+    [inside, ['reviewer', 'reviewer'], { corrections: 0, markerFixes: 0, markerRewrites: 1 }]]) {
+    const f = await setup(t);
+    fs.mkdirSync(path.dirname(safePath(f.root, f.units[0].target)), { recursive: true });
+    fs.writeFileSync(safePath(f.root, f.units[0].target), left());
+    const calls = [];
+    const report = await translate(f.root, f.config, async call => {
+      calls.push(call);
+      if (call.role === 'fixer') return content(call, good());
+      return fake(call);
+    });
+    assert.equal(report.done, 1);
+    assert.deepEqual(roles(calls), expected);
+    if (expected[0] === 'fixer') assert.equal(calls[0].extra.confirmedFindings[0].reference, 'marker:M1');
+    assert.equal(fs.readFileSync(safePath(f.root, f.units[0].target), 'utf8'), good());
+    assert.equal(done(f.root, f.units[0], inputContext(f.root, f.config)), true);
+    assert.deepEqual(summary(f, report).selfRepairs, repairs);
+  }
 });
 
-test('a trailer the fixer cannot place blocks after two fixes in the run, with the reason, and gets no extra pass', async t => {
+test('a trailer the fixer cannot correct blocks after two fixes in the run, with the reason, and gets no extra pass', async t => {
   const f = await setup(t);
   const calls = [];
   const error = await translate(f.root, f.config, async call => {
     calls.push(call);
-    if (call.role === 'implementer' || call.role === 'fixer') return content(call, inside());
+    if (call.role === 'implementer' || call.role === 'fixer') return content(call, miscounted());
     return fake(call);
   }).catch(e => e);
-  assert.match(error.message, /PORT STATUS count mismatch or invalid trailer: TODO\(port\) lines=0, claimed=0\. The PORT STATUS line is line \d+, but line \d+ "}" follows it/);
+  assert.match(error.message, /PORT STATUS count mismatch or invalid trailer: TODO\(port\) lines=0, claimed=1\. It says todos=1 but 0 lines contain TODO\(port\)/);
   const state = unitState(f.root, f.units[0]);
   assert.equal(state.status, 'blocked'); assert.equal(state.markerRepair.count, 2);
   // Two marker fixes, each asked once more: four fixer calls, no third round.
@@ -330,16 +345,19 @@ const slip = () => Object.assign(new Error('Agent did not return one valid JSON 
 
 test('a trailer fix is not held to maxFixRounds: a bounded unit whose rounds are used still gets its trailer fixed', async t => {
   const f = await setup(t, { executionMode: 'bounded', overrides: { maxFixRounds: 1 } });
-  // The single-pass fix uses the one round and keeps the trailer above the brace.
+  // The single-pass fix uses the one round and keeps the trailer above the
+  // brace, with code after it, so the runner cannot move it.
   const { calls, adapter } = firstReview([finding], (call, n) => n <= 2 ? fixedInside() : fixedGood());
   const report = await translate(f.root, f.config, adapter);
   assert.equal(report.done, 1); assert.deepEqual(report.errors, []);
-  assert.deepEqual(roles(calls), ['implementer', 'reviewer', 'reviewer', 'arbiter', 'fixer', 'fixer', 'fixer', 'reviewer', 'reviewer']);
+  // 0.46.0: the trailer fix changed the trailer alone, so the single-pass reviews stand.
+  assert.deepEqual(roles(calls), ['implementer', 'reviewer', 'reviewer', 'arbiter', 'fixer', 'fixer', 'fixer']);
   assert.equal(calls.filter(c => c.role === 'fixer')[2].extra.confirmedFindings[0].reference, 'marker:M1');
   const state = unitState(f.root, f.units[0]);
   assert.equal(state.round, 1, 'the trailer fix is not a fix round');
+  assert.equal(state.singlePass.trailerFixedBy, 'fixer');
   assert.equal(done(f.root, f.units[0], inputContext(f.root, f.config)), true);
-  assert.deepEqual(summary(f, report).selfRepairs, { corrections: 1, markerFixes: 1 });
+  assert.deepEqual(summary(f, report).selfRepairs, { corrections: 1, markerFixes: 1, reviewsKept: 1 });
 });
 
 test('a trailer the fixer cannot place under the bounded limit blocks with the trailer reason, never the fix-round limit', async t => {
@@ -373,7 +391,7 @@ test('a fixer that slips during a trailer fix resumes at the fix on the last pas
   const calls = [];
   const report = await translate(f.root, f.config, async call => {
     calls.push(call);
-    if (call.role === 'implementer') return content(call, inside());
+    if (call.role === 'implementer') return content(call, miscounted());
     if (call.role === 'fixer') { if (calls.filter(c => c.role === 'fixer').length <= 2) throw slip(); return content(call, good()); }
     return fake(call);
   });
@@ -578,7 +596,7 @@ test('a forged trailer-fix receipt cannot finish without two fresh reviews', asy
   assert.equal(done(f.root, f.units[0], context), true);
   // A forged receipt whose file is wrong still goes to the fixer first.
   const wrong = unitState(f.root, f.units[0]);
-  fs.writeFileSync(safePath(f.root, f.units[0].target), inside());
+  fs.writeFileSync(safePath(f.root, f.units[0].target), miscounted());
   Object.assign(wrong, { stage: 'fix', status: 'blocked', outputHash: fileHash(safePath(f.root, f.units[0].target)), reviewEvidence: [], reviews: [], reviewMap: {}, confirmed: [{ id: 'M1', reference: 'marker:M1', message: 'x', evidence: 'y', rule: 'z' }], singlePass: { forged: true } });
   delete wrong.arbitration;
   writeJSON(statePath(f.root, f.units[0]), wrong);
@@ -591,19 +609,22 @@ test('a forged trailer-fix receipt cannot finish without two fresh reviews', asy
 });
 
 test('a unit an older kit blocked at completion for its trailer goes to the fixer first on resume', async t => {
-  const f = await setup(t);
-  await translate(f.root, f.config, async call => call.role === 'implementer' ? content(call, good()) : fake(call));
-  // As 0.40.2 left the two units: reviewed, stage done, blocked by the trailer.
-  const out = safePath(f.root, f.units[0].target);
-  fs.writeFileSync(out, inside());
-  const state = unitState(f.root, f.units[0]);
-  Object.assign(state, { stage: 'done', status: 'blocked', error: 'PORT STATUS count mismatch or invalid trailer: TODO(port) lines=0, claimed=0. Return one final confidence/todos trailer matching the agreed marker policy.', outputHash: fileHash(out) });
-  writeJSON(statePath(f.root, f.units[0]), state);
-  const calls = [];
-  const report = await translate(f.root, f.config, async call => { calls.push(call); return call.role === 'fixer' ? content(call, good()) : fake(call); });
-  assert.equal(report.done, 1);
-  assert.deepEqual(roles(calls), ['fixer', 'reviewer', 'reviewer']);
-  assert.equal(fs.readFileSync(out, 'utf8'), good());
+  // As 0.40.2 left the two units: reviewed, stage done, blocked by the trailer
+  // (above the brace: since 0.46.0 the runner moves it, and only the reviews run).
+  for (const [left, expected] of [[miscounted, ['fixer', 'reviewer', 'reviewer']], [inside, ['reviewer', 'reviewer']]]) {
+    const f = await setup(t);
+    await translate(f.root, f.config, async call => call.role === 'implementer' ? content(call, good()) : fake(call));
+    const out = safePath(f.root, f.units[0].target);
+    fs.writeFileSync(out, left());
+    const state = unitState(f.root, f.units[0]);
+    Object.assign(state, { stage: 'done', status: 'blocked', error: 'PORT STATUS count mismatch or invalid trailer: TODO(port) lines=0, claimed=0. Return one final confidence/todos trailer matching the agreed marker policy.', outputHash: fileHash(out) });
+    writeJSON(statePath(f.root, f.units[0]), state);
+    const calls = [];
+    const report = await translate(f.root, f.config, async call => { calls.push(call); return call.role === 'fixer' ? content(call, good()) : fake(call); });
+    assert.equal(report.done, 1);
+    assert.deepEqual(roles(calls), expected);
+    assert.equal(fs.readFileSync(out, 'utf8'), good());
+  }
 });
 
 test('an arbiter asked again for its references counts as a correction; a tripped breaker gives no extra pass', async t => {
@@ -624,13 +645,17 @@ test('a single-pass fix with a wrong trailer under a unit typecheck goes to the 
   const { calls, adapter } = firstReview([finding], (call, n) => n <= 2 ? fixedInside() : fixedGood());
   const report = await translate(f.root, f.config, adapter);
   assert.equal(report.done, 1);
-  assert.deepEqual(roles(calls), ['implementer', 'reviewer', 'reviewer', 'arbiter', 'fixer', 'fixer', 'fixer', 'reviewer', 'reviewer']);
+  // 0.46.0: a fix of the trailer alone keeps the single-pass reviews.
+  assert.deepEqual(roles(calls), ['implementer', 'reviewer', 'reviewer', 'arbiter', 'fixer', 'fixer', 'fixer']);
+  assert.equal(unitState(f.root, f.units[0]).typecheck.code, 0, 'the trailer fix is typechecked again');
   assert.equal(calls.filter(c => c.role === 'fixer')[2].extra.confirmedFindings[0].reference, 'marker:M1');
   assert.equal(done(f.root, f.units[0], inputContext(f.root, f.config)), true);
 });
 
 test('in continuous mode trailer fixes stop at two per run even when each later fix breaks the trailer again', async t => {
-  const f = await setup(t, { executionMode: 'continuous' });
+  // rereview: each trailer-fixed file is reviewed (a single-pass fix of the
+  // trailer alone keeps its reviews since 0.46.0, so it would finish).
+  const f = await setup(t, { executionMode: 'continuous', single: false });
   const calls = [];
   const error = await translate(f.root, f.config, async call => {
     calls.push(call);
@@ -653,9 +678,9 @@ test('the last pass shares the run\'s two trailer fixes: a unit that used one be
   const calls = [];
   const error = await translate(f.root, f.config, async call => {
     calls.push(call);
-    if (call.role === 'implementer') return content(call, inside());
-    // The first trailer fix slips twice; every later fix keeps the trailer above the brace.
-    if (call.role === 'fixer') { if (calls.filter(c => c.role === 'fixer').length <= 2) throw slip(); return content(call, inside()); }
+    if (call.role === 'implementer') return content(call, miscounted());
+    // The first trailer fix slips twice; every later fix keeps the count wrong.
+    if (call.role === 'fixer') { if (calls.filter(c => c.role === 'fixer').length <= 2) throw slip(); return content(call, miscounted()); }
     return fake(call);
   }).catch(e => e);
   assert.match(error.message, /PORT STATUS count mismatch or invalid trailer/);
@@ -669,7 +694,7 @@ test('a unit resumed with one review done, or repaired, on a file with a wrong t
   await translate(f.root, f.config, async call => call.role === 'implementer' ? content(call, good()) : fake(call));
   const out = safePath(f.root, f.units[0].target);
   // As an older kit could leave it: one reviewer done on a file whose trailer is wrong.
-  fs.writeFileSync(out, inside());
+  fs.writeFileSync(out, miscounted());
   const state = unitState(f.root, f.units[0]);
   Object.assign(state, { stage: 'review', status: 'review', outputHash: fileHash(out), reviewMap: { 'reviewer-semantics': state.reviewMap['reviewer-semantics'] }, reviews: [], reviewEvidence: [] });
   delete state.arbitration;
@@ -679,7 +704,7 @@ test('a unit resumed with one review done, or repaired, on a file with a wrong t
   assert.equal(report.done, 1);
   assert.deepEqual(roles(calls), ['fixer', 'reviewer', 'reviewer']);
   // A repair run fixes the trailer before it reviews the file with the diagnostic.
-  fs.writeFileSync(out, inside());
+  fs.writeFileSync(out, miscounted());
   fs.writeFileSync(safePath(f.root, 'migration/diagnostic.txt'), 'Check the division rounding again.\n');
   const repairs = [];
   const repaired = await translate(f.root, f.config, async call => { repairs.push(call); return call.role === 'fixer' ? content(call, good()) : fake(call); }, { onlyTarget: f.units[0].target, evidence: 'migration/diagnostic.txt' });

@@ -1,3 +1,111 @@
+# 0.46.0 — 2026-11-04
+
+A PORT STATUS trailer that is wrong only in its form or its place is
+rewritten by the runner, with no AI call, and after a single-pass fix a fix
+of the trailer alone keeps that fix's reviews. On 2026-11-04 phase 04 on
+Windows (98 of 554) showed how heavy one turn over a wrong trailer is: the
+worker was asked again for the whole file, the trailer then went to the
+fixer as `marker:M1` for the whole file once more (with another correction
+when that answer was wrong too), and the fixed file had both reviews again
+from the start, with an arbitration and a fix when they found anything,
+although the trailer is no code. Most wrong trailers need no judgment:
+capitals or punctuation the check does not take, a block comment left open,
+the line above the final closing brace, the same trailer twice.
+
+- `lib/trailer-repair.mjs` (new) rewrites a trailer when every PORT STATUS
+  line is a whole-line comment (its opener right before `PORT STATUS:`; a
+  block comment left open counts only when nothing but its closer, on a line
+  of its own, follows it), they all say the same confidence and count, read
+  leniently (either order, capitals, `=` or `:`, quotes or brackets around a
+  value, commas between, nothing else), the count matches the `TODO(port)`
+  lines, and every nonempty line after the first trailer closes a block: a
+  closing brace, bracket or parenthesis (not a line with `]]` in it, which
+  may end a Lua long string), an end keyword (not a bare `END` or `End`,
+  which may end a heredoc), `fi`, `done` or `esac`, `#endif` or
+  `#endregion`, each with a line comment after it or not. A markup comment
+  (`<!--`, `<%--`, `<%#`, `{#`) moves only below closing tags and HTML
+  comments, Razor's `@*` below both kinds, and a line-comment trailer also
+  below line comments of its own kind that close no block comment (`-->`,
+  `#}`, `*/` and the like). The rewrite keeps the comment's opener (the
+  worker chose the syntax), adds a missing closer, writes
+  `<opener> PORT STATUS: confidence=<c> todos=<n>` (and the closer) after
+  the last nonempty line, and keeps the line endings (CRLF or LF), a missing final line ending
+  and the byte order mark. A JSON-family file loses its whole-line trailer
+  comments. The rewrite is used only when it passes the marker check and
+  differs from what was there in nothing but its whole-line PORT STATUS
+  comments (`sameButTrailer`).
+- Still left to a worker: a count that differs from the `TODO(port)` lines
+  (a `TODO(port)` line may be left out), a missing trailer (its confidence
+  is the worker's), trailers that disagree, a trailer with any other word,
+  one on a line of code, one before a line that closes nothing (code, a
+  string's end, PHP's `?>`, `</script>` below a `//` comment), a line
+  comment a final backslash continues, and a target that is not UTF-8 (a
+  file is never re-encoded).
+- Where: the implementer's and the fixer's answers are rewritten before they
+  are written, and the check that asks once more reads them rewritten, so a
+  trailer the runner can rewrite asks no correction. A written file is
+  rewritten in place at the review, fix and done stages, where its trailer
+  would have gone to the fixer; the reviews judge the rewritten file. The
+  worker's record keeps what it answered. Each rewrite shows "trailer
+  rewritten by the runner" and counts in `selfRepairs.markerRewrites`.
+- After a single-pass fix (`fixPolicy: "single-pass"`), a wrong trailer that
+  goes to the fixer as `marker:M1` keeps the fix's two reviews and its
+  receipt when the fixer changes nothing but the trailer: the file differs
+  from the single-pass fixer's recorded content in its whole-line PORT
+  STATUS comments alone, and is not the reviewed candidate again. No review
+  follows a single-pass fix, and the trailer is no code. It shows "trailer
+  fixed alone; the single-pass reviews stand" and counts in
+  `selfRepairs.reviewsKept`. A fix that changes more (a `TODO(port)` line
+  added for a count that differed, any code) or undoes the single-pass fix
+  is reviewed as before, and so is every trailer fix under `fixPolicy:
+  "rereview"` and after a typecheck-only fix. With a unit typecheck
+  configured, `verify-fix` runs it again first. A trailer the runner
+  rewrites on a file already reviewed is reviewed again unless it follows a
+  single-pass fix.
+- The single-pass receipt adds `singlePass.trailerFixedBy` (`runner` or
+  `fixer`) when the trailer was fixed after the fix. `unitDone` then takes
+  the receipt while the target differs from the fixer record's content in
+  nothing but its whole-line PORT STATUS comments (and whether the text
+  before them ends with a line ending); the trailer passes the marker check
+  as before. Without `trailerFixedBy` the content must be exactly the
+  target, as before.
+- A run stopped between a trailer sent to the fixer and its fix resumes at
+  the fix with the reviews kept. A trailer fix an earlier kit left, and a
+  single-pass fix an earlier kit left at `verify-fix` or `done`, are
+  rewritten on resume with no call when the runner can.
+- The run summary's `selfRepairs` shows `markerRewrites` and `reviewsKept`
+  only when they happened; the progress lines are new. The prompts, the
+  RULEBOOK templates and the rules for a valid trailer do not change.
+- Test: `tests/trailer-rewrite-2026-11-04.test.mjs`, twelve tests. 21
+  trailers the runner rewrites (above a closing brace, above closers with a
+  comment after them, no final line ending, CRLF, a byte order mark, blank
+  lines at the end, capitals and punctuation, quotes in the other order, the
+  same trailer twice, VB, Ruby, a header guard, XML above the closing root
+  tag, an XML comment left open or closed on the line below, JSP, Razor,
+  OCaml's `**)`, CSS left open, JSON), each passing after and changing
+  nothing else; 25 left to the worker (a count that differs, no trailer,
+  trailers that disagree, other words, code after the trailer, a Python
+  string, a template literal, two Lua long strings, a heredoc, PHP's `?>`, a
+  line comment above `</script>`, a comment left open that hides code, a
+  trailer on a line of code, a backslash continuation, a quote that is a
+  string, a comment block's inner line, a line comment inside an XML or a
+  Jinja comment or above the end of a block comment, JSON values); the
+  changes `sameButTrailer` takes as the trailer alone and the ones it does
+  not (code, a `TODO(port)` line, a blank line, the line endings, the byte
+  order mark, a string). Runs: an answer rewritten with no call, both
+  reviewers seeing the rewritten file; no rewrite without the marker policy;
+  a single-pass fix rewritten, its receipt binding the fix's code and its
+  note; a trailer fix after a single-pass fix keeping the reviews; fixes
+  that change more (a `TODO(port)` line, code, the single-pass fix undone)
+  reviewed again; a run stopped before the trailer fix resuming at the fix
+  with the reviews kept; `fixPolicy: "rereview"` reviewing as before; a
+  Latin-1 target never rewritten; a trailer fix and a single-pass fix at
+  `verify-fix` left by an earlier kit, finished with no call. The five runs
+  of new behavior fail on 0.45.1. In `tests/self-repair-2026-11-01.test.mjs`
+  and `tests/trailer-formats-2026-11-04.test.mjs` the cases whose trailer
+  sat above the closing brace (or in a JSON file) now expect the rewrite
+  with no call, and the worker paths are kept with a count that differs.
+
 # 0.45.1 — 2026-11-04
 
 A file of a format without line comments, such as XML, can finish with its
