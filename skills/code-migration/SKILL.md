@@ -580,12 +580,14 @@ by itself; if it persists, offer a lower `concurrency` after the run (it keeps
 reviewed work). A run that stops at its AI call budget is a budget stop: rerun
 `translate`, or propose `translate --max-calls N` with the number the person agrees.
 
-The runner repairs slips of one answer itself: it asks the same role once more,
-saying what was wrong (not one JSON object or the wrong shape, an answer that
-ended without a final message, arbitration references, a PORT STATUS trailer in
-the wrong place or with the wrong count, a single-pass fix that changed
-nothing), sends a wrong trailer left on a written file back to the fixer (twice
-per run, not counted as fix rounds), and gives units still blocked by a slip,
+The runner repairs slips of one answer itself: it rewrites a PORT STATUS
+trailer wrong only in its form or place with no AI call, asks the same role
+once more, saying what was wrong (not one JSON object or the wrong shape, an
+answer that ended without a final message, arbitration references, any other
+wrong trailer, such as a count that differs, a single-pass fix that changed
+nothing), sends such a trailer left on a written file back to the fixer (twice
+per run, not counted as fix rounds; after a single-pass fix, a fix of the
+trailer alone keeps its reviews), and gives units still blocked by a slip,
 or by a temporary failure that used up its retries (silence, the CLI's stall or
 lock wait, a dropped or intercepted connection), one more pass before the run
 ends. The run summary's `selfRepairs` counts them:
