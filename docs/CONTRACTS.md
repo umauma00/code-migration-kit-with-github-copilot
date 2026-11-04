@@ -160,39 +160,43 @@ value, brackets around the whole; a quote, a backtick or a bracket left over
 is not read, since the line may end a string opened above it), the count
 matches the `TODO(port)` lines, and every nonempty line after the first
 trailer closes a block: a closing brace, bracket or parenthesis, an end
-keyword (`end` or a word of letters that starts with it, not `endef`; not a
-bare `END` or `End`, nor a name such as `end_time`), below a `#` comment
-`fi`/`done`/`esac`, `#endif`/`#endregion`, or a line comment of the trailer's
-own kind, each with no quote or backtick on its line (VB's `'` is its comment)
-and ending no block comment or long string (`-->`, `*/`, `*)`, `#>`, `]]`,
-`]=]`, `-}`, `%}` and the like, or a line of nothing but CoffeeScript's
-`###`); below a `//` or `/*` trailer with no block comment open above it,
-whole `/* … */` comments on such a line are read away first
-(`#endif /* A_H */`), and a line of nothing but such comments passes too;
-below a markup comment only closing tags and HTML comments, not the end of an
-element whose text is kept as written (`</pre>`, `</textarea>`, `</script>`
-and the like). No such line may start with the word that ends a heredoc opened
-above the trailer (`<<END`, `<<<END`, `<<~end`, or an end of other characters
-quoted right after the `<<`, as `<<"}"`), and no line a backslash continues
-may run into a trailer line. The trailer is not moved in YAML, nor below code
-in Razor, MDX, Astro or Svelte files (after a code block comes page text;
-Razor's `@*` and markup comments still move), nor in Markdown unless it is a
-markup comment (a `#` line there is a heading), nor below a line with a
-bracket in Ruby, Perl, Elixir, Crystal, Pascal or Tcl files (a bracket may end
-`%w[ ]`, `qw( )`, a `{ }` comment or a Tcl `{ }` string); an indented trailer
-in YAML or Markdown is left alone. The rewrite keeps the comment's opener,
-adds a missing closer, puts the trailer after the last nonempty line, keeps
-the line endings, the file's last line ending (or its lack of one) and the
-byte order mark, removes a JSON-family file's trailer comments unless one
-holds a `TODO(port)` note, and is used only when it passes and nothing but the
-trailer changed; a target the review stage does not read as UTF-8 is never
-rewritten. Answers are rewritten before they are written (the worker's record
-keeps its answer), and a written file at the review, fix and done stages
-before its trailer would go to the fixer; `selfRepairs.markerRewrites` counts
-them. The implementer's and the fixer's files are checked before they are
-written, as they would be written, with one correction. A trailer the runner
-cannot rewrite on a written file becomes the confirmed finding `marker:M1` for
-the fixer, and the fixed file is reviewed: a file about to be reviewed (a
+keyword (`end` or a word of lowercase letters that starts with it, not
+`endef`; not a bare `END` or `End`, nor a name such as `end_time`), below a
+`#` comment `fi`/`done`/`esac`, `#endif`/`#endregion`, or a line comment of
+the trailer's own kind, each with no quote or backtick on its line (VB's `'`
+is its comment) and ending no block comment or long string (`-->`, `*/`, `*)`,
+`#>`, `]]`, `]=]`, `-}`, `%}`, PHP's `?>` and the like, or a line of nothing
+but CoffeeScript's `###`); below a `//` or `/*` trailer with no block comment
+open above it (a `/*` in a string or a line comment counts too), whole
+`/* … */` comments with no quote or other closer in them are read away first
+on such a line (`#endif /* A_H */`), and a line of nothing but such comments
+passes too; below a markup comment only closing tags and HTML comments, not
+the end of an element whose text is kept as written (`</pre>`, `</textarea>`,
+`</script>` and the like). No such line may start with the word that ends a
+heredoc opened above the trailer (`<<END`, `<<<END`, `<<~end`, or an end of
+other characters quoted right after the `<<`, as `<<"}"`, or after spaces
+below a `#` trailer), and no line a backslash continues may run into a trailer
+line. A block-comment trailer does not move while a comment of its kind is
+open above it (its closer may end that comment). The trailer is not moved in
+YAML, nor below code in Razor, MDX, Astro or Svelte files (after a code block
+comes page text; Razor's `@*` and markup comments still move), nor in Markdown
+unless it is a markup comment (a `#` line there is a heading), nor below a
+line with a bracket in Ruby, Perl, Elixir, Crystal, Pascal or Tcl files (a
+bracket may end `%w[ ]`, `qw( )`, a `{ }` comment or a Tcl `{ }` string); an
+indented trailer in YAML or Markdown is left alone. The rewrite keeps the
+comment's opener, adds a missing closer, puts the trailer after the last
+nonempty line (where it was, when nothing nonempty follows it), keeps the line
+endings, the file's last line ending (or its lack of one) and the byte order
+mark, removes a JSON-family file's trailer comments unless one holds a
+`TODO(port)` note, and is used only when it passes and nothing but the trailer
+changed; a target the review stage does not read as UTF-8 is never rewritten.
+Answers are rewritten before they are written (the worker's record keeps its
+answer), and a written file at the review, fix and done stages before its
+trailer would go to the fixer; `selfRepairs.markerRewrites` counts them. The
+implementer's and the fixer's files are checked before they are written, as
+they would be written, with one correction. A trailer the runner cannot
+rewrite on a written file becomes the confirmed finding `marker:M1` for the
+fixer, and the fixed file is reviewed: a file about to be reviewed (a
 worker's, an earlier run's, a resumed unit's) goes to the fixer first, a
 single-pass fix when the unit would complete. After a single-pass fix
 (0.46.0), while `fixPolicy` is `single-pass`, the fix keeps its reviews and

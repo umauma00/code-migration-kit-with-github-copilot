@@ -3512,12 +3512,12 @@
     },
     {
       "path": "lib/trailer-repair.mjs",
-      "sha256": "1ca530108fe8389b09b6e67f3e2ba06fcfe89be837f88031e76e5921d86daf89",
+      "sha256": "69ee443b409092ed0f315775456132e345593b852e4e824d4c9bc59033688b88",
       "entries": [
         {
-          "line": 102,
+          "line": 106,
           "kind": "loop-exit-candidate",
-          "code": "if (close < 0 || /[\"'`]/.test(text.slice(open + 2, close))) break;"
+          "code": "if (close < 0 || /[\"'`]/.test(body) || blockEnd.test(body)) break;"
         }
       ]
     },

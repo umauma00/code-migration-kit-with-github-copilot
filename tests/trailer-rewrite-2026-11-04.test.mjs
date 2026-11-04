@@ -49,6 +49,7 @@ test('the runner rewrites a trailer wrong only in its form or place, and nothing
     ['a JSON file\'s two trailers', 'ported/app.json', '{\n  "a": 1\n// PORT STATUS: x\n}\n<!-- PORT STATUS: y -->\n', '{\n  "a": 1\n}\n'],
     ['SQL above END;', 'ported/a.sql', 'BEGIN\n  x;\n-- PORT STATUS: confidence=high todos=0\nEND;\n', 'BEGIN\n  x;\nEND;\n-- PORT STATUS: confidence=high todos=0\n'],
     ['YAML, the form alone at the end', 'ported/a.yml', 'a: 1\n# PORT STATUS: Confidence=High todos=0\n', 'a: 1\n# PORT STATUS: confidence=high todos=0\n'],
+    ['YAML, a blank line above the trailer stays above it', 'ported/a.yml', 'script: |+\n  echo hi\n\n# PORT STATUS: Confidence=High todos=0\n', 'script: |+\n  echo hi\n\n# PORT STATUS: confidence=high todos=0\n'],
     ['a shift is no heredoc', 'ported/a.cpp', 'int f() {\n  return 1 << 2;\n// PORT STATUS: confidence=high todos=0\n}\n', 'int f() {\n  return 1 << 2;\n}\n// PORT STATUS: confidence=high todos=0\n'],
     ['HTML above its body and html tags', 'ported/a.html', '<body>\n<p/>\n<!-- PORT STATUS: confidence=high todos=0 -->\n</body>\n</html>\n', '<body>\n<p/>\n</body>\n</html>\n<!-- PORT STATUS: confidence=high todos=0 -->\n'],
     ['no final newline, the form alone', 'ported/a.mjs', 'x();\n// PORT STATUS: Confidence=HIGH todos=0', 'x();\n// PORT STATUS: confidence=high todos=0'],
@@ -106,6 +107,7 @@ test('a trailer only a worker can settle, or one the runner cannot move safely, 
     ['inside a shell heredoc that ends with done', 'ported/a.sh', 'cat <<done\n# PORT STATUS: confidence=high todos=0\ndone\n'],
     ['inside a quoted shell heredoc that ends with fi', 'ported/a.sh', 'cat <<-"fi"\n# PORT STATUS: confidence=high todos=0\nfi\n'],
     ['inside a shell heredoc that ends with a brace', 'ported/a.sh', 'cat <<"}"\n# PORT STATUS: confidence=High todos=0\n}\n'],
+    ['inside a shell heredoc that ends with a brace, a space before it', 'ported/a.sh', 'cat << "}"\n# PORT STATUS: confidence=High todos=0\n}\n'],
     ['a line a backslash continues into the trailer', 'ported/a.sh', 'f() {\n  echo hi \\\n# PORT STATUS: confidence=High todos=0\n}\n'],
     ['inside a textarea', 'ported/a.html', '<textarea>\n<!-- PORT STATUS: confidence=high todos=0 -->\n</textarea>\n'],
     ['inside a pre element', 'ported/a.html', '<pre>\n<!-- PORT STATUS: confidence=high todos=0 -->\n</pre>\n'],
@@ -156,6 +158,10 @@ test('a trailer only a worker can settle, or one the runner cannot move safely, 
     ['inside a C block comment ended after a brace', 'ported/a.c', '/*\n// PORT STATUS: confidence=high todos=0\n} // */\n'],
     ['inside a C block comment ended after a header guard', 'ported/a.h', '/* note\n// PORT STATUS: confidence=High todos=0\n#endif /* A_H */\n'],
     ['a quote in a block comment after a brace', 'ported/a.c', "int f() {\n// PORT STATUS: confidence=High todos=0\n} /* don't */\n"],
+    ['a block comment trailer that closes a comment open above', 'ported/a.c', 'int f(void) {\n  /* old\n/* PORT STATUS: confidence=High todos=0 */\n}\n'],
+    ['an HTML comment trailer that closes a comment open above', 'ported/a.html', '<div>\n<!-- old\n<!-- PORT STATUS: confidence=High todos=0 -->\n</div>\n'],
+    ['an HTML comment closed inside a block comment of PHP\'s page text', 'ported/a.php', '<p>hi</p>\n<!--\n// PORT STATUS: confidence=High todos=0\n/* --> */\n'],
+    ['PHP\'s ?> in the comment after a brace', 'ported/a.php', '<?php\nfunction f() {\n    // PORT STATUS: confidence=High todos=0\n} // end ?>\n'],
     ['inside a Haskell block comment', 'ported/a.hs', '{-\n-- PORT STATUS: confidence=high todos=0\n-- x -}\n'],
     ['inside a Julia block comment', 'ported/a.jl', '#=\n# PORT STATUS: confidence=high todos=0\n=#\n'],
     ['a JSON trailer line that holds a TODO(port) note', 'ported/app.json', '{\n  "a": 1\n}\n// PORT STATUS: confidence=low todos=1 TODO(port): keys\n']];
@@ -165,7 +171,7 @@ test('a trailer only a worker can settle, or one the runner cannot move safely, 
   }
 });
 
-test('a long line after the trailer is read in linear time', () => {
+test('a long line after the trailer, and many words after << above many closers, are read in linear time', () => {
   // A closer followed by a long run of spaces and then text once took seconds.
   for (const [head, target, comment] of [['}', 'ported/a.mjs', '// PORT STATUS: confidence=high todos=0'], ['end', 'ported/a.mjs', '// PORT STATUS: confidence=high todos=0'],
     ['End Class', 'ported/a.mjs', '// PORT STATUS: confidence=high todos=0'], ['fi', 'ported/a.sh', '# PORT STATUS: confidence=high todos=0'],
@@ -174,6 +180,11 @@ test('a long line after the trailer is read in linear time', () => {
     assert.equal(repairTrailer(policy, `a();\n${comment}\n${head}${' '.repeat(100000)}!\n`, target), null, head);
     assert.ok(Date.now() - started < 2000, `${head}: ${Date.now() - started} ms`);
   }
+  // Many words after << above the trailer (C++ shifts) and many closers below it.
+  const shifts = Array.from({ length: 40000 }, (_, i) => `  x << w${i};\n`).join(''), closers = '}\n'.repeat(40000);
+  const started = Date.now();
+  assert.notEqual(repairTrailer(policy, `void f() {\n${shifts}// PORT STATUS: confidence=High todos=0\n${closers}`, 'ported/a.cpp'), null);
+  assert.ok(Date.now() - started < 2000, `heredoc words: ${Date.now() - started} ms`);
 });
 
 test('a change of the trailer alone is told apart from any other change', () => {
