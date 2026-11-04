@@ -110,6 +110,7 @@ test('a trailer only a worker can settle, or one the runner cannot move safely, 
     ['inside a shell heredoc that ends with a brace', 'ported/a.sh', 'cat <<"}"\n# PORT STATUS: confidence=High todos=0\n}\n'],
     ['inside a shell heredoc that ends with a brace, a space before it', 'ported/a.sh', 'cat << "}"\n# PORT STATUS: confidence=High todos=0\n}\n'],
     ['inside a shell heredoc whose end is a brace after a backslash', 'ported/a.sh', 'cat <<-\\}\ntext\n# PORT STATUS: confidence=High todos=0\n\t}\n'],
+    ['inside a shell heredoc whose end is a brace with a pipe right after it', 'ported/a.sh', 'cat <<\\}|cat\ntext\n# PORT STATUS: confidence=High todos=0\n}\n'],
     ['a line a backslash continues into the trailer', 'ported/a.sh', 'f() {\n  echo hi \\\n# PORT STATUS: confidence=High todos=0\n}\n'],
     ['inside a textarea', 'ported/a.html', '<textarea>\n<!-- PORT STATUS: confidence=high todos=0 -->\n</textarea>\n'],
     ['inside a pre element', 'ported/a.html', '<pre>\n<!-- PORT STATUS: confidence=high todos=0 -->\n</pre>\n'],
@@ -173,7 +174,7 @@ test('a trailer only a worker can settle, or one the runner cannot move safely, 
   }
 });
 
-test('a long line after the trailer, and many words after << above many closers, are read in linear time', () => {
+test('a long line after the trailer, many words after << above many closers, and very many trailers are read in linear time', () => {
   // A closer followed by a long run of spaces and then text once took seconds.
   for (const [head, target, comment] of [['}', 'ported/a.mjs', '// PORT STATUS: confidence=high todos=0'], ['end', 'ported/a.mjs', '// PORT STATUS: confidence=high todos=0'],
     ['End Class', 'ported/a.mjs', '// PORT STATUS: confidence=high todos=0'], ['fi', 'ported/a.sh', '# PORT STATUS: confidence=high todos=0'],

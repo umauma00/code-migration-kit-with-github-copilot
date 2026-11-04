@@ -122,7 +122,7 @@ the line above the final closing brace, the same trailer twice.
   `@*` and an HTML comment in Razor, an HTML comment in Markdown above a
   closing tag, OCaml's `**)`, CSS left open, YAML's form alone and with
   blank lines above it kept (one trailer or two), JSON), each passing after
-  and changing nothing else; 86 left to the worker (a count that differs, no
+  and changing nothing else; 87 left to the worker (a count that differs, no
   trailer, trailers that disagree, other words, code after the trailer;
   strings, template literals, Lua long strings (also of level one), heredocs
   of shell (also ones that end with a brace), Ruby, PHP and Perl, a Makefile
