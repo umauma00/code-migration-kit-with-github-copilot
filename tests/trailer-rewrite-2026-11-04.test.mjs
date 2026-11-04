@@ -44,7 +44,19 @@ test('the runner rewrites a trailer wrong only in its form or place, and nothing
     ['a closer drawn with asterisks', 'ported/a.ml', 'let x = 1\n(** PORT STATUS: Confidence=high todos=0 **)\n', 'let x = 1\n(** PORT STATUS: confidence=high todos=0 *)\n'],
     ['a CSS comment left open', 'ported/a.css', 'a {}\n/* PORT STATUS: confidence=high todos=0\n', 'a {}\n/* PORT STATUS: confidence=high todos=0 */\n'],
     ['a JSON file\'s trailer', 'ported/app.json', '{\n  "a": 1\n}\n// PORT STATUS: confidence=high todos=0\n', '{\n  "a": 1\n}\n'],
-    ['a JSON file\'s two trailers', 'ported/app.json', '{\n  "a": 1\n// PORT STATUS: x\n}\n<!-- PORT STATUS: y -->\n', '{\n  "a": 1\n}\n']];
+    ['a JSON file\'s two trailers', 'ported/app.json', '{\n  "a": 1\n// PORT STATUS: x\n}\n<!-- PORT STATUS: y -->\n', '{\n  "a": 1\n}\n'],
+    ['SQL above END;', 'ported/a.sql', 'BEGIN\n  x;\n-- PORT STATUS: confidence=high todos=0\nEND;\n', 'BEGIN\n  x;\nEND;\n-- PORT STATUS: confidence=high todos=0\n'],
+    ['YAML, the form alone at the end', 'ported/a.yml', 'a: 1\n# PORT STATUS: Confidence=High todos=0\n', 'a: 1\n# PORT STATUS: confidence=high todos=0\n'],
+    ['a shift is no heredoc', 'ported/a.cpp', 'int f() {\n  return 1 << 2;\n// PORT STATUS: confidence=high todos=0\n}\n', 'int f() {\n  return 1 << 2;\n}\n// PORT STATUS: confidence=high todos=0\n'],
+    ['HTML above its body and html tags', 'ported/a.html', '<body>\n<p/>\n<!-- PORT STATUS: confidence=high todos=0 -->\n</body>\n</html>\n', '<body>\n<p/>\n</body>\n</html>\n<!-- PORT STATUS: confidence=high todos=0 -->\n'],
+    ['no final newline, the form alone', 'ported/a.mjs', 'x();\n// PORT STATUS: Confidence=HIGH todos=0', 'x();\n// PORT STATUS: confidence=high todos=0'],
+    ['the whole in brackets', 'ported/a.mjs', 'x();\n// PORT STATUS: (Confidence=High, todos=0)\n', 'x();\n// PORT STATUS: confidence=high todos=0\n'],
+    ['values in brackets, todo, no equals sign', 'ported/a.mjs', 'x();\n// PORT STATUS: confidence [High] todo (0)\n', 'x();\n// PORT STATUS: confidence=high todos=0\n'],
+    ['VB, an apostrophe in the comment after End Class', 'ported/A.vb', "Class A\n  ' PORT STATUS: confidence=High todos=0\nEnd Class ' it's done\n", "Class A\nEnd Class ' it's done\n' PORT STATUS: confidence=high todos=0\n"],
+    ['shell fi, a heredoc closed above', 'ported/a.sh', 'cat <<EOF\nhi\nEOF\nif true; then\n  # PORT STATUS: confidence=High todos=0\nfi\n', 'cat <<EOF\nhi\nEOF\nif true; then\nfi\n# PORT STATUS: confidence=high todos=0\n'],
+    ['CMake endif()', 'ported/CMakeLists.txt', 'if(X)\n  # PORT STATUS: confidence=High todos=0\nendif()\n', 'if(X)\nendif()\n# PORT STATUS: confidence=high todos=0\n'],
+    ['Razor, an HTML comment above a closing tag', 'ported/A.razor', '<div>\n<!-- PORT STATUS: confidence=High todos=0 -->\n</div>\n', '<div>\n</div>\n<!-- PORT STATUS: confidence=high todos=0 -->\n'],
+    ['XML, a comment closed on its own line above the root tag', 'ported/Database.xml', '<root>\n<!-- PORT STATUS: confidence=High todos=0\n-->\n</root>\n', '<root>\n</root>\n<!-- PORT STATUS: confidence=high todos=0 -->\n']];
   for (const [name, target, before, after] of cases) {
     assert.equal(markerEvidence(policy, before, target).valid, false, `${name}: the check refuses it`);
     assert.equal(repairTrailer(policy, before, target), after, name);
@@ -82,10 +94,73 @@ test('a trailer only a worker can settle, or one the runner cannot move safely, 
     ['a quote that is more likely a string', 'ported/a.py', "x = [\n'PORT STATUS: confidence=high todos=0',\n]\n"],
     ['a comment block\'s inner line', 'ported/A.java', '/**\n * PORT STATUS: confidence=high todos=0\n */\n'],
     ['a JSON value that holds the words', 'ported/app.json', '{\n  "a": "PORT STATUS: x"\n}\n'],
-    ['a JSON trailer after a value on its line', 'ported/app.json', '{\n  "a": 1\n} // PORT STATUS: confidence=high todos=0\n']];
+    ['a JSON trailer after a value on its line', 'ported/app.json', '{\n  "a": 1\n} // PORT STATUS: confidence=high todos=0\n'],
+    // Ends of strings, heredocs and comments of another kind that look like closers.
+    ['inside a PHP heredoc that ends with END;', 'ported/a.php', '<?php\n$s = <<<END\n// PORT STATUS: confidence=high todos=0\nEND;\n'],
+    ['inside a PHP nowdoc', 'ported/a.php', "<?php\n$s = <<<'END'\n// PORT STATUS: confidence=high todos=0\nEND;\n"],
+    ['inside a Makefile define', 'ported/Makefile', 'define SCRIPT\n# PORT STATUS: confidence=high todos=0\nendef\n'],
+    ['inside a Ruby heredoc that ends with end', 'ported/a.rb', 's = <<~end\n# PORT STATUS: confidence=high todos=0\nend\n'],
+    ['inside a shell heredoc that ends with done', 'ported/a.sh', 'cat <<done\n# PORT STATUS: confidence=high todos=0\ndone\n'],
+    ['inside a quoted shell heredoc that ends with fi', 'ported/a.sh', 'cat <<-"fi"\n# PORT STATUS: confidence=high todos=0\nfi\n'],
+    ['a line a backslash continues into the trailer', 'ported/a.sh', 'f() {\n  echo hi \\\n# PORT STATUS: confidence=High todos=0\n}\n'],
+    ['inside a textarea', 'ported/a.html', '<textarea>\n<!-- PORT STATUS: confidence=high todos=0 -->\n</textarea>\n'],
+    ['inside a pre element', 'ported/a.html', '<pre>\n<!-- PORT STATUS: confidence=high todos=0 -->\n</pre>\n'],
+    ['inside a YAML block scalar, above a brace', 'ported/a.yml', 'cmd: |\n  # PORT STATUS: confidence=high todos=0\n  }\n'],
+    ['indented in YAML (a block scalar\'s last line)', 'ported/a.yaml', 'cmd: |\n  echo\n  # PORT STATUS: Confidence=High todos=0\n'],
+    ['indented in Markdown (a code block)', 'ported/a.md', 'text\n\n    <!-- PORT STATUS: Confidence=High todos=0 -->\n'],
+    ['inside a PowerShell block comment', 'ported/a.ps1', '<#\n# PORT STATUS: confidence=high todos=0\n#>\n'],
+    ['inside a Lua block comment', 'ported/a.lua', '--[[\n-- PORT STATUS: confidence=high todos=0\n--]]\n'],
+    // A code block in markup: after its brace (or End Code) comes page text.
+    ['Razor, a C# comment in @code', 'ported/Counter.razor', '<h1>Counter</h1>\n@code {\n    private int count;\n    // PORT STATUS: confidence=high todos=0\n}\n'],
+    ['Razor, a block comment in @code', 'ported/Counter.razor', '<h1>Counter</h1>\n@code {\n    /* PORT STATUS: confidence=high todos=0 */\n}\n'],
+    ['cshtml, a C# comment in @{ }', 'ported/Index.cshtml', '<p>hi</p>\n@{\n    // PORT STATUS: confidence=high todos=0\n}\n'],
+    ['vbhtml, a VB comment above End Code', 'ported/Index.vbhtml', "<p>Hi</p>\n@Code\n    ' PORT STATUS: confidence=high todos=0\nEnd Code\n"],
+    ['MDX, a comment in an exported function', 'ported/page.mdx', '# Title\n\nexport function Note() {\n  // PORT STATUS: confidence=high todos=0\n}\n'],
+    ['Svelte, a comment in an expression', 'ported/A.svelte', '{(() => {\n  // PORT STATUS: confidence=high todos=0\n})()}\n'],
+    // A closer line with a quote or backtick may end a string opened above.
+    ['a Python string that ends after a parenthesis', 'ported/a.py', "x = '''\n# PORT STATUS: confidence=high todos=0\n)'''\n"],
+    ['a Python string whose last line looks like a comment', 'ported/a.py', 'x = """\n# PORT STATUS: confidence=high todos=0\n# end"""\n'],
+    ['an awk program in quotes', 'ported/a.sh', "awk '{\n  print $1\n# PORT STATUS: confidence=high todos=0\n}' file\n"],
+    ['a template literal whose last line looks like a comment', 'ported/a.mjs', 'const s = `\n// PORT STATUS: confidence=high todos=0\n// do not edit`;\n'],
+    ['an SQL string that ends after end', 'ported/a.sql', "INSERT INTO t VALUES ('abc\n-- PORT STATUS: confidence=high todos=0\nend');\n"],
+    ['an apostrophe after a closer', 'ported/a.c', "int f() {\n// PORT STATUS: confidence=high todos=0\n} // it's done\n"],
+    // The trailer's own line may end a string or a literal.
+    ['the trailer line ends a Python string', 'ported/a.py', 'x = """\n# PORT STATUS: confidence=High todos=0"""\n'],
+    ['the trailer line ends a template literal', 'ported/a.mjs', 'const s = `\n// PORT STATUS: confidence=High todos=0`;\n'],
+    ['a quoted value, then the end of a Python string', 'ported/a.py', 'x = """\n# PORT STATUS: confidence="High" todos="0"""\n'],
+    ['the trailer line ends a Lua block comment', 'ported/a.lua', '--[[\n-- PORT STATUS: confidence=High todos=0]]\n'],
+    ['the trailer line ends a Ruby word array', 'ported/a.rb', 'x = %w[\n# PORT STATUS: confidence=High todos=0]\n'],
+    ['a bracket left open', 'ported/a.mjs', 'x();\n// PORT STATUS: (confidence=High todos=0\n'],
+    // Heredocs, literals and keywords.
+    ['inside a shell heredoc that ends with end', 'ported/a.sh', 'cat <<end\n# PORT STATUS: confidence=high todos=0\nend\n'],
+    ['inside a Perl heredoc with a quoted terminator', 'ported/a.pl', 'print <<"END OF TEXT";\n# PORT STATUS: confidence=high todos=0\nEND OF TEXT\n'],
+    ['inside a Ruby word array', 'ported/a.rb', 'WORDS = %w[\n  foo\n  # PORT STATUS: confidence=high todos=0\n]\n'],
+    ['inside a Ruby %q string', 'ported/a.rb', 's = %q{\n# PORT STATUS: confidence=high todos=0\n}\n'],
+    ['inside a Perl qw list', 'ported/a.pl', 'my @a = qw(\n  a b\n  # PORT STATUS: confidence=high todos=0\n);\n'],
+    ['Ruby end with a bracket after it', 'ported/a.rb', 'f(proc do\n  # PORT STATUS: confidence=high todos=0\nend)\n'],
+    ['an identifier that starts with end', 'ported/a.py', 'def f():\n    # PORT STATUS: confidence=high todos=0\n    end_time\n'],
+    ['done below a // comment', 'ported/a.mjs', 'x();\n// PORT STATUS: confidence=high todos=0\ndone;\n'],
+    // Other block comments.
+    ['inside a MATLAB block comment', 'ported/a.m', '%{\n% PORT STATUS: confidence=high todos=0\n%}\n'],
+    ['inside a Pascal brace comment', 'ported/a.pas', '{\n// PORT STATUS: confidence=high todos=0\n}\n'],
+    ['inside a C block comment ended after a brace', 'ported/a.c', '/*\n// PORT STATUS: confidence=high todos=0\n} // */\n'],
+    ['inside a Haskell block comment', 'ported/a.hs', '{-\n-- PORT STATUS: confidence=high todos=0\n-- x -}\n'],
+    ['inside a Julia block comment', 'ported/a.jl', '#=\n# PORT STATUS: confidence=high todos=0\n=#\n'],
+    ['a JSON trailer line that holds a TODO(port) note', 'ported/app.json', '{\n  "a": 1\n}\n// PORT STATUS: confidence=low todos=1 TODO(port): keys\n']];
   for (const [name, target, content] of cases) {
     assert.equal(markerEvidence(policy, content, target).valid, false, `${name}: the check refuses it`);
     assert.equal(repairTrailer(policy, content, target), null, name);
+  }
+});
+
+test('a long line after the trailer is read in linear time', () => {
+  // A closer followed by a long run of spaces and then text once took seconds.
+  for (const [head, target, comment] of [['}', 'ported/a.mjs', '// PORT STATUS: confidence=high todos=0'], ['end', 'ported/a.mjs', '// PORT STATUS: confidence=high todos=0'],
+    ['End Class', 'ported/a.mjs', '// PORT STATUS: confidence=high todos=0'], ['fi', 'ported/a.sh', '# PORT STATUS: confidence=high todos=0'],
+    ['</a>', 'ported/a.xml', '<!-- PORT STATUS: confidence=high todos=0 -->']]) {
+    const started = Date.now();
+    assert.equal(repairTrailer(policy, `a();\n${comment}\n${head}${' '.repeat(100000)}!\n`, target), null, head);
+    assert.ok(Date.now() - started < 2000, `${head}: ${Date.now() - started} ms`);
   }
 });
 
@@ -320,4 +395,41 @@ test('a unit an earlier kit stopped during a trailer fix, or before completing a
   assert.equal(after.singlePass.trailerFixedBy, 'runner'); assert.equal(after.typecheck.code, 0);
   assert.equal(hash(fs.readFileSync(gout)), after.outputHash);
   assert.equal(done(g.root, g.units[0], inputContext(g.root, g.config)), true);
+});
+
+test('a trailer the fixer leaves wrong after a single-pass fix keeps the reviews but is not counted; blocked after two fixes, the next run starts at the fix', async t => {
+  const f = await setup(t);
+  const first = firstReview(() => `${fixedBody()}\n${trailer(1)}\n`);
+  const error = await translate(f.root, f.config, first.adapter, { onProgress: first.onProgress }).catch(e => e);
+  const { report } = error;
+  assert.equal(report.done, 0);
+  assert.match(report.errors[0].error, /PORT STATUS count mismatch/);
+  assert.deepEqual(roles(first.calls), ['implementer', 'reviewer', 'reviewer', 'arbiter', 'fixer', 'fixer', 'fixer', 'fixer', 'fixer', 'fixer']);
+  assert.ok(!first.stages.includes('trailer fixed alone; the single-pass reviews stand'), first.stages.join(' | '));
+  assert.deepEqual(summary(f, report).selfRepairs, { corrections: 3, markerFixes: 2 });
+  const state = unitState(f.root, f.units[0]);
+  assert.equal(state.stage, 'fix'); assert.equal(state.confirmed[0].reference, 'marker:M1');
+  assert.equal(state.reviewEvidence.length, 2); assert.ok(state.singlePass.fix.path);
+  const calls = [];
+  const again = await translate(f.root, f.config, async call => { calls.push(call); return call.role === 'fixer' ? content(call, fixedGood()) : fake(call); });
+  assert.equal(again.done, 1);
+  assert.deepEqual(roles(calls), ['fixer']);
+  assert.deepEqual(summary(f, again).selfRepairs, { corrections: 0, markerFixes: 0, reviewsKept: 1 });
+  assert.equal(unitState(f.root, f.units[0]).singlePass.trailerFixedBy, 'fixer');
+  assert.equal(done(f.root, f.units[0], inputContext(f.root, f.config)), true);
+});
+
+test('after fixPolicy changes to rereview, a trailer fix after a single-pass fix is reviewed', async t => {
+  const f = await setup(t);
+  const first = firstReview(() => `${fixedBody()}\n${trailer(1)}\n`);
+  await translate(f.root, f.config, first.adapter, { maxCalls: 6 }).catch(e => e);
+  assert.equal(unitState(f.root, f.units[0]).stage, 'fix');
+  f.config.fixPolicy = 'rereview';
+  writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
+  const calls = [];
+  const report = await translate(f.root, f.config, async call => { calls.push(call); return call.role === 'fixer' ? content(call, fixedGood()) : fake(call); });
+  assert.equal(report.done, 1);
+  assert.deepEqual(roles(calls), ['fixer', 'reviewer', 'reviewer']);
+  assert.equal(unitState(f.root, f.units[0]).singlePass, undefined);
+  assert.equal(done(f.root, f.units[0], inputContext(f.root, f.config)), true);
 });

@@ -112,7 +112,11 @@ hashes. Since 0.46.0, when the trailer was fixed after the fix
 when a fix of `marker:M1` changed it alone), the content may differ from the
 target in nothing but its whole-line PORT STATUS comments and whether the
 text before them ends with a line ending (`sameButTrailer` in
-`lib/trailer-repair.mjs`); the trailer itself passes the marker check. A
+`lib/trailer-repair.mjs`); the trailer itself passes the marker check.
+`sameButTrailer` reads lines, not the language: a comment-looking PORT STATUS
+line inside a multi-line string counts as a trailer line too, as `withoutFlags`
+reads quotes only on their own line (the marker check still counts every line
+with `PORT STATUS:`). A
 fixer that returns the reviewed candidate unchanged is asked once more
 to change the file or record what this file cannot fix as a
 `TODO(port): <reference>: <what is needed>` line; unchanged again, it fails the
@@ -152,17 +156,32 @@ only for the content it was recorded with. Since 0.46.0 a trailer wrong only
 in its form or its place is rewritten by the runner with no worker call
 (`lib/trailer-repair.mjs`): every PORT STATUS line is a whole-line comment,
 they all say the same confidence and count (read leniently: either order,
-capitals, `=` or `:`, quotes or brackets around a value), the count matches
-the `TODO(port)` lines, and every nonempty line after the first trailer
-closes a block (a closing brace or bracket on a line without `]]`, an end
-keyword other than a bare `END` or `End`, `fi`/`done`/`esac`,
-`#endif`/`#endregion`; closing tags and HTML comments below a markup comment;
-line comments of the trailer's own kind that close no block comment). The
-rewrite keeps the comment's
-opener, adds a missing closer, puts the trailer after the last nonempty line,
-keeps line endings and the byte order mark, removes a JSON-family file's
-trailer comments, and is used only when it passes and nothing but the
-trailer changed; a target that is not UTF-8 is never rewritten. Answers are
+capitals, `=`, `:` or a space, `todo` or `todos`, quotes or brackets around
+a value or the whole; a quote, a backtick or a bracket left over is not read,
+since the line may end a string opened above it), the count matches the
+`TODO(port)` lines, and every nonempty line after the first trailer closes a
+block: a closing brace, bracket or parenthesis, an end keyword (not `endef`,
+a bare `END` or `End`, or a word such as `end_time`), below a `#` comment
+`fi`/`done`/`esac`, `#endif`/`#endregion`, or a line comment of the
+trailer's own kind, each with no quote or backtick on its line (VB's `'` is
+its comment) and ending no block comment or long string (`-->`, `*/`, `*)`,
+`#>`, `]]`, `-}`, `%}` and the like); below a markup comment only closing
+tags and HTML comments, not the end of an element whose text is kept as
+written (`</pre>`, `</textarea>`, `</script>` and the like). No such line may
+start with the word that ends a heredoc opened above the trailer (`<<END`,
+`<<<END`, `<<~end`), and no line a backslash continues may run into a
+trailer line. The trailer is not moved in YAML, nor below code in Razor,
+MDX, Astro or Svelte files (after a code block comes page text; Razor's
+`@*` and markup comments still move), nor below a line with a bracket in
+Ruby, Perl, Elixir, Crystal or Pascal files (a bracket may end `%w[ ]`,
+`qw( )` or a `{ }` comment); an indented trailer in YAML or Markdown is
+left alone. The rewrite keeps the comment's opener, adds a missing closer,
+puts the trailer after the last nonempty line, keeps the line endings, the
+file's last line ending (or its lack of one) and the byte order mark,
+removes a JSON-family file's trailer comments unless one holds a
+`TODO(port)` note, and is used only when it passes and nothing but the
+trailer changed; a target the review stage does not read as UTF-8 is never
+rewritten. Answers are
 rewritten before they are written (the worker's record keeps its answer),
 and a written file at the review, fix and done stages before its trailer
 would go to the fixer; `selfRepairs.markerRewrites` counts them. The
@@ -172,11 +191,14 @@ rewrite on a written file becomes the confirmed finding `marker:M1` for the
 fixer, and the fixed file is reviewed: a file about to be reviewed (a
 worker's, an earlier run's, a resumed unit's) goes to the fixer first, a
 single-pass fix when the unit would complete. After a single-pass fix
-(0.46.0) the fix keeps its reviews and receipt when the fixer changed
-nothing but the trailer (`trailerFixedBy: "fixer"`, counted in
-`selfRepairs.reviewsKept`); a fix that changed more (a `TODO(port)` line
-included) or returned the reviewed candidate is reviewed as before, and a
-rewrite by the runner there keeps them too (`trailerFixedBy: "runner"`). A
+(0.46.0), while `fixPolicy` is `single-pass`, the fix keeps its reviews and
+receipt when the fixer changed nothing but the trailer (`trailerFixedBy:
+"fixer"`, counted in `selfRepairs.reviewsKept` once the trailer passes; one
+still wrong goes back to the fixer with the reviews kept); a fix that
+changed more (a `TODO(port)` line included) or returned the reviewed
+candidate is reviewed as before, and a rewrite by the runner there keeps
+them too (`trailerFixedBy: "runner"`). Under `fixPolicy: "rereview"`,
+also after a switch from `single-pass`, every trailer fix is reviewed. A
 trailer the runner rewrites on any other file already reviewed sends it to
 review again. A trailer fix is not a fix round (`maxFixRounds` neither
 stops nor counts it) and keeps its stage `fix` when resumed, with no reviews
@@ -186,7 +208,8 @@ runner rewrites, needs no fixer call: it goes to review with no review
 records (a fix stopped under an earlier rule), or after a single-pass fix
 keeps that fix's reviews, while one that still fails gives the fixer the
 problem as this kit finds it. After two in one run the unit is blocked with
-the reason. An invalid `markerEvidence` carries
+the reason; after a single-pass fix it keeps that fix's reviews and the next
+run starts at the fix. An invalid `markerEvidence` carries
 `problem` (what is wrong, with line numbers); a valid one keeps its six
 fields, so existing receipts still match. The evidence of a JSON-family file
 adds `noTrailer: true`, valid or not.
