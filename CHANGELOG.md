@@ -1,3 +1,41 @@
+# 0.45.2 — 2026-11-04
+
+A worker CLI that fails before it has read its whole prompt reports its own
+error on Windows too. On 2026-11-04 phase 04 on Windows left two files
+unfinished with "write EOF; taskkill exit 128 (tree termination
+unconfirmed)", which the guidance read as an unexpected error. The kit gives
+a worker its prompt on standard input, and a Copilot CLI that exits before
+it has read all of it (it failed as it started) fails that write. Linux and
+macOS report EPIPE, and `runProcess` in `lib/process.mjs` waited for the
+CLI's own exit. Windows reports EOF (libuv's word for ERROR_BROKEN_PIPE),
+and the runner failed the call itself: it stopped a CLI that was already
+gone (taskkill's exit 128: no such process) and reported the write.
+
+- EOF is read like EPIPE: on every platform the call ends with the child's
+  own exit status and output. The adapter then does what it does with any
+  CLI that failed. Its message carries the CLI's exit status, the error in
+  its stream (`session.error`, which the CLI writes on stdout with stderr
+  empty) and the end of its stderr, so the status, the guidance and the
+  choice between a retry, a stop and an unfinished file read the CLI's own
+  error. A CLI signed out only in the kit's worker home (`workerCopilotHome`
+  `separate`) is tried in the person's home; up to 0.45.1 such a call failed
+  on Windows with the write's error instead.
+- Any other failed write (EIO and the rest) still fails the call.
+- Records keep their form: approvals, completion records, phase records, a
+  prepared pilot and finished units stay valid, and the update can go in
+  during phase 04 (stop the runner, update, run `translate` again in the same
+  folder). A file left unfinished by a write EOF is tried again by the next
+  `translate`, as every unfinished file is.
+- Test: `tests/write-eof-2026-11-04.test.mjs`, five tests. The first lets a
+  real write fail (EPIPE on Linux and macOS, EOF on Windows) and checks that
+  the call ends with the child's exit status and output. The others give the
+  write Windows' EOF on every platform: the call is left to the child as
+  with EPIPE, and another failed write still fails it; a worker CLI's lock
+  error and its stream's rate limit reach the message and the guidance and
+  are retried; a CLI signed out in the worker home is tried in the person's
+  home; a file whose first call failed this way is retried and completes.
+  These four fail on 0.45.1.
+
 # 0.45.1 — 2026-11-04
 
 A file of a format without line comments, such as XML, can finish with its

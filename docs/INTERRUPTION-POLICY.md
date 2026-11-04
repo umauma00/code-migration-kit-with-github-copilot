@@ -73,7 +73,7 @@ inventoryの巨大ファイルは断片をまたぐデータフローを確定�
 | 本当に処理できない必須データ | バイナリ（NULを含み UTF-16 でもない）・読取権限、rulebookやcensusの1項目など必須メタデータだけでモデル容量を超える。ソース本文の大きさによる停止とは区別して報告 |
 | 変換結果・テストの失敗 | typecheck・original・mutation・build・smoke・parityの非ゼロ終了、比較差分、未確定のマーカー。build-loop内の修正可能な失敗はレビュー付き修正へ進む |
 | 修正の所有先を決められない | manifestに対応しないコンパイラ診断、16000文字を超える1修正用診断、元テストの失敗、比較器自身の欠陥。元ソースや比較器を勝手に直さない |
-| 保存・環境の実障害 | ENOSPC、EACCES、EMFILE、EIO、spawn失敗、stdinのEPIPE以外の障害、OSによるOOM kill、外部プロセス・端末・サービスの終了。保存できない結果を完了としない |
+| 保存・環境の実障害 | ENOSPC、EACCES、EMFILE、EIO、spawn失敗、子の標準入力への書き込みの EPIPE・EOF 以外の障害（EPIPE と Windows の EOF は、子が入力を読み終える前に終わったことなので、子自身の終了コードと出力で扱う）、OSによるOOM kill、外部プロセス・端末・サービスの終了。保存できない結果を完了としない |
 | hookが権限制限を保証できない | hookの欠落・応答不正、ホスト側のhook制限時間30秒、prompt modeでhookが読み込まれない。doctorはその問題を検出する。30秒はworkerの実行時間ではない |
 | 補助ツールの不正入力 | 未知のCLIオプション、空manifest、壊れたTSV/設定、benchmarkがテスト専用rootでない、インストール先の衝突。作業開始前に具体的な誤りを報告 |
 

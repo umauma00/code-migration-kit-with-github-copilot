@@ -1,6 +1,17 @@
-# Upgrading (0.45.1 and earlier releases)
+# Upgrading (0.45.2 and earlier releases)
 
 [日本語](UPGRADING.md) | English
+
+## 0.45.2 (on Windows, a worker CLI's error hidden behind "write EOF")
+
+On 2026-11-04 phase 04 on Windows left two files unfinished with "write EOF; taskkill exit 128 (tree termination unconfirmed)", and the guidance called it an unexpected error. The kit gives a worker Copilot CLI its prompt on standard input. A CLI that ends before it has read all of it (it failed as it started, for instance) fails the write that gives it the prompt. Linux and macOS call that EPIPE, and the kit waited for the CLI's own exit. Windows calls it EOF, and the kit took it for a failure of its own: it tried to stop a CLI that was already gone (taskkill's 128 means no such process) and reported only the failed write.
+
+1. Windows' EOF is read like EPIPE: on every platform the call ends with the CLI's own exit status and output. The guidance and `status` show the CLI's error, not the write (as `Copilot implementer failed (exit 1): ...`, with the `session.error` the CLI wrote in its output and the end of its stderr). The CLI's error also decides whether the call is retried (network, rate limits, the CLI's lock wait and so on), the run stops and says why (sign-in and so on), or only that file is left unfinished.
+2. With a CLI home of the kit's own for workers (`workerCopilotHome` `separate`), a CLI signed out only there is tried in your usual home. Up to 0.45.1 on Windows it was not, and the call failed with the write's error.
+3. A failed write other than EPIPE and EOF still fails the call, as before.
+4. The records' format does not change. From 0.40.1 or later, approvals, completion records, phase records, prepared pilots and finished units are kept. It can go in during phase 04: stop the runner (in the Copilot app, Stop on the running command), update, and run `translate` again in the same folder; it goes on with the units not finished, including a file a "write EOF" left unfinished.
+5. A host on 0.45.1 does not break the records, but a Windows host keeps failing this way until it has 0.45.2 (for hosts on 0.45.0 or earlier, see item 11 of 0.45.1).
+6. In a copy install replace all of `migration-kit/` with the temporary install's contents (the orchestrator's instructions and the skill do not change, so approvals are kept). A plugin install takes it with the update.
 
 ## 0.45.1 (the trailer of XML and other formats without a line comment; JSON files)
 

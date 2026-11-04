@@ -2522,7 +2522,7 @@
     },
     {
       "path": "lib/process.mjs",
-      "sha256": "1e8787ba516506aa75fafeca2412596ebef1f9b52bf3aac8dbfb4c5b4ab8a672",
+      "sha256": "31b8fc7dbeaa83d4ddcf8b3c02a76efe0ac3ff8003e54707ecfc50533d974ba7",
       "entries": [
         {
           "line": 90,
@@ -2630,32 +2630,32 @@
           "code": "if (process.platform !== 'win32') { try { process.kill(-child.pid, 0); } catch (e) { if (e.code === 'ESRCH') groupGone = true; } }"
         },
         {
-          "line": 344,
+          "line": 354,
           "kind": "error-or-exit-candidate",
-          "code": "child.stdin.on('error', e => { if (e.code !== 'EPIPE') fail(e); });"
+          "code": "child.stdin.on('error', e => { if (e.code !== 'EPIPE' && e.code !== 'EOF') fail(e); });"
         },
         {
-          "line": 371,
+          "line": 381,
           "kind": "error-or-exit-candidate",
           "code": "if (!relative.startsWith('migration/runs/process-output/') || relative.split('/').includes('..')) throw new Error('Process output file outside runner log directory');"
         },
         {
-          "line": 373,
+          "line": 383,
           "kind": "error-or-exit-candidate",
           "code": "if (fs.lstatSync(at).isSymbolicLink()) throw new Error('Symlink in process output path');"
         },
         {
-          "line": 377,
+          "line": 387,
           "kind": "error-or-exit-candidate",
           "code": "if (fs.lstatSync(file).isSymbolicLink()) throw new Error('Symlink in process output path');"
         },
         {
-          "line": 384,
+          "line": 394,
           "kind": "loop-exit-candidate",
           "code": "if (!count) break;"
         },
         {
-          "line": 393,
+          "line": 403,
           "kind": "error-or-exit-candidate",
           "code": "if ((root && typeof expected !== 'string') || (expected && hasher.digest('hex') !== expected)) throw new Error('Process output log changed or has no recorded hash; refusing altered diagnostic evidence');"
         }
