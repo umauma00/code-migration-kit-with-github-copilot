@@ -28,7 +28,7 @@ import path from 'node:path';
 import { prepare, ready, fake, result, scopesOf } from './helpers.mjs';
 import { safePath, writeJSON, readJSON, atomicWrite, loadConfig, inputContext, done, statePath, operationalConfigKeys } from '../lib/core.mjs';
 import { translate, dispatchOrder, runStage, approve } from '../lib/pipeline.mjs';
-import { runProcess, callLimitMessage, workWatch, callIdleMs } from '../lib/process.mjs';
+import { runProcess, callLimitMessage, workWatch, callLimiter, callIdleMs } from '../lib/process.mjs';
 import { callLimitMinutes, defaultWorkerCallMinutes } from '../lib/execution-policy.mjs';
 import { createCopilotAdapter, agentPrompt } from '../scripts/copilot_adapter.mjs';
 import { isTransientFailure, isSystemicFailure, isLimitedRetry, isCallLimit, isSilentCall, retryCause, stoppedWithRun } from '../lib/failures.mjs';
@@ -63,7 +63,7 @@ test('a tool-assisted call reads its own files whole, in view_range parts, and a
     assert.match(p, /Read in full (?:only )?the file named by the input's source and the listed files that are not in the input's sources, except migration\/inventory\.tsv/, role);
     assert.match(p, /view returns about 20 KB at most per call and turns down a larger file without view_range, so read a larger one in consecutive view_range parts/, role);
     assert.match(p, /The other files of the input's sources are dependencies/, role);
-    assert.match(p, /search a dependency for the names this unit uses with your search tool \(grep or rg; output_mode content with line numbers; paths set to that file, or, if the tool takes no file there, to its folder with glob set to its name\), then view only the line ranges you need/, role);
+    assert.match(p, /search a dependency for the names this unit uses with your search tool \(grep or rg; output_mode content with line numbers; paths set to that file: it takes a single file, although its description names directories\), then view only the line ranges you need/, role);
     assert.match(p, /Never view a dependency whole and never use forceReadLargeFiles on one/, role);
     assert.match(p, /never view it whole/, `${role}: the inventory as before`);
     assert.match(p, /This reading rule replaces any other in your agent instructions\./, `${role}: a profile an update left in place says otherwise`);
@@ -83,7 +83,7 @@ test('a tool-assisted call reads its own files whole, in view_range parts, and a
   // relevant dependencies if needed", and its profile sent it to the manual).
   const arbiter = agentPrompt({ role: 'arbiter', unit, extra: { designInputs: [], references: ['reviewer-rules:F1'] } });
   assert.match(arbiter, /Read migration\/RULEBOOK\.md, source "src\/BranchSelectImpl\.cs", the target "ported\/BranchSelectImpl\.java" if present and every file in extra\.designInputs in full \(a link is not the design body\): view returns about 20 KB at most per call/);
-  assert.match(arbiter, /For this unit's rows of migration\/inventory\.tsv, search it for the source; never view it whole\. Where a finding turns on a dependency, search a dependency for the names this unit uses/);
+  assert.match(arbiter, /For this unit's rows of migration\/inventory\.tsv, search it for the source \(paths set to that file\); never view it whole\. Where a finding turns on a dependency, search a dependency for the names this unit uses/);
   assert.match(arbiter, /Never view a dependency whole and never use forceReadLargeFiles on one\. This reading rule replaces any other in your agent instructions\./);
   assert.doesNotMatch(arbiter, /Read relevant dependencies if needed/);
   // The read-only reviewer profiles say the same; the two copies of each
@@ -95,9 +95,9 @@ test('a tool-assisted call reads its own files whole, in view_range parts, and a
       assert.doesNotMatch(text, /Read every listed file/, name);
       assert.doesNotMatch(text, /^Read \[/m, `${name}: the manual is for people`);
       assert.match(text, /^For human setup: /m, name);
-      if (name === 'arbiter') { assert.match(text, /^Read only the files the coordinator's task names, as its reading rule says\.$/m); continue; }
+      if (name === 'arbiter') { assert.match(text, /^Read only the files the coordinator's task names and the dependencies its findings turn on, as its reading rule says\.$/m); continue; }
       assert.match(text, /consecutive view_range parts/, name);
-      assert.match(text, /paths set to that file, or, if the tool takes no file there, to its folder with glob set to its name/, name);
+      assert.match(text, /and paths set to that file: it takes a single file, although its description names directories\)/, name);
       assert.match(text, /never view a dependency whole and never use forceReadLargeFiles on one/, name);
       assert.match(text, /never report that a dependency was not read in full/, name);
       assert.match(text, /Never open migration\/runs/, name);
@@ -186,9 +186,11 @@ test('a child still at work past its call limit is stopped however much it write
   assert.match(interrupted.message, /^Interrupted; Process ran past its call limit/);
   assert.equal(isTransientFailure(interrupted), false);
   assert.notEqual(failureGuidance(interrupted).id, 'cli-call-limit');
+  assert.notEqual(failureGuidance(`Translation stopped: src/a.cs: ${interrupted.message}`).id, 'cli-call-limit', 'nor in a run summary');
+  assert.equal(failureGuidance(`Translation stopped: src/a.cs: ${e.message}`).id, 'cli-call-limit');
 });
 
-test('while the silence check is on, time in which a call has written nothing for a while is waiting, not work, and is left to the silence check', async () => {
+test('while the silence check is on, a call at its limit that has written nothing for a while is stopped at its next output, or by the silence check first', async () => {
   assert.equal(callIdleMs, 120000);
   const silent = 'setTimeout(() => {}, 30000);';
   // Silent from the start, under a call limit shorter than its silence wait
@@ -197,14 +199,14 @@ test('while the silence check is on, time in which a call has written nothing fo
   const quiet = await runProcess(process.execPath, ['-e', silent], { silenceMs: 800, limitMs: 300, idleMs: 100 }).then(() => null, error => error);
   assert.ok(quiet, 'the silent child is stopped');
   assert.equal(quiet.callLimit, undefined); assert.equal(isCallLimit(quiet), false); assert.equal(isSilentCall(quiet), true);
-  // One that writes, falls silent for 700 ms and writes again: the silent
-  // time past idleMs does not count toward its limit.
-  const pause = 'let n = 0; const t = setInterval(() => { process.stdout.write("x\\n"); if (++n === 5) { clearInterval(t); setTimeout(() => setInterval(() => process.stdout.write("y\\n"), 20), 700); } }, 20);';
-  const started = performance.now();
-  const late = await runProcess(process.execPath, ['-e', pause], { silenceMs: 5000, limitMs: 400, idleMs: 100 }).then(() => null, error => error);
+  // One that writes nothing past its limit (a model turn that takes long to
+  // start writing), then writes: stopped for its limit at that output, not
+  // while it was silent (and however long the child took to start).
+  const slow = 'setTimeout(() => setInterval(() => process.stdout.write("y\\n"), 20), 700);';
+  const late = await runProcess(process.execPath, ['-e', slow], { silenceMs: 5000, limitMs: 300, idleMs: 100 }).then(() => null, error => error);
   assert.equal(late?.callLimit, true, late?.message);
-  assert.ok(performance.now() - started >= 900, `the 600 ms without output past idleMs did not count (${Math.round(performance.now() - started)} ms)`);
-  // Without the silence check all of a call's time counts.
+  assert.match(late.result.stdout, /y/, 'not stopped before it wrote');
+  // Without the silence check, a call is stopped at its limit, silent or not.
   const off = await runProcess(process.execPath, ['-e', silent], { limitMs: 300, idleMs: 100 }).then(() => null, error => error);
   assert.equal(off?.callLimit, true, off?.message);
   assert.throws(() => runProcess(process.execPath, ['-e', ''], { idleMs: 0 }), /call limit/);
@@ -220,10 +222,35 @@ test('the time at work is counted in steps, a late step as two at most, so a com
   for (let i = 0; i < 16; i++) { now += 50; assert.equal(w.tick(), false); }
   now += 50; assert.equal(w.tick(), true);
   assert.equal(workWatch(3600000).step, 30000, 'at most 30 s a step');
-  // tick(false): the time since the last tick was spent waiting, not at work.
-  const idle = workWatch(1000, () => now);
-  now += 50; idle.tick(); now += 50; assert.equal(idle.tick(false), false); now += 50; idle.tick();
-  assert.equal(idle.worked, 100);
+});
+
+test('a call\'s time counts while it writes nothing; at its limit after idleMs without output it waits for its next output, and without the silence check it is stopped at once', () => {
+  let now = 0;
+  const clock = () => now;
+  const l = callLimiter(1000, { silence: true, idleMs: 200, clock });
+  assert.equal(l.step, 50);
+  for (let i = 0; i < 2; i++) { now += 50; l.output(); assert.equal(l.tick(), false); }
+  // 900 ms without output (a model turn over a large context that has not
+  // started to write): all of it counts.
+  for (let i = 0; i < 18; i++) { now += 50; assert.equal(l.tick(), false, `tick ${i}`); }
+  assert.equal(l.worked, 1000, 'the silent time counted');
+  now += 50; assert.equal(l.tick(), false, 'at its limit, silent for idleMs: not stopped for its limit');
+  now += 10; l.output(); now += 40; assert.equal(l.tick(), true, 'stopped at its next output');
+  // At its limit while it writes: stopped at once, even with a step longer
+  // than idleMs (an output since the last tick).
+  now = 0;
+  const busy = callLimiter(1000, { silence: true, idleMs: 200, clock });
+  for (let i = 0; i < 19; i++) { now += 50; busy.output(); assert.equal(busy.tick(), false); }
+  now += 50; busy.output(); assert.equal(busy.tick(), true);
+  now = 0;
+  const longStep = callLimiter(1000, { silence: true, idleMs: 10, clock });
+  for (let i = 0; i < 19; i++) { now += 50; assert.equal(longStep.tick(), false); }
+  now += 20; longStep.output(); now += 30; assert.equal(longStep.tick(), true, 'an output since the last tick');
+  // Without the silence check nothing waits on an output.
+  now = 0;
+  const off = callLimiter(1000, { clock });
+  for (let i = 0; i < 19; i++) { now += 50; assert.equal(off.tick(), false); }
+  now += 50; assert.equal(off.tick(), true);
 });
 
 test('a call still at work at its call limit is tried once more, told what it did; then its file is set aside for the run, without the last pass, and the other files go on', async t => {
@@ -299,6 +326,34 @@ test('a retry that answers finishes the file, and with workerCallMinutes 0 no ca
   assert.equal(Object.hasOwn(record, 'callLimitMinutes'), false);
 });
 
+test('a call stopped at its call limit takes none of the retries of a host stall: after one overrun, five host stalls still get theirs', async t => {
+  const f = await continuous(t);
+  const failed = [];
+  const report = await translate(f.root, f.config, async args => {
+    if (args.role === 'implementer' && failed.length < 6) {
+      const e = failed.length === 0 ? overrun(30) : new Error("Session host did not acknowledge 'session.idle' delivery within 120s");
+      failed.push(e); throw e;
+    }
+    return fake(args);
+  });
+  assert.equal(failed.length, 6);
+  assert.equal(isLimitedRetry(failed[1]), true, 'a host stall is a limited retry');
+  assert.equal(report.done, 1); assert.deepEqual(report.errors, []);
+  const record = attempts(f, readJSON(statePath(f.root, f.units[0])).runId).find(a => a.role === 'implementer');
+  assert.equal(record.retries.length, 6);
+  assert.equal(record.retries.filter(r => r.hostStall).length, 5);
+  assert.equal(record.retries[0].callLimit, true);
+  // And the other way round: after five host stalls, an overrun still gets its retry.
+  const g = await continuous(t);
+  let tries = 0;
+  const after = await translate(g.root, g.config, async args => {
+    if (args.role === 'implementer' && ++tries <= 6) throw tries <= 5 ? new Error("Session host did not acknowledge 'session.idle' delivery within 120s") : overrun(30);
+    return fake(args);
+  });
+  assert.equal(tries, 7);
+  assert.equal(after.done, 1); assert.deepEqual(after.errors, []);
+});
+
 test('end to end: the real adapter stops a CLI that keeps reading, and the error carries what it did', { timeout: 30000 }, async t => {
   const f = prepare(t, { executionMode: 'continuous' });
   const file = safePath(f.root, 'reading-cli.mjs');
@@ -313,6 +368,8 @@ setInterval(() => {
   out({ type: 'tool.execution_start', data: { toolCallId: 'call_' + n, toolName: 'view', arguments: { path: ${JSON.stringify(safePath(f.root, 'src/math_ops.py'))}, view_range: [n * 300, n * 300 + 299] } } });
   out({ type: 'tool.execution_complete', data: { toolCallId: 'call_' + n, success: true, result: { content: 'SECRET FILE TEXT' }, toolTelemetry: { properties: {}, metrics: { context_current_tokens: 1000 * n, context_token_limit: 922000 } } } });
 }, 30);
+// Never outlives the test, even when the call limit does not stop it.
+setTimeout(() => process.exit(0), 20000);
 `);
   const adapter = createCopilotAdapter({ command: process.execPath, prefixArgs: [file] });
   const e = await adapter({ root: f.root, config: f.config, role: 'reviewer-semantics', unit: f.units[0], reviewInput: '{"mode":"tool-assisted","files":[]}', reviewMode: 'tool-assisted', extra: {}, callLimitMs: 600 }).then(() => null, error => error);
@@ -470,7 +527,7 @@ const realLines = [
   '{"type":"assistant.turn_start","data":{"turnId":"2"}}',
   '{"type":"assistant.message","data":{"content":"","toolRequests":[{"toolCallId":"call_3","name":"view","arguments":{"path":"ROOT/src/Database.designer.cs","forceReadLargeFiles":true}}]}}',
   '{"type":"tool.execution_start","data":{"toolCallId":"call_3","toolName":"view","arguments":{"path":"ROOT/src/Database.designer.cs","forceReadLargeFiles":true}}}',
-  '{"type":"tool.execution_complete","data":{"toolCallId":"call_3","success":true,"result":{"content":"(file text omitted)"},"toolTelemetry":{"properties":{"command":"view"},"metrics":{"context_token_limit":922000,"context_current_tokens":4566}}}}',
+  '{"type":"tool.execution_complete","data":{"toolCallId":"call_3","success":true,"result":{"content":"(file text omitted)"},"toolTelemetry":{"properties":{"command":"view"},"metrics":{"context_token_limit":922000,"context_current_tokens":4566,"result_token_count_estimate":249103}}}}',
   '{"type":"assistant.turn_end","data":{"turnId":"2"}}',
   '{"type":"assistant.turn_start","data":{"turnId":"3"}}',
   '{"type":"assistant.message","data":{"content":"","toolRequests":[{"toolCallId":"call_4","name":"rg","arguments":{"pattern":"Table123DataTable","paths":"ROOT/src/Database.designer.cs","output_mode":"content","-n":true}}]}}',
@@ -498,9 +555,11 @@ test('what a call did is counted from the CLI\'s own JSON lines (CLI 1.0.105): t
   const activity = callActivity(lines, root);
   // context_current_tokens is the context before a result is added; with
   // result_token_count, after it (the last search: 252197 + 5354). The whole
-  // 1 MB file read with forceReadLargeFiles carries no result_token_count and
-  // shows in the next result's context (4566, then 251847).
+  // 1 MB file read with forceReadLargeFiles carries only an estimate
+  // (4566 + 249103), which counts for a call stopped in the turn after it.
   assert.deepEqual(activity, { turns: 7, tools: { rg: 3, view: 3 }, views: [{ path: 'src/Database.designer.cs', views: 3, refused: 1 }], contextTokens: 257551, contextLimit: 922000, compactions: null });
+  assert.equal(callActivity(lines.slice(0, 15), root).contextTokens, 253669, 'the estimate of the 1 MB result');
+  assert.equal(callActivity(['{"type":"tool.execution_complete","data":{"toolCallId":"c","toolTelemetry":{"metrics":{"context_current_tokens":3836,"result_token_count":"x","result_token_count_estimate":35}}}}'], root).contextTokens, 3871, 'an invalid count falls back to the estimate');
   assert.equal(activitySummary(activity), '7 model turns, 6 tool calls, src/Database.designer.cs viewed 3 times, context up to 257551 tokens of 922000');
   assert.equal(activitySummary(activity, { withPath: false }), '7 model turns, 6 tool calls, a file viewed 3 times, context up to 257551 tokens of 922000');
   assert.doesNotMatch(JSON.stringify(activity), /omitted|Table123|activity-root|view_range|forceReadLargeFiles/);

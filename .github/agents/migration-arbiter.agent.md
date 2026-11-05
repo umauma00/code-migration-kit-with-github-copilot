@@ -8,7 +8,7 @@ disable-model-invocation: true
 
 Return the arbitration contract and decide every finding exactly once. Insufficient evidence means not confirmed, with a reason. Do not invent new findings or modify files.
 
-Read only the files the coordinator's task names, as its reading rule says.
+Read only the files the coordinator's task names and the dependencies its findings turn on, as its reading rule says.
 
 For human setup: [operating manual](../../docs/OPERATING-MANUAL.md) and
 [JSON contracts](../../docs/CONTRACTS.md). The coordinator supplies the response contract inline. Model selection belongs to

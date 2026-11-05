@@ -22,7 +22,8 @@ the kit's instruction, not the CLI's tools, made the difference.
   reviewers, `migration/RULEBOOK.md` and the design inputs), a larger one in
   consecutive view_range parts. A dependency (the other files of the input's
   sources) is searched for the names the unit uses (grep or rg, `paths` set to
-  that file, or to its folder with `glob` set to its name) and read only at
+  that file: both take a single file, although their descriptions name
+  directories) and read only at
   those lines: never whole, never with forceReadLargeFiles. Reviewers base
   their findings on the source and the target and do not report that a
   dependency was not read in full. The arbiter, which always reads with its
@@ -50,9 +51,11 @@ the kit's instruction, not the CLI's tools, made the difference.
   reads it to choose its retries and guidance, and a file's name could read as
   another cause. Time is counted as the silence check counts it: a step that
   comes much later than planned (sleep, a pause) counts as two. While the
-  silence check is on, time after 2 minutes without output is left to it, so
-  a call that lost its connection is still stopped and retried as a silent
-  call, not as one that ran past its limit. A stop that comes as the run is
+  silence check is on, a call at its limit that has written nothing for 2
+  minutes is stopped at its next output instead, or by the silence check
+  first, so a call that lost its connection is still stopped and retried as a
+  silent call, not as one that ran past its limit; that time counts all the
+  same (a model turn over a large context can take minutes to start writing). A stop that comes as the run is
   interrupted is recorded as interrupted. Surveys, preparation audits and the
   benchmark do not use it.
 - Order (`lib/pipeline.mjs` `dispatchOrder`): a translate run (not a repair)
@@ -67,7 +70,8 @@ the kit's instruction, not the CLI's tools, made the difference.
   `activity`, on success and failure, counted from the CLI's JSON lines: model
   turns, tool calls by tool, the five project files viewed most with how often
   view turned them down, the largest the context grew once a tool result was
-  in it (`context_current_tokens` plus `result_token_count`) and its limit,
+  in it (`context_current_tokens` plus `result_token_count`, or its estimate
+  for a large result) and its limit,
   and compactions once the CLI writes them (CLI 1.0.105 does not). Counts and
   project paths only, no content. The record also keeps `workInputMode` and
   `callLimitMinutes`, and a retry after a stop at the limit keeps
@@ -76,7 +80,7 @@ the kit's instruction, not the CLI's tools, made the difference.
   `activeRoles` has `startedAt`, `elapsedMinutes` and `callLimitMinutes`, with
   `--fast` too (up to 0.46.1 `--fast` showed no calls), and the markdown view
   says "implementer 12 min, limit 30 min" (minutes on the clock; the limit
-  counts time at work). The fast view reads only the head of a finished call
+  leaves out sleep). The fast view reads only the head of a finished call
   record, which holds the worker's whole answer. Units have `recorded` (a
   state file). The markdown view lists only the units tried and not finished
   and those with a call at work, and counts the others ("Other units: 117
@@ -106,16 +110,19 @@ the kit's instruction, not the CLI's tools, made the difference.
   of what the migration produces (every finished unit then looks stale there)
   and reports the key in `migration/settings.json` as unknown: put every host
   on 0.47.0.
-- Test: `tests/runaway-calls-2026-11-05.test.mjs`, twenty-one tests: the
+- Test: `tests/runaway-calls-2026-11-05.test.mjs`, twenty-three tests: the
   reading rule in the prompts (the arbiter's too) and the six profiles; the
   note a retry hears; the limit (its size, 0, the setting's check, a run
   setting) and the files a run's calls count for it; a real child still
   writing stopped at its limit and one that ends in time kept; a silent child
-  left to the silence check, and the silent time of one that writes again not
-  counted; steps counted with a late one as two, and waiting time not at all;
-  a unit set aside after two stops, without the last pass, while the others
-  finish; a reason that names no file whatever the file's name; a retry that
-  answers; the real adapter stopping a CLI double that keeps reading, with
+  left to the silence check, and one silent past its limit stopped once it
+  writes; steps counted with a late one as two; with a clock of the test's
+  own, silent time counted and the stop at the limit waiting for the next
+  output only while the silence check is on; a unit set aside after two
+  stops, without the last pass, while the others finish; a reason that names
+  no file whatever the file's name; a retry that answers; a stop at the limit
+  and five host stalls in either order, each with its own retries; the real
+  adapter stopping a CLI double that keeps reading, with
   what it did in the error; the order of a run and `dispatchOrder`; the
   minutes in the full and the fast status; `status --wait` answering for a
   stop, a block or a survey scope and not for a finished unit or a call; the

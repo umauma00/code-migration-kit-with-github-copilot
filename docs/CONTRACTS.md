@@ -246,10 +246,12 @@ reviewers, arbiter, fixer) has a call limit, in both execution modes:
 minute for every 8 KiB of the files the call reads whole: the unit's source
 and current target, `migration/RULEBOOK.md` and the design inputs
 (`callLimitMinutes` in `lib/execution-policy.mjs`). Bounded `timeoutSeconds`
-stays final; the earlier of the two stops a call. The limit counts time at
-work: a step delayed by sleep counts as two at most, and while the silence
-check is on, time after `callIdleMs` (2 minutes) without output is not
-counted (`runProcess` `idleMs`), so a silent call stays a silent call. A call
+stays final; the earlier of the two stops a call. The limit counts the
+call's time, a step delayed by sleep as two at most (`workWatch`). While the
+silence check is on, a call at its limit that has written nothing for
+`callIdleMs` (2 minutes) is stopped at its next output instead, or by the
+silence check first (`callLimiter`, `runProcess` `idleMs`), so a silent call
+stays a silent call. A call
 still at work at its limit is stopped with its child processes ("Process ran
 past its call limit") and tried once more in a new session, with
 `extra.previousAttempt`: a sentence after the task data that says what the
@@ -272,7 +274,8 @@ project files viewed most; `refused` counts view results with
 `largeOutputAvoided`), `moreViews` and `outsideViews` when not zero,
 `contextTokens` (the largest context once a tool result is in it:
 `context_current_tokens`, the context before the result, plus its
-`result_token_count` when the CLI gives one), `contextLimit` and
+`result_token_count`, or `result_token_count_estimate` for a large result,
+when the CLI gives one), `contextLimit` and
 `compactions` (null when the CLI wrote none). It holds counts and
 project-relative paths only. A retry entry of a call stopped at its limit
 adds `callLimit: true` and that attempt's `activity`. None of these fields is
