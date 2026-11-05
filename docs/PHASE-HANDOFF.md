@@ -247,7 +247,9 @@ instruction. Do not create a question merely to end the conversation.
 
 First apply bounded recovery already authorized by the current phase: the
 runner's transient retry (also of a worker call it stopped itself for writing
-nothing for `workerSilenceSeconds`) and single survey correction, preserving validated
+nothing for `workerSilenceSeconds`, or of a translation call still at work past
+`workerCallMinutes`, whose file it sets aside after a second stop and tries
+again on the next run) and single survey correction, preserving validated
 rows, read-only diagnostics and resuming the same authorized process. Report
 what is happening; these operations do not need a new decision after each
 attempt. Never kill, cancel or relaunch work solely for CPU at 100%, low CPU,

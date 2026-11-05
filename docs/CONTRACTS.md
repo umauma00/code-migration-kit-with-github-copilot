@@ -240,6 +240,48 @@ counts these in `selfRepairs` (`corrections`, the arbiter's reference re-ask
 included, `markerFixes`, `repass`, `flagged`, and since 0.46.0, when they
 happened, `markerRewrites` and `reviewsKept`).
 
+Since 0.47.0 each worker call of the translation loop (implementer,
+reviewers, arbiter, fixer) has a call limit, in both execution modes:
+`workerCallMinutes` (30 by default, 0 for none, otherwise 10 to 1440) plus one
+minute for every 8 KiB of the unit's source and current target
+(`callLimitMinutes` in `lib/execution-policy.mjs`). Bounded `timeoutSeconds`
+stays final; the earlier of the two stops a call. A call still at work at its
+limit is stopped with its child processes ("Process ran past its call limit")
+and tried once more in a new session, with `extra.previousAttempt`: a sentence
+after the task data that says what the stopped call did and, when it had used
+tools, to search a dependency rather than read it whole. The answer contract
+is unchanged. A second stop at the limit blocks the unit with "Copilot
+<role> ran past its call limit of N min (workerCallMinutes) on 2 attempts in a
+row", and the unit gets no last pass in that run. A stop that comes as the run
+is interrupted is recorded as interrupted, without a retry. A translate run
+(not a repair run) dispatches the pending units that have no state file first
+and those that have one (an earlier run tried them) last, each group in
+manifest order. The coordinator's attempt record adds
+`workInputMode` (`frozen` or `tool-assisted`, implementer and fixer),
+`callLimitMinutes` (when a limit applies) and, on success and failure,
+`activity`: `turns` (the main agent's `assistant.turn_start` events), `tools`
+(tool calls by name), `views` (up to five `{path, views, refused?}`, the
+project files viewed most; `refused` counts view results with
+`largeOutputAvoided`), `moreViews` and `outsideViews` when not zero,
+`contextTokens` (the largest `context_current_tokens` of a tool result),
+`contextLimit` and `compactions` (null when the CLI wrote none). It holds
+counts and project-relative paths only. A retry entry of a call stopped at
+its limit adds `callLimit: true` and that attempt's `activity`. None of these
+fields is part of a receipt: a unit finished by an earlier kit stays finished.
+
+`status` (full and `--fast`) gives each call at work in a unit's
+`activeRoles` its `startedAt` (when its current try started: the last retry's
+`at`, else the attempt's `startedAt`), `elapsedMinutes` and, when set,
+`callLimitMinutes`, and each unit `recorded` (it has a state file). Since
+0.47.0 the markdown view lists only the units that have a state file and are
+not done or that have a call at work, and counts the others ("Other units: N
+done, M not started"); a report without `recorded` lists every unit.
+`status --wait` returns when the run stops or starts, its run ID or the unit
+count changes, the number of blocked units changes, the build loop moves to
+another stage or round, a survey's run, finished scopes, active scopes or
+state change, or the wait is over: not for each finished unit, worker call or
+survey part.
+
 Before every worker call (retries included) the runner appends `{id, role,
 target, at}` to `migration/runs/<run>/cli-sessions.jsonl` and passes that `id` as
 the CLI's `--session-id`; attempt and survey records also keep it as
@@ -428,8 +470,12 @@ See the canonical section in the [operating manual](OPERATING-MANUAL.md#vs-code-
 
 executionMode defaults to continuous even when the key is absent in a legacy
 configuration. Saved 600-second, call, fix-round, input, credit and retry-count
-limits do not interrupt normal work. CPU usage and silence are never kill
-conditions. status --wait is a reporting wait only. See
+limits do not interrupt normal work. CPU usage and a command's silence are
+never kill conditions. Two checks stop one worker call, never the run: a call
+that writes nothing for `workerSilenceSeconds` (since 0.44.0) and a call of
+the translation loop still at work past its call limit (`workerCallMinutes`,
+since 0.47.0, Receipts above); each is tried again. status --wait is a
+reporting wait only. See
 [all interruption conditions and source index](INTERRUPTION-POLICY.md).
 
 runProcess spills output over its memory threshold to private files under

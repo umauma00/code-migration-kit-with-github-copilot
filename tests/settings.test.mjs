@@ -763,3 +763,29 @@ test('workerSilenceSeconds (0.44.0) is an entry of the file: shown with its defa
   assert.equal(loadConfig(root).workerSilenceSeconds, 1200);
   assert.equal(settingsState(root, readJSON(recordFile)).state, 'applied');
 });
+
+test('workerCallMinutes (0.47.0) is an entry of the file: shown with its default, checked, applied, and it keeps every record', t => {
+  const root = fresh(t);
+  initSettings(root, models);
+  const s = filled(root), recordFile = safePath(root, 'migration/state/config.json');
+  assert.equal(s.workerCallMinutes, 30, 'the default is shown');
+  assert.match(helpOf(root), /- `workerCallMinutes`: .*10〜1440.*8 KB ごとに1分/);
+  writeSettings(root, s);
+  assert.equal(applySettings(root, models).applied, true);
+  assert.equal(Object.hasOwn(readJSON(recordFile), 'workerCallMinutes'), false, 'the default written back adds no key to the record');
+  const before = readJSON(recordFile);
+  for (const bad of [5, 1441, 12.5]) {
+    writeSettings(root, { ...s, workerCallMinutes: bad });
+    const refused = applySettings(root, models);
+    assert.equal(refused.applied, false, String(bad));
+    assert.match(refused.errors.join('\n'), /workerCallMinutes must be 0 \(off\) or a whole number of minutes from 10 to 1440/);
+    assert.deepEqual(readJSON(recordFile), before, 'nothing written');
+  }
+  for (const value of [0, 90]) {
+    writeSettings(root, { ...s, workerCallMinutes: value });
+    const applied = applySettings(root, models);
+    assert.equal(applied.applied, true, JSON.stringify(applied.errors));
+    assert.equal(loadConfig(root).workerCallMinutes, value);
+    assert.equal(settingsState(root, readJSON(recordFile)).state, 'applied');
+  }
+});

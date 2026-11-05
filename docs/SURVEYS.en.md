@@ -61,7 +61,9 @@ empty censuses are reported as incomplete and cannot be merged. Readable scopes
 are preserved, and repaired inputs resume without re-running completed scopes.
 
 Monitor the existing terminal with `status --fast --format markdown` (optionally
-`--wait 600`), which reads recorded progress without walking the source tree.
+`--wait 600`, which returns when the run stops, a scope finishes or starts, its
+state changes or 600 seconds pass, and since 0.47.0 not for each part or AI call), which
+reads recorded progress without walking the source tree.
 This view is explicitly not revalidated and cannot authorize a gate. Quiet
 output, CPU at 100% or low CPU, elapsed time (including 600 seconds), and log
 volume are never reasons to interrupt or relaunch work. A status wait returning

@@ -31,7 +31,10 @@ Do not replace the runner with fleet or an unrestricted chat loop.
 Run `translate` in a background or continuing terminal and check it with
 `status --fast --wait 600 --format markdown`. This waits for status only; keep
 polling the same job after it returns. Never kill/cancel/relaunch work for CPU
-at 100% or low CPU, silence, elapsed time or output volume. Normal execution is
+at 100% or low CPU, silence, elapsed time or output volume. The runner itself
+stops a call still at work past `workerCallMinutes`, tries it once more, and
+then sets its file aside for that run and goes on (status shows each call's
+minutes and limit); the next `translate` tries it after the files not tried yet. Normal execution is
 continuous even with old 600-second/maxAgentCalls settings. Finite time/call/round
 limits require the person's explicit choice (executionMode bounded or a command
 budget). Execution-policy changes retain reviewed work and approvals.

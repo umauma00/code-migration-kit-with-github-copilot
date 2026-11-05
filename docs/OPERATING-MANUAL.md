@@ -146,4 +146,8 @@ Only user-chosen bounded mode or explicit command budgets impose finite limits.
 The runner itself stops and retries a worker call that writes nothing for
 `workerSilenceSeconds` (600 s by default, longer on each retry): that is its own
 recovery from a connection lost without an error, never a reason to stop the run.
+It also stops a translation call still at work past `workerCallMinutes` (30
+minutes by default, a minute more for every 8 KiB of the unit's own files),
+tries it once more, and then sets that file aside for the run while the other
+files go on; the next run tries it after the files not tried yet.
 Read [every interruption condition and source index](INTERRUPTION-POLICY.md).

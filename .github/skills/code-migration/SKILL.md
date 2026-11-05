@@ -414,6 +414,13 @@ Respect explicit user cancellation and actual input/permission failures.
 A worker call that writes nothing for `workerSilenceSeconds` (600 s by default)
 is stopped and retried by the runner itself, with a longer wait each time
 (status shows it as retrying): it is never a reason to stop or relaunch anything.
+A translation call still at work past `workerCallMinutes` (30 minutes by
+default, a minute more for every 8 KiB of the unit's own files) is stopped by
+the runner too, tried once more with a note on what it did, and then its file
+is set aside for that run while the other files go on: status shows each call's
+minutes and limit, and the reason of a file set aside. A long call is never a
+reason to stop the run; the next `translate` tries a file set aside after the
+files not tried yet.
 A phase recorded earlier can go out of date when a file it recorded changes
 (a pilot or repair fix, a kit update). `status --fast` does not revalidate;
 `phase next` does and then returns `stale` with what changed, `action`
@@ -550,9 +557,10 @@ While it runs the terminal shows a heartbeat every 15 seconds and one line per
 unit change (`14:03:45 [3/12] src/a.cs: review (agent calls 14)`: time,
 finished/total of this run, unit, stage, AI calls so far). Check it with
 `status --root ROOT --wait 600 --format markdown` (ROOT is the pilot directory
-for `pilot run`): the runner itself waits up to that many seconds and answers as
-soon as a unit finishes or the run stops, so each check costs one model turn,
-not one per poll. After each check, tell the person in chat the finished count,
+for `pilot run`): the runner itself waits up to that many seconds and answers
+when the run stops, a unit is blocked or the build loop or a survey moves on
+(not for each finished unit), so each check costs one model turn, not one per
+poll. The markdown lists the units tried and not finished and counts the rest. After each check, tell the person in chat the finished count,
 the active units and any retry or blocked unit. Never block the parent on the
 run or kill it for being slow. When status shows a worker retrying after a transient failure
 (rate limit, service error), tell the user at once: the runner waits and retries
