@@ -175,7 +175,8 @@ test('status tells the person while a worker is retrying after a transient failu
   assert.equal(seen.retrying?.length, 1);
   assert.equal(seen.retrying[0].role, 'implementer'); assert.equal(seen.retrying[0].retries, 1);
   assert.ok(seen.nextActions.some(a => /retried after a transient failure \(rate limit\)/.test(a)));
-  assert.match(statusMarkdown(seen), /implementer, retrying after a transient failure, attempt 1/);
+  // 0.47.0: the call's minutes and its call limit come first.
+  assert.match(statusMarkdown(seen), /implementer \d+ min, limit 30 min, retrying after a transient failure, attempt 1/);
   assert.match(statusMarkdown(seen, 'ja'), /レート制限/);
 });
 

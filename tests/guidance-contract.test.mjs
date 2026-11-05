@@ -56,6 +56,7 @@ const samples = {
   'copilot-missing': 'spawn copilot ENOENT',
   'copilot-auth': 'Copilot implementer failed (exit 1): To authenticate, you can use any of the following methods',
   'cli-silent': 'Process showed no sign of progress for 600s (nothing on stdout or stderr); stopped as a silent call',
+  'cli-call-limit': 'Copilot reviewer-semantics ran past its call limit of 30 min (workerCallMinutes) on 2 attempts; this file is set aside for this run, and the next run tries it after the other files unless one of them waits on it (last attempt: 41 model turns, 40 tool calls, a file viewed 38 times, context up to 360000 tokens of 922000)',
   'cli-network': 'Copilot reviewer-rules failed (exit 1): Error: Failed to fetch models: connect ETIMEDOUT 140.82.112.21:443',
   'cli-intercepted': 'Copilot implementer failed (exit 1): error sending request for url (https://api.githubcopilot.com/chat/completions): client error (Connect): invalid peer certificate: UnknownIssuer',
   'cli-gave-up': 'Copilot implementer failed (exit 1): Failed to get response from the AI model; retried 3 times (total retry wait time: 9.00 seconds) Last error: Failed to finalize chat-completions stream: missing finish_reason for choice 0',

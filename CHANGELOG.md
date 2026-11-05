@@ -1,3 +1,138 @@
+# 0.47.0 — 2026-11-05
+
+A translation call with a large input no longer reads its dependencies whole,
+and a call that still runs on is stopped at a call limit. On 2026-11-05 phase
+04 on Windows (kit 0.46.1, CLI 1.0.105, four workers) stood at 117 of 554
+while calls that usually take 2 to 4 minutes ran for hours: two reviews of a
+59-line file were stopped by hand after 201.8 and 192.8 minutes, and each
+restart began with the same files again. Over `maxReviewInputBytes` (1 MiB
+there) the kit lists the files and the worker reads them with tools, and up
+to 0.46.1 it told the worker to read every listed file in full. The unit's
+dependency chain held a 1016 KB generated file (in 61 units' chains), and CLI
+1.0.105's view turns down a file over 20 KB without a view_range and returns
+about 20 KB per call with one (checked with the real CLI, offline): one model
+turn per part, over a growing context. Such a call keeps writing, so the
+silence check of 0.44.0 never stops it, and continuous mode had no other
+limit. Upstream's workers read what they need with Claude Code's own tools;
+the kit's instruction, not the CLI's tools, made the difference.
+
+- Reading with tools (`scripts/copilot_adapter.mjs`, the two `reviewer-*-read`
+  profiles): the implementer, the fixer and the read-only reviewers read in
+  full only the unit's own files (its source, the target for the fixer and the
+  reviewers, `migration/RULEBOOK.md` and the design inputs), a larger one in
+  consecutive view_range parts. A dependency (the other files of the input's
+  sources) is searched for the names the unit uses (grep or rg, `paths` set to
+  that file: both take a single file, although their descriptions name
+  directories) and read only at
+  those lines: never whole, never with forceReadLargeFiles. Reviewers base
+  their findings on the source and the target and do not report that a
+  dependency was not read in full. The arbiter, which always reads with its
+  tools, follows the same rule, and its profile no longer sends it to the
+  operating manual and the contracts. The prompt says that its reading rule
+  replaces any other in the agent's instructions, and `doctor` warns of a
+  worker profile an update left from 0.46.1 or earlier. The input (the listed
+  files, their hashes, the inventory rows) is unchanged, so review input
+  hashes and finished units hold.
+- A call limit for the translation loop (`lib/process.mjs`,
+  `lib/execution-policy.mjs`, `lib/pipeline.mjs`): `workerCallMinutes`, a new
+  run setting (30 by default, plus one minute for every 8 KiB of the files a
+  call reads whole: the unit's source and current target, the RULEBOOK and the
+  design inputs; 0 for none, otherwise 10 to 1440), applies to every
+  implementer, reviewer, arbiter and fixer call, in continuous and bounded
+  mode (bounded `timeoutSeconds` stays final; the earlier one stops a call). A
+  call still at work at its limit is stopped with its child processes, as a
+  silent call is, and tried once more in a new session, told what the stopped
+  call did (`extra.previousAttempt`: model turns, tool calls, the file it
+  viewed most and how often, its context) and, when it had used tools, to
+  search a dependency instead of reading it. When that try runs past the
+  limit too, the file is set aside for the run with the reason and gets no
+  last pass (it would repeat the same hours); the files that use it wait, the
+  others go on. The reason names no file (the call's record does): the kit
+  reads it to choose its retries and guidance, and a file's name could read as
+  another cause. Time is counted as the silence check counts it: a step that
+  comes much later than planned (sleep, a pause) counts as two. While the
+  silence check is on, a call at its limit that has written nothing for 2
+  minutes is stopped at its next output instead, or by the silence check
+  first, so a call that lost its connection is still stopped and retried as a
+  silent call, not as one that ran past its limit; that time counts all the
+  same (a model turn over a large context can take minutes to start writing). A stop that comes as the run is
+  interrupted is recorded as interrupted. Surveys, preparation audits and the
+  benchmark do not use it.
+- Order (`lib/pipeline.mjs` `dispatchOrder`): a translate run (not a repair)
+  dispatches the files an earlier run left unfinished (blocked, set aside,
+  stopped by a person or left mid-way) after the others, each group in
+  manifest order. One that another pending file waits on keeps its place, so
+  no file waits for the end of the run because of this order; a file finished
+  before whose inputs changed keeps its place too. Up to 0.46.1 every restart
+  began with the files that had held the last run up (on 2026-11-05 the same
+  four filled all four slots).
+- What a call did (`lib/activity.mjs`, new): each attempt record keeps
+  `activity`, on success and failure, counted from the CLI's JSON lines: model
+  turns, tool calls by tool, the five project files viewed most with how often
+  view turned them down, the largest the context grew once a tool result was
+  in it (`context_current_tokens` plus `result_token_count`, or its estimate
+  for a large result) and its limit,
+  and compactions once the CLI writes them (CLI 1.0.105 does not). Counts and
+  project paths only, no content. The record also keeps `workInputMode` and
+  `callLimitMinutes`, and a retry after a stop at the limit keeps
+  `callLimit: true` and that attempt's `activity`.
+- Status (`lib/status.mjs`, `lib/status-snapshot.mjs`): each call at work in
+  `activeRoles` has `startedAt`, `elapsedMinutes` and `callLimitMinutes`, with
+  `--fast` too (up to 0.46.1 `--fast` showed no calls), and the markdown view
+  says "implementer 12 min, limit 30 min" (minutes on the clock; the limit
+  leaves out sleep). The fast view reads only the head of a finished call
+  record, which holds the worker's whole answer. Units have `recorded` (a
+  state file). The markdown view lists only the units tried and not finished
+  and those with a call at work, and counts the others ("Other units: 117
+  done, 430 not started"); the JSON keeps every unit. A call stopped at its
+  limit is named first among the causes of a retry. The guidance
+  (`cli-call-limit`) offers a rerun, a longer limit and a check of the
+  dependency chain.
+- `status --wait` (`scripts/run_migration.mjs`) no longer returns for each
+  finished unit, worker call or survey part: it returns when the run stops or
+  starts, the number of blocked units changes, the build loop moves to another
+  stage or round, a survey scope finishes or starts or its state changes, or
+  the wait is over. With four workers a unit finished every few minutes, and
+  each return was a model turn of the parent agent over its whole
+  conversation.
+- Settings and documents: `workerCallMinutes` is in the advanced part of
+  `migration/settings.json` with its help (ja, en), and the help of
+  `maxReviewInputBytes` says what it counts and what happens over it. The
+  skill, the operating manual, the phase 04 kickoff, the reference and the
+  interruption policy say that a long call is no reason to stop the run.
+- Records keep their form (attempt records add fields). From 0.46.1,
+  approvals, completion records, phase records, a prepared pilot and finished
+  units stay valid (from an earlier release, see the notes in between): the
+  reading rule and the worker profiles are no input of a finished unit, and
+  `workerCallMinutes` is a run setting. The update can go in during phase 04:
+  stop the runner, update, and run `translate` again in the same folder. A
+  host still on 0.46.1 takes a `workerCallMinutes` other than 30 for a setting
+  of what the migration produces (every finished unit then looks stale there)
+  and reports the key in `migration/settings.json` as unknown: put every host
+  on 0.47.0.
+- Test: `tests/runaway-calls-2026-11-05.test.mjs`, twenty-three tests: the
+  reading rule in the prompts (the arbiter's too) and the six profiles; the
+  note a retry hears; the limit (its size, 0, the setting's check, a run
+  setting) and the files a run's calls count for it; a real child still
+  writing stopped at its limit and one that ends in time kept; a silent child
+  left to the silence check, and one silent past its limit stopped once it
+  writes; steps counted with a late one as two; with a clock of the test's
+  own, silent time counted and the stop at the limit waiting for the next
+  output only while the silence check is on; a unit set aside after two
+  stops, without the last pass, while the others finish; a reason that names
+  no file whatever the file's name; a retry that answers; a stop at the limit
+  and five host stalls in either order, each with its own retries; the real
+  adapter stopping a CLI double that keeps reading, with
+  what it did in the error; the order of a run and `dispatchOrder`; the
+  minutes in the full and the fast status; `status --wait` answering for a
+  stop, a block or a survey scope and not for a finished unit or a call; the
+  markdown lines; `activity` from the real CLI's JSON lines; the records; an
+  update keeping every finished unit; doctor's warning of an old profile; and
+  the fast view skipping a finished record. `tests/settings.test.mjs` adds one
+  for `workerCallMinutes` in the settings file (its default, its check, 0 and
+  90 applied), and the tests of the guidance, the run settings and the status
+  lines follow the new key and lines.
+
 # 0.46.1 — 2026-11-04
 
 A worker CLI that fails before it has read its whole prompt reports its own
