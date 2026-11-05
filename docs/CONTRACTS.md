@@ -437,7 +437,12 @@ migration/runs/process-output. Result stdout/stderr then contain display tails;
 stdoutFile/stderrFile (recorded relative to the migration root since 0.6.1),
 stdoutBytes/stderrBytes and stdoutHash/stderrHash identify the complete output; diagnostic reads reject altered logs or non-runner paths.
 The CLI JSONL and build diagnostic consumers iterate full logs, not the tails.
-A write failure is real evidence loss and remains an error.
+A write failure is real evidence loss and remains an error. A child that stops
+reading its input before the end fails the runner's write of it (EPIPE, or EOF
+on Windows): that does not fail the call, which ends with the child's own exit
+status and output, and the result's stdinError names the write. The worker
+adapter adds "before it had read its whole prompt" to a failed CLI's message
+and does not use the answer of one that exited 0 (since 0.46.1).
 
 Facts and contracts split oversized source bodies, including single long lines,
 into source-numbered ranges. An inventory file that does not fit in one input

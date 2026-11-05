@@ -1227,7 +1227,7 @@
     },
     {
       "path": "lib/guidance.mjs",
-      "sha256": "7a3bec7d2ccf677e1d69bf5c190ced9306c6f1b4e3243ff13b5b5bd5487c1290",
+      "sha256": "40810e5d254bf4e952d5e33a053e5812796e0b31342d94c5fe8937b4a3b4a315",
       "entries": [
         {
           "line": 81,
@@ -1340,7 +1340,7 @@
     },
     {
       "path": "lib/models.mjs",
-      "sha256": "08ba9e22dd77f429374743edcc542021d803ac2bfa2407d9f944c1983af0eabc",
+      "sha256": "223b60cbeaa9d8541bed2d62de9922451f152218178267a11aa401471b2d0bd2",
       "entries": [
         {
           "line": 26,
@@ -2527,7 +2527,7 @@
     },
     {
       "path": "lib/process.mjs",
-      "sha256": "1e8787ba516506aa75fafeca2412596ebef1f9b52bf3aac8dbfb4c5b4ab8a672",
+      "sha256": "7cbdd6eae1cb2fbec9aafc48bbb2ed66fcd510917c39fe4c1558c13929b2a6ef",
       "entries": [
         {
           "line": 90,
@@ -2540,127 +2540,127 @@
           "code": "// timeoutMs is opt-in. In particular, zero must not schedule a 1 ms timer."
         },
         {
-          "line": 160,
+          "line": 162,
           "kind": "deadline-or-observation",
           "code": "export function runProcess(command, args, { cwd, env = process.env, input, timeoutMs = 0, silenceMs = 0, dropLine, signal, maxBytes = 16 * 1024 * 1024, outputDir } = {}) {"
         },
         {
-          "line": 161,
+          "line": 163,
           "kind": "deadline-or-observation",
           "code": "if (!Number.isFinite(timeoutMs) || timeoutMs < 0 || !Number.isFinite(silenceMs) || silenceMs < 0 || !Number.isSafeInteger(maxBytes) || maxBytes < 1) throw new Error('Invalid process timeout, silence wait or output memory threshold');"
         },
         {
-          "line": 164,
+          "line": 166,
           "kind": "deadline-or-observation",
           "code": "let child, failure, timeout, watch, watcher, killTimer, releaseTimer, reapTimer, closed = false, terminated = true, settled = false, exited = false, groupGone = false;"
         },
         {
-          "line": 206,
+          "line": 208,
           "kind": "deadline-or-observation",
           "code": "clearTimeout(timeout); clearInterval(watch); clearTimeout(killTimer); clearTimeout(releaseTimer); clearTimeout(reapTimer); signal?.removeEventListener('abort', abort);"
         },
         {
-          "line": 223,
+          "line": 225,
           "kind": "error-or-exit-candidate",
           "code": "if (failure) { failure.result = result; failure.spawned = Boolean(child?.pid); reject(failure); } else resolve(result);"
         },
         {
-          "line": 247,
+          "line": 249,
           "kind": "process-termination",
           "code": "try { process.kill(-child.pid, 'SIGTERM'); } catch { letGo(); return; }"
         },
         {
-          "line": 248,
+          "line": 250,
           "kind": "process-termination",
           "code": "reapTimer = setTimeout(() => { try { process.kill(-child.pid, 'SIGKILL'); } catch {} letGo(); }, groupKillWaitMs);"
         },
         {
-          "line": 254,
+          "line": 256,
           "kind": "deadline-or-observation",
           "code": "failure = error; clearTimeout(timeout); clearInterval(watch);"
         },
         {
-          "line": 263,
+          "line": 265,
           "kind": "process-termination",
           "code": "killTimer = setTimeout(() => { failure.message += `; taskkill did not finish within ${taskkillWaitMs / 1000} s (tree termination unconfirmed)`; child.kill(); killed(); }, taskkillWaitMs);"
         },
         {
-          "line": 265,
+          "line": 267,
           "kind": "process-termination",
           "code": "killer.once('error', e => { clearTimeout(killTimer); if (settled) return; failure.message += `; taskkill failed: ${e.message}`; child.kill(); killed(); });"
         },
         {
-          "line": 269,
+          "line": 271,
           "kind": "process-termination",
           "code": "if (status !== 0) { failure.message += `; taskkill exit ${status} (tree termination unconfirmed)`; child.kill(); }"
         },
         {
-          "line": 273,
+          "line": 275,
           "kind": "process-termination",
           "code": "try { process.kill(-child.pid, 'SIGTERM'); } catch {}"
         },
         {
-          "line": 277,
+          "line": 279,
           "kind": "process-termination",
           "code": "try { process.kill(-child.pid, 'SIGKILL'); } catch (e) { if (e.code !== 'ESRCH') failure.message += `; group kill failed: ${e.message}`; }"
         },
         {
-          "line": 282,
+          "line": 284,
           "kind": "error-or-exit-candidate",
           "code": "const abort = () => fail(new Error('Interrupted'));"
         },
         {
-          "line": 289,
+          "line": 291,
           "kind": "deadline-or-observation",
           "code": "if (timeoutMs > 0) timeout = setTimeout(() => fail(new Error(`Process timed out after ${timeoutMs}ms (explicit bounded deadline)`)), timeoutMs);"
         },
         {
-          "line": 296,
+          "line": 298,
           "kind": "error-or-exit-candidate",
           "code": "if (watcher.tick()) setImmediate(() => { if (watcher.silent && !exited) fail(Object.assign(new Error(silentProcessMessage(silenceMs)), { silent: true })); });"
         },
         {
-          "line": 330,
+          "line": 332,
           "kind": "error-or-exit-candidate",
           "code": "else fail(new Error(`Cannot preserve process output: ${e.message}`, { cause: e }));"
         },
         {
-          "line": 338,
+          "line": 340,
           "kind": "deadline-or-observation",
           "code": "exited = true; clearInterval(watch); clearTimeout(timeout);"
         },
         {
-          "line": 339,
+          "line": 341,
           "kind": "pid-probe",
           "code": "if (process.platform !== 'win32') { try { process.kill(-child.pid, 0); } catch (e) { if (e.code === 'ESRCH') groupGone = true; } }"
         },
         {
-          "line": 344,
+          "line": 359,
           "kind": "error-or-exit-candidate",
-          "code": "child.stdin.on('error', e => { if (e.code !== 'EPIPE') fail(e); });"
+          "code": "child.stdin.on('error', e => { if (e.code === 'EPIPE' || e.code === 'EOF') stdinError ??= e.code; else fail(e); });"
         },
         {
-          "line": 371,
+          "line": 386,
           "kind": "error-or-exit-candidate",
           "code": "if (!relative.startsWith('migration/runs/process-output/') || relative.split('/').includes('..')) throw new Error('Process output file outside runner log directory');"
         },
         {
-          "line": 373,
+          "line": 388,
           "kind": "error-or-exit-candidate",
           "code": "if (fs.lstatSync(at).isSymbolicLink()) throw new Error('Symlink in process output path');"
         },
         {
-          "line": 377,
+          "line": 392,
           "kind": "error-or-exit-candidate",
           "code": "if (fs.lstatSync(file).isSymbolicLink()) throw new Error('Symlink in process output path');"
         },
         {
-          "line": 384,
+          "line": 399,
           "kind": "loop-exit-candidate",
           "code": "if (!count) break;"
         },
         {
-          "line": 393,
+          "line": 408,
           "kind": "error-or-exit-candidate",
           "code": "if ((root && typeof expected !== 'string') || (expected && hasher.digest('hex') !== expected)) throw new Error('Process output log changed or has no recorded hash; refusing altered diagnostic evidence');"
         }
@@ -3772,7 +3772,7 @@
     },
     {
       "path": "scripts/copilot_adapter.mjs",
-      "sha256": "573488e87d7ce2fb01d6effc21e2bd970c8c8e35d5a10938d41ad107793b550c",
+      "sha256": "b3610fd0a5b77bd0e5c761e7630590e36a64e75e49d280ec4b1c68f4902b7495",
       "entries": [
         {
           "line": 9,
@@ -3995,22 +3995,22 @@
           "code": "Object.assign(e, versionFields, usageFields(usage)); throw e;"
         },
         {
-          "line": 518,
-          "kind": "error-or-exit-candidate",
-          "code": "if (result.code !== 0) throw new Error(`Copilot ${role} failed (exit ${result.code}): ${[copilotStreamError(processOutputLines(result)), result.stderr.slice(-2000)].filter(Boolean).join('\\n')}`);"
-        },
-        {
           "line": 524,
           "kind": "error-or-exit-candidate",
-          "code": "throw e;"
+          "code": "if (result.code !== 0 || unread) throw new Error(`Copilot ${role} failed (exit ${result.code})${unread}: ${[result.code === 0 ? 'its answer to a prompt cut short is not used' : '', copilotStreamError(processOutputLines(result)), result.stderr.slice(-2000)].filter(Boolean).join('\\n')}`);"
         },
         {
-          "line": 529,
+          "line": 530,
           "kind": "error-or-exit-candidate",
           "code": "throw e;"
         },
         {
-          "line": 542,
+          "line": 535,
+          "kind": "error-or-exit-candidate",
+          "code": "throw e;"
+        },
+        {
+          "line": 548,
           "kind": "error-or-exit-candidate",
           "code": "ledger(false, reportedModelOf(result)); e.result = recordedOutput(result, root); Object.assign(e, versionFields, usageFields(usage)); throw e; }"
         }

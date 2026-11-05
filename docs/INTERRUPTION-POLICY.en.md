@@ -67,7 +67,7 @@ These are not time or load cutoffs: continuing could not save a correct result.
 | Required data that truly cannot be processed | binary files (NUL bytes that are not UTF-16), unreadable files, or required metadata (rulebook, one census site) larger than the model capacity on its own |
 | Translation and test failures | non-zero typecheck, original, mutation, build, smoke or parity; fixable failures go to reviewed repair inside build-loop |
 | No owner for a fix | a compiler diagnostic that maps to no manifest target, a failing original test, a defect in the judge itself |
-| Real environment faults | ENOSPC, EACCES, EMFILE, EIO, spawn failure, OOM kill, external termination |
+| Real environment faults | ENOSPC, EACCES, EMFILE, EIO, spawn failure, a failed write to a child's standard input other than EPIPE or EOF (both mean the child ended or closed its input before it had read all of it, so its own exit status and output decide), OOM kill, external termination |
 | Hooks cannot guarantee permissions | missing or invalid hooks, the host's 30 s hook limit (not a worker time limit) |
 | Invalid helper input | unknown options, empty manifest, broken TSV or config |
 

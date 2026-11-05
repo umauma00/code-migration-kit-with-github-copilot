@@ -515,7 +515,13 @@ export function createCopilotAdapter({ command = 'copilot', prefixArgs = [], ver
     }
     finally { fs.rmSync(usageDir, { recursive: true, force: true }); }
     try {
-      if (result.code !== 0) throw new Error(`Copilot ${role} failed (exit ${result.code}): ${[copilotStreamError(processOutputLines(result)), result.stderr.slice(-2000)].filter(Boolean).join('\n')}`);
+      // A CLI that stopped reading its prompt before the end (the runner's
+      // write of it failed: stdinError) says so in the message, and one that
+      // answered all the same (exit status 0) answered a prompt cut short:
+      // that answer is not used. Only a prompt larger than the pipe (about
+      // 64 KiB on Windows) can show it.
+      const unread = result.stdinError ? ' before it had read its whole prompt' : '';
+      if (result.code !== 0 || unread) throw new Error(`Copilot ${role} failed (exit ${result.code})${unread}: ${[result.code === 0 ? 'its answer to a prompt cut short is not used' : '', copilotStreamError(processOutputLines(result)), result.stderr.slice(-2000)].filter(Boolean).join('\n')}`);
       let parsed, value;
       try {
         parsed = parseCopilotOutput(processOutputLines(result));
