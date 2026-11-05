@@ -153,6 +153,11 @@ export const doctorProbeSeconds = 180;
 export const doctorTimeout = config => Math.min(processTimeout(config, 'commandTimeoutSeconds') || Infinity, doctorProbeSeconds * 1000);
 const stalled = e => /^Process timed out after /.test(e?.message ?? '');
 export const doctorStallDetail = (stage, ms) => `Doctor check "${stage}" did not finish within ${Number((ms / 1000).toFixed(1))} s. The Copilot CLI got no answer in time: a proxy that does not respond (HTTPS_PROXY / HTTP_PROXY), a sign-in waiting for input, or a blocked network can hold it. Nothing was changed.`;
+// A worker profile of 0.46.1 or earlier that an update left in place (a copy
+// install that replaced migration-kit/ only) still says to read every listed
+// file in full, or the operating manual (the arbiter). The prompt's reading
+// rule replaces it (0.47.0), so doctor warns instead of failing the check.
+const outdatedReading = /\bRead every listed file in full\b|^Read \[the operating manual\]/im;
 export async function doctor(root, config, { checkCLI = false, command = 'copilot', signal, sandboxProbe = localSandboxProbe, probeTimeoutMs } = {}) {
   if (signal?.aborted) throw new Error('Interrupted');
   const timeoutMs = probeTimeoutMs ?? doctorTimeout(config);
@@ -169,6 +174,10 @@ export async function doctor(root, config, { checkCLI = false, command = 'copilo
     if (role !== 'orchestrator' && fs.existsSync(file)) {
       try { validateWorkerProfile(root, role, config); checks.push({ check: `${role}: model and tools`, ok: true }); }
       catch (e) { checks.push({ check: `${role}: model and tools`, ok: false, detail: e.message }); }
+      try {
+        if (outdatedReading.test(fs.readFileSync(file, 'utf8'))) checks.push({ check: `${role}: reading rule`, ok: true, status: 'outdated',
+          warning: `${p} is from kit 0.46.1 or earlier and still says to read every listed file in full (or the operating manual). The prompt's reading rule replaces it; replace the file with this kit's copy (UPGRADING, 0.47.0 item 10).` });
+      } catch {}
     }
   }
   try { checks.push({ check: 'verification input files', ok: true, files: verificationFiles(root, config), note: 'Add transitive build scripts, nested dependency/config files and environment descriptions to verificationInputs. This list is not an automatic dependency graph.' }); }

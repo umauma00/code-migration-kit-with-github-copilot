@@ -243,31 +243,40 @@ happened, `markerRewrites` and `reviewsKept`).
 Since 0.47.0 each worker call of the translation loop (implementer,
 reviewers, arbiter, fixer) has a call limit, in both execution modes:
 `workerCallMinutes` (30 by default, 0 for none, otherwise 10 to 1440) plus one
-minute for every 8 KiB of the unit's source and current target
+minute for every 8 KiB of the files the call reads whole: the unit's source
+and current target, `migration/RULEBOOK.md` and the design inputs
 (`callLimitMinutes` in `lib/execution-policy.mjs`). Bounded `timeoutSeconds`
-stays final; the earlier of the two stops a call. A call still at work at its
-limit is stopped with its child processes ("Process ran past its call limit")
-and tried once more in a new session, with `extra.previousAttempt`: a sentence
-after the task data that says what the stopped call did and, when it had used
-tools, to search a dependency rather than read it whole. The answer contract
-is unchanged. A second stop at the limit blocks the unit with "Copilot
-<role> ran past its call limit of N min (workerCallMinutes) on 2 attempts in a
-row", and the unit gets no last pass in that run. A stop that comes as the run
-is interrupted is recorded as interrupted, without a retry. A translate run
-(not a repair run) dispatches the pending units that have no state file first
-and those that have one (an earlier run tried them) last, each group in
-manifest order. The coordinator's attempt record adds
-`workInputMode` (`frozen` or `tool-assisted`, implementer and fixer),
-`callLimitMinutes` (when a limit applies) and, on success and failure,
+stays final; the earlier of the two stops a call. The limit counts time at
+work: a step delayed by sleep counts as two at most, and while the silence
+check is on, time after `callIdleMs` (2 minutes) without output is not
+counted (`runProcess` `idleMs`), so a silent call stays a silent call. A call
+still at work at its limit is stopped with its child processes ("Process ran
+past its call limit") and tried once more in a new session, with
+`extra.previousAttempt`: a sentence after the task data that says what the
+stopped call did and, when it had used tools, to search a dependency rather
+than read it whole. The answer contract is unchanged. A second stop at the
+limit blocks the unit with "Copilot <role> ran past its call limit of N min
+(workerCallMinutes) on 2 attempts; this file is set aside for this run ...",
+which names no file (the attempt record does), and the unit gets no last pass
+in that run. A stop that comes as the run is interrupted is recorded as
+interrupted ("Interrupted; ..."), without a retry. A translate run (not a
+repair run) dispatches the pending units an earlier run left unfinished (a
+state file whose status is not `done`) after the others, each group in
+manifest order, except a unit that another pending unit waits on, which keeps
+its place (`dispatchOrder` in `lib/pipeline.mjs`). The coordinator's attempt
+record adds `workInputMode` (`frozen` or `tool-assisted`, implementer and
+fixer), `callLimitMinutes` (when a limit applies) and, on success and failure,
 `activity`: `turns` (the main agent's `assistant.turn_start` events), `tools`
 (tool calls by name), `views` (up to five `{path, views, refused?}`, the
 project files viewed most; `refused` counts view results with
 `largeOutputAvoided`), `moreViews` and `outsideViews` when not zero,
-`contextTokens` (the largest `context_current_tokens` of a tool result),
-`contextLimit` and `compactions` (null when the CLI wrote none). It holds
-counts and project-relative paths only. A retry entry of a call stopped at
-its limit adds `callLimit: true` and that attempt's `activity`. None of these
-fields is part of a receipt: a unit finished by an earlier kit stays finished.
+`contextTokens` (the largest context once a tool result is in it:
+`context_current_tokens`, the context before the result, plus its
+`result_token_count` when the CLI gives one), `contextLimit` and
+`compactions` (null when the CLI wrote none). It holds counts and
+project-relative paths only. A retry entry of a call stopped at its limit
+adds `callLimit: true` and that attempt's `activity`. None of these fields is
+part of a receipt: a unit finished by an earlier kit stays finished.
 
 `status` (full and `--fast`) gives each call at work in a unit's
 `activeRoles` its `startedAt` (when its current try started: the last retry's

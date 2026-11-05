@@ -27,16 +27,16 @@ import os from 'node:os';
 import path from 'node:path';
 import { prepare, ready, fake, result, scopesOf } from './helpers.mjs';
 import { safePath, writeJSON, readJSON, atomicWrite, loadConfig, inputContext, done, statePath, operationalConfigKeys } from '../lib/core.mjs';
-import { translate } from '../lib/pipeline.mjs';
-import { runProcess, callLimitMessage, workWatch } from '../lib/process.mjs';
+import { translate, dispatchOrder, runStage, approve } from '../lib/pipeline.mjs';
+import { runProcess, callLimitMessage, workWatch, callIdleMs } from '../lib/process.mjs';
 import { callLimitMinutes, defaultWorkerCallMinutes } from '../lib/execution-policy.mjs';
 import { createCopilotAdapter, agentPrompt } from '../scripts/copilot_adapter.mjs';
-import { isTransientFailure, isSystemicFailure, isLimitedRetry, isCallLimit, retryCause, stoppedWithRun } from '../lib/failures.mjs';
+import { isTransientFailure, isSystemicFailure, isLimitedRetry, isCallLimit, isSilentCall, retryCause, stoppedWithRun } from '../lib/failures.mjs';
 import { failureGuidance } from '../lib/guidance.mjs';
 import { migrationStatus, statusMarkdown } from '../lib/status.mjs';
-import { statusSnapshot } from '../lib/status-snapshot.mjs';
+import { statusSnapshot, runningAttempts } from '../lib/status-snapshot.mjs';
 import { callActivity, activitySummary } from '../lib/activity.mjs';
-import { progressKey, waitForProgress } from '../scripts/run_migration.mjs';
+import { progressKey, waitForProgress, doctor } from '../scripts/run_migration.mjs';
 import { kitRoot } from '../scripts/install.mjs';
 
 const continuous = async (t, options = {}) => {
@@ -63,9 +63,10 @@ test('a tool-assisted call reads its own files whole, in view_range parts, and a
     assert.match(p, /Read in full (?:only )?the file named by the input's source and the listed files that are not in the input's sources, except migration\/inventory\.tsv/, role);
     assert.match(p, /view returns about 20 KB at most per call and turns down a larger file without view_range, so read a larger one in consecutive view_range parts/, role);
     assert.match(p, /The other files of the input's sources are dependencies/, role);
-    assert.match(p, /search a dependency for the names this unit uses with your search tool \(grep or rg; output_mode content with line numbers; paths set to that file\), then view only the line ranges you need/, role);
+    assert.match(p, /search a dependency for the names this unit uses with your search tool \(grep or rg; output_mode content with line numbers; paths set to that file, or, if the tool takes no file there, to its folder with glob set to its name\), then view only the line ranges you need/, role);
     assert.match(p, /Never view a dependency whole and never use forceReadLargeFiles on one/, role);
     assert.match(p, /never view it whole/, `${role}: the inventory as before`);
+    assert.match(p, /This reading rule replaces any other in your agent instructions\./, `${role}: a profile an update left in place says otherwise`);
   }
   assert.match(prompts.fixer, /\(migration\/RULEBOOK\.md, the design inputs and the target\)/);
   assert.match(prompts.implementer, /\(migration\/RULEBOOK\.md and the design inputs\)/);
@@ -78,15 +79,25 @@ test('a tool-assisted call reads its own files whole, in view_range parts, and a
   const frozen = agentPrompt({ role: 'implementer', unit, workInput: '{}', frozenInput: '{}', workMode: 'frozen' });
   assert.match(frozen, /No tools are available/); assert.doesNotMatch(frozen, /view_range/);
   assert.doesNotMatch(agentPrompt({ role: 'reviewer-rules', unit, reviewInput: '{}' }), /view_range/);
+  // The arbiter reads with its tools, by the same rule (up to 0.46.1: "Read
+  // relevant dependencies if needed", and its profile sent it to the manual).
+  const arbiter = agentPrompt({ role: 'arbiter', unit, extra: { designInputs: [], references: ['reviewer-rules:F1'] } });
+  assert.match(arbiter, /Read migration\/RULEBOOK\.md, source "src\/BranchSelectImpl\.cs", the target "ported\/BranchSelectImpl\.java" if present and every file in extra\.designInputs in full \(a link is not the design body\): view returns about 20 KB at most per call/);
+  assert.match(arbiter, /For this unit's rows of migration\/inventory\.tsv, search it for the source; never view it whole\. Where a finding turns on a dependency, search a dependency for the names this unit uses/);
+  assert.match(arbiter, /Never view a dependency whole and never use forceReadLargeFiles on one\. This reading rule replaces any other in your agent instructions\./);
+  assert.doesNotMatch(arbiter, /Read relevant dependencies if needed/);
   // The read-only reviewer profiles say the same; the two copies of each
   // differ only in the name and the plugin's paragraph on paths.
-  for (const name of ['reviewer-rules-read', 'reviewer-semantics-read']) {
+  for (const name of ['reviewer-rules-read', 'reviewer-semantics-read', 'arbiter']) {
     const copy = fs.readFileSync(path.join(kitRoot, `.github/agents/migration-${name}.agent.md`), 'utf8');
     const plugin = fs.readFileSync(path.join(kitRoot, `com.github.copilot/agents/code-migration-plugin-${name}.agent.md`), 'utf8');
     for (const text of [copy, plugin]) {
       assert.doesNotMatch(text, /Read every listed file/, name);
+      assert.doesNotMatch(text, /^Read \[/m, `${name}: the manual is for people`);
+      assert.match(text, /^For human setup: /m, name);
+      if (name === 'arbiter') { assert.match(text, /^Read only the files the coordinator's task names, as its reading rule says\.$/m); continue; }
       assert.match(text, /consecutive view_range parts/, name);
-      assert.match(text, /paths set to that file/, name);
+      assert.match(text, /paths set to that file, or, if the tool takes no file there, to its folder with glob set to its name/, name);
       assert.match(text, /never view a dependency whole and never use forceReadLargeFiles on one/, name);
       assert.match(text, /never report that a dependency was not read in full/, name);
       assert.match(text, /Never open migration\/runs/, name);
@@ -126,6 +137,29 @@ test('a call may run workerCallMinutes plus a minute for every 8 KiB of the unit
   for (const good of [0, 10, 1440]) { writeJSON(file, { ...f.config, workerCallMinutes: good }); assert.equal(loadConfig(f.root).workerCallMinutes, good); }
 });
 
+test('each call of a run gets a minute more for every 8 KiB of the files it reads whole: the source, the current target, the RULEBOOK and the design inputs', async t => {
+  const f = prepare(t, { executionMode: 'continuous' });
+  fs.appendFileSync(safePath(f.root, 'src/math_ops.py'), `# ${'x'.repeat(97)}\n`.repeat(400));
+  fs.appendFileSync(safePath(f.root, 'migration/RULEBOOK.md'), `${'r'.repeat(99)}\n`.repeat(300));
+  atomicWrite(safePath(f.root, 'docs/design.md'), `${'d'.repeat(99)}\n`.repeat(200));
+  f.config.designInputs = ['docs/design.md']; f.config.transientRetryDelayMs = 1;
+  writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
+  await runStage(f.root, f.config, 'judge');
+  approve(f.root, f.config, 'translation', 'Automated fixture approval for tests only');
+  const size = name => fs.existsSync(safePath(f.root, name)) ? fs.statSync(safePath(f.root, name)).size : 0;
+  const own = () => ['src/math_ops.py', 'ported/math_ops.mjs', 'migration/RULEBOOK.md', 'docs/design.md'].reduce((sum, name) => sum + size(name), 0);
+  const seen = [];
+  const report = await translate(f.root, f.config, async args => { seen.push({ role: args.role, ms: args.callLimitMs, expected: (30 + Math.floor(own() / 8192)) * 60000 }); return fake(args); });
+  assert.equal(report.done, 1, JSON.stringify(report.errors));
+  const implementer = seen.find(c => c.role === 'implementer');
+  assert.ok(own() > 90000 && size('ported/math_ops.mjs') > 0);
+  assert.equal(implementer.ms, (30 + Math.floor((size('src/math_ops.py') + size('migration/RULEBOOK.md') + size('docs/design.md')) / 8192)) * 60000, 'no target yet');
+  assert.ok(implementer.ms >= 41 * 60000, String(implementer.ms));
+  for (const call of seen) assert.equal(call.ms, call.expected, call.role);
+  assert.ok(seen.some(c => c.role.startsWith('reviewer-')));
+  for (const r of attempts(f, report.runId)) assert.equal(r.callLimitMinutes * 60000, seen.find(c => c.role === r.role).ms, r.role);
+});
+
 test('a child still at work past its call limit is stopped however much it writes; one that ends in time keeps its answer', async () => {
   const busy = 'setInterval(() => process.stdout.write("working\\n"), 20);';
   const started = Date.now();
@@ -154,6 +188,28 @@ test('a child still at work past its call limit is stopped however much it write
   assert.notEqual(failureGuidance(interrupted).id, 'cli-call-limit');
 });
 
+test('while the silence check is on, time in which a call has written nothing for a while is waiting, not work, and is left to the silence check', async () => {
+  assert.equal(callIdleMs, 120000);
+  const silent = 'setTimeout(() => {}, 30000);';
+  // Silent from the start, under a call limit shorter than its silence wait
+  // (as 30 minutes against the third wait of 40): it ends as a silent call,
+  // retried and guided as one, not as a call that ran past its limit.
+  const quiet = await runProcess(process.execPath, ['-e', silent], { silenceMs: 800, limitMs: 300, idleMs: 100 }).then(() => null, error => error);
+  assert.ok(quiet, 'the silent child is stopped');
+  assert.equal(quiet.callLimit, undefined); assert.equal(isCallLimit(quiet), false); assert.equal(isSilentCall(quiet), true);
+  // One that writes, falls silent for 700 ms and writes again: the silent
+  // time past idleMs does not count toward its limit.
+  const pause = 'let n = 0; const t = setInterval(() => { process.stdout.write("x\\n"); if (++n === 5) { clearInterval(t); setTimeout(() => setInterval(() => process.stdout.write("y\\n"), 20), 700); } }, 20);';
+  const started = performance.now();
+  const late = await runProcess(process.execPath, ['-e', pause], { silenceMs: 5000, limitMs: 400, idleMs: 100 }).then(() => null, error => error);
+  assert.equal(late?.callLimit, true, late?.message);
+  assert.ok(performance.now() - started >= 900, `the 600 ms without output past idleMs did not count (${Math.round(performance.now() - started)} ms)`);
+  // Without the silence check all of a call's time counts.
+  const off = await runProcess(process.execPath, ['-e', silent], { limitMs: 300, idleMs: 100 }).then(() => null, error => error);
+  assert.equal(off?.callLimit, true, off?.message);
+  assert.throws(() => runProcess(process.execPath, ['-e', ''], { idleMs: 0 }), /call limit/);
+});
+
 test('the time at work is counted in steps, a late step as two at most, so a computer that slept does not use up a call\'s limit', () => {
   let now = 0;
   const w = workWatch(1000, () => now);
@@ -164,6 +220,10 @@ test('the time at work is counted in steps, a late step as two at most, so a com
   for (let i = 0; i < 16; i++) { now += 50; assert.equal(w.tick(), false); }
   now += 50; assert.equal(w.tick(), true);
   assert.equal(workWatch(3600000).step, 30000, 'at most 30 s a step');
+  // tick(false): the time since the last tick was spent waiting, not at work.
+  const idle = workWatch(1000, () => now);
+  now += 50; idle.tick(); now += 50; assert.equal(idle.tick(false), false); now += 50; idle.tick();
+  assert.equal(idle.worked, 100);
 });
 
 test('a call still at work at its call limit is tried once more, told what it did; then its file is set aside for the run, without the last pass, and the other files go on', async t => {
@@ -182,7 +242,7 @@ test('a call still at work at its call limit is tried once more, told what it di
   assert.ok(!stages.some(s => /one more pass/.test(s)), stages.join('\n'));
   const state = readJSON(statePath(f.root, f.units[0]));
   assert.equal(state.status, 'blocked');
-  assert.equal(state.error, 'Copilot reviewer-semantics ran past its call limit of 30 min (workerCallMinutes) on 2 attempts in a row; this file is set aside for this run, and the next run tries it after the files not tried yet (last attempt: 41 model turns, 40 tool calls, src/Database.designer.cs viewed 38 times, context up to 360000 tokens of 922000)');
+  assert.equal(state.error, 'Copilot reviewer-semantics ran past its call limit of 30 min (workerCallMinutes) on 2 attempts; this file is set aside for this run, and the next run tries it after the other files unless one of them waits on it (last attempt: 41 model turns, 40 tool calls, a file viewed 38 times, context up to 360000 tokens of 922000)');
   assert.equal(readJSON(statePath(f.root, f.units[1])).status, 'done', 'the other file went on');
   assert.equal(failureGuidance(state.error, { language: 'ja' }).id, 'cli-call-limit');
   assert.deepEqual(failureGuidance(state.error).options.map(o => o.id), ['rerun', 'longer-limit', 'check-dependencies', 'pause']);
@@ -197,7 +257,26 @@ test('a call still at work at its call limit is tried once more, told what it di
   let calls = 0;
   await translate(g.root, g.config, async args => { if (args.role === 'implementer') { calls++; throw overrun(30, null); } return fake(args); }).catch(() => {});
   assert.equal(calls, 1);
-  assert.match(readJSON(statePath(g.root, g.units[0])).error, /^Copilot implementer ran past its call limit of 30 min \(workerCallMinutes\) and was stopped; this file is set aside for this run, and the next run tries it after the files not tried yet$/);
+  assert.match(readJSON(statePath(g.root, g.units[0])).error, /^Copilot implementer ran past its call limit of 30 min \(workerCallMinutes\) and was stopped; this file is set aside for this run, and the next run tries it after the other files unless one of them waits on it$/);
+});
+
+test('the reason a file was set aside names no file, so a file\'s name cannot read as another cause; the call\'s record keeps it', async t => {
+  for (const name of ['src/Keys/ApiKey.cs', 'src/ThreadInterruptedException.cs', 'migration/manifest.tsv', 'src/AuthenticationRequired.cs']) {
+    const f = await continuous(t);
+    const activity = { ...did, views: [{ path: name, views: 38 }] };
+    await translate(f.root, f.config, async args => { if (args.role === 'implementer') throw overrun(30, activity); return fake(args); }).catch(() => {});
+    const state = readJSON(statePath(f.root, f.units[0]));
+    assert.equal(state.status, 'blocked');
+    assert.ok(!state.error.includes(name), state.error);
+    assert.match(state.error, /a file viewed 38 times/);
+    assert.equal(failureGuidance(state.error).id, 'cli-call-limit', name);
+    assert.equal(isSystemicFailure(state.error), false, name); assert.equal(isTransientFailure(state.error), true, name);
+    const record = attempts(f, state.runId).find(a => a.role === 'implementer');
+    assert.equal(record.activity.views[0].path, name);
+  }
+  // A stop of the run comes first in the message; a name later on does not hide the guidance.
+  assert.equal(failureGuidance('Copilot reviewer-rules ran past its call limit of 30 min (workerCallMinutes) on 2 attempts; this file is set aside for this run (last attempt: Interrupted)').id, 'cli-call-limit');
+  assert.notEqual(failureGuidance('Interrupted; Copilot reviewer-rules ran past its call limit of 30 min (workerCallMinutes) and was stopped').id, 'cli-call-limit');
 });
 
 test('a retry that answers finishes the file, and with workerCallMinutes 0 no call is given a limit', async t => {
@@ -220,7 +299,7 @@ test('a retry that answers finishes the file, and with workerCallMinutes 0 no ca
   assert.equal(Object.hasOwn(record, 'callLimitMinutes'), false);
 });
 
-test('end to end: the real adapter stops a CLI that keeps reading, and the error carries what it did', async t => {
+test('end to end: the real adapter stops a CLI that keeps reading, and the error carries what it did', { timeout: 30000 }, async t => {
   const f = prepare(t, { executionMode: 'continuous' });
   const file = safePath(f.root, 'reading-cli.mjs');
   atomicWrite(file, `#!/usr/bin/env node
@@ -246,21 +325,48 @@ setInterval(() => {
   assert.doesNotMatch(JSON.stringify(e.activity), /SECRET|view_range/);
 });
 
-test('a run tries the files no run has tried first and the files an earlier run left unfinished last, each group in manifest order', async t => {
+test('a run starts with the other files and tries the files an earlier run left unfinished last, unless another file waits on one', async t => {
   const order = async f => {
     f.config.concurrency = 1; writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
     const seen = [];
     await translate(f.root, f.config, async args => { if (args.role === 'implementer') seen.push(args.unit.target); return fake(args); });
     return seen;
   };
+  const left = (f, u, error) => writeJSON(statePath(f.root, u), { schemaVersion: 1, ...u, status: 'blocked', stage: 'review', error });
   const f = await continuous(t, { count: 3 });
   assert.deepEqual(await order(f), ['ported/math_ops.mjs', 'ported/text_ops.mjs', 'ported/main.mjs'], 'manifest order when no run has tried any');
-  // math_ops was tried before (it held the last run up and was stopped): it
-  // goes after text_ops; main still waits for both of its dependencies.
-  const g = await continuous(t, { count: 3 });
-  writeJSON(statePath(g.root, g.units[0]), { schemaVersion: 1, ...g.units[0], status: 'blocked', stage: 'review', error: 'Interrupted' });
-  assert.deepEqual(await order(g), ['ported/text_ops.mjs', 'ported/math_ops.mjs', 'ported/main.mjs']);
-  assert.ok(g.units.every(u => readJSON(statePath(g.root, u)).status === 'done'), 'every file is still done in the same run');
+  // math_ops held the last run up (set aside at its call limit, or stopped by
+  // a person): it goes after text_ops, and every file is still done in the run.
+  for (const error of ['Copilot implementer ran past its call limit of 30 min (workerCallMinutes) on 2 attempts; this file is set aside for this run', 'Interrupted']) {
+    const g = await continuous(t, { count: 2 });
+    left(g, g.units[0], error);
+    assert.deepEqual(await order(g), ['ported/text_ops.mjs', 'ported/math_ops.mjs'], error);
+    assert.ok(g.units.every(u => readJSON(statePath(g.root, u)).status === 'done'));
+  }
+  // main waits on math_ops: math_ops keeps its place, so main does not wait for the end.
+  const h = await continuous(t, { count: 3 });
+  left(h, h.units[0], 'Interrupted');
+  assert.deepEqual(await order(h), ['ported/math_ops.mjs', 'ported/text_ops.mjs', 'ported/main.mjs']);
+  // A file finished before whose record no longer holds keeps its place too.
+  const k = await continuous(t, { count: 2 });
+  writeJSON(statePath(k.root, k.units[0]), { schemaVersion: 1, ...k.units[0], status: 'done', stage: 'done' });
+  assert.deepEqual(await order(k), ['ported/math_ops.mjs', 'ported/text_ops.mjs']);
+});
+
+test('dispatchOrder: the units set back go last in their own order, a unit another one waits on keeps its place, and a repair keeps its order', () => {
+  const [a, b, c, d, e] = ['a', 'b', 'c', 'd', 'e'].map(id => ({ id }));
+  const pending = [a, b, c, d, e], back = new Set([a, c, d]), setBack = u => back.has(u);
+  const none = new Map(pending.map(u => [u, new Set()]));
+  assert.deepEqual(dispatchOrder(pending, { setBack, dependencies: none }), [b, e, a, c, d]);
+  // e waits on c: c keeps its place; nothing waits on the units set back.
+  const waits = new Map([...none, [e, new Set([c])]]);
+  assert.deepEqual(dispatchOrder(pending, { setBack, dependencies: waits }), [b, c, e, a, d]);
+  // Only what a pending unit waits on keeps its place (c is not pending here).
+  assert.deepEqual(dispatchOrder([a, b], { setBack, dependencies: new Map([[a, new Set()], [b, new Set([c])]]) }), [b, a]);
+  assert.deepEqual(dispatchOrder(pending, { setBack, dependencies: waits, repairing: true }), pending);
+  assert.deepEqual(dispatchOrder(pending, { setBack: () => false, dependencies: none }), pending);
+  assert.deepEqual(dispatchOrder(pending, { setBack }), [b, e, a, c, d], 'no dependency map: nothing waits');
+  assert.notEqual(dispatchOrder(pending, { setBack, dependencies: none, repairing: true }), pending, 'a copy');
 });
 
 test('status shows how long each call at work has run and its call limit, in the full and the fast view', async t => {
@@ -390,8 +496,13 @@ const under = root => line => JSON.stringify(JSON.parse(line, (k, v) => typeof v
 test('what a call did is counted from the CLI\'s own JSON lines (CLI 1.0.105): turns, tools, the files viewed most, refusals and the context, never content', () => {
   const root = path.join(os.tmpdir(), 'activity-root'), lines = realLines.map(under(root));
   const activity = callActivity(lines, root);
-  assert.deepEqual(activity, { turns: 7, tools: { rg: 3, view: 3 }, views: [{ path: 'src/Database.designer.cs', views: 3, refused: 1 }], contextTokens: 252197, contextLimit: 922000, compactions: null });
-  assert.equal(activitySummary(activity), '7 model turns, 6 tool calls, src/Database.designer.cs viewed 3 times, context up to 252197 tokens of 922000');
+  // context_current_tokens is the context before a result is added; with
+  // result_token_count, after it (the last search: 252197 + 5354). The whole
+  // 1 MB file read with forceReadLargeFiles carries no result_token_count and
+  // shows in the next result's context (4566, then 251847).
+  assert.deepEqual(activity, { turns: 7, tools: { rg: 3, view: 3 }, views: [{ path: 'src/Database.designer.cs', views: 3, refused: 1 }], contextTokens: 257551, contextLimit: 922000, compactions: null });
+  assert.equal(activitySummary(activity), '7 model turns, 6 tool calls, src/Database.designer.cs viewed 3 times, context up to 257551 tokens of 922000');
+  assert.equal(activitySummary(activity, { withPath: false }), '7 model turns, 6 tool calls, a file viewed 3 times, context up to 257551 tokens of 922000');
   assert.doesNotMatch(JSON.stringify(activity), /omitted|Table123|activity-root|view_range|forceReadLargeFiles/);
   // A subagent's events are its own; a file outside the project is counted
   // without its name; more than five files: the rest as a count; a
@@ -409,8 +520,12 @@ test('what a call did is counted from the CLI\'s own JSON lines (CLI 1.0.105): t
   assert.deepEqual(more.views.map(v => v.path), ['src/Database.designer.cs', 'src/a.cs', 'src/b.cs', 'src/c.cs', 'src/d.cs']);
   assert.equal(more.moreViews, 1);
   assert.equal(more.compactions, 1);
-  assert.equal(activitySummary(more), '7 model turns, 12 tool calls, src/Database.designer.cs viewed 3 times, context up to 252197 tokens of 922000, 1 compactions');
+  assert.equal(activitySummary(more), '7 model turns, 12 tool calls, src/Database.designer.cs viewed 3 times, context up to 257551 tokens of 922000, 1 compactions');
   assert.equal(activitySummary(undefined), '');
+  // A name of the project may start with two dots; the folder above may not.
+  const dots = [`${root}/..config.cs`, `${root}/../other/x.cs`].map((p, i) => JSON.stringify({ type: 'tool.execution_start', data: { toolCallId: `d${i}`, toolName: 'view', arguments: { path: p } } }));
+  const named = callActivity(dots, root);
+  assert.deepEqual(named.views, [{ path: '..config.cs', views: 1 }]); assert.equal(named.outsideViews, 1);
   assert.deepEqual(callActivity([], root), { turns: 0, tools: {}, views: [], contextTokens: null, contextLimit: null, compactions: null });
 });
 
@@ -445,15 +560,48 @@ out({ type: 'result', exitCode: 0 });
   assert.ok(records.filter(r => r.role.startsWith('reviewer-')).every(r => r.workInputMode === undefined && typeof r.reviewInputMode === 'string'));
 });
 
-test('updating to 0.47.0 keeps every finished file: the reading rule, the read-only reviewer profiles and workerCallMinutes are no input of a finished unit', async t => {
+test('updating to 0.47.0 keeps every finished file: the reading rule, the read-only reviewer and arbiter profiles and workerCallMinutes are no input of a finished unit', async t => {
   const f = await ready(t, { count: 2 });
   await translate(f.root, f.config, fake);
   const scopes = scopesOf(f.root, f.config);
-  for (const name of ['reviewer-rules-read', 'reviewer-semantics-read'])
+  for (const name of ['reviewer-rules-read', 'reviewer-semantics-read', 'arbiter'])
     fs.appendFileSync(safePath(f.root, `.github/agents/migration-${name}.agent.md`), '\nRead a dependency only where the unit uses it.\n');
   writeJSON(safePath(f.root, 'migration/state/config.json'), { ...f.config, workerCallMinutes: 45 });
   const config = loadConfig(f.root), context = inputContext(f.root, config);
   assert.equal(scopesOf(f.root, config), scopes);
   assert.ok(f.units.every(u => done(f.root, u, context)));
   assert.equal((await translate(f.root, config, fake)).agentCalls, 0);
+});
+
+test('doctor warns of a worker profile an update left from 0.46.1 or earlier, whose reading rule the prompt replaces', async t => {
+  const f = prepare(t, { executionMode: 'continuous' });
+  const clean = await doctor(f.root, f.config);
+  assert.ok(!clean.checks.some(c => / reading rule$/.test(c.check)), JSON.stringify(clean.warnings));
+  const profile = safePath(f.root, '.github/agents/migration-reviewer-rules-read.agent.md');
+  const text = fs.readFileSync(profile, 'utf8'), old = text.replace(/Read in full, before judging,[\s\S]*?Search only inside the listed files\./, 'Read every listed file in full with view before judging; use grep/glob only inside those files.');
+  assert.notEqual(old, text);
+  fs.writeFileSync(profile, old);
+  const arbiter = safePath(f.root, '.github/agents/migration-arbiter.agent.md');
+  fs.writeFileSync(arbiter, fs.readFileSync(arbiter, 'utf8').replace('For human setup: [operating manual]', 'Read [the operating manual]'));
+  const report = await doctor(f.root, f.config);
+  const warned = report.checks.filter(c => / reading rule$/.test(c.check));
+  assert.deepEqual(warned.map(c => c.check), ['arbiter: reading rule', 'reviewer-rules-read: reading rule']);
+  assert.ok(warned.every(c => c.ok === true && c.status === 'outdated'));
+  assert.equal(report.staticValid, clean.staticValid, 'a warning, not a failed check');
+  assert.ok(report.warnings.some(w => w.startsWith('reviewer-rules-read: reading rule: .github/agents/migration-reviewer-rules-read.agent.md is from kit 0.46.1 or earlier')), JSON.stringify(report.warnings));
+});
+
+test('the fast view reads a running call record whole, but only the head of a finished one, which holds the worker\'s whole answer', t => {
+  const f = prepare(t);
+  const dir = safePath(f.root, 'migration/runs/run-1'), id = f.units[0].id;
+  const name = role => `${id}-1-${role}-${'0'.repeat(8)}.json`;
+  writeJSON(path.join(dir, name('reviewer-rules')), { role: 'reviewer-rules', unit: f.units[0], startedAt: '2026-11-05T00:00:00.000Z', status: 'running', callLimitMinutes: 30 });
+  // A finished record: its status near the top, then (here) text that is no JSON.
+  atomicWrite(path.join(dir, name('implementer')), `{\n  "role": "implementer",\n  "unit": ${JSON.stringify(f.units[0], null, 2).replace(/\n/g, '\n  ')},\n  "startedAt": "2026-11-05T00:00:00.000Z",\n  "status": "success",\n  "result": ${'x'.repeat(40000)}`);
+  // A record whose head shows no status is read whole.
+  atomicWrite(path.join(dir, name('arbiter')), '{"role":"arbiter","status":"running","unit":' + JSON.stringify(f.units[0]) + '}');
+  const errors = [];
+  const found = runningAttempts(f.root, 'run-1', { units: new Set([id]), onError: (p, reason) => errors.push(p) });
+  assert.deepEqual(found.map(a => a.role).sort(), ['arbiter', 'reviewer-rules']);
+  assert.deepEqual(errors, [], 'the finished record was not parsed');
 });

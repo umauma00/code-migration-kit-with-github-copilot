@@ -22,37 +22,52 @@ the kit's instruction, not the CLI's tools, made the difference.
   reviewers, `migration/RULEBOOK.md` and the design inputs), a larger one in
   consecutive view_range parts. A dependency (the other files of the input's
   sources) is searched for the names the unit uses (grep or rg, `paths` set to
-  that file) and read only at those lines: never whole, never with
-  forceReadLargeFiles. Reviewers base their findings on the source and the
-  target and do not report that a dependency was not read in full. The input
-  (the listed files, their hashes, the inventory rows) is unchanged, so review
-  input hashes and finished units hold.
+  that file, or to its folder with `glob` set to its name) and read only at
+  those lines: never whole, never with forceReadLargeFiles. Reviewers base
+  their findings on the source and the target and do not report that a
+  dependency was not read in full. The arbiter, which always reads with its
+  tools, follows the same rule, and its profile no longer sends it to the
+  operating manual and the contracts. The prompt says that its reading rule
+  replaces any other in the agent's instructions, and `doctor` warns of a
+  worker profile an update left from 0.46.1 or earlier. The input (the listed
+  files, their hashes, the inventory rows) is unchanged, so review input
+  hashes and finished units hold.
 - A call limit for the translation loop (`lib/process.mjs`,
   `lib/execution-policy.mjs`, `lib/pipeline.mjs`): `workerCallMinutes`, a new
-  run setting (30 by default, plus one minute for every 8 KiB of the unit's
-  source and current target; 0 for none, otherwise 10 to 1440), applies to
-  every implementer, reviewer, arbiter and fixer call, in continuous and
-  bounded mode (bounded `timeoutSeconds` stays final; the earlier one stops a
-  call). A call still at work at its limit is stopped with its child
-  processes, as a silent call is, and tried once more in a new session, told
-  what the stopped call did (`extra.previousAttempt`: model turns, tool calls,
-  the file it viewed most and how often, its context) and, when it had used
-  tools, to search a dependency instead of reading it. When that try runs
-  past the limit too, the file is set aside for the run with the reason and
-  gets no last pass (it would repeat the same hours); the files that use it
-  wait, the others go on. Time is counted as the silence check counts it: a
-  step that comes much later than planned (sleep, a pause) counts as two. A
-  stop that comes as the run is interrupted is recorded as interrupted.
-  Surveys, preparation audits and the benchmark do not use it.
-- Order (`lib/pipeline.mjs`): a translate run (not a repair) dispatches the
-  files no run has tried first and the files an earlier run left unfinished
-  last, each group in manifest order. Up to 0.46.1 every restart began with
-  the files that had held the last run up (on 2026-11-05 the same four filled
-  all four slots).
+  run setting (30 by default, plus one minute for every 8 KiB of the files a
+  call reads whole: the unit's source and current target, the RULEBOOK and the
+  design inputs; 0 for none, otherwise 10 to 1440), applies to every
+  implementer, reviewer, arbiter and fixer call, in continuous and bounded
+  mode (bounded `timeoutSeconds` stays final; the earlier one stops a call). A
+  call still at work at its limit is stopped with its child processes, as a
+  silent call is, and tried once more in a new session, told what the stopped
+  call did (`extra.previousAttempt`: model turns, tool calls, the file it
+  viewed most and how often, its context) and, when it had used tools, to
+  search a dependency instead of reading it. When that try runs past the
+  limit too, the file is set aside for the run with the reason and gets no
+  last pass (it would repeat the same hours); the files that use it wait, the
+  others go on. The reason names no file (the call's record does): the kit
+  reads it to choose its retries and guidance, and a file's name could read as
+  another cause. Time is counted as the silence check counts it: a step that
+  comes much later than planned (sleep, a pause) counts as two. While the
+  silence check is on, time after 2 minutes without output is left to it, so
+  a call that lost its connection is still stopped and retried as a silent
+  call, not as one that ran past its limit. A stop that comes as the run is
+  interrupted is recorded as interrupted. Surveys, preparation audits and the
+  benchmark do not use it.
+- Order (`lib/pipeline.mjs` `dispatchOrder`): a translate run (not a repair)
+  dispatches the files an earlier run left unfinished (blocked, set aside,
+  stopped by a person or left mid-way) after the others, each group in
+  manifest order. One that another pending file waits on keeps its place, so
+  no file waits for the end of the run because of this order; a file finished
+  before whose inputs changed keeps its place too. Up to 0.46.1 every restart
+  began with the files that had held the last run up (on 2026-11-05 the same
+  four filled all four slots).
 - What a call did (`lib/activity.mjs`, new): each attempt record keeps
   `activity`, on success and failure, counted from the CLI's JSON lines: model
   turns, tool calls by tool, the five project files viewed most with how often
-  view turned them down, the largest context of a tool result and its limit,
+  view turned them down, the largest the context grew once a tool result was
+  in it (`context_current_tokens` plus `result_token_count`) and its limit,
   and compactions once the CLI writes them (CLI 1.0.105 does not). Counts and
   project paths only, no content. The record also keeps `workInputMode` and
   `callLimitMinutes`, and a retry after a stop at the limit keeps
@@ -60,12 +75,15 @@ the kit's instruction, not the CLI's tools, made the difference.
 - Status (`lib/status.mjs`, `lib/status-snapshot.mjs`): each call at work in
   `activeRoles` has `startedAt`, `elapsedMinutes` and `callLimitMinutes`, with
   `--fast` too (up to 0.46.1 `--fast` showed no calls), and the markdown view
-  says "implementer 12 min, limit 30 min". Units have `recorded` (a state
-  file). The markdown view lists only the units tried and not finished and
-  those with a call at work, and counts the others ("Other units: 117 done,
-  430 not started"); the JSON keeps every unit. A call stopped at its limit is
-  named first among the causes of a retry. The guidance (`cli-call-limit`)
-  offers a rerun, a longer limit and a check of the dependency chain.
+  says "implementer 12 min, limit 30 min" (minutes on the clock; the limit
+  counts time at work). The fast view reads only the head of a finished call
+  record, which holds the worker's whole answer. Units have `recorded` (a
+  state file). The markdown view lists only the units tried and not finished
+  and those with a call at work, and counts the others ("Other units: 117
+  done, 430 not started"); the JSON keeps every unit. A call stopped at its
+  limit is named first among the causes of a retry. The guidance
+  (`cli-call-limit`) offers a rerun, a longer limit and a check of the
+  dependency chain.
 - `status --wait` (`scripts/run_migration.mjs`) no longer returns for each
   finished unit, worker call or survey part: it returns when the run stops or
   starts, the number of blocked units changes, the build loop moves to another
@@ -83,22 +101,30 @@ the kit's instruction, not the CLI's tools, made the difference.
   units stay valid (from an earlier release, see the notes in between): the
   reading rule and the worker profiles are no input of a finished unit, and
   `workerCallMinutes` is a run setting. The update can go in during phase 04:
-  stop the runner, update, and run `translate` again in the same folder.
-- Test: `tests/runaway-calls-2026-11-05.test.mjs`, fifteen tests: the reading
-  rule in both prompts and the four profiles; the note a retry hears; the
-  limit (its size, 0, the setting's check, a run setting); a real child still
-  writing stopped at its limit and one that ends in time kept; steps counted
-  with a late one as two; a unit set aside after two stops, without the last
-  pass, while the others finish; a retry that answers; the real adapter
-  stopping a CLI double that keeps reading, with what it did in the error; the
-  order of a run; the minutes in the full and the fast status; `status
-  --wait` answering for a stop, a block or a survey scope and not for a
-  finished unit or a call; the markdown lines; `activity` from the real CLI's
-  JSON lines; the records; and an update keeping every finished unit.
-  `tests/settings.test.mjs` adds one for `workerCallMinutes` in the settings
-  file (its default, its check, 0 and 90 applied), and the tests of the
-  guidance, the run settings and the status lines follow the new key and
-  lines.
+  stop the runner, update, and run `translate` again in the same folder. A
+  host still on 0.46.1 takes a `workerCallMinutes` other than 30 for a setting
+  of what the migration produces (every finished unit then looks stale there)
+  and reports the key in `migration/settings.json` as unknown: put every host
+  on 0.47.0.
+- Test: `tests/runaway-calls-2026-11-05.test.mjs`, twenty-one tests: the
+  reading rule in the prompts (the arbiter's too) and the six profiles; the
+  note a retry hears; the limit (its size, 0, the setting's check, a run
+  setting) and the files a run's calls count for it; a real child still
+  writing stopped at its limit and one that ends in time kept; a silent child
+  left to the silence check, and the silent time of one that writes again not
+  counted; steps counted with a late one as two, and waiting time not at all;
+  a unit set aside after two stops, without the last pass, while the others
+  finish; a reason that names no file whatever the file's name; a retry that
+  answers; the real adapter stopping a CLI double that keeps reading, with
+  what it did in the error; the order of a run and `dispatchOrder`; the
+  minutes in the full and the fast status; `status --wait` answering for a
+  stop, a block or a survey scope and not for a finished unit or a call; the
+  markdown lines; `activity` from the real CLI's JSON lines; the records; an
+  update keeping every finished unit; doctor's warning of an old profile; and
+  the fast view skipping a finished record. `tests/settings.test.mjs` adds one
+  for `workerCallMinutes` in the settings file (its default, its check, 0 and
+  90 applied), and the tests of the guidance, the run settings and the status
+  lines follow the new key and lines.
 
 # 0.46.1 — 2026-11-04
 

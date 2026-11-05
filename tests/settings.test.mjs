@@ -769,7 +769,7 @@ test('workerCallMinutes (0.47.0) is an entry of the file: shown with its default
   initSettings(root, models);
   const s = filled(root), recordFile = safePath(root, 'migration/state/config.json');
   assert.equal(s.workerCallMinutes, 30, 'the default is shown');
-  assert.match(helpOf(root), /- `workerCallMinutes`: .*10〜1440.*8 KB ごとに1分/);
+  assert.match(helpOf(root), /- `workerCallMinutes`: .*10〜1440.*RULEBOOK・設計文書の大きさ 8 KiB ごとに1分.*0\.47\.0 以降にしてから変える/);
   writeSettings(root, s);
   assert.equal(applySettings(root, models).applied, true);
   assert.equal(Object.hasOwn(readJSON(recordFile), 'workerCallMinutes'), false, 'the default written back adds no key to the record');

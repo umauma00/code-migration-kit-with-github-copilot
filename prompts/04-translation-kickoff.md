@@ -34,7 +34,7 @@ polling the same job after it returns. Never kill/cancel/relaunch work for CPU
 at 100% or low CPU, silence, elapsed time or output volume. The runner itself
 stops a call still at work past `workerCallMinutes`, tries it once more, and
 then sets its file aside for that run and goes on (status shows each call's
-minutes and limit); the next `translate` tries it after the files not tried yet. Normal execution is
+minutes and limit); the next `translate` tries it after the other files (in its place when another file waits on it). Normal execution is
 continuous even with old 600-second/maxAgentCalls settings. Finite time/call/round
 limits require the person's explicit choice (executionMode bounded or a command
 budget). Execution-policy changes retain reviewed work and approvals.

@@ -415,12 +415,12 @@ A worker call that writes nothing for `workerSilenceSeconds` (600 s by default)
 is stopped and retried by the runner itself, with a longer wait each time
 (status shows it as retrying): it is never a reason to stop or relaunch anything.
 A translation call still at work past `workerCallMinutes` (30 minutes by
-default, a minute more for every 8 KiB of the unit's own files) is stopped by
-the runner too, tried once more with a note on what it did, and then its file
-is set aside for that run while the other files go on: status shows each call's
-minutes and limit, and the reason of a file set aside. A long call is never a
-reason to stop the run; the next `translate` tries a file set aside after the
-files not tried yet.
+default, a minute more for every 8 KiB of the files it reads whole) is stopped
+by the runner too, tried once more with a note on what it did, and then its
+file is set aside for that run while the other files go on: status shows each
+call's minutes and limit, and the reason of a file set aside. A long call is
+never a reason to stop the run; the next `translate` tries a file set aside
+after the other files (in its place when another file waits on it).
 A phase recorded earlier can go out of date when a file it recorded changes
 (a pilot or repair fix, a kit update). `status --fast` does not revalidate;
 `phase next` does and then returns `stale` with what changed, `action`
