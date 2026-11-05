@@ -190,7 +190,7 @@ test('a child still at work past its call limit is stopped however much it write
   assert.equal(failureGuidance(`Translation stopped: src/a.cs: ${e.message}`).id, 'cli-call-limit');
 });
 
-test('while the silence check is on, a call at its limit that has written nothing for a while is stopped at its next output, or by the silence check first', async () => {
+test('while the silence check is on, a call at its limit that has written nothing for a while is stopped at its next output, or by the silence check first', { timeout: 30000 }, async () => {
   assert.equal(callIdleMs, 120000);
   const silent = 'setTimeout(() => {}, 30000);';
   // Silent from the start, under a call limit shorter than its silence wait
@@ -202,7 +202,9 @@ test('while the silence check is on, a call at its limit that has written nothin
   // One that writes nothing past its limit (a model turn that takes long to
   // start writing), then writes: stopped for its limit at that output, not
   // while it was silent (and however long the child took to start).
-  const slow = 'setTimeout(() => setInterval(() => process.stdout.write("y\\n"), 20), 700);';
+  // (It ends by itself after 5 s, so a limiter that no longer hears its
+  // output fails the test instead of leaving it waiting.)
+  const slow = 'setTimeout(() => setInterval(() => process.stdout.write("y\\n"), 20), 700); setTimeout(() => process.exit(0), 5000);';
   const late = await runProcess(process.execPath, ['-e', slow], { silenceMs: 5000, limitMs: 300, idleMs: 100 }).then(() => null, error => error);
   assert.equal(late?.callLimit, true, late?.message);
   assert.match(late.result.stdout, /y/, 'not stopped before it wrote');
@@ -236,6 +238,14 @@ test('a call\'s time counts while it writes nothing; at its limit after idleMs w
   assert.equal(l.worked, 1000, 'the silent time counted');
   now += 50; assert.equal(l.tick(), false, 'at its limit, silent for idleMs: not stopped for its limit');
   now += 10; l.output(); now += 40; assert.equal(l.tick(), true, 'stopped at its next output');
+  // It wrote a little before its limit, not since the last tick: within
+  // idleMs it is at work, and stopped at once.
+  now = 0;
+  const recent = callLimiter(1000, { silence: true, idleMs: 200, clock });
+  for (let i = 0; i < 17; i++) { now += 50; assert.equal(recent.tick(), false); }
+  now += 30; recent.output(); now += 20; assert.equal(recent.tick(), false, 'at 900 ms, below its limit');
+  now += 50; assert.equal(recent.tick(), false);
+  now += 50; assert.equal(recent.tick(), true, 'at its limit 120 ms after its last output');
   // At its limit while it writes: stopped at once, even with a step longer
   // than idleMs (an output since the last tick).
   now = 0;
