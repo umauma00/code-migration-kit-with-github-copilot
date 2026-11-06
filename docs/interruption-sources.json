@@ -5080,7 +5080,7 @@
     },
     {
       "path": "scripts/run_migration.mjs",
-      "sha256": "afc7c823b66776a0405100b0f7136b949750701a800ccff24674ce5d3628bf89",
+      "sha256": "6e56e64e680be66b78bad9644ffccc0cb9d61cf6a9fe26b29d024a5dd75914ed",
       "entries": [
         {
           "line": 103,
@@ -5353,57 +5353,57 @@
           "code": "if (typeof args.message !== 'string' || !args.message.trim()) throw new Error('guidance requires --message TEXT (the error to explain)');"
         },
         {
-          "line": 510,
+          "line": 511,
           "kind": "cancellation",
           "code": "const abort = () => controller.abort();"
         },
         {
-          "line": 515,
+          "line": 516,
           "kind": "error-or-exit-candidate",
           "code": "if (args._[1] !== 'command') throw new Error('Use stress-b command --dir DIR [--model ID]');"
         },
         {
-          "line": 556,
+          "line": 557,
           "kind": "error-or-exit-candidate",
           "code": "else if (cmd === 'source-spec') throw new Error('Use source-spec init [--apply] | check');"
         },
         {
-          "line": 570,
+          "line": 571,
           "kind": "error-or-exit-candidate",
           "code": "} else throw new Error('Use survey plan|run|status|merge --kind facts|contracts|inventory [--max-files N] [--sites migration/PATH.tsv]');"
         },
         {
-          "line": 584,
+          "line": 585,
           "kind": "error-or-exit-candidate",
           "code": "else throw new Error('Use sessions status | prune [--run RUN_ID]');"
         },
         {
-          "line": 592,
+          "line": 593,
           "kind": "error-or-exit-candidate",
           "code": "} else throw new Error('Use guardrails show | install [--add CSV] [--remove CSV] [--deny CSV] [--waiver NOTE] [--replace]');"
         },
         {
-          "line": 597,
+          "line": 598,
           "kind": "error-or-exit-candidate",
           "code": "process.exitCode = 1;"
         },
         {
-          "line": 609,
+          "line": 610,
           "kind": "error-or-exit-candidate",
           "code": "if (args._[1] !== 'translation' || args['complete-phase'] !== '03') throw new Error(`Option --complete-phase does not apply to approve ${args._[1]} --complete-phase ${args['complete-phase']}: it applies only as approve translation --complete-phase 03. Add --help for usage.`);"
         },
         {
-          "line": 619,
+          "line": 620,
           "kind": "error-or-exit-candidate",
           "code": "if (cmd === 'repair' && !args.target && !args.queue) throw new Error('repair requires --target or --queue');"
         },
         {
-          "line": 624,
+          "line": 625,
           "kind": "error-or-exit-candidate",
           "code": "} else throw new Error(`Unknown command ${cmd}\\n${usage}`);"
         },
         {
-          "line": 645,
+          "line": 646,
           "kind": "error-or-exit-candidate",
           "code": "process.exitCode = 1;"
         }

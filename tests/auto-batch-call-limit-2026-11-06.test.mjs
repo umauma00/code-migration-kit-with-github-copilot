@@ -453,8 +453,9 @@ test('the retry hears how long the stopped call was at work; a file set aside af
     ['cli-call-limit', ['ported/b.mjs'], ['rerun', 'longer-limit', 'check-dependencies', 'pause']]]);
   assert.notEqual(failureGuidance(`Interrupted; ${callLimitMessage(30 * 60000, { finishMs: 60000 })}`).id, 'cli-call-limit');
   // guidance --message with such a summary gives each cause its own
-  // guidance, as the run does (the JSON keeps its fields and adds groups);
-  // a single message is explained as before.
+  // guidance, as the run does (in JSON, the first cause's fields, the whole
+  // message and every cause in groups); a single message is explained as
+  // before.
   const script = safePath(h.root, 'migration-kit/scripts/run_migration.mjs');
   const summary = `Translation stopped: ported/a.mjs: ${hstate.error}; ported/b.mjs: ${atWork}`;
   const json = await runProcess(process.execPath, [script, 'guidance', '--message', summary, '--format', 'json'], { cwd: h.root });
@@ -463,6 +464,8 @@ test('the retry hears how long the stopped call was at work; a file set aside af
   assert.equal(explained.explained, true);
   assert.deepEqual(explained.groups.map(g => [g.targets, g.guidance.options.map(o => o.id)]), [
     [['ported/a.mjs'], ['rerun', 'check-cli-exit', 'pause']], [['ported/b.mjs'], ['rerun', 'longer-limit', 'check-dependencies', 'pause']]]);
+  assert.deepEqual([explained.id, explained.cause, explained.options, explained.choices], [explained.groups[0].guidance.id, explained.groups[0].guidance.cause, explained.groups[0].guidance.options, explained.groups[0].guidance.choices], 'the first cause, as the markdown shows it first');
+  assert.equal(explained.message, summary);
   const markdown = await runProcess(process.execPath, [script, 'guidance', '--message', summary], { cwd: h.root });
   assert.equal(markdown.code, 0, markdown.stderr);
   assert.match(markdown.stdout, /^# What to do, per cause \(2\)\n/);

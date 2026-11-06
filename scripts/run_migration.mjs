@@ -496,10 +496,11 @@ export async function main(argv = process.argv.slice(2)) {
     const g = failureGuidance(args.message, { root, language, explain: true });
     // A run's summary ("Translation stopped: FILE: …; FILE: …") can hold more
     // than one cause: each gets its own guidance, as the run prints them
-    // (0.48.0; the JSON keeps its fields and adds them as groups).
+    // (0.48.0). The JSON has the first cause's fields, as the markdown shows
+    // it first, with the whole message and every cause in groups.
     const list = /^(?:Translation|Survey) stopped: /.test(args.message) ? failureGuidanceList(args.message, { root, language, explain: true }) : [];
     const groups = list.length > 1 ? list : null;
-    console.log(args.format === 'json' ? JSON.stringify(groups ? { ...g, groups } : g, null, 2) : groups ? guidanceListMarkdown(groups, language) : guidanceMarkdown(g, language));
+    console.log(args.format === 'json' ? JSON.stringify(groups ? { ...groups[0].guidance, message: g.message, groups } : g, null, 2) : groups ? guidanceListMarkdown(groups, language) : guidanceMarkdown(g, language));
     return;
   }
   // An edit of the settings file is applied (and the kit's records leave
