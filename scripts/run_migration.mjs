@@ -494,7 +494,12 @@ export async function main(argv = process.argv.slice(2)) {
   if (cmd === 'guidance') {
     if (typeof args.message !== 'string' || !args.message.trim()) throw new Error('guidance requires --message TEXT (the error to explain)');
     const g = failureGuidance(args.message, { root, language, explain: true });
-    console.log(args.format === 'json' ? JSON.stringify(g, null, 2) : guidanceMarkdown(g, language));
+    // A run's summary ("Translation stopped: FILE: …; FILE: …") can hold more
+    // than one cause: each gets its own guidance, as the run prints them
+    // (0.48.0; the JSON keeps its fields and adds them as groups).
+    const list = /^(?:Translation|Survey) stopped: /.test(args.message) ? failureGuidanceList(args.message, { root, language, explain: true }) : [];
+    const groups = list.length > 1 ? list : null;
+    console.log(args.format === 'json' ? JSON.stringify(groups ? { ...g, groups } : g, null, 2) : groups ? guidanceListMarkdown(groups, language) : guidanceMarkdown(g, language));
     return;
   }
   // An edit of the settings file is applied (and the kit's records leave

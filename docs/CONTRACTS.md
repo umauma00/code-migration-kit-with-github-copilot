@@ -253,7 +253,7 @@ call's time, a step delayed by sleep as two at most (`workWatch`). While the
 silence check is on, a call at its limit that has written nothing for
 `callIdleMs` (2 minutes) is stopped at its next output instead, or by the
 silence check first (`callLimiter`, `runProcess` `idleMs`), so a silent call
-stays a silent call. A call
+stays a silent call; not a call that finished its answer (below). A call
 still at work at its limit is stopped with its child processes ("Process ran
 past its call limit"). Since 0.48.0 a call writing its final answer without
 tools at its limit may finish, up to twice the limit (`callLimiter` `writing`:
@@ -265,9 +265,10 @@ it for its CLI to exit; a CLI that does not exit is stopped at its limit or
 when that wait is over, whichever is later, with "had not exited Ns after it
 finished its answer" and `finishedAtLimit` (its retry's
 `extra.previousAttempt` says the answer was lost because the CLI did not
-exit). While the silence check is on, that is only for a CLI that wrote
-within `callIdleMs` before; one silent longer is stopped by the silence check
-as a silent call, as above. The call is tried once more in a new
+exit), however long it has been silent since its answer: silence after an
+answer is no lost connection. A CLI silent for the silence check's wait
+after its answer before then is stopped by the silence check first, as a
+silent call. The call is tried once more in a new
 session, since 0.48.0 with twice the limit (`tryLimitMinutes`), with
 `extra.previousAttempt`: a sentence after the task data that says what the
 stopped call did and, when it had used tools, to search a dependency rather

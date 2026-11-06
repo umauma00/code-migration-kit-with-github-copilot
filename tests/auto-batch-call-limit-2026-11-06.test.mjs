@@ -22,6 +22,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import { prepare, fake, result } from './helpers.mjs';
 import { safePath, writeJSON, readJSON, atomicWrite, statePath, loadConfig } from '../lib/core.mjs';
 import { translate, approve, runStage, translationApprovalOnly, autoBatchNotice, stopAtEndRefusal } from '../lib/pipeline.mjs';
@@ -127,12 +128,45 @@ test('a call that finished its answer has a minute (or its limit, when shorter) 
   writing = false; finished = true;
   assert.deepEqual(ticks(minute, 3, 30000), [false, false, true]);
   assert.equal(finishWaitMs, 60000);
+  // With the silence check on, a call that finished its answer and then
+  // wrote nothing is stopped at its limit all the same: silence after an
+  // answer is no lost connection. A silent call at work waits for its next
+  // output, as before.
+  now = 0;
+  const quiet = callLimiter(1000, { silence: true, idleMs: 100, finished: () => true, finishMs: 200, clock });
+  assert.deepEqual(ticks(quiet, 20), [...Array(19).fill(false), true], 'silent since its answer: stopped at its limit');
+  assert.equal(quiet.finishedAtStop, true);
+  now = 0;
+  const silentAtWork = callLimiter(1000, { silence: true, idleMs: 100, finished: () => false, clock });
+  assert.ok(ticks(silentAtWork, 30).every(due => !due), 'a silent call at work is not stopped at its limit');
+  silentAtWork.output();
+  assert.deepEqual(ticks(silentAtWork, 1), [true], 'but at its next output');
+  assert.equal(silentAtWork.finishedAtStop, false);
   // Not finished when stopped: the plain words of a call at work.
   now = 0;
   const plain = callLimiter(1000, { finished: () => false, clock });
   assert.deepEqual(ticks(plain, 20), [...Array(19).fill(false), true]);
   assert.equal(plain.finishedAtStop, false);
   assert.equal(callLimitMessage(30 * 60000, { finishMs: 60000 }), 'Process ran past its call limit (30 min, from workerCallBaseMinutes and the files the call reads) and had not exited 60s after it finished its answer; stopped');
+});
+
+test('with the silence check on, a CLI silent after its answer is stopped at its limit as one that did not exit, not as a silent call (runProcess)', async t => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kit-silent-after-answer-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const script = path.join(dir, 'answer-then-hang.mjs');
+  fs.writeFileSync(script, `const out = o => process.stdout.write(JSON.stringify(o) + '\\n');
+out({ type: 'assistant.turn_start', data: { turnId: '0' } });
+out({ type: 'assistant.message', data: { content: 'done', toolRequests: [] } });
+out({ type: 'result', exitCode: 0 });
+setInterval(() => {}, 1000);
+`);
+  const watch = answerWatch(), started = performance.now();
+  const e = await runProcess(process.execPath, [script], { silenceMs: 20000, limitMs: 1500, idleMs: 200, watchLine: watch.line, writing: watch.writing, finished: watch.finished }).then(() => null, x => x);
+  assert.ok(e, 'stopped');
+  assert.equal(e.silent, undefined, e.message);
+  assert.equal(e.finishedAtLimit, true, e.message);
+  assert.equal(e.message, callLimitMessage(1500, { finishMs: 1500 }));
+  assert.ok(performance.now() - started < 15000, 'stopped well before the silence check would have');
 });
 
 test('answerWatch reads from the CLI\'s events whether the main agent is writing its answer or has finished it', () => {
@@ -390,7 +424,7 @@ test('the retry hears how long the stopped call was at work; a file set aside af
   }).catch(() => null);
   assert.equal(heard[1], 'after 31 minutes: it had finished its answer, but the Copilot CLI did not exit after it, so the answer was lost. Return your answer again.');
   // Status's retry line says the CLI did not exit, not that the call was still at work.
-  assert.ok(retried.nextActions.some(a => /retried after a transient failure \(a call stopped at its call limit after it had finished its answer, as its CLI did not exit \(its limit grows from workerCallBaseMinutes with the files the call reads\): it is tried once more with twice the limit, told that its answer was lost, and a file whose second try runs past that too is set aside/.test(a)), retried.nextActions.join('\n'));
+  assert.ok(retried.nextActions.some(a => /retried after a transient failure \(a call stopped at its call limit because its CLI did not exit after it had finished its answer \(its limit grows from workerCallBaseMinutes with the files the call reads\): it is tried once more with twice the limit, told that its answer was lost, and a file whose second try runs past that too is set aside/.test(a)), retried.nextActions.join('\n'));
   assert.equal(retried.retrying[0].finishedAtLimit, true);
   const hstate = readJSON(statePath(h.root, h.units[0]));
   assert.match(hstate.error, /^Copilot implementer ran past its call limit on 2 attempts \(30 min, then 60 min on the retry; from workerCallBaseMinutes and the files the call reads\), the last time with its answer finished but its CLI not exiting; this file is set aside for this run/);
@@ -418,6 +452,25 @@ test('the retry hears how long the stopped call was at work; a file set aside af
     ['cli-call-limit', ['ported/a.mjs', 'ported/c.mjs'], ['rerun', 'check-cli-exit', 'pause']],
     ['cli-call-limit', ['ported/b.mjs'], ['rerun', 'longer-limit', 'check-dependencies', 'pause']]]);
   assert.notEqual(failureGuidance(`Interrupted; ${callLimitMessage(30 * 60000, { finishMs: 60000 })}`).id, 'cli-call-limit');
+  // guidance --message with such a summary gives each cause its own
+  // guidance, as the run does (the JSON keeps its fields and adds groups);
+  // a single message is explained as before.
+  const script = safePath(h.root, 'migration-kit/scripts/run_migration.mjs');
+  const summary = `Translation stopped: ported/a.mjs: ${hstate.error}; ported/b.mjs: ${atWork}`;
+  const json = await runProcess(process.execPath, [script, 'guidance', '--message', summary, '--format', 'json'], { cwd: h.root });
+  assert.equal(json.code, 0, json.stderr);
+  const explained = JSON.parse(json.stdout);
+  assert.equal(explained.explained, true);
+  assert.deepEqual(explained.groups.map(g => [g.targets, g.guidance.options.map(o => o.id)]), [
+    [['ported/a.mjs'], ['rerun', 'check-cli-exit', 'pause']], [['ported/b.mjs'], ['rerun', 'longer-limit', 'check-dependencies', 'pause']]]);
+  const markdown = await runProcess(process.execPath, [script, 'guidance', '--message', summary], { cwd: h.root });
+  assert.equal(markdown.code, 0, markdown.stderr);
+  assert.match(markdown.stdout, /^# What to do, per cause \(2\)\n/);
+  assert.match(markdown.stdout, /Affected: ported\/a\.mjs\n## 1\. What to do about this message[\s\S]*did not exit after it[\s\S]*Affected: ported\/b\.mjs\n## 2\. What to do about this message[\s\S]*raise the limit/);
+  const single = await runProcess(process.execPath, [script, 'guidance', '--message', hstate.error, '--format', 'json'], { cwd: h.root });
+  assert.equal(single.code, 0, single.stderr);
+  assert.equal(Object.hasOwn(JSON.parse(single.stdout), 'groups'), false);
+  assert.deepEqual(JSON.parse(single.stdout).options.map(o => o.id), ['rerun', 'check-cli-exit', 'pause']);
   // Two calls retried at once, one stopped at work and one whose CLI did not
   // exit: status's retry line names both.
   const m = prepare(t, { executionMode: 'continuous', count: 2 });
@@ -439,7 +492,7 @@ test('the retry hears how long the stopped call was at work; a file set aside af
     return fake(args);
   });
   assert.ok(mixed, 'both retries ran at once');
-  assert.ok(mixed.nextActions.some(a => /\(a call stopped at its call limit while still at work, or after it had finished its answer as its CLI did not exit \(its limit grows from workerCallBaseMinutes with the files the call reads\): it is tried once more with twice the limit, told what the stopped call did, and a file/.test(a)), mixed.nextActions.join('\n'));
+  assert.ok(mixed.nextActions.some(a => /\(a call stopped at its call limit while still at work, or because its CLI did not exit after it had finished its answer \(its limit grows from workerCallBaseMinutes with the files the call reads\): it is tried once more with twice the limit, told what the stopped call did, and a file/.test(a)), mixed.nextActions.join('\n'));
   assert.ok(allDone(m));
 });
 

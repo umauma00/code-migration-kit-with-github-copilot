@@ -85,13 +85,18 @@ time was stopped again.
   session after its result, and a stop then would lose the answer. One that
   does not exit is stopped at its limit or when that wait is over, whichever
   is later, and says so ("had not exited ... after it finished its answer",
-  `finishedAtLimit`, in its reason and attempt record); with the silence check
-  on, that is only for a CLI that wrote something in the 2 minutes before,
-  and one silent longer is stopped by the silence check as a silent call, as
-  before. Its retry hears that the answer was lost because the CLI did not
-  exit, status's retry line says so, and the guidance of its file
-  (`cli-call-limit`) names the CLI not exiting and offers to check why
-  (`check-cli-exit`) in place of a longer limit and the dependency check.
+  `finishedAtLimit`, in its reason and attempt record), however long it has
+  been silent since its answer (silence after an answer is no lost
+  connection, so the 2 minutes without output that hold back the stop of a
+  call at work do not apply); one silent for the silence check's wait
+  (`workerSilenceSeconds`) after its answer before then is stopped by the
+  silence check first, as a silent call, as before. Its retry hears that the
+  answer was lost because the CLI did not exit, status's retry line says so,
+  and the guidance of its file (`cli-call-limit`) names the CLI not exiting
+  and offers to check why (`check-cli-exit`) in place of a longer limit and
+  the dependency check; `guidance --message` with a run's summary gives each
+  of its causes its own guidance, as the run does (the JSON adds them as
+  `groups`).
   The adapter reads the CLI's stream events (`answerWatch`:
   writing, the main agent's `assistant.message_delta` text; finished, an
   `assistant.message` without tool requests, the end of a turn that was
