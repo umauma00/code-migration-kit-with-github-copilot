@@ -28,7 +28,7 @@ import { translate, approve, runStage, translationApprovalOnly, autoBatchNotice,
 import { runProcess, callLimitMessage, callLimiter, finishWaitMs } from '../lib/process.mjs';
 import { currentPhase } from '../lib/phases.mjs';
 import { createCopilotAdapter, answerWatch, isStreamedDelta } from '../scripts/copilot_adapter.mjs';
-import { failureGuidance, guidanceMarkdown } from '../lib/guidance.mjs';
+import { failureGuidance, failureGuidanceList, guidanceMarkdown } from '../lib/guidance.mjs';
 import { migrationStatus, statusMarkdown } from '../lib/status.mjs';
 import { statusSnapshot, runProgress } from '../lib/status-snapshot.mjs';
 import { setPreferences } from '../lib/preferences.mjs';
@@ -172,9 +172,9 @@ test('answerWatch reads from the CLI\'s events whether the main agent is writing
 // --output-format json --stream on and the workers' tool flags, against a
 // loopback OpenAI-compatible provider (COPILOT_PROVIDER_BASE_URL,
 // COPILOT_OFFLINE true) that streamed a turn writing a sentence and calling
-// view, then the final answer in three pieces. Every line it wrote, in order,
-// each line's data cut to the fields answerWatch reads (the raw output, with
-// its ids, times, paths and tool list, is not kept here). With the state of
+// view, then the final answer in three pieces. Its 29 lines, in order, each
+// line's data cut to the fields answerWatch reads (the raw output, with its
+// ids, times, paths and tool list, is not kept here). With the state of
 // writing and finished after each line.
 const realStream = [
   ['{"type":"session.skills_loaded","data":{}}', false, false],
@@ -207,7 +207,8 @@ const realStream = [
   ['{"type":"assistant.turn_end","data":{"turnId":"1"}}', false, true],
   ['{"type":"assistant.idle","data":{}}', false, true],
   ['{"type":"result","exitCode":0}', false, true]];
-test('answerWatch follows every line of a real CLI 1.0.105 run', () => {
+test('answerWatch follows the lines of a real CLI 1.0.105 run, their data cut down', () => {
+  assert.equal(realStream.length, 29, 'the 29 lines of that run');
   const w = answerWatch();
   for (const [line, writing, finished] of realStream) {
     w.line(line);
@@ -378,19 +379,68 @@ test('the retry hears how long the stopped call was at work; a file set aside af
   await runStage(h.root, h.config, 'judge');
   approve(h.root, h.config, 'translation', 'Automated fixture approval for tests only');
   const heard = [];
+  let retried;
   await translate(h.root, h.config, async args => {
     if (args.unit.target === h.units[0].target && args.role === 'implementer') {
       heard.push(args.extra.previousAttempt);
+      if (heard.length === 2) retried = migrationStatus(h.root);
       throw Object.assign(new Error(callLimitMessage(args.callLimitMs, { finishMs: 60000 })), { callLimit: true, finishedAtLimit: true, workedMs: args.callLimitMs + 60000 });
     }
     return fake(args);
   }).catch(() => null);
   assert.equal(heard[1], 'after 31 minutes: it had finished its answer, but the Copilot CLI did not exit after it, so the answer was lost. Return your answer again.');
+  // Status's retry line says the CLI did not exit, not that the call was still at work.
+  assert.ok(retried.nextActions.some(a => /retried after a transient failure \(a call stopped at its call limit after it had finished its answer, as its CLI did not exit \(its limit grows from workerCallBaseMinutes with the files the call reads\): it is tried once more with twice the limit, told that its answer was lost, and a file whose second try runs past that too is set aside/.test(a)), retried.nextActions.join('\n'));
+  assert.equal(retried.retrying[0].finishedAtLimit, true);
   const hstate = readJSON(statePath(h.root, h.units[0]));
   assert.match(hstate.error, /^Copilot implementer ran past its call limit on 2 attempts \(30 min, then 60 min on the retry; from workerCallBaseMinutes and the files the call reads\), the last time with its answer finished but its CLI not exiting; this file is set aside for this run/);
   const runs = safePath(h.root, 'migration/runs');
   const attempts = fs.readdirSync(runs, { withFileTypes: true }).filter(d => d.isDirectory()).flatMap(d => fs.readdirSync(path.join(runs, d.name)).filter(n => /-implementer-.*\.json$/.test(n)).map(n => JSON.parse(fs.readFileSync(path.join(runs, d.name, n), 'utf8'))));
   assert.ok(attempts.some(a => (a.retries ?? []).some(r => r.finishedAtLimit === true)), 'the attempt record says so');
+  // Its guidance names the CLI not exiting and offers to check why, not a
+  // longer limit or the dependency chain; so does the runner's own error. A
+  // call stopped at work keeps its choices, and a summary with both gives
+  // each its own; a stop of the run is not a call limit.
+  for (const message of [hstate.error, callLimitMessage(30 * 60000, { finishMs: 60000 })]) {
+    const en = failureGuidance(message), ja = failureGuidance(message, { language: 'ja' });
+    assert.equal(en.id, 'cli-call-limit', message);
+    assert.deepEqual(en.options.map(o => o.id), ['rerun', 'check-cli-exit', 'pause'], message);
+    assert.match(en.cause, /finished its answer, but the Copilot CLI did not exit after it/);
+    assert.doesNotMatch(en.cause, /kept writing|dependency chain/);
+    assert.match(en.impact, /telling it the answer was lost/);
+    assert.match(ja.cause, /答えを書き終えたのに、Copilot CLI が終わりませんでした/);
+    assert.match(ja.options[1].label, /答えの後に Copilot CLI が終わらない理由/);
+  }
+  const atWork = 'Copilot implementer ran past its call limit on 2 attempts (30 min, then 60 min on the retry; from workerCallBaseMinutes and the files the call reads); this file is set aside for this run, and the next run tries it after the other files unless one of them waits on it (last attempt: 41 model turns, 40 tool calls)';
+  assert.deepEqual(failureGuidance(atWork).options.map(o => o.id), ['rerun', 'longer-limit', 'check-dependencies', 'pause']);
+  const groups = failureGuidanceList(`Translation stopped: ported/a.mjs: ${hstate.error}; ported/b.mjs: ${atWork}; ported/c.mjs: ${hstate.error}`);
+  assert.deepEqual(groups.map(g => [g.guidance.id, g.targets, g.guidance.options.map(o => o.id)]), [
+    ['cli-call-limit', ['ported/a.mjs', 'ported/c.mjs'], ['rerun', 'check-cli-exit', 'pause']],
+    ['cli-call-limit', ['ported/b.mjs'], ['rerun', 'longer-limit', 'check-dependencies', 'pause']]]);
+  assert.notEqual(failureGuidance(`Interrupted; ${callLimitMessage(30 * 60000, { finishMs: 60000 })}`).id, 'cli-call-limit');
+  // Two calls retried at once, one stopped at work and one whose CLI did not
+  // exit: status's retry line names both.
+  const m = prepare(t, { executionMode: 'continuous', count: 2 });
+  m.config.transientRetryDelayMs = 1; writeJSON(safePath(m.root, 'migration/state/config.json'), m.config);
+  await runStage(m.root, m.config, 'judge');
+  approve(m.root, m.config, 'translation', 'Automated fixture approval for tests only');
+  const tries = new Map();
+  let started = 0, both, mixed;
+  const ready = new Promise(resolve => { both = resolve; });
+  await translate(m.root, m.config, async args => {
+    if (args.role !== 'implementer') return fake(args);
+    const n = (tries.get(args.unit.target) ?? 0) + 1;
+    tries.set(args.unit.target, n);
+    if (n === 1) throw args.unit.target === m.units[0].target
+      ? Object.assign(new Error(callLimitMessage(args.callLimitMs, { finishMs: 60000 })), { callLimit: true, finishedAtLimit: true })
+      : Object.assign(new Error(callLimitMessage(args.callLimitMs)), { callLimit: true });
+    if (++started === 2) { mixed = migrationStatus(m.root); both(); }
+    await Promise.race([ready, new Promise(resolve => setTimeout(resolve, 10000))]);
+    return fake(args);
+  });
+  assert.ok(mixed, 'both retries ran at once');
+  assert.ok(mixed.nextActions.some(a => /\(a call stopped at its call limit while still at work, or after it had finished its answer as its CLI did not exit \(its limit grows from workerCallBaseMinutes with the files the call reads\): it is tried once more with twice the limit, told what the stopped call did, and a file/.test(a)), mixed.nextActions.join('\n'));
+  assert.ok(allDone(m));
 });
 
 test('status shows the AI calls at work of concurrency and the files waiting on a dependency, from the run\'s progress record', async t => {

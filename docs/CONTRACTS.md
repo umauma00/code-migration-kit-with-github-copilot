@@ -265,7 +265,9 @@ it for its CLI to exit; a CLI that does not exit is stopped at its limit or
 when that wait is over, whichever is later, with "had not exited Ns after it
 finished its answer" and `finishedAtLimit` (its retry's
 `extra.previousAttempt` says the answer was lost because the CLI did not
-exit). The call is tried once more in a new
+exit). While the silence check is on, that is only for a CLI that wrote
+within `callIdleMs` before; one silent longer is stopped by the silence check
+as a silent call, as above. The call is tried once more in a new
 session, since 0.48.0 with twice the limit (`tryLimitMinutes`), with
 `extra.previousAttempt`: a sentence after the task data that says what the
 stopped call did and, when it had used tools, to search a dependency rather
