@@ -423,12 +423,21 @@ export const isStreamedDelta = line => {
 // Whether the main agent is writing its answer now (0.48.0), from the CLI's
 // events as they come (runProcess watchLine): its turn streamed text
 // (assistant.message_delta) and has not turned to a tool, or it ended with a
-// reply without tools (the CLI's result is next). A tool call, or a new turn,
-// ends it; reasoning and a subagent's events are not its answer. The runner
-// gives a call writing its answer at its call limit up to twice the limit to
-// finish it (lib/process.mjs callLimiter). A line over 64 KiB is not seen (a
-// long final reply): what came before it decides.
-const answerEvents = /"type"\s*:\s*"(?:assistant\.(?:turn_start|message_delta|message)|tool\.execution_start)"/;
+// reply without tools (the CLI's idle and result are next). A tool call
+// (streamed as assistant.tool_call_delta, then run), a new turn, the CLI going
+// idle or its result ends it: a CLI that hangs once its answer is done is
+// stopped at its limit as before. Reasoning and a subagent's events are not
+// its answer. Checked on CLI 1.0.105 with a streaming loopback model: a turn
+// writes assistant.message_delta (data.deltaContent), then for a tool
+// assistant.tool_call_delta and an assistant.message with toolRequests, and
+// the final turn an assistant.message with toolRequests [], assistant.idle and
+// result. The runner gives a call writing its answer at its call limit up to
+// twice the limit to finish it (lib/process.mjs callLimiter). A line over
+// 64 KiB comes as its head only, which is no JSON: a tool call's still ends it
+// (the CLI writes the type first); for any other (a long final reply), what
+// came before it decides.
+const answerEvents = /"type"\s*:\s*"(?:assistant\.(?:turn_start|message_delta|tool_call_delta|message|idle)|tool\.execution_start|result)"/;
+const toolCallHead = /^\{\s*"type"\s*:\s*"(?:tool\.execution_start|assistant\.tool_call_delta)"/;
 export function answerWatch() {
   let writing = false;
   const main = event => !event.agentId && !event.data?.parentToolCallId;
@@ -437,11 +446,11 @@ export function answerWatch() {
       const text = String(line);
       if (!answerEvents.test(text)) return;
       let event;
-      try { event = JSON.parse(text); } catch { return; }
+      try { event = JSON.parse(text); } catch { if (toolCallHead.test(text)) writing = false; return; }
       if (!event || typeof event !== 'object') return;
-      if (event.type === 'tool.execution_start') writing = false;
+      if (event.type === 'tool.execution_start' || event.type === 'result') writing = false;
       else if (!main(event)) return;
-      else if (event.type === 'assistant.turn_start') writing = false;
+      else if (['assistant.turn_start', 'assistant.tool_call_delta', 'assistant.idle'].includes(event.type)) writing = false;
       else if (event.type === 'assistant.message_delta') { if (typeof event.data?.deltaContent === 'string' && event.data.deltaContent) writing = true; }
       else if (event.type === 'assistant.message') writing = !event.data?.toolRequests?.length && typeof event.data?.content === 'string' && Boolean(event.data.content.trim());
     },

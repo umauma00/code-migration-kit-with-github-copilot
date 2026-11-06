@@ -81,7 +81,8 @@ export const usage = `Usage: node migration-kit/scripts/run_migration.mjs COMMAN
                               Keep phases, approvals and finished units under the changed RULEBOOK and send back
                               only the chosen units (host-confirmed human gate)
   approve STAGE --note TEXT   Review/approve translation, build, smoke, parity, post-parity, handoff
-                              translation may use --batch N or --targets PATH,PATH, and --complete-phase 03
+                              translation may use --batch N or --targets PATH,PATH (with --stop-at-end, auto
+                              mode too stops at that batch's end for the person's word), and --complete-phase 03
                               to record the reviewed phase 03 in the same confirmation
   translate [--max-calls N]  Run/resume translation with Copilot CLI workers; --max-calls is this run's
                               explicit AI call budget, agreed with the person (normal default: continuous)
@@ -595,7 +596,7 @@ export async function main(argv = process.argv.slice(2)) {
       }
     }
     else if (cmd === 'approve') {
-      const scope = { batch: args.batch, targets: args.targets?.split(',') };
+      const scope = { batch: args.batch, targets: args.targets?.split(','), ...(args['stop-at-end'] ? { stopAtEnd: true } : {}) };
       if (args['complete-phase'] === undefined) result = approve(root, config, args._[1], args.note, scope);
       else {
         // The 03 review and the translation approval are one human decision: record both under one confirmation.

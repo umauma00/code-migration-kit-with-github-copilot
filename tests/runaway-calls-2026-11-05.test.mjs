@@ -166,10 +166,10 @@ test('a child still at work past its call limit is stopped however much it write
   const e = await runProcess(process.execPath, ['-e', busy], { limitMs: 400, silenceMs: 300 }).then(() => null, error => error);
   assert.ok(e, 'the busy child is stopped');
   assert.equal(e.callLimit, true);
-  assert.match(e.message, /^Process ran past its call limit \(\d+(?:\.\d)? min, workerCallBaseMinutes\) while still at work; stopped$/);
+  assert.match(e.message, /^Process ran past its call limit \(\d+(?:\.\d)? min, from workerCallBaseMinutes and the files the call reads\) while still at work; stopped$/);
   assert.equal(e.writingAtLimit, undefined, 'it was not writing an answer');
-  assert.equal(callLimitMessage(30 * 60000), 'Process ran past its call limit (30 min, workerCallBaseMinutes) while still at work; stopped');
-  assert.equal(callLimitMessage(30 * 60000, { writing: true }), 'Process ran past its call limit (30 min, workerCallBaseMinutes) while still at work, and past twice that (60 min) while still writing its answer; stopped');
+  assert.equal(callLimitMessage(30 * 60000), 'Process ran past its call limit (30 min, from workerCallBaseMinutes and the files the call reads) while still at work; stopped');
+  assert.equal(callLimitMessage(30 * 60000, { writing: true }), 'Process ran past its call limit (30 min, from workerCallBaseMinutes and the files the call reads) while still at work, and past twice that (60 min) while still writing its answer; stopped');
   assert.match(e.result.stdout, /working/);
   assert.ok(Date.now() - started < 10000);
   const ok = await runProcess(process.execPath, ['-e', 'setTimeout(() => console.log("done"), 50)'], { limitMs: 5000 });
@@ -281,7 +281,7 @@ test('a call still at work at its call limit is tried once more with twice the l
   assert.ok(!stages.some(s => /one more pass/.test(s)), stages.join('\n'));
   const state = readJSON(statePath(f.root, f.units[0]));
   assert.equal(state.status, 'blocked');
-  assert.equal(state.error, 'Copilot reviewer-semantics ran past its call limit on 2 attempts (30 min, then 60 min on the retry; workerCallBaseMinutes); this file is set aside for this run, and the next run tries it after the other files unless one of them waits on it (last attempt: 41 model turns, 40 tool calls, a file viewed 38 times, context up to 360000 tokens of 922000)');
+  assert.equal(state.error, 'Copilot reviewer-semantics ran past its call limit on 2 attempts (30 min, then 60 min on the retry; from workerCallBaseMinutes and the files the call reads); this file is set aside for this run, and the next run tries it after the other files unless one of them waits on it (last attempt: 41 model turns, 40 tool calls, a file viewed 38 times, context up to 360000 tokens of 922000)');
   assert.equal(readJSON(statePath(f.root, f.units[1])).status, 'done', 'the other file went on');
   assert.equal(failureGuidance(state.error, { language: 'ja' }).id, 'cli-call-limit');
   assert.deepEqual(failureGuidance(state.error).options.map(o => o.id), ['rerun', 'longer-limit', 'check-dependencies', 'pause']);
@@ -296,7 +296,7 @@ test('a call still at work at its call limit is tried once more with twice the l
   let calls = 0;
   await translate(g.root, g.config, async args => { if (args.role === 'implementer') { calls++; throw overrun(30, null); } return fake(args); }).catch(() => {});
   assert.equal(calls, 1);
-  assert.match(readJSON(statePath(g.root, g.units[0])).error, /^Copilot implementer ran past its call limit of 30 min \(workerCallBaseMinutes\) and was stopped; this file is set aside for this run, and the next run tries it after the other files unless one of them waits on it$/);
+  assert.match(readJSON(statePath(g.root, g.units[0])).error, /^Copilot implementer ran past its call limit of 30 min \(from workerCallBaseMinutes and the files the call reads\) and was stopped; this file is set aside for this run, and the next run tries it after the other files unless one of them waits on it$/);
 });
 
 test('the reason a file was set aside names no file, so a file\'s name cannot read as another cause; the call\'s record keeps it', async t => {
@@ -315,7 +315,7 @@ test('the reason a file was set aside names no file, so a file\'s name cannot re
   }
   // A stop of the run comes first in the message; a name later on does not hide the guidance.
   assert.equal(failureGuidance('Copilot reviewer-rules ran past its call limit of 30 min (workerCallMinutes) on 2 attempts; this file is set aside for this run (last attempt: Interrupted)').id, 'cli-call-limit', 'the reason 0.47.0 recorded');
-  assert.equal(failureGuidance('Copilot reviewer-rules ran past its call limit on 2 attempts (30 min, then 60 min on the retry; workerCallBaseMinutes); this file is set aside for this run (last attempt: Interrupted)').id, 'cli-call-limit');
+  assert.equal(failureGuidance('Copilot reviewer-rules ran past its call limit on 2 attempts (30 min, then 60 min on the retry; from workerCallBaseMinutes and the files the call reads); this file is set aside for this run (last attempt: Interrupted)').id, 'cli-call-limit');
   assert.notEqual(failureGuidance('Interrupted; Copilot reviewer-rules ran past its call limit of 30 min (workerCallMinutes) and was stopped').id, 'cli-call-limit');
 });
 
@@ -328,7 +328,7 @@ test('a retry that answers finishes the file, and with workerCallBaseMinutes 0 (
     return fake(args);
   });
   assert.equal(report.done, 1); assert.deepEqual(report.errors, []);
-  assert.ok(status.nextActions.some(a => /retried after a transient failure \(a call stopped at its call limit while still at work \(workerCallBaseMinutes\): it is tried once more with twice the limit.*never stop the runner for it/.test(a)), status.nextActions.join('\n'));
+  assert.ok(status.nextActions.some(a => /retried after a transient failure \(a call stopped at its call limit while still at work \(its limit grows from workerCallBaseMinutes with the files the call reads\): it is tried once more with twice the limit.*never stop the runner for it/.test(a)), status.nextActions.join('\n'));
   assert.equal(status.retrying[0].callLimit, true);
   const g = await continuous(t);
   g.config.workerCallMinutes = 0; writeJSON(safePath(g.root, 'migration/state/config.json'), g.config);

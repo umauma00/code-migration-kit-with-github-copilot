@@ -69,7 +69,7 @@ These are not time or load cutoffs: continuing could not save a correct result.
 |---|---|
 | The person's action | SIGINT / SIGTERM / AbortSignal |
 | Limits the person chose | bounded mode, explicit `--max-calls` / `--max-rounds` |
-| Permission and phase scope | missing or stale approval, unfinished earlier phase, outside the approved batch or pilot |
+| Permission and phase scope | missing or stale approval, unfinished earlier phase, outside the approved batch or pilot (in auto mode a production translate records a missing, stale or used-up translation approval itself, with the checks of `approve translation`, since 0.48.0; only those checks stop it) |
 | Input/output safety | writing over sources, protected paths, traversal, symlinks, duplicate targets, guardrail violations |
 | Inputs changed during a run | source, rules, config, judge or repair intent changed |
 | Concurrency and record integrity | a run/build-loop lock whose owner is alive or that comes from another host (an ownerless lock on this host is removed automatically), broken ledgers or hashes |

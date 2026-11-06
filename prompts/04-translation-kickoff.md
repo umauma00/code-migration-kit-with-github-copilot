@@ -24,9 +24,12 @@ concrete units, separate from maxAgentCalls. Stop after that approved scope,
 report burndown/unknown timing and wait for the next batch instruction. Never
 convert a completed batch into permission for build or remaining translation.
 Auto mode does not stop at the end of a batch it approved itself: translate
-records the approval of every file left and goes on. A batch approved outside
-auto mode still stops at its end: report it and wait for the person's word; when
-they say to go on, run `translate` again.
+records the approval of every file left and goes on, so never cut a batch on
+your own in auto mode. When the person asks for some files first, approve that
+batch alone with `approve translation --batch N --stop-at-end --note '…'`. A
+batch the person chose (approved outside auto mode, or with `--stop-at-end`)
+stops at its end: report it and wait for the person's word; when they say to go
+on, run `translate` again.
 When markerPolicy is configured, both reviews receive measured TODO line counts;
 the coordinator rejects a mismatched final trailer before recording done.
 

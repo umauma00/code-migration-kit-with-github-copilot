@@ -5,7 +5,9 @@ reviewed scope completion, then await the next batch instruction. maxAgentCalls
 is a budget, not batch size. See [execution scopes](EXECUTION-SCOPES.md).
 In auto mode there is no such wait for a batch auto mode approved itself:
 `translate` records the approval of every file left (marked auto) and goes on.
-Only a batch approved outside auto mode waits for the person's word.
+Only a batch the person chose waits for the person's word: one approved
+outside auto mode, or with `--stop-at-end` (in auto mode, when the person asks
+for some files first).
 Pilot reports explicitly identify disposable purpose and grant; they cannot
 authorize production. Map the ten internal IDs to the six macro stages without
 removing preparation or cleanup evidence.

@@ -23,6 +23,9 @@ node migration-kit/scripts/run_migration.mjs approve translation --batch 20 --no
 ```
 
 `--targets ported/a.js,ported/b.js` chooses exact manifest targets instead.
+`--stop-at-end` (0.48.0, with `--batch` or `--targets`) marks a batch the person
+chose to check before the rest; it matters in auto mode, which otherwise goes
+on past the end of a batch (below).
 They must include unfinished prerequisites. A batch selects pending units in
 dependency-ready order; actual selected targets are saved in the approval.
 Without either option, the existing whole-manifest approval behavior remains.
@@ -38,10 +41,12 @@ of `approve translation` itself (phase 03 complete, its reports, a judge run
 that succeeded for the current inputs), records the approval of every file left
 (marked auto, and listed by status among the records made without the person)
 and goes on in the same run; when a check fails it stops and says which. A
-batch approved outside auto mode is the person's gate: the run stops at its end,
-status says to wait for the person's word, and the next `translate` records the
-rest. An approval made in auto mode is always marked auto, so to review the work
-batch by batch, approve the batches in normal or relaxed mode.
+batch the person chose is their gate: one approved outside auto mode, or in
+auto mode with `approve translation --batch N --stop-at-end` (or `--targets`)
+when the person asks for some files first. The run stops at its end, status
+says to wait for the person's word, and the next `translate` records the rest.
+A failure of the translation gate that is not about the approval (phase 03 out
+of date, a file another program holds) stops `translate` as before.
 
 A batch count is files/units, not maxAgentCalls. All implementation, review,
 arbitration and fix calls share concurrency; saved call/fix-round budgets apply

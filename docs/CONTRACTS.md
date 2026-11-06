@@ -264,8 +264,8 @@ session, since 0.48.0 with twice the limit (`tryLimitMinutes`), with
 stopped call did and, when it had used tools, to search a dependency rather
 than read it whole. The answer contract is unchanged. A second stop at the
 limit blocks the unit with "Copilot <role> ran past its call limit on 2
-attempts (N min, then 2N min on the retry; workerCallBaseMinutes); this file is
-set aside for this run ...",
+attempts (N min, then 2N min on the retry; from workerCallBaseMinutes and the
+files the call reads); this file is set aside for this run ...",
 which names no file (the attempt record does), and the unit gets no last pass
 in that run. A stop that comes as the run is interrupted is recorded as
 interrupted ("Interrupted; ..."), without a retry. A translate run (not a
@@ -408,15 +408,32 @@ held and the record names that run; it is not part of `status --wait`'s key,
 so a new count does not end a wait.
 
 In auto mode (since 0.48.0) a translate run (production, not a repair) whose
-translation approval is missing, out of date or invalid, or names a batch auto
-mode approved, or a batch the person approved whose every file is done, records
-the approval of every file left itself before it starts: the same function as
-`approve translation` with the run's context and lock, its checks included
-(phase 03, the reports, a current judge), and the gate carries `auto: true`
-and `recordedBy: "translate"`. The run summary then has `autoApproval` (why). A
-failed check stops the run with "Auto mode could not record the translation
-approval itself: " and the check's own message. A current approval of every
-file, or a batch the person approved with a file still to do, is kept.
+translation approval is missing, out of date, for another purpose, of a scope
+the manifest no longer has or in a file that is not JSON (`translationApprovalOnly`),
+or names a batch auto mode approved, or a batch the person chose whose every
+file is done, records the approval of every file left itself before it starts:
+the same function as `approve translation` with the run's context and lock,
+its checks included (phase 03, the reports, a current judge), and the gate
+carries `auto: true` and `recordedBy: "translate"`. The run summary then has
+`autoApproval` (why). A failed check stops the run with "Auto mode could not
+record the translation approval itself: " and the check's own message; any
+other failure of the gate (phase 03 out of date, a file another program holds)
+stops it as before. A current approval of every file, or a batch the person
+chose with a file still to do, is kept. A batch the person chose is one
+approved outside auto mode (no `auto`) or with `--stop-at-end` (the gate's
+`stopAtEnd: true`, only with `--batch` or `--targets`). When its approval is
+out of date or names a file the manifest no longer has (`personsStaleBatch`),
+translate approves that batch again while a file of it is left: its files in
+the manifest with each prerequisite of them that is no longer done, as
+`targets` with `stopAtEnd: true`, so the run still stops at its end (a scope
+the check refuses becomes every file left); with none left, status shows the
+end of their batch, and the next run records every file left. While translate
+is to record the approval, status shows no approval of a later stage (each
+needs a current translation approval), and the guidance of a translation
+approval that is out of date, for another purpose (the gate's own message
+names its stage since 0.48.0) or of an invalid scope names translate with
+nothing to decide (a RULEBOOK change keeps `rulebook accept`). A pilot never
+records one: its runner approves its own translation.
 With unit typecheck deferred, cycle membership is computed across the full
 manifest even for single-target repair; incomplete prerequisites outside that
 cycle still block the repair.

@@ -29,11 +29,18 @@ time was stopped again.
   The run summary carries `autoApproval` (why). A failed check approves nothing
   and stops with "Auto mode could not record the translation approval itself:"
   and the check's own message, which keeps its own guidance. So auto mode never
-  stops at the end of a batch; only a batch approved outside auto mode stops
-  at its end, and status says to wait for the person's word (the next
-  translate then records the rest). An approval made in auto mode is always
-  marked auto, so batches to review one by one are approved in normal or
-  relaxed mode. Normal and relaxed mode are unchanged.
+  stops at the end of a batch; only a batch the person chose stops at its
+  end (approved outside auto mode, or with the new `approve translation
+  --batch N --stop-at-end`, which the AI adds when the person asks for some
+  files first), and status says to wait for the person's word (the next
+  translate then records the rest). A failure of the gate that is not about
+  the approval (phase 03 out of date, a file another program holds) stops
+  translate as before, and status makes approve's checks before it says to
+  run translate. A batch the person chose whose approval went out of date is
+  approved again as that batch (with each file it needs that is no longer
+  done) while a file of it is left, and still stops at its end
+  (`personsStaleBatch`). A pilot never records one. Normal and relaxed mode
+  are unchanged.
 - Approval guidance and status (`lib/guidance.mjs`, `lib/status.mjs`): in
   auto mode a missing or out-of-date approval asks nothing: the guidance names
   translate for the translation approval and `approve STAGE --note '…'` as a
@@ -43,7 +50,12 @@ time was stopped again.
   status lists a translation approval translate records itself as no blocker
   ("Implementation start: translate records the approval itself"; phase 04
   ready, not awaiting approval) and says to run translate; past a batch auto
-  mode approved, it says to run translate too. Outside auto mode the guidance
+  mode approved, it says to run translate too, and with every file done it
+  shows no approval of a later stage until translate has recorded the
+  translation approval. The guidance of a translation approval that is out of
+  date, for another purpose (that message now names its stage) or of an
+  invalid scope names translate there too (a RULEBOOK change keeps `rulebook
+  accept`). Outside auto mode the guidance
   and status add that Copilot CLI autopilot refuses the approval question by
   itself: approve interactively without autopilot, or choose auto mode. The
   operating manual's rule 3, the skill, the 04 prompt, the phase handoff and
@@ -64,7 +76,9 @@ time was stopped again.
   without tools when its limit comes may finish, up to twice the limit: the
   adapter reads the CLI's stream events (`answerWatch`: the main agent's
   `assistant.message_delta` text, or an `assistant.message` without tool
-  requests; a tool call or a new turn ends it), only with `--stream on`. A
+  requests; a tool call, from its streamed `assistant.tool_call_delta` on, a
+  new turn, or `assistant.idle` or `result` ends it, as the real CLI 1.0.105
+  writes them), only with `--stream on`. A
   call stopped there says so ("past twice that ... while still writing its
   answer", `writingAtLimit`), and so does the reason of a file set aside.
 - Tests: `tests/auto-batch-call-limit-2026-11-06.test.mjs`; the call limit and

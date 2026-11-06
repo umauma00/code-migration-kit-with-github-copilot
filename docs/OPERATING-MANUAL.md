@@ -125,7 +125,9 @@ CLI autopilot can drive the run; every such record is marked auto (see
 [auto mode](ORDERED-WORKFLOW.en.md#auto-mode)). There `translate` records a
 missing, out-of-date or used-up translation approval itself, with the checks of
 `approve translation`, and goes on with every file left: auto mode never stops
-at the end of a batch, except one approved outside auto mode. Outside auto mode
+at the end of a batch, except one the person chose (approved outside auto mode,
+or in auto mode with `approve translation --batch N --stop-at-end` when the
+person asks for some files first). Outside auto mode
 an approval is the person's, and Copilot CLI autopilot refuses the question by
 itself: approve in an interactive session without autopilot, or choose auto mode.
 

@@ -506,9 +506,11 @@ with the next phase. In 04, run `translate` without `approve translation`:
 when the translation approval is missing, out of date or its batch (one auto
 mode approved) is used up, translate makes the checks of approve translation
 itself, records the approval of every file left (marked auto) and goes on, so
-auto mode never stops at the end of a batch. Only a batch approved outside auto
-mode stops at its end: report it and wait for the person's word; when they say
-to go on, run `translate`. A failure guidance that needs no decision says so
+auto mode never stops at the end of a batch: never cut one on your own. When
+the person asks for some files first, approve that batch alone with `approve
+translation --batch N --stop-at-end --note '…'`. Only a batch the person chose
+(approved outside auto mode, or with `--stop-at-end`) stops at its end: report
+it and wait for the person's word; when they say to go on, run `translate`. A failure guidance that needs no decision says so
 ("No decision is needed" / 「判断は不要です」): run its command and continue without asking. A gate failure ending `Relaxed mode (auto): ...` means: if
 the phase's own work can supply what is missing, do that work; only otherwise
 run `phase waive ID --note "<why>"` and retry. Never waive phases ahead of the

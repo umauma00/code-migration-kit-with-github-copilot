@@ -23,17 +23,21 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { prepare, fake, result } from './helpers.mjs';
-import { safePath, writeJSON, readJSON, atomicWrite, statePath } from '../lib/core.mjs';
-import { translate, approve, runStage } from '../lib/pipeline.mjs';
+import { safePath, writeJSON, readJSON, atomicWrite, statePath, loadConfig } from '../lib/core.mjs';
+import { translate, approve, runStage, translationApprovalOnly } from '../lib/pipeline.mjs';
 import { runProcess, callLimitMessage, callLimiter } from '../lib/process.mjs';
 import { createCopilotAdapter, answerWatch, isStreamedDelta } from '../scripts/copilot_adapter.mjs';
 import { failureGuidance, guidanceMarkdown } from '../lib/guidance.mjs';
 import { migrationStatus, statusMarkdown } from '../lib/status.mjs';
 import { statusSnapshot, runProgress } from '../lib/status-snapshot.mjs';
 import { setPreferences } from '../lib/preferences.mjs';
+import { preparePilot } from '../lib/pilot.mjs';
+import { autoPhases } from '../lib/phases.mjs';
 import { interactiveDecision } from '../lib/guardrails.mjs';
 import { phaseCommand } from '../scripts/phase_cli.mjs';
 import { kitRoot } from '../scripts/install.mjs';
+import { progressKey } from '../scripts/run_migration.mjs';
+import { parseCommandLine, specs } from '../lib/cli.mjs';
 
 const gateFile = f => safePath(f.root, 'migration/gates/translation.json');
 const gate = f => readJSON(gateFile(f));
@@ -54,6 +58,10 @@ async function phase04(t, { count = 2, mode } = {}) {
   return f;
 }
 const kit = 'node migration-kit/scripts/run_migration.mjs';
+// What status says at the end of a batch the person chose, in auto mode.
+const waitWord = /^The batch of 1 file\(s\) the person chose is done: tell the person and wait for their word \(auto mode stops at a batch only when the person chose it: approved outside auto mode, or with --stop-at-end\); when they say to go on, run translate/;
+// An approval that went out of date (here: its content hash).
+const staleGate = f => writeJSON(gateFile(f), { ...gate(f), contextHash: 'f'.repeat(64) });
 
 test('a call writing its answer at its limit may finish, up to twice the limit; one that turns to a tool is stopped then (callLimiter)', () => {
   let now = 0, writing = true;
@@ -98,18 +106,48 @@ test('answerWatch reads from the CLI\'s events whether the main agent is writing
   for (const line of ['not json', '{"type":"assistant.message_delta"', '"assistant.turn_start"', JSON.stringify({ type: 'session.info', data: {} })]) w.line(line);
   assert.equal(w.writing(), true, 'a broken or other line changes nothing');
   ev({ type: 'tool.execution_start', agentId: 'sub', data: { toolName: 'grep' } }); assert.equal(w.writing(), false, 'any agent\'s tool call');
+  ev({ type: 'assistant.message_delta', data: { deltaContent: 'Let me read it.' } }); assert.equal(w.writing(), true);
+  ev({ type: 'assistant.tool_call_delta', data: { toolCallId: 'call_2', toolName: 'view', inputDelta: '{"path"' } }); assert.equal(w.writing(), false, 'the turn streams a tool call');
+  ev({ type: 'assistant.message', data: { content: '{}', toolRequests: [] } }); assert.equal(w.writing(), true);
+  ev({ type: 'assistant.idle', data: {} }); assert.equal(w.writing(), false, 'the answer is done: a CLI that hangs now is stopped at its limit');
+  ev({ type: 'assistant.message', data: { content: '{}', toolRequests: [] } });
+  ev({ type: 'result', exitCode: 0, usage: {} }); assert.equal(w.writing(), false);
   // The pieces the watch reads are the ones the runner drops from its logs.
   assert.equal(isStreamedDelta(JSON.stringify({ type: 'assistant.message_delta', data: { deltaContent: 'x' } })), true);
 });
 
+// The events of the real Copilot CLI 1.0.105 (Linux, a streaming loopback
+// model, the workers' flags; data trimmed to the fields the watch reads): a
+// turn that writes a sentence and calls view, then the final answer.
+test('answerWatch follows the events of the real CLI 1.0.105', () => {
+  const trace = [
+    ['session.tools_updated', false], ['user.message', false], ['assistant.turn_start', false], ['model.call_start', false], ['assistant.message_start', false],
+    ['assistant.message_delta', true, { deltaContent: 'Let me ' }], ['assistant.message_delta', true, { deltaContent: 'read it.' }],
+    ['assistant.tool_call_delta', false, { toolCallId: 'call_1', toolName: 'view', toolType: 'function', inputDelta: '' }], ['model.call_finished', false],
+    ['assistant.message', false, { content: 'Let me read it.', toolRequests: [{ toolCallId: 'call_1', name: 'view', arguments: { path: 'a.txt' }, type: 'function' }] }],
+    ['tool.execution_start', false, { toolCallId: 'call_1', toolName: 'view' }], ['model.call_final_result', false], ['tool.execution_complete', false], ['assistant.turn_end', false],
+    ['assistant.turn_start', false], ['model.call_start', false], ['assistant.message_start', false],
+    ['assistant.message_delta', true, { deltaContent: '{"schema' }], ['assistant.message_delta', true, { deltaContent: 'Version": 1}' }], ['model.call_finished', true],
+    ['assistant.message', true, { content: '{"schemaVersion": 1}', toolRequests: [] }], ['model.call_final_result', true], ['assistant.turn_end', true],
+    ['assistant.idle', false], ['result', false]];
+  const w = answerWatch();
+  for (const [type, writing, data = {}] of trace) {
+    w.line(JSON.stringify(type === 'result' ? { type, exitCode: 0, usage: {} } : { type, data, id: 'e', timestamp: '2026-11-06T18:19:47.000Z' }));
+    assert.equal(w.writing(), writing, type);
+  }
+});
+
 // A stand-in for the Copilot CLI that streams its answer slowly (--stream on).
+// started: when the adapter checked its version, right before the call, so
+// a slow start of the call itself (Windows) does not move what it times.
 function streamingCli(f, name, body) {
-  const file = safePath(f.root, name);
+  const file = safePath(f.root, name), stamp = safePath(f.root, `${name}.t0`);
   atomicWrite(file, `#!/usr/bin/env node
-if (process.argv.includes('--version')) { console.log('GitHub Copilot CLI 1.0.105.'); process.exit(0); }
+import fs from 'node:fs';
+if (process.argv.includes('--version')) { fs.writeFileSync(${JSON.stringify(stamp)}, String(Date.now())); console.log('GitHub Copilot CLI 1.0.105.'); process.exit(0); }
 let prompt = ''; for await (const c of process.stdin) prompt += c;
 const out = e => process.stdout.write(JSON.stringify(e) + '\\n');
-const started = Date.now();
+const started = Number(fs.readFileSync(${JSON.stringify(stamp)}, 'utf8'));
 // Never outlives the test, whatever the limit does.
 setTimeout(() => process.exit(0), 30000);
 ${body}
@@ -118,10 +156,13 @@ ${body}
 }
 const call = (f, adapter, callLimitMs) => adapter({ root: f.root, config: f.config, role: 'reviewer-semantics', unit: f.units[0], reviewInput: '{"mode":"frozen"}', extra: {}, callLimitMs });
 
-test('end to end: the real adapter lets a CLI still writing its answer at its limit finish, stops one writing past twice the limit, and stops one at work with tools at the limit', { timeout: 60000 }, async t => {
+test('end to end: the real adapter lets a CLI still writing its answer at its limit finish, stops one writing past twice the limit, and stops one at work with tools at the limit', { timeout: 90000 }, async t => {
   const f = prepare(t, { executionMode: 'continuous' });
   const answer = JSON.stringify(result('reviewer-semantics', f.units[0]));
-  const limit = 2000;
+  // The stand-in counts from its version check, right before the call: it
+  // finishes past the limit while the steps between the two take less than
+  // 0.4 times the limit, and a slow start of the call has the whole limit.
+  const limit = 3000;
   // Still writing at its limit; done at about 1.4 times the limit.
   const finishing = streamingCli(f, 'finishing-cli.mjs', `const answer = ${JSON.stringify(answer)};
 out({ type: 'assistant.turn_start', data: { turnId: '1' } });
@@ -140,6 +181,7 @@ setInterval(() => out({ type: 'assistant.message_delta', data: { messageId: 'm1'
   assert.equal(stopped.callLimit, true); assert.equal(stopped.writingAtLimit, true);
   assert.equal(stopped.message, callLimitMessage(limit, { writing: true }));
   assert.ok(Date.now() - at >= 2 * limit, `not before twice the limit (${Date.now() - at} ms)`);
+  assert.ok(stopped.workedMs >= 2 * limit, `the minutes it was at work go with it (${stopped.workedMs} ms)`);
   // At work with tools: stopped at its limit, as in 0.47.0.
   const reading = streamingCli(f, 'reading-cli.mjs', `let n = 0;
 setInterval(() => { n++; out({ type: 'assistant.turn_start', data: { turnId: String(n) } }); out({ type: 'tool.execution_start', data: { toolCallId: 'call_' + n, toolName: 'view', arguments: {} } }); }, 25);`);
@@ -147,6 +189,17 @@ setInterval(() => { n++; out({ type: 'assistant.turn_start', data: { turnId: Str
   assert.ok(tools, 'stopped');
   assert.equal(tools.callLimit, true); assert.equal(tools.writingAtLimit, undefined);
   assert.equal(tools.message, callLimitMessage(limit));
+  assert.ok(tools.workedMs >= limit && tools.workedMs < 2 * limit, String(tools.workedMs));
+  // A tool call on a line too long to read whole (70 KB of arguments), after
+  // text and with no streamed tool call before it: still stopped at the limit.
+  const bigTool = streamingCli(f, 'big-tool-cli.mjs', `out({ type: 'assistant.turn_start', data: { turnId: '1' } });
+out({ type: 'assistant.message_delta', data: { messageId: 'm1', deltaContent: 'Let me read it.' } });
+out({ type: 'tool.execution_start', data: { toolCallId: 'call_1', toolName: 'view', arguments: { path: 'x'.repeat(70000) } } });
+setInterval(() => out({ type: 'session.info', data: { message: 'at work' } }), 25);`);
+  const big = await call(f, bigTool, limit).then(() => null, e => e);
+  assert.ok(big, 'stopped');
+  assert.equal(big.writingAtLimit, undefined, 'the tool call on its long line ended the answer');
+  assert.equal(big.message, callLimitMessage(limit));
   // Without the stream (workerSilenceSeconds 0) the kit cannot tell, so the limit stays the limit.
   f.config.workerSilenceSeconds = 0;
   const unseen = await call(f, forever, limit).then(() => null, e => e);
@@ -171,9 +224,41 @@ test('a call stopped while still writing at twice its limit is retried with twic
   assert.equal(seen[1].note, 'after 60 minutes, still writing its answer (2 model turns, 0 tool calls). Return your answer as soon as it is complete.');
   const state = readJSON(statePath(f.root, f.units[0]));
   assert.equal(state.status, 'blocked');
-  assert.match(state.error, /^Copilot implementer ran past its call limit on 2 attempts \(30 min, then 60 min on the retry; workerCallBaseMinutes\), the last time while still writing its answer at twice its limit; this file is set aside for this run/);
+  assert.match(state.error, /^Copilot implementer ran past its call limit on 2 attempts \(30 min, then 60 min on the retry; from workerCallBaseMinutes and the files the call reads\), the last time while still writing its answer at twice its limit; this file is set aside for this run/);
   assert.equal(failureGuidance(state.error).id, 'cli-call-limit');
   assert.equal(readJSON(statePath(f.root, f.units[1])).status, 'done', 'the other file went on');
+});
+
+test('the retry hears how long the stopped call was at work; a file set aside after its only try says so without "the last time"', async t => {
+  // A call writing at its limit that turned to a tool was stopped past its
+  // limit: its retry hears those minutes, not the limit's.
+  const f = prepare(t, { executionMode: 'continuous', count: 2 });
+  f.config.transientRetryDelayMs = 1; writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
+  await runStage(f.root, f.config, 'judge');
+  approve(f.root, f.config, 'translation', 'Automated fixture approval for tests only');
+  const activity = { turns: 3, tools: { view: 2 }, views: [], contextTokens: null, contextLimit: null, compactions: null };
+  const notes = [];
+  await translate(f.root, f.config, async args => {
+    if (args.unit.target === f.units[0].target && args.role === 'implementer') {
+      notes.push(args.extra.previousAttempt);
+      if (notes.length === 1) throw Object.assign(new Error(callLimitMessage(30 * 60000)), { callLimit: true, workedMs: 45 * 60000, activity });
+    }
+    return fake(args);
+  });
+  assert.equal(notes.length, 2);
+  assert.match(notes[1], /^after 45 minutes, still at work and without a final answer \(3 model turns, 2 tool calls/);
+  assert.ok(allDone(f));
+  // Bounded mode without retries: one try, set aside.
+  const b = prepare(t, { executionMode: 'bounded', count: 2 });
+  b.config.transientRetries = 0; writeJSON(safePath(b.root, 'migration/state/config.json'), b.config);
+  await runStage(b.root, b.config, 'judge');
+  approve(b.root, b.config, 'translation', 'Automated fixture approval for tests only');
+  await translate(b.root, b.config, async args => {
+    if (args.unit.target === b.units[0].target && args.role === 'implementer') throw Object.assign(new Error(callLimitMessage(30 * 60000, { writing: true })), { callLimit: true, writingAtLimit: true, workedMs: 60 * 60000 });
+    return fake(args);
+  }).catch(() => null);
+  const state = readJSON(statePath(b.root, b.units[0]));
+  assert.match(state.error, /^Copilot implementer ran past its call limit of 30 min \(from workerCallBaseMinutes and the files the call reads\) and was stopped, while still writing its answer at twice its limit; this file is set aside for this run/);
 });
 
 test('status shows the AI calls at work of concurrency and the files waiting on a dependency, from the run\'s progress record', async t => {
@@ -209,6 +294,12 @@ test('status shows the AI calls at work of concurrency and the files waiting on 
   assert.match(statusMarkdown({ ...full, runProgress: { ...full.runProgress, callsWaiting: 3 } }, 'ja'), /2本が実行中（同時2本まで）・3本が空き待ち。/);
   // Fewer files at work than the limit because the rest wait: said so.
   assert.match(statusMarkdown({ ...full, runProgress: { ...full.runProgress, concurrency: 4, callsActive: 2 } }, 'ja'), /依存待ち1件・開始待ち0件（残りのファイルは依存先の完了を待っているため、作業中のファイルが同時の上限より少なくなっています）。/);
+  // A change of these counts does not end a status --wait (each call that
+  // starts or ends would be a model turn of the parent agent).
+  assert.equal(progressKey({ ...fast, runProgress: { ...fast.runProgress, callsActive: 1, unitsAtWork: 1, unitsReady: 1 } }), progressKey(fast));
+  // The run's last write: nothing at work any more.
+  const last = readJSON(safePath(f.root, `migration/runs/${record.runId}/progress.json`));
+  assert.deepEqual([last.callsActive, last.callsWaiting, last.unitsAtWork, last.unitsWaitingOnDependencies, last.unitsReady], [0, 0, 0, 0, 0]);
   // Not after the run, and never from a record of another run or a broken one.
   const after = migrationStatus(f.root);
   assert.equal(after.runProgress, undefined);
@@ -258,7 +349,7 @@ test('auto mode never stops at the end of a batch it approved; a stale approval 
   // An approval that went stale (here: its content hash).
   const s = await phase04(t, { mode: 'auto' });
   approve(s.root, s.config, 'translation', 'Autopilot');
-  writeJSON(gateFile(s), { ...gate(s), contextHash: 'f'.repeat(64) });
+  staleGate(s);
   const stale = await translate(s.root, s.config, fake);
   assert.match(stale.autoApproval, /^the translation approval was not current: translation approval is stale/);
   assert.ok(allDone(s));
@@ -271,9 +362,22 @@ test('auto mode never stops at the end of a batch it approved; a stale approval 
   assert.equal(run.autoApproval, undefined);
   assert.deepEqual(gate(p), kept);
   assert.ok(allDone(p));
+  // An approval file that cannot be read: no blocker in auto mode, approve
+  // replaces it (until 0.47.0 it failed reading it), and so does translate.
+  const u = await phase04(t, { mode: 'auto' });
+  atomicWrite(gateFile(u), '{ not json');
+  const shown = migrationStatus(u.root);
+  assert.ok(!shown.blockers.some(b => b.path === 'migration/gates/translation.json'), JSON.stringify(shown.blockers));
+  assert.equal(shown.autoRecordsApproval, true);
+  assert.equal(approve(u.root, u.config, 'translation', 'Autopilot').auto, true);
+  atomicWrite(gateFile(u), '{ not json');
+  const replaced = await translate(u.root, u.config, fake);
+  assert.match(replaced.autoApproval, /^the translation approval file could not be read \(/);
+  assert.equal(gate(u).recordedBy, 'translate');
+  assert.ok(allDone(u));
 });
 
-test('auto mode stops at the end of a batch the person approved outside it; status says to wait for the person, and the next translate records the rest', async t => {
+test('auto mode stops at the end of a batch the person chose (approved outside auto mode, or with --stop-at-end); status says to wait for the person, and the next translate records the rest', async t => {
   const f = await phase04(t, { mode: 'normal' });
   approve(f.root, f.config, 'translation', 'The person reviews one file first', { batch: 1 });
   const theirs = gate(f);
@@ -285,24 +389,62 @@ test('auto mode stops at the end of a batch the person approved outside it; stat
   assert.deepEqual(gate(f), theirs);
   assert.equal(fs.existsSync(statePath(f.root, f.units[1])), false, 'the run stopped at its end');
   const status = migrationStatus(f.root);
-  assert.ok(status.nextActions.some(a => /^The batch of 1 file\(s\) the person approved is done: tell the person and wait for their word \(auto mode stops at a batch only when the person chose it\); when they say to go on, run translate/.test(a)), status.nextActions.join('\n'));
+  assert.ok(status.nextActions.some(a => waitWord.test(a)), status.nextActions.join('\n'));
   assert.ok(!status.nextActions.some(a => /obtain approval for the next explicit translation batch/.test(a)));
   const second = await translate(f.root, f.config, fake);
-  assert.equal(second.autoApproval, 'every file of the batch of 1 the person approved was done');
+  assert.equal(second.autoApproval, 'every file of the batch of 1 the person chose was done');
   assert.ok(allDone(f));
   assert.equal(gate(f).recordedBy, 'translate');
+  // In auto mode, a batch the person asked for is approved with --stop-at-end
+  // (the command line's own spelling): it stops at its end the same way.
+  const a = await phase04(t, { mode: 'auto' });
+  const chosen = approve(a.root, a.config, 'translation', 'The person asked for one file first', { batch: 1, stopAtEnd: true });
+  assert.equal(chosen.auto, true); assert.equal(chosen.stopAtEnd, true);
+  const run = await translate(a.root, a.config, fake);
+  assert.equal(run.autoApproval, undefined, 'kept');
+  assert.deepEqual(run.scopeTargets, ['ported/math_ops.mjs']);
+  assert.equal(fs.existsSync(statePath(a.root, a.units[1])), false, 'the run stopped at its end');
+  assert.ok(migrationStatus(a.root).nextActions.some(a => waitWord.test(a)));
+  assert.equal((await translate(a.root, a.config, fake)).autoApproval, 'every file of the batch of 1 the person chose was done');
+  assert.ok(allDone(a));
+  // Without a batch it has no end to stop at: refused, nothing recorded.
+  const n = await phase04(t, { mode: 'auto' });
+  assert.throws(() => approve(n.root, n.config, 'translation', 'Autopilot', { stopAtEnd: true }), /^Error: --stop-at-end applies to a translation batch/);
+  assert.equal(fs.existsSync(gateFile(n)), false);
+  // The command line passes it on.
+  assert.deepEqual(parseCommandLine(['approve', 'translation', '--batch', '5', '--stop-at-end', '--note', 'x'], specs.run_migration)['stop-at-end'], true);
 });
 
 test('auto mode approves nothing when a check of approve translation fails; normal mode, repairs and the batch end outside auto mode are as before', async t => {
-  // The stress report is gone: phase 03 and the approval's check fail.
+  // The stress report is gone: phase 03 is out of date. That failure of the
+  // gate is not about the approval: it stops translate as before.
   const f = await phase04(t, { mode: 'auto' });
   fs.rmSync(safePath(f.root, 'migration/stress-test/report.md'));
   const failed = await translate(f.root, f.config, fake).then(() => null, e => e);
   assert.ok(failed);
-  assert.match(failed.message, /^Auto mode could not record the translation approval itself: /);
+  assert.match(failed.message, /^Phase 03's record is out of date/);
   assert.equal(fs.existsSync(gateFile(f)), false, 'no approval written');
   assert.ok(!f.units.some(u => fs.existsSync(statePath(f.root, u))), 'nothing translated');
-  assert.notEqual(failureGuidance(failed, { root: f.root }).id, 'unknown', 'the check keeps its own guidance');
+  assert.notEqual(failureGuidance(failed, { root: f.root }).id, 'unknown', 'it keeps its own guidance');
+  assert.ok(migrationStatus(f.root).blockers.some(b => b.path === 'migration/gates/translation.json' && /^Phase 03's record is out of date/.test(b.reason)));
+  // Phase 03 waived and a report gone: the gate only lacks its approval, and
+  // a check of approve translation refuses; status says the same first.
+  const w = await phase04(t, { mode: 'auto' });
+  fs.rmSync(safePath(w.root, 'migration/feasibility.md'));
+  phaseCommand(w.root, w.config, 'waive', '03', { note: 'Auto mode: the stress test could not run (test fixture)' });
+  const shown = migrationStatus(w.root);
+  assert.ok(shown.blockers.some(b => /^Auto mode could not record the translation approval itself: Review artifact required: migration\/feasibility\.md/.test(b.reason)), JSON.stringify(shown.blockers));
+  assert.equal(shown.autoRecordsApproval, undefined);
+  assert.ok(!shown.nextActions.some(a => /^Run translate/.test(a)), shown.nextActions.join('\n'));
+  const refused = await translate(w.root, w.config, fake).then(() => null, e => e);
+  assert.match(refused?.message ?? '', /^Auto mode could not record the translation approval itself: Review artifact required: migration\/feasibility\.md/);
+  assert.equal(failureGuidance(refused, { root: w.root }).id, 'artifact', 'the check keeps its own guidance');
+  assert.equal(fs.existsSync(gateFile(w)), false, 'no approval written');
+  // A file another program holds (or any other error of the gate) is never
+  // taken for a missing approval.
+  const held = Object.assign(new Error('EBUSY: resource busy or locked, open \'migration/gates/translation.json\''), { code: 'EBUSY' });
+  assert.equal(translationApprovalOnly(w.root, held), false);
+  assert.equal(translationApprovalOnly(w.root, new SyntaxError('Unexpected token')), false, 'a parse error of another file');
   // Normal mode: translate still refuses, and status and guidance say autopilot refuses the question.
   const n = await phase04(t, { mode: 'normal' });
   await assert.rejects(translate(n.root, n.config, fake), /^Error: No translation approval/);
@@ -321,6 +463,16 @@ test('auto mode approves nothing when a check of approve translation fails; norm
   approve(n.root, n.config, 'translation', 'The person reviews one file first', { batch: 1 });
   await translate(n.root, n.config, fake);
   assert.ok(migrationStatus(n.root).nextActions.some(a => /^Review the completed batch; obtain approval for the next explicit translation batch \(the person's decision; Copilot CLI autopilot refuses/.test(a)));
+  // Relaxed mode, and auto mode chosen without its own record (a hand-edited
+  // preferences file), refuse as before too.
+  const x = await phase04(t, { mode: 'relaxed' });
+  await assert.rejects(translate(x.root, x.config, fake), /^Error: No translation approval/);
+  assert.equal(fs.existsSync(gateFile(x)), false);
+  const h = await phase04(t, { mode: 'auto' });
+  fs.rmSync(safePath(h.root, 'migration/phases/auto-mode.json'));
+  await assert.rejects(translate(h.root, h.config, fake), /^Error: No translation approval/);
+  assert.equal(fs.existsSync(gateFile(h)), false);
+  assert.equal(migrationStatus(h.root).autoRecordsApproval, undefined);
   // A repair never records an approval, in auto mode either.
   const r = await phase04(t, { mode: 'auto' });
   atomicWrite(safePath(r.root, 'migration/evidence.txt'), 'diagnostic\n');
@@ -345,6 +497,8 @@ test('the approval guidance asks nothing in auto mode: translate for the transla
     assert.ok(!build.options.some(o => o.id === 'review-approve'));
     // The command as given runs unasked in auto mode: one command, a note in single quotes.
     assert.equal(interactiveDecision({ toolName: 'bash', toolArgs: { command: build.options[0].command.replace(/^node \S+/, kit) }, cwd: f.root }, f.root), null);
+    // So does a batch the person asked for.
+    assert.equal(interactiveDecision({ toolName: 'bash', toolArgs: { command: `${kit} approve translation --batch 5 --stop-at-end --note 'The person asked for five files first'` }, cwd: f.root }, f.root), null);
     const judge = failureGuidance('Run judge successfully for these inputs before approving translation', { root: f.root, language });
     assert.equal(judge.options[0].id, 'run-judge'); assert.match(judge.options[0].command, /run_migration\.mjs judge$/);
     assert.equal(judge.actionRequired, false);
@@ -353,4 +507,107 @@ test('the approval guidance asks nothing in auto mode: translate for the transla
   const normal = failureGuidance('Run judge successfully for these inputs before approving translation', { language: 'en' });
   assert.equal(normal.options[0].id, 'run-judge'); assert.equal(normal.actionRequired, true);
   assert.ok(normal.options.some(o => o.id === 'review-approve'));
+});
+
+test('auto mode keeps a batch the person chose when its approval goes out of date: translate approves that batch again, with each file it needs that is no longer done, and still stops at its end', async t => {
+  const f = await phase04(t, { mode: 'normal' });
+  approve(f.root, f.config, 'translation', 'The person reviews one file first', { batch: 1 });
+  setPreferences(f.root, { phaseMode: 'auto' });
+  staleGate(f);
+  const before = migrationStatus(f.root);
+  assert.ok(before.nextActions.some(a => /^Run translate \(the approval of the batch of 1 file\(s\) the person chose is out of date; 1 file\(s\) of it left\): in auto mode it records the approval of that batch again itself/.test(a)), before.nextActions.join('\n'));
+  assert.ok(!before.blockers.some(b => b.path === 'migration/gates/translation.json'), JSON.stringify(before.blockers));
+  const stages = [];
+  const first = await translate(f.root, f.config, fake, { onProgress: e => stages.push(e.stage) });
+  assert.match(first.autoApproval, /^the translation approval was not current: translation approval is stale/);
+  assert.deepEqual(first.scopeTargets, ['ported/math_ops.mjs']);
+  assert.ok(stages.some(s => /^auto mode recorded the translation approval of the batch the person chose again \(/.test(s)), stages.join('\n'));
+  const again = gate(f);
+  assert.deepEqual([again.targets, again.stopAtEnd, again.auto, again.recordedBy], [['ported/math_ops.mjs'], true, true, 'translate']);
+  assert.match(again.note, /^Auto mode: translate recorded the approval of the batch the person chose again itself \(1 file\(s\)\)/);
+  assert.equal(fs.existsSync(statePath(f.root, f.units[1])), false, 'the run stopped at the end of their batch');
+  assert.ok(migrationStatus(f.root).nextActions.some(a => waitWord.test(a)));
+  // Their batch done, then out of date: the end of their batch, as before;
+  // once they say to go on, translate records every file left.
+  staleGate(f);
+  const end = migrationStatus(f.root);
+  assert.ok(end.nextActions.some(a => waitWord.test(a)), end.nextActions.join('\n'));
+  assert.ok(!end.nextActions.some(a => /^Run translate/.test(a)), end.nextActions.join('\n'));
+  const second = await translate(f.root, f.config, fake);
+  assert.match(second.autoApproval, /^the translation approval was not current/);
+  assert.equal(gate(f).targets, undefined);
+  assert.ok(allDone(f));
+  // A file their batch uses that is no longer done is approved with it, and
+  // nothing else is.
+  const d = await phase04(t, { count: 3, mode: 'normal' });
+  approve(d.root, d.config, 'translation', 'The person reviews the files main uses first', { batch: 2 });
+  await translate(d.root, d.config, fake);
+  approve(d.root, d.config, 'translation', 'Then main', { targets: ['ported/main.mjs'] });
+  setPreferences(d.root, { phaseMode: 'auto' });
+  const math = d.units.find(u => u.target === 'ported/math_ops.mjs'), text = d.units.find(u => u.target === 'ported/text_ops.mjs');
+  const textState = fs.readFileSync(statePath(d.root, text));
+  fs.rmSync(statePath(d.root, math));
+  staleGate(d);
+  const run = await translate(d.root, d.config, fake);
+  const expected = d.units.map(u => u.target).filter(p => ['ported/math_ops.mjs', 'ported/main.mjs'].includes(p));
+  assert.deepEqual(run.scopeTargets, expected);
+  assert.deepEqual([gate(d).targets, gate(d).stopAtEnd], [expected, true]);
+  assert.ok(allDone(d));
+  assert.deepEqual(fs.readFileSync(statePath(d.root, text)), textState, 'a file their batch uses that is done is left as it is');
+});
+
+test('auto mode with every file done and the translation approval out of date: status and the guidance of approve build say to run translate, which records it; outside auto mode the person reviews the change', async t => {
+  const f = await phase04(t, { mode: 'auto' });
+  await translate(f.root, f.config, fake);
+  assert.ok(allDone(f));
+  staleGate(f);
+  const status = migrationStatus(f.root);
+  assert.ok(status.nextActions.some(a => /^Run translate \(every file is done; the approval build needs is missing or out of date\)/.test(a)), status.nextActions.join('\n'));
+  assert.ok(!status.nextActions.some(a => /approve (?:build|smoke|parity)/.test(a)), 'no approval of a later stage, which would fail on it');
+  const refused = (() => { try { approve(f.root, f.config, 'build', 'Autopilot'); return null; } catch (e) { return e; } })();
+  assert.match(refused?.message ?? '', /^translation approval is stale/);
+  for (const language of ['ja', 'en']) for (const message of [refused.message, 'translation approval belongs to a different execution purpose', 'Invalid translation approval scope']) {
+    const g = failureGuidance(message, { root: f.root, language });
+    assert.equal(g.id, 'approval', message); assert.equal(g.actionRequired, false, message);
+    assert.equal(g.options[0].id, 'run-translate', message);
+  }
+  // The gate of another stage names its own stage, which approve STAGE records.
+  assert.equal(failureGuidance('build approval belongs to a different execution purpose', { root: f.root }).id, 'unknown');
+  const run = await translate(f.root, f.config, fake);
+  assert.match(run.autoApproval, /^the translation approval was not current: translation approval is stale/);
+  assert.ok(migrationStatus(f.root).nextActions.some(a => /^Review current evidence; approve build with a concrete note and run build/.test(a)));
+  assert.equal(approve(f.root, f.config, 'build', 'Autopilot').auto, true);
+  // Outside auto mode the same failure keeps its own guidance.
+  const n = await phase04(t, { mode: 'normal' });
+  assert.equal(failureGuidance(refused.message, { root: n.root }).id, 'inputs-changed');
+  assert.equal(failureGuidance(refused.message, { root: n.root }).actionRequired, true);
+});
+
+// A pilot is a trial in a copy outside the project: its runner approves its
+// own translation, so translate never records one there, in auto mode either.
+test('a pilot never has translate record the translation approval itself, in auto mode either', async t => {
+  const f = prepare(t, { realCommands: true, count: 3 });
+  f.config.phasePolicy = 'strict'; f.config.commands.typecheck = null;
+  writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
+  fs.rmSync(safePath(f.root, 'migration/stress-test/report.md'));
+  for (const name of ['migration/judge-report.md', 'migration/depmap/report.md', 'migration/gap-report.md']) atomicWrite(safePath(f.root, name), 'Disposable preparation fixture; not actual AI review or human signoff.\n');
+  for (const id of ['00', '00b', '01', '02']) phaseCommand(f.root, f.config, 'complete', id, { note: 'Synthetic preparation review for boundary tests only' });
+  await runStage(f.root, f.config, 'judge');
+  setPreferences(f.root, { phaseMode: 'auto' });
+  const child = `${f.root}-pilot`;
+  t.after(() => fs.rmSync(child, { recursive: true, force: true }));
+  preparePilot(f.root, f.config, { target: child, sources: ['src/main.py'], note: 'Auto mode: 1 chosen file', expectTotal: 1 });
+  setPreferences(child, { phaseMode: 'auto' });
+  assert.equal(autoPhases(child), true, 'auto mode is on in the copy');
+  const config = loadConfig(child);
+  await runStage(child, config, 'judge');
+  await assert.rejects(translate(child, config, fake), /^Error: No translation approval/);
+  assert.equal(fs.existsSync(safePath(child, 'migration/gates/translation.json')), false);
+  assert.equal(migrationStatus(child).autoRecordsApproval, undefined);
+  for (const message of ['No translation approval. Review the artifacts and explicitly run approve translation.', 'translation approval is stale; inputs or outputs changed']) {
+    const g = failureGuidance(message, { root: child, language: 'en' });
+    assert.equal(g.actionRequired, true, message);
+    assert.ok(!g.options.some(o => o.id === 'run-translate'), message);
+  }
+  assert.equal(failureGuidance('translation approval is stale; inputs or outputs changed', { root: child }).id, 'inputs-changed', 'kept as before');
 });
