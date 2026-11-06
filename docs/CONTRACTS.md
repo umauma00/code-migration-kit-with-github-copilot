@@ -261,7 +261,11 @@ the adapter's `answerWatch` reads the CLI's stream events; `writingAtLimit`
 on the error when it was stopped there), and one that finished its answer
 (`finished`: its last reply without tools, or the CLI's result) has
 `finishWaitMs` (a minute, or the limit when shorter) after the tick that saw
-it for its CLI to exit; a CLI that does not exit is stopped at its limit. The call is tried once more in a new
+it for its CLI to exit; a CLI that does not exit is stopped at its limit or
+when that wait is over, whichever is later, with "had not exited Ns after it
+finished its answer" and `finishedAtLimit` (its retry's
+`extra.previousAttempt` says the answer was lost because the CLI did not
+exit). The call is tried once more in a new
 session, since 0.48.0 with twice the limit (`tryLimitMinutes`), with
 `extra.previousAttempt`: a sentence after the task data that says what the
 stopped call did and, when it had used tools, to search a dependency rather

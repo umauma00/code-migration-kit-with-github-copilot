@@ -103,11 +103,14 @@ test('a call that finished its answer has a minute (or its limit, when shorter) 
   writing = false; finished = true;
   assert.deepEqual(ticks(exiting, 21), [...Array(20).fill(false), true], 'stopped 1000 ms after the tick that saw it finished');
   assert.equal(exiting.writingAtStop, false);
+  assert.equal(exiting.finishedAtStop, true, 'it had finished, but not exited');
+  assert.equal(exiting.finishMs, 1000);
   // Finished long before its limit and still running (a CLI that hangs once
   // its answer is done): stopped at its limit, as before 0.48.0.
   now = 0;
   const hung = callLimiter(1000, { finished: () => true, finishMs: 200, clock });
   assert.deepEqual(ticks(hung, 20), [...Array(19).fill(false), true]);
+  assert.equal(hung.finishedAtStop, true);
   // Finished, then at work again (a new turn): the wait counts from the time
   // it finished again.
   now = 0; writing = false; finished = true;
@@ -124,6 +127,12 @@ test('a call that finished its answer has a minute (or its limit, when shorter) 
   writing = false; finished = true;
   assert.deepEqual(ticks(minute, 3, 30000), [false, false, true]);
   assert.equal(finishWaitMs, 60000);
+  // Not finished when stopped: the plain words of a call at work.
+  now = 0;
+  const plain = callLimiter(1000, { finished: () => false, clock });
+  assert.deepEqual(ticks(plain, 20), [...Array(19).fill(false), true]);
+  assert.equal(plain.finishedAtStop, false);
+  assert.equal(callLimitMessage(30 * 60000, { finishMs: 60000 }), 'Process ran past its call limit (30 min, from workerCallBaseMinutes and the files the call reads) and had not exited 60s after it finished its answer; stopped');
 });
 
 test('answerWatch reads from the CLI\'s events whether the main agent is writing its answer or has finished it', () => {
@@ -153,17 +162,20 @@ test('answerWatch reads from the CLI\'s events whether the main agent is writing
   ev({ type: 'result', exitCode: 0, usage: {} }); assert.deepEqual(state(), finished, 'the CLI wrote its result: it has only to exit');
   ev({ type: 'assistant.turn_start', data: { turnId: '3' } }); assert.deepEqual(state(), neither, 'a new turn: it went on');
   ev({ type: 'result', agentId: 'sub', exitCode: 0 }); assert.deepEqual(state(), neither, 'a subagent\'s result is not the CLI\'s');
+  ev({ type: 'assistant.message_delta', data: { deltaContent: 'x' } });
+  ev({ type: 'result', agentId: 'sub', exitCode: 0 }); assert.deepEqual(state(), writing, 'nor does it end the main agent\'s writing');
   // The pieces the watch reads are the ones the runner drops from its logs.
   assert.equal(isStreamedDelta(JSON.stringify({ type: 'assistant.message_delta', data: { deltaContent: 'x' } })), true);
 });
 
-// Every line a real Copilot CLI 1.0.105 run wrote, in order (Linux x64,
-// 2026-11-06): -p with --output-format json --stream on and the workers' tool
-// flags, against a loopback OpenAI-compatible provider (COPILOT_PROVIDER_BASE_URL,
+// Built from a real Copilot CLI 1.0.105 run (Linux x64, 2026-11-06): -p with
+// --output-format json --stream on and the workers' tool flags, against a
+// loopback OpenAI-compatible provider (COPILOT_PROVIDER_BASE_URL,
 // COPILOT_OFFLINE true) that streamed a turn writing a sentence and calling
-// view, then the final answer in three pieces. Each line's data is cut to the
-// fields answerWatch reads (ids, times and the rest left out); the path is
-// under ROOT. With the state of writing and finished after each line.
+// view, then the final answer in three pieces. Every line it wrote, in order,
+// each line's data cut to the fields answerWatch reads (the raw output, with
+// its ids, times, paths and tool list, is not kept here). With the state of
+// writing and finished after each line.
 const realStream = [
   ['{"type":"session.skills_loaded","data":{}}', false, false],
   ['{"type":"session.info","data":{}}', false, false],
@@ -268,8 +280,9 @@ out({ type: 'assistant.message', data: { content: ${JSON.stringify(answer)}, too
 out({ type: 'assistant.turn_end', data: { turnId: '1' } }); out({ type: 'assistant.idle', data: {} }); out({ type: 'result', exitCode: 0 });`);
   const hung = await call(f, hanging, limit).then(() => null, e => e);
   assert.ok(hung, 'stopped');
-  assert.equal(hung.callLimit, true); assert.equal(hung.writingAtLimit, undefined);
-  assert.equal(hung.message, callLimitMessage(limit));
+  assert.equal(hung.callLimit, true); assert.equal(hung.writingAtLimit, undefined); assert.equal(hung.finishedAtLimit, true);
+  assert.equal(hung.message, callLimitMessage(limit, { finishMs: limit }));
+  assert.match(hung.message, /and had not exited 3s after it finished its answer; stopped$/);
   assert.ok(hung.workedMs >= limit && hung.workedMs < 2 * limit, String(hung.workedMs));
   // Writes forever: stopped at twice its limit, and says so.
   const forever = streamingCli(f, 'forever-cli.mjs', `out({ type: 'assistant.turn_start', data: { turnId: '1' } });
@@ -286,7 +299,7 @@ setInterval(() => out({ type: 'assistant.message_delta', data: { messageId: 'm1'
 setInterval(() => { n++; out({ type: 'assistant.turn_start', data: { turnId: String(n) } }); out({ type: 'tool.execution_start', data: { toolCallId: 'call_' + n, toolName: 'view', arguments: {} } }); }, 25);`);
   const tools = await call(f, reading, limit).then(() => null, e => e);
   assert.ok(tools, 'stopped');
-  assert.equal(tools.callLimit, true); assert.equal(tools.writingAtLimit, undefined);
+  assert.equal(tools.callLimit, true); assert.equal(tools.writingAtLimit, undefined); assert.equal(tools.finishedAtLimit, undefined);
   assert.equal(tools.message, callLimitMessage(limit));
   assert.ok(tools.workedMs >= limit && tools.workedMs < 2 * limit, String(tools.workedMs));
   // A tool call on a line too long to read whole (70 KB of arguments), after
@@ -358,6 +371,26 @@ test('the retry hears how long the stopped call was at work; a file set aside af
   }).catch(() => null);
   const state = readJSON(statePath(b.root, b.units[0]));
   assert.match(state.error, /^Copilot implementer ran past its call limit of 30 min \(from workerCallBaseMinutes and the files the call reads\) and was stopped, while still writing its answer at twice its limit; this file is set aside for this run/);
+  // A call that finished its answer, but whose CLI did not exit: its retry
+  // is told the answer was lost (nothing to do faster), and the reason says so.
+  const h = prepare(t, { executionMode: 'continuous', count: 2 });
+  h.config.transientRetryDelayMs = 1; writeJSON(safePath(h.root, 'migration/state/config.json'), h.config);
+  await runStage(h.root, h.config, 'judge');
+  approve(h.root, h.config, 'translation', 'Automated fixture approval for tests only');
+  const heard = [];
+  await translate(h.root, h.config, async args => {
+    if (args.unit.target === h.units[0].target && args.role === 'implementer') {
+      heard.push(args.extra.previousAttempt);
+      throw Object.assign(new Error(callLimitMessage(args.callLimitMs, { finishMs: 60000 })), { callLimit: true, finishedAtLimit: true, workedMs: args.callLimitMs + 60000 });
+    }
+    return fake(args);
+  }).catch(() => null);
+  assert.equal(heard[1], 'after 31 minutes: it had finished its answer, but the Copilot CLI did not exit after it, so the answer was lost. Return your answer again.');
+  const hstate = readJSON(statePath(h.root, h.units[0]));
+  assert.match(hstate.error, /^Copilot implementer ran past its call limit on 2 attempts \(30 min, then 60 min on the retry; from workerCallBaseMinutes and the files the call reads\), the last time with its answer finished but its CLI not exiting; this file is set aside for this run/);
+  const runs = safePath(h.root, 'migration/runs');
+  const attempts = fs.readdirSync(runs, { withFileTypes: true }).filter(d => d.isDirectory()).flatMap(d => fs.readdirSync(path.join(runs, d.name)).filter(n => /-implementer-.*\.json$/.test(n)).map(n => JSON.parse(fs.readFileSync(path.join(runs, d.name, n), 'utf8'))));
+  assert.ok(attempts.some(a => (a.retries ?? []).some(r => r.finishedAtLimit === true)), 'the attempt record says so');
 });
 
 test('status shows the AI calls at work of concurrency and the files waiting on a dependency, from the run\'s progress record', async t => {
@@ -525,7 +558,7 @@ test('approve says when auto mode will go on past a batch it records, refuses --
   const chosen = await cli('approve', 'translation', '--batch', '1', '--stop-at-end', '--note', 'The person asked for one file first');
   assert.equal(chosen.code, 0, chosen.stderr);
   assert.doesNotMatch(chosen.stderr, /NOTE: auto mode does not stop/);
-  for (const g of [{ auto: true }, { targets: ['a'] }, { targets: ['a'], auto: true, stopAtEnd: true }, { targets: ['a'], auto: true, recordedBy: 'translate' }, null]) assert.equal(autoBatchNotice(f.root, g), null, JSON.stringify(g));
+  for (const g of [{ auto: true }, { targets: ['a'] }, { targets: ['a'], auto: true, stopAtEnd: true }, { targets: ['a'], auto: true, recordedBy: 'translate' }, null]) assert.equal(autoBatchNotice(g), null, JSON.stringify(g));
   // --complete-phase 03 with --stop-at-end and no batch: nothing is recorded.
   const p = prepare(t);
   p.config.phasePolicy = 'strict'; writeJSON(safePath(p.root, 'migration/state/config.json'), p.config);

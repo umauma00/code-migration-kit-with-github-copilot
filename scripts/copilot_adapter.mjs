@@ -454,8 +454,8 @@ export function answerWatch() {
       try { event = JSON.parse(text); } catch { if (toolCallHead.test(text)) tool(); return; }
       if (!event || typeof event !== 'object') return;
       if (event.type === 'tool.execution_start') tool();
-      else if (event.type === 'result') { writing = false; if (main(event)) finished = true; }
       else if (!main(event)) return;
+      else if (event.type === 'result') { writing = false; finished = true; }
       else if (['assistant.turn_start', 'assistant.tool_call_delta'].includes(event.type)) tool();
       else if (['assistant.turn_end', 'assistant.idle'].includes(event.type)) { finished ||= writing; writing = false; }
       else if (event.type === 'assistant.message_delta') { if (typeof event.data?.deltaContent === 'string' && event.data.deltaContent) { writing = true; finished = false; } }

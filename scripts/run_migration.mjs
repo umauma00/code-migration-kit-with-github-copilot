@@ -606,7 +606,7 @@ export async function main(argv = process.argv.slice(2)) {
         const phase = phaseCommand(root, config, 'complete', '03', { note: args.note });
         result = { phase, approval: approve(root, config, 'translation', args.note, scope) };
       }
-      const notice = autoBatchNotice(root, result?.approval ?? result);
+      const notice = autoBatchNotice(result?.approval ?? result);
       if (notice) console.error(`NOTE: ${notice}`);
     }
     else if (['judge', 'build', 'smoke', 'parity', 'handoff'].includes(cmd)) result = await runStage(root, config, cmd, { signal: controller.signal });

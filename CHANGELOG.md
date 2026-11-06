@@ -80,10 +80,13 @@ time was stopped again.
   limit is tried once more with twice the limit (`tryLimitMinutes`), and the
   attempt record and status show that limit. A call writing its final answer
   without tools when its limit comes may finish, up to twice the limit, and
-  one that finished it has a minute (or the limit, when shorter) for its CLI
-  to exit (`finishWaitMs`): the CLI saves its session after its result, and
-  a stop then would lose the answer; one that does not exit is stopped at its
-  limit as before. The adapter reads the CLI's stream events (`answerWatch`:
+  one that finished it has about a minute (or the limit, when shorter;
+  counted in steps) for its CLI to exit (`finishWaitMs`): the CLI saves its
+  session after its result, and a stop then would lose the answer. One that
+  does not exit is stopped at its limit or when that wait is over, whichever
+  is later, and says so ("had not exited ... after it finished its answer",
+  `finishedAtLimit`, in its reason and attempt record); its retry hears that
+  the answer was lost because the CLI did not exit. The adapter reads the CLI's stream events (`answerWatch`:
   writing, the main agent's `assistant.message_delta` text; finished, an
   `assistant.message` without tool requests, the end of a turn that was
   writing or `result`; a tool call, from its streamed
