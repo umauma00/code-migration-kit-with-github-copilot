@@ -8,7 +8,7 @@ import { lockRun, readLock, loadConfig, unsetModels, readManifest, unitState, do
 import { strictPhases, phaseRecorded } from '../lib/phases.mjs';
 import { validateWorkerProfile, assistedReviewerRoles } from '../lib/review.mjs';
 import { runProcess } from '../lib/process.mjs';
-import { approve, runStage, translate, runPilot, runJudgePreparation } from '../lib/pipeline.mjs';
+import { approve, runStage, translate, runPilot, runJudgePreparation, checkStopAtEnd, autoBatchNotice } from '../lib/pipeline.mjs';
 import { preparePilot, planPilot } from '../lib/pilot.mjs';
 import { createCopilotAdapter, requiredCopilotFlags, copilotEnv, copilotArgs, probeWorkerAgents, probeReviewerHook, probeModelTools, stressBTools, stressBCommand, fileReadTools, fileLimits, fileLimitMinimum } from './copilot_adapter.mjs';
 import { runtimeLayout, pluginRoot } from '../lib/runtime.mjs';
@@ -600,10 +600,14 @@ export async function main(argv = process.argv.slice(2)) {
       if (args['complete-phase'] === undefined) result = approve(root, config, args._[1], args.note, scope);
       else {
         // The 03 review and the translation approval are one human decision: record both under one confirmation.
-        if (args._[1] !== 'translation' || args['complete-phase'] !== '03') throw new Error('--complete-phase applies only as approve translation --complete-phase 03');
+        // A command line's error (lib/guidance.mjs command-line), not an approval's.
+        if (args._[1] !== 'translation' || args['complete-phase'] !== '03') throw new Error(`Option --complete-phase does not apply to approve ${args._[1]} --complete-phase ${args['complete-phase']}: it applies only as approve translation --complete-phase 03. Add --help for usage.`);
+        checkStopAtEnd('translation', scope);
         const phase = phaseCommand(root, config, 'complete', '03', { note: args.note });
         result = { phase, approval: approve(root, config, 'translation', args.note, scope) };
       }
+      const notice = autoBatchNotice(root, result?.approval ?? result);
+      if (notice) console.error(`NOTE: ${notice}`);
     }
     else if (['judge', 'build', 'smoke', 'parity', 'handoff'].includes(cmd)) result = await runStage(root, config, cmd, { signal: controller.signal });
     else if (['translate', 'repair'].includes(cmd)) {

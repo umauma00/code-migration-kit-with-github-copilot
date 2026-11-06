@@ -38,8 +38,14 @@ time was stopped again.
   translate as before, and status makes approve's checks before it says to
   run translate. A batch the person chose whose approval went out of date is
   approved again as that batch (with each file it needs that is no longer
-  done) while a file of it is left, and still stops at its end
-  (`personsStaleBatch`). A pilot never records one. Normal and relaxed mode
+  done, as the scope check counts them) while a file of it is left, and still
+  stops at its end (`personsStaleBatch`). `--stop-at-end` without a batch, or
+  on another approval, is refused as a command-line error (`stopAtEndRefusal`,
+  never an approval's words, which auto mode would answer by approving every
+  file left) before anything is written (also before the phase 03 record of
+  `--complete-phase 03`, whose own refusal is a command-line error too), and
+  a batch approved in auto mode without it gets a NOTE that the run will not
+  stop at its end. A pilot never records one. Normal and relaxed mode
   are unchanged.
 - Approval guidance and status (`lib/guidance.mjs`, `lib/status.mjs`): in
   auto mode a missing or out-of-date approval asks nothing: the guidance names
@@ -73,12 +79,17 @@ time was stopped again.
   `scripts/copilot_adapter.mjs`, `lib/pipeline.mjs`): a call stopped at its
   limit is tried once more with twice the limit (`tryLimitMinutes`), and the
   attempt record and status show that limit. A call writing its final answer
-  without tools when its limit comes may finish, up to twice the limit: the
-  adapter reads the CLI's stream events (`answerWatch`: the main agent's
-  `assistant.message_delta` text, or an `assistant.message` without tool
-  requests; a tool call, from its streamed `assistant.tool_call_delta` on, a
-  new turn, or `assistant.idle` or `result` ends it, as the real CLI 1.0.105
-  writes them), only with `--stream on`. A
+  without tools when its limit comes may finish, up to twice the limit, and
+  one that finished it has a minute (or the limit, when shorter) for its CLI
+  to exit (`finishWaitMs`): the CLI saves its session after its result, and
+  a stop then would lose the answer; one that does not exit is stopped at its
+  limit as before. The adapter reads the CLI's stream events (`answerWatch`:
+  writing, the main agent's `assistant.message_delta` text; finished, an
+  `assistant.message` without tool requests, the end of a turn that was
+  writing or `result`; a tool call, from its streamed
+  `assistant.tool_call_delta` on, or a new turn ends both, as the real CLI
+  1.0.105 writes them; a test replays every line of such a run), only with
+  `--stream on`. A
   call stopped there says so ("past twice that ... while still writing its
   answer", `writingAtLimit`), and so does the reason of a file set aside.
 - Tests: `tests/auto-batch-call-limit-2026-11-06.test.mjs`; the call limit and

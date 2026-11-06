@@ -24,8 +24,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { prepare, fake, result } from './helpers.mjs';
 import { safePath, writeJSON, readJSON, atomicWrite, statePath, loadConfig } from '../lib/core.mjs';
-import { translate, approve, runStage, translationApprovalOnly } from '../lib/pipeline.mjs';
-import { runProcess, callLimitMessage, callLimiter } from '../lib/process.mjs';
+import { translate, approve, runStage, translationApprovalOnly, autoBatchNotice, stopAtEndRefusal } from '../lib/pipeline.mjs';
+import { runProcess, callLimitMessage, callLimiter, finishWaitMs } from '../lib/process.mjs';
+import { currentPhase } from '../lib/phases.mjs';
 import { createCopilotAdapter, answerWatch, isStreamedDelta } from '../scripts/copilot_adapter.mjs';
 import { failureGuidance, guidanceMarkdown } from '../lib/guidance.mjs';
 import { migrationStatus, statusMarkdown } from '../lib/status.mjs';
@@ -44,8 +45,9 @@ const gate = f => readJSON(gateFile(f));
 const allDone = f => f.units.every(u => fs.existsSync(statePath(f.root, u)) && readJSON(statePath(f.root, u)).status === 'done');
 // A strict project with phases 00 to 03 recorded by the person, the judge run
 // and the guardrails installed: ready for phase 04 except its approval.
-async function phase04(t, { count = 2, mode } = {}) {
+async function phase04(t, { count = 2, mode, setup } = {}) {
   const f = prepare(t, { count });
+  setup?.(f);
   f.config.phasePolicy = 'strict';
   writeJSON(safePath(f.root, 'migration/state/config.json'), f.config);
   for (const name of ['migration/judge-report.md', 'migration/depmap/report.md', 'migration/gap-report.md']) atomicWrite(safePath(f.root, name), 'Synthetic preparation evidence; not actual AI review or human approval.\n');
@@ -83,58 +85,137 @@ test('a call writing its answer at its limit may finish, up to twice the limit; 
   // Not writing (or a check that throws): stopped at the limit, as in 0.47.0.
   for (const check of [() => false, () => { throw new Error('unreadable'); }, () => 'yes', undefined]) {
     now = 0;
-    const plain = callLimiter(1000, { ...(check ? { writing: check } : {}), clock });
+    const plain = callLimiter(1000, { ...(check ? { writing: check, finished: check } : {}), clock });
     assert.deepEqual(ticks(plain, 20), [...Array(19).fill(false), true]);
     assert.equal(plain.writingAtStop, false);
   }
 });
 
-test('answerWatch reads from the CLI\'s events whether the main agent is writing its answer', () => {
-  const w = answerWatch(), ev = e => w.line(JSON.stringify(e));
-  assert.equal(w.writing(), false);
-  ev({ type: 'assistant.turn_start', data: { turnId: '1' } }); assert.equal(w.writing(), false);
-  ev({ type: 'assistant.reasoning_delta', data: { deltaContent: 'thinking' } }); assert.equal(w.writing(), false, 'reasoning is not its answer');
-  ev({ type: 'assistant.message_delta', data: { deltaContent: '' } }); assert.equal(w.writing(), false, 'an empty piece');
-  ev({ type: 'assistant.message_delta', data: { deltaContent: '{"schemaVersion"' } }); assert.equal(w.writing(), true);
-  ev({ type: 'tool.execution_start', data: { toolName: 'view' } }); assert.equal(w.writing(), false, 'a tool call ends it');
-  ev({ type: 'assistant.message_delta', data: { deltaContent: 'x' } }); assert.equal(w.writing(), true);
-  ev({ type: 'assistant.turn_start', data: { turnId: '2' } }); assert.equal(w.writing(), false, 'a new turn ends it');
-  ev({ type: 'assistant.message_delta', agentId: 'sub', data: { deltaContent: 'x' } }); assert.equal(w.writing(), false, 'a subagent\'s text is not its answer');
-  ev({ type: 'assistant.message_delta', data: { deltaContent: 'x', parentToolCallId: 'call_1' } }); assert.equal(w.writing(), false);
-  ev({ type: 'assistant.message', data: { content: 'Let me read it', toolRequests: [{ name: 'view' }] } }); assert.equal(w.writing(), false, 'a reply that asks for tools');
-  ev({ type: 'assistant.message', data: { content: '{"kind":"review"}', toolRequests: [] } }); assert.equal(w.writing(), true, 'the final reply: the result is next');
+test('a call that finished its answer has a minute (or its limit, when shorter) to exit before its limit stops it; one that hangs once finished is stopped then (callLimiter)', () => {
+  let now = 0, writing = true, finished = false;
+  const clock = () => now;
+  const ticks = (limiter, n, step = 50) => { const out = []; for (let i = 0; i < n; i++) { now += step; out.push(limiter.tick()); } return out; };
+  // Writing past its limit, then finished: it has finishMs (here the limit,
+  // 1000 ms, shorter than a minute) from the tick that saw it finished, even
+  // past twice the limit.
+  const exiting = callLimiter(1000, { writing: () => writing, finished: () => finished, clock });
+  assert.ok(ticks(exiting, 30).every(due => !due), 'past its limit while writing');
+  writing = false; finished = true;
+  assert.deepEqual(ticks(exiting, 21), [...Array(20).fill(false), true], 'stopped 1000 ms after the tick that saw it finished');
+  assert.equal(exiting.writingAtStop, false);
+  // Finished long before its limit and still running (a CLI that hangs once
+  // its answer is done): stopped at its limit, as before 0.48.0.
+  now = 0;
+  const hung = callLimiter(1000, { finished: () => true, finishMs: 200, clock });
+  assert.deepEqual(ticks(hung, 20), [...Array(19).fill(false), true]);
+  // Finished, then at work again (a new turn): the wait counts from the time
+  // it finished again.
+  now = 0; writing = false; finished = true;
+  const again = callLimiter(1000, { writing: () => writing, finished: () => finished, finishMs: 200, clock });
+  assert.ok(ticks(again, 5).every(due => !due));
+  finished = false; writing = true;
+  assert.ok(ticks(again, 20).every(due => !due), 'writing at its limit');
+  writing = false; finished = true;
+  assert.deepEqual(ticks(again, 5), [false, false, false, false, true]);
+  // A limit of ten minutes (a step of 30 s): a minute.
+  now = 0; writing = true; finished = false;
+  const minute = callLimiter(600000, { writing: () => writing, finished: () => finished, clock });
+  assert.ok(ticks(minute, 24, 30000).every(due => !due), 'writing past its limit');
+  writing = false; finished = true;
+  assert.deepEqual(ticks(minute, 3, 30000), [false, false, true]);
+  assert.equal(finishWaitMs, 60000);
+});
+
+test('answerWatch reads from the CLI\'s events whether the main agent is writing its answer or has finished it', () => {
+  const w = answerWatch(), ev = e => w.line(JSON.stringify(e)), state = () => [w.writing(), w.finished()];
+  const writing = [true, false], finished = [false, true], neither = [false, false];
+  assert.deepEqual(state(), neither);
+  ev({ type: 'assistant.turn_start', data: { turnId: '1' } }); assert.deepEqual(state(), neither);
+  ev({ type: 'assistant.reasoning_delta', data: { deltaContent: 'thinking' } }); assert.deepEqual(state(), neither, 'reasoning is not its answer');
+  ev({ type: 'assistant.message_delta', data: { deltaContent: '' } }); assert.deepEqual(state(), neither, 'an empty piece');
+  ev({ type: 'assistant.message_delta', data: { deltaContent: '{"schemaVersion"' } }); assert.deepEqual(state(), writing);
+  ev({ type: 'tool.execution_start', data: { toolName: 'view' } }); assert.deepEqual(state(), neither, 'a tool call ends it');
+  ev({ type: 'assistant.message_delta', data: { deltaContent: 'x' } }); assert.deepEqual(state(), writing);
+  ev({ type: 'assistant.turn_start', data: { turnId: '2' } }); assert.deepEqual(state(), neither, 'a new turn ends it');
+  ev({ type: 'assistant.message_delta', agentId: 'sub', data: { deltaContent: 'x' } }); assert.deepEqual(state(), neither, 'a subagent\'s text is not its answer');
+  ev({ type: 'assistant.message_delta', data: { deltaContent: 'x', parentToolCallId: 'call_1' } }); assert.deepEqual(state(), neither);
+  ev({ type: 'assistant.message', data: { content: 'Let me read it', toolRequests: [{ name: 'view' }] } }); assert.deepEqual(state(), neither, 'a reply that asks for tools');
+  ev({ type: 'assistant.message', data: { content: '{"kind":"review"}', toolRequests: [] } }); assert.deepEqual(state(), finished, 'the final reply: the CLI has only to exit');
   for (const line of ['not json', '{"type":"assistant.message_delta"', '"assistant.turn_start"', JSON.stringify({ type: 'session.info', data: {} })]) w.line(line);
-  assert.equal(w.writing(), true, 'a broken or other line changes nothing');
-  ev({ type: 'tool.execution_start', agentId: 'sub', data: { toolName: 'grep' } }); assert.equal(w.writing(), false, 'any agent\'s tool call');
-  ev({ type: 'assistant.message_delta', data: { deltaContent: 'Let me read it.' } }); assert.equal(w.writing(), true);
-  ev({ type: 'assistant.tool_call_delta', data: { toolCallId: 'call_2', toolName: 'view', inputDelta: '{"path"' } }); assert.equal(w.writing(), false, 'the turn streams a tool call');
-  ev({ type: 'assistant.message', data: { content: '{}', toolRequests: [] } }); assert.equal(w.writing(), true);
-  ev({ type: 'assistant.idle', data: {} }); assert.equal(w.writing(), false, 'the answer is done: a CLI that hangs now is stopped at its limit');
-  ev({ type: 'assistant.message', data: { content: '{}', toolRequests: [] } });
-  ev({ type: 'result', exitCode: 0, usage: {} }); assert.equal(w.writing(), false);
+  assert.deepEqual(state(), finished, 'a broken or other line changes nothing');
+  ev({ type: 'tool.execution_start', agentId: 'sub', data: { toolName: 'grep' } }); assert.deepEqual(state(), neither, 'any agent\'s tool call');
+  ev({ type: 'assistant.message_delta', data: { deltaContent: 'Let me read it.' } }); assert.deepEqual(state(), writing);
+  ev({ type: 'assistant.tool_call_delta', data: { toolCallId: 'call_2', toolName: 'view', inputDelta: '{"path"' } }); assert.deepEqual(state(), neither, 'the turn streams a tool call');
+  ev({ type: 'assistant.message', data: { content: '{}', toolRequests: [] } }); assert.deepEqual(state(), finished);
+  ev({ type: 'assistant.idle', data: {} }); assert.deepEqual(state(), finished, 'still finished once idle');
+  ev({ type: 'assistant.message_delta', data: { deltaContent: 'more' } }); assert.deepEqual(state(), writing, 'new text: writing again');
+  ev({ type: 'assistant.message', data: { content: ' ', toolRequests: [] } }); assert.deepEqual(state(), neither, 'an empty reply is no answer');
+  ev({ type: 'result', exitCode: 0, usage: {} }); assert.deepEqual(state(), finished, 'the CLI wrote its result: it has only to exit');
+  ev({ type: 'assistant.turn_start', data: { turnId: '3' } }); assert.deepEqual(state(), neither, 'a new turn: it went on');
+  ev({ type: 'result', agentId: 'sub', exitCode: 0 }); assert.deepEqual(state(), neither, 'a subagent\'s result is not the CLI\'s');
   // The pieces the watch reads are the ones the runner drops from its logs.
   assert.equal(isStreamedDelta(JSON.stringify({ type: 'assistant.message_delta', data: { deltaContent: 'x' } })), true);
 });
 
-// The events of the real Copilot CLI 1.0.105 (Linux, a streaming loopback
-// model, the workers' flags; data trimmed to the fields the watch reads): a
-// turn that writes a sentence and calls view, then the final answer.
-test('answerWatch follows the events of the real CLI 1.0.105', () => {
-  const trace = [
-    ['session.tools_updated', false], ['user.message', false], ['assistant.turn_start', false], ['model.call_start', false], ['assistant.message_start', false],
-    ['assistant.message_delta', true, { deltaContent: 'Let me ' }], ['assistant.message_delta', true, { deltaContent: 'read it.' }],
-    ['assistant.tool_call_delta', false, { toolCallId: 'call_1', toolName: 'view', toolType: 'function', inputDelta: '' }], ['model.call_finished', false],
-    ['assistant.message', false, { content: 'Let me read it.', toolRequests: [{ toolCallId: 'call_1', name: 'view', arguments: { path: 'a.txt' }, type: 'function' }] }],
-    ['tool.execution_start', false, { toolCallId: 'call_1', toolName: 'view' }], ['model.call_final_result', false], ['tool.execution_complete', false], ['assistant.turn_end', false],
-    ['assistant.turn_start', false], ['model.call_start', false], ['assistant.message_start', false],
-    ['assistant.message_delta', true, { deltaContent: '{"schema' }], ['assistant.message_delta', true, { deltaContent: 'Version": 1}' }], ['model.call_finished', true],
-    ['assistant.message', true, { content: '{"schemaVersion": 1}', toolRequests: [] }], ['model.call_final_result', true], ['assistant.turn_end', true],
-    ['assistant.idle', false], ['result', false]];
+// Every line a real Copilot CLI 1.0.105 run wrote, in order (Linux x64,
+// 2026-11-06): -p with --output-format json --stream on and the workers' tool
+// flags, against a loopback OpenAI-compatible provider (COPILOT_PROVIDER_BASE_URL,
+// COPILOT_OFFLINE true) that streamed a turn writing a sentence and calling
+// view, then the final answer in three pieces. Each line's data is cut to the
+// fields answerWatch reads (ids, times and the rest left out); the path is
+// under ROOT. With the state of writing and finished after each line.
+const realStream = [
+  ['{"type":"session.skills_loaded","data":{}}', false, false],
+  ['{"type":"session.info","data":{}}', false, false],
+  ['{"type":"session.mcp_servers_loaded","data":{}}', false, false],
+  ['{"type":"session.tools_updated","data":{}}', false, false],
+  ['{"type":"user.message","data":{"content":"Read a.txt then answer.","turnId":"0"}}', false, false],
+  ['{"type":"assistant.turn_start","data":{"turnId":"0"}}', false, false],
+  ['{"type":"model.call_start","data":{"turnId":"0"}}', false, false],
+  ['{"type":"assistant.message_start","data":{}}', false, false],
+  ['{"type":"assistant.message_delta","data":{"deltaContent":"Let me "}}', true, false],
+  ['{"type":"assistant.message_delta","data":{"deltaContent":"read it."}}', true, false],
+  ['{"type":"assistant.tool_call_delta","data":{"toolCallId":"call_1","toolName":"view"}}', false, false],
+  ['{"type":"model.call_finished","data":{"turnId":"0"}}', false, false],
+  ['{"type":"assistant.message","data":{"content":"Let me read it.","toolRequests":[{"toolCallId":"call_1","name":"view"}],"turnId":"0"}}', false, false],
+  ['{"type":"tool.execution_start","data":{"toolCallId":"call_1","toolName":"view","turnId":"0"}}', false, false],
+  ['{"type":"model.call_final_result","data":{}}', false, false],
+  ['{"type":"tool.execution_complete","data":{"toolCallId":"call_1","turnId":"0"}}', false, false],
+  ['{"type":"assistant.turn_end","data":{"turnId":"0"}}', false, false],
+  ['{"type":"assistant.turn_start","data":{"turnId":"1"}}', false, false],
+  ['{"type":"model.call_start","data":{"turnId":"1"}}', false, false],
+  ['{"type":"assistant.message_start","data":{}}', false, false],
+  ['{"type":"assistant.message_delta","data":{"deltaContent":"{\\"schema"}}', true, false],
+  ['{"type":"assistant.message_delta","data":{"deltaContent":"Version\\": 1, "}}', true, false],
+  ['{"type":"assistant.message_delta","data":{"deltaContent":"\\"answer\\": \\"done\\"}"}}', true, false],
+  ['{"type":"model.call_finished","data":{"turnId":"1"}}', true, false],
+  // Its answer is done: from here the CLI has a minute to exit.
+  ['{"type":"assistant.message","data":{"content":"{\\"schemaVersion\\": 1, \\"answer\\": \\"done\\"}","toolRequests":[],"turnId":"1"}}', false, true],
+  ['{"type":"model.call_final_result","data":{}}', false, true],
+  ['{"type":"assistant.turn_end","data":{"turnId":"1"}}', false, true],
+  ['{"type":"assistant.idle","data":{}}', false, true],
+  ['{"type":"result","exitCode":0}', false, true]];
+test('answerWatch follows every line of a real CLI 1.0.105 run', () => {
   const w = answerWatch();
-  for (const [type, writing, data = {}] of trace) {
-    w.line(JSON.stringify(type === 'result' ? { type, exitCode: 0, usage: {} } : { type, data, id: 'e', timestamp: '2026-11-06T18:19:47.000Z' }));
-    assert.equal(w.writing(), writing, type);
+  for (const [line, writing, finished] of realStream) {
+    w.line(line);
+    assert.deepEqual([w.writing(), w.finished()], [writing, finished], line);
   }
+  // A final reply on a line too long to read whole (its head is no JSON):
+  // the end of the turn that was writing it finishes the answer.
+  const long = answerWatch();
+  for (const line of ['{"type":"assistant.message_delta","data":{"deltaContent":"x"}}', `{"type":"assistant.message","data":{"content":"${'x'.repeat(1000)}`]) long.line(line);
+  assert.deepEqual([long.writing(), long.finished()], [true, false]);
+  long.line('{"type":"assistant.turn_end","data":{"turnId":"2"}}');
+  assert.deepEqual([long.writing(), long.finished()], [false, true]);
+  // A subagent's turn ending is not the main agent's.
+  const sub = answerWatch();
+  for (const line of ['{"type":"assistant.message_delta","data":{"deltaContent":"x"}}', '{"type":"assistant.turn_end","agentId":"sub","data":{"turnId":"9"}}']) sub.line(line);
+  assert.deepEqual([sub.writing(), sub.finished()], [true, false]);
+  // A turn that ends without writing (a tool turn) finishes nothing.
+  const tools = answerWatch();
+  for (const line of ['{"type":"tool.execution_complete","data":{}}', '{"type":"assistant.turn_end","data":{"turnId":"0"}}', '{"type":"assistant.idle","data":{}}']) tools.line(line);
+  assert.deepEqual([tools.writing(), tools.finished()], [false, false]);
 });
 
 // A stand-in for the Copilot CLI that streams its answer slowly (--stream on).
@@ -156,22 +237,40 @@ ${body}
 }
 const call = (f, adapter, callLimitMs) => adapter({ root: f.root, config: f.config, role: 'reviewer-semantics', unit: f.units[0], reviewInput: '{"mode":"frozen"}', extra: {}, callLimitMs });
 
-test('end to end: the real adapter lets a CLI still writing its answer at its limit finish, stops one writing past twice the limit, and stops one at work with tools at the limit', { timeout: 90000 }, async t => {
+test('end to end: the real adapter lets a CLI still writing its answer at its limit finish and exit, stops one writing past twice the limit, one that hangs once its answer is done, and one at work with tools at the limit', { timeout: 90000 }, async t => {
   const f = prepare(t, { executionMode: 'continuous' });
   const answer = JSON.stringify(result('reviewer-semantics', f.units[0]));
   // The stand-in counts from its version check, right before the call: it
   // finishes past the limit while the steps between the two take less than
   // 0.4 times the limit, and a slow start of the call has the whole limit.
   const limit = 3000;
-  // Still writing at its limit; done at about 1.4 times the limit.
+  // Still writing at its limit; done at about 1.4 times the limit, then its
+  // turn ends, it goes idle, writes its result and exits 300 ms later (two
+  // steps of the limit's watch: a CLI saves its session before it exits).
   const finishing = streamingCli(f, 'finishing-cli.mjs', `const answer = ${JSON.stringify(answer)};
 out({ type: 'assistant.turn_start', data: { turnId: '1' } });
 const timer = setInterval(() => {
   out({ type: 'assistant.message_delta', data: { messageId: 'm1', deltaContent: 'x' } });
-  if (Date.now() - started > ${1.4 * limit}) { clearInterval(timer); out({ type: 'assistant.message', data: { content: answer, toolRequests: [] } }); out({ type: 'result', exitCode: 0 }); process.exit(0); }
+  if (Date.now() - started > ${1.4 * limit}) {
+    clearInterval(timer);
+    out({ type: 'assistant.message', data: { content: answer, toolRequests: [] } });
+    out({ type: 'assistant.turn_end', data: { turnId: '1' } }); out({ type: 'assistant.idle', data: {} }); out({ type: 'result', exitCode: 0 });
+    setTimeout(() => process.exit(0), 300);
+  }
 }, 25);`);
   const done = await call(f, finishing, limit);
   assert.equal(done.result.verdict, 'pass', 'its answer is used');
+  // Its answer done and its result written, then it never exits: stopped at
+  // its limit as one at work, as before 0.48.0 (its minute to exit is the
+  // limit here, shorter), and well before twice the limit.
+  const hanging = streamingCli(f, 'hanging-cli.mjs', `out({ type: 'assistant.turn_start', data: { turnId: '1' } });
+out({ type: 'assistant.message', data: { content: ${JSON.stringify(answer)}, toolRequests: [] } });
+out({ type: 'assistant.turn_end', data: { turnId: '1' } }); out({ type: 'assistant.idle', data: {} }); out({ type: 'result', exitCode: 0 });`);
+  const hung = await call(f, hanging, limit).then(() => null, e => e);
+  assert.ok(hung, 'stopped');
+  assert.equal(hung.callLimit, true); assert.equal(hung.writingAtLimit, undefined);
+  assert.equal(hung.message, callLimitMessage(limit));
+  assert.ok(hung.workedMs >= limit && hung.workedMs < 2 * limit, String(hung.workedMs));
   // Writes forever: stopped at twice its limit, and says so.
   const forever = streamingCli(f, 'forever-cli.mjs', `out({ type: 'assistant.turn_start', data: { turnId: '1' } });
 setInterval(() => out({ type: 'assistant.message_delta', data: { messageId: 'm1', deltaContent: 'x' } }), 25);`);
@@ -409,10 +508,74 @@ test('auto mode stops at the end of a batch the person chose (approved outside a
   assert.ok(allDone(a));
   // Without a batch it has no end to stop at: refused, nothing recorded.
   const n = await phase04(t, { mode: 'auto' });
-  assert.throws(() => approve(n.root, n.config, 'translation', 'Autopilot', { stopAtEnd: true }), /^Error: --stop-at-end applies to a translation batch/);
+  assert.throws(() => approve(n.root, n.config, 'translation', 'Autopilot', { stopAtEnd: true }), /^Error: Option --stop-at-end does not apply to approve translation without --batch N or --targets PATH,PATH: write the batch the person chose in the same command/);
   assert.equal(fs.existsSync(gateFile(n)), false);
   // The command line passes it on.
   assert.deepEqual(parseCommandLine(['approve', 'translation', '--batch', '5', '--stop-at-end', '--note', 'x'], specs.run_migration)['stop-at-end'], true);
+});
+
+test('approve says when auto mode will go on past a batch it records, refuses --stop-at-end without a batch before phase 03 is recorded, and never replaces an approval it cannot read for a reason other than its JSON', async t => {
+  const f = await phase04(t, { mode: 'auto' });
+  const script = safePath(f.root, 'migration-kit/scripts/run_migration.mjs');
+  const cli = (...args) => runProcess(process.execPath, [script, ...args], { cwd: f.root });
+  const goesOn = /NOTE: auto mode does not stop at the end of this batch of 1 file\(s\): translate goes on with every file left\. If the person asked for this batch first, approve it again with --stop-at-end/;
+  const plain = await cli('approve', 'translation', '--batch', '1', '--note', 'Autopilot batch');
+  assert.equal(plain.code, 0, plain.stderr);
+  assert.match(plain.stderr, goesOn);
+  const chosen = await cli('approve', 'translation', '--batch', '1', '--stop-at-end', '--note', 'The person asked for one file first');
+  assert.equal(chosen.code, 0, chosen.stderr);
+  assert.doesNotMatch(chosen.stderr, /NOTE: auto mode does not stop/);
+  for (const g of [{ auto: true }, { targets: ['a'] }, { targets: ['a'], auto: true, stopAtEnd: true }, { targets: ['a'], auto: true, recordedBy: 'translate' }, null]) assert.equal(autoBatchNotice(f.root, g), null, JSON.stringify(g));
+  // --complete-phase 03 with --stop-at-end and no batch: nothing is recorded.
+  const p = prepare(t);
+  p.config.phasePolicy = 'strict'; writeJSON(safePath(p.root, 'migration/state/config.json'), p.config);
+  for (const name of ['migration/judge-report.md', 'migration/depmap/report.md', 'migration/gap-report.md']) atomicWrite(safePath(p.root, name), 'Synthetic preparation evidence; not actual AI review or human approval.\n');
+  phaseCommand(p.root, p.config, 'init');
+  for (const id of ['00', '00b', '01', '02']) phaseCommand(p.root, p.config, 'complete', id, { note: 'Test fixture reviewed preparation only' });
+  await runStage(p.root, p.config, 'judge');
+  fs.copyFileSync(path.join(kitRoot, 'templates/guardrails.json'), safePath(p.root, 'migration/guardrails.json'));
+  const refused = await runProcess(process.execPath, [safePath(p.root, 'migration-kit/scripts/run_migration.mjs'), 'approve', 'translation', '--complete-phase', '03', '--stop-at-end', '--note', 'Reviewed'], { cwd: p.root });
+  assert.equal(refused.code, 1); assert.match(refused.stderr, /Option --stop-at-end does not apply to approve translation without --batch N/);
+  assert.equal(currentPhase(p.root, p.config, '03'), false, 'phase 03 not recorded');
+  assert.equal(fs.existsSync(gateFile(p)), false);
+  // Its words are a command line's error, never an approval's: in auto mode
+  // the approval guidance would run translate, which approves every file
+  // left instead of the person's batch. The same for --complete-phase.
+  const wrongPhase = await cli('approve', 'build', '--complete-phase', '03', '--note', 'Reviewed');
+  assert.equal(wrongPhase.code, 1);
+  const phaseRefusal = 'Option --complete-phase does not apply to approve build --complete-phase 03: it applies only as approve translation --complete-phase 03. Add --help for usage.';
+  assert.match(wrongPhase.stderr, new RegExp(phaseRefusal.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  for (const message of [stopAtEndRefusal('translation'), stopAtEndRefusal('build'), phaseRefusal]) {
+    const g = failureGuidance(new Error(message), { root: f.root });
+    assert.equal(g.id, 'command-line', message);
+    assert.ok(g.options.some(o => o.id === 'fix-command'));
+  }
+  // approve build --stop-at-end is refused before anything else, and
+  // writes nothing (the build approval retires phase 04's waiver once every
+  // file is reviewed): here every file is done.
+  const b = await phase04(t, { mode: 'auto' });
+  // Before any file is done (the build approval's own checks would refuse).
+  assert.throws(() => approve(b.root, b.config, 'build', 'Reviewed', { stopAtEnd: true }), e => e.message === stopAtEndRefusal('build'));
+  await translate(b.root, b.config, fake);
+  assert.ok(allDone(b));
+  const tree = root => { const out = {}; const walk = d => { for (const e of fs.readdirSync(d, { withFileTypes: true })) { const p = path.join(d, e.name); if (e.isDirectory()) walk(p); else out[path.relative(root, p)] = fs.readFileSync(p, 'utf8'); } }; walk(safePath(root, 'migration')); return out; };
+  const before = tree(b.root);
+  assert.throws(() => approve(b.root, b.config, 'build', 'Reviewed', { stopAtEnd: true }), e => e.message === stopAtEndRefusal('build'));
+  assert.deepEqual(tree(b.root), before, 'nothing written');
+  const buildCli = await runProcess(process.execPath, [safePath(b.root, 'migration-kit/scripts/run_migration.mjs'), 'approve', 'build', '--stop-at-end', '--note', 'Reviewed'], { cwd: b.root });
+  assert.equal(buildCli.code, 1); assert.match(buildCli.stderr, /Option --stop-at-end does not apply to approve build: it marks a batch of the translation approval/);
+  // (The command's start brings the settings file and its records up to
+  // date, as any command that may change something does.)
+  const startup = ['migration/settings.json', 'migration/state/settings-applied.json', 'migration/state/context-upgrade.json'];
+  const without = t => Object.fromEntries(Object.entries(t).filter(([k]) => !startup.includes(k.split(path.sep).join('/'))));
+  assert.deepEqual(without(tree(b.root)), without(before), 'nothing written by the command either');
+  // An approval file approve cannot read for another reason than its JSON
+  // (EBUSY or EACCES on Windows; a folder in its place here) stops approve
+  // where it reads it, before it writes anything in its place.
+  const u = await phase04(t, { mode: 'auto' });
+  fs.mkdirSync(gateFile(u), { recursive: true });
+  assert.throws(() => approve(u.root, u.config, 'translation', 'Autopilot'), e => e.code === 'EISDIR' && e.syscall === 'read');
+  assert.ok(fs.statSync(gateFile(u)).isDirectory(), 'left in place');
 });
 
 test('auto mode approves nothing when a check of approve translation fails; normal mode, repairs and the batch end outside auto mode are as before', async t => {
@@ -515,7 +678,7 @@ test('auto mode keeps a batch the person chose when its approval goes out of dat
   setPreferences(f.root, { phaseMode: 'auto' });
   staleGate(f);
   const before = migrationStatus(f.root);
-  assert.ok(before.nextActions.some(a => /^Run translate \(the approval of the batch of 1 file\(s\) the person chose is out of date; 1 file\(s\) of it left\): in auto mode it records the approval of that batch again itself/.test(a)), before.nextActions.join('\n'));
+  assert.ok(before.nextActions.some(a => /^Run translate \(the approval of the batch of 1 file\(s\) the person chose is out of date; 1 file\(s\) to do for it, counting each file it needs that is no longer done\): in auto mode it records the approval of those files again itself/.test(a)), before.nextActions.join('\n'));
   assert.ok(!before.blockers.some(b => b.path === 'migration/gates/translation.json'), JSON.stringify(before.blockers));
   const stages = [];
   const first = await translate(f.root, f.config, fake, { onProgress: e => stages.push(e.stage) });
@@ -548,12 +711,27 @@ test('auto mode keeps a batch the person chose when its approval goes out of dat
   const textState = fs.readFileSync(statePath(d.root, text));
   fs.rmSync(statePath(d.root, math));
   staleGate(d);
+  // Status counts the file it needs with it, and says so.
+  assert.ok(migrationStatus(d.root).nextActions.some(a => /^Run translate \(the approval of the batch of 1 file\(s\) the person chose is out of date; 2 file\(s\) to do for it, counting each file it needs that is no longer done\)/.test(a)));
   const run = await translate(d.root, d.config, fake);
   const expected = d.units.map(u => u.target).filter(p => ['ported/math_ops.mjs', 'ported/main.mjs'].includes(p));
   assert.deepEqual(run.scopeTargets, expected);
   assert.deepEqual([gate(d).targets, gate(d).stopAtEnd], [expected, true]);
   assert.ok(allDone(d));
   assert.deepEqual(fs.readFileSync(statePath(d.root, text)), textState, 'a file their batch uses that is done is left as it is');
+  // Two files that use each other, without a unit typecheck: as the scope
+  // check, the batch approved again does not hold the first to the second.
+  const m = await phase04(t, { mode: 'normal', setup: x => {
+    x.config.commands.typecheck = null;
+    writeJSON(safePath(x.root, 'migration/review-dependencies.json'), { schemaVersion: 1, dependencies: { 'src/math_ops.py': ['src/text_ops.py'], 'src/text_ops.py': ['src/math_ops.py'] } });
+  } });
+  approve(m.root, m.config, 'translation', 'The person reviews one file first', { targets: ['ported/math_ops.mjs'] });
+  setPreferences(m.root, { phaseMode: 'auto' });
+  staleGate(m);
+  const one = await translate(m.root, m.config, fake);
+  assert.deepEqual(one.scopeTargets, ['ported/math_ops.mjs']);
+  assert.deepEqual(gate(m).targets, ['ported/math_ops.mjs']);
+  assert.equal(fs.existsSync(statePath(m.root, m.units[1])), false, 'the other file of the pair waits for the person');
 });
 
 test('auto mode with every file done and the translation approval out of date: status and the guidance of approve build say to run translate, which records it; outside auto mode the person reviews the change', async t => {

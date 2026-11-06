@@ -258,7 +258,10 @@ still at work at its limit is stopped with its child processes ("Process ran
 past its call limit"). Since 0.48.0 a call writing its final answer without
 tools at its limit may finish, up to twice the limit (`callLimiter` `writing`:
 the adapter's `answerWatch` reads the CLI's stream events; `writingAtLimit`
-on the error when it was stopped there). The call is tried once more in a new
+on the error when it was stopped there), and one that finished its answer
+(`finished`: its last reply without tools, or the CLI's result) has
+`finishWaitMs` (a minute, or the limit when shorter) after the tick that saw
+it for its CLI to exit; a CLI that does not exit is stopped at its limit. The call is tried once more in a new
 session, since 0.48.0 with twice the limit (`tryLimitMinutes`), with
 `extra.previousAttempt`: a sentence after the task data that says what the
 stopped call did and, when it had used tools, to search a dependency rather
@@ -421,10 +424,15 @@ other failure of the gate (phase 03 out of date, a file another program holds)
 stops it as before. A current approval of every file, or a batch the person
 chose with a file still to do, is kept. A batch the person chose is one
 approved outside auto mode (no `auto`) or with `--stop-at-end` (the gate's
-`stopAtEnd: true`, only with `--batch` or `--targets`). When its approval is
+`stopAtEnd: true`, only with `--batch` or `--targets`; refused without one, or
+on another approval, as a command-line error before anything is written,
+including the phase 03 record of `--complete-phase 03`; a batch approved in auto mode without it gets a NOTE on
+stderr that auto mode goes on past its end). When its approval is
 out of date or names a file the manifest no longer has (`personsStaleBatch`),
 translate approves that batch again while a file of it is left: its files in
-the manifest with each prerequisite of them that is no longer done, as
+the manifest with each prerequisite of them that is no longer done (as the
+scope check counts prerequisites: without a unit typecheck, of two files that
+use each other only the second waits for the first), as
 `targets` with `stopAtEnd: true`, so the run still stops at its end (a scope
 the check refuses becomes every file left); with none left, status shows the
 end of their batch, and the next run records every file left. While translate
