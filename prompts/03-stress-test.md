@@ -86,7 +86,11 @@ Report timings, known usage, rule adherence and unresolved questions. Never star
 production fan-out based on your own favorable report. When the person has reviewed
 the report and wants translation to start, record both with one confirmation:
 `approve translation --complete-phase 03 --note TEXT` (add `--batch N` or
-`--targets` for a bounded first scope). `phase complete 03` alone stays available.
+`--targets` only when the person asks for a bounded first scope; in auto mode
+add `--stop-at-end` with it, so the run stops at its end for their word).
+`phase complete 03` alone stays available. In auto mode nothing waits for this:
+`phase complete 03`, then `translate`, which records the translation approval
+itself.
 
 <!-- Copilot adaptation: migration control and instructions updated on 2026-10-08; see NOTICE. -->
 

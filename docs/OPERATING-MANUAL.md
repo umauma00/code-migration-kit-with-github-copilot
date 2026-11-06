@@ -32,6 +32,8 @@ does not apply to automated workers, which keep their JSON-only contracts.
 3. Complete one phase, report the evidence, then stop. The user's explicit next
    phase invocation authorizes that phase. Never self-issue `approve` without the
    user asking you to approve the concrete artifacts. Approval is bound to hashes.
+   Auto mode, which only the person switches on, is the one exception (below):
+   it records phase completions and approvals without the person.
    The hook asks the person to confirm approval, phase-completion,
    `pilot prepare`, `source-spec init --apply`, `guardrails install`,
    `build-loop` and `sessions prune` commands and switching auto mode on (auto
@@ -120,7 +122,14 @@ agent picker, with Copilot and Local alike; it reads the code-migration skill.
 In auto phase mode, which only the person switches on, phase completions,
 approvals, waivers and build loops run without those confirmations so Copilot
 CLI autopilot can drive the run; every such record is marked auto (see
-[auto mode](ORDERED-WORKFLOW.en.md#auto-mode)).
+[auto mode](ORDERED-WORKFLOW.en.md#auto-mode)). There `translate` records a
+missing, out-of-date or used-up translation approval itself, with the checks of
+`approve translation`, and goes on with every file left: auto mode never stops
+at the end of a batch, except one the person chose (approved outside auto mode,
+or in auto mode with `approve translation --batch N --stop-at-end` when the
+person asks for some files first). Outside auto mode
+an approval is the person's, and Copilot CLI autopilot refuses the question by
+itself: approve in an interactive session without autopilot, or choose auto mode.
 
 ## VS Code orchestration and verification modes
 
@@ -146,9 +155,11 @@ Only user-chosen bounded mode or explicit command budgets impose finite limits.
 The runner itself stops and retries a worker call that writes nothing for
 `workerSilenceSeconds` (600 s by default, longer on each retry): that is its own
 recovery from a connection lost without an error, never a reason to stop the run.
-It also stops a translation call still at work past `workerCallMinutes` (30
-minutes by default, a minute more for every 8 KiB of the files it reads whole),
-tries it once more, and then sets that file aside for the run while the other
-files go on; the next run tries it after the other files (in its place when
-another file waits on it).
+It also stops a translation call still at work past its call limit
+(`workerCallBaseMinutes`, 30 minutes by default, plus a minute for every 8 KiB
+of the files it reads whole; `workerCallMinutes` until 0.47.0), unless the call
+is writing its final answer, which may finish up to twice the limit. It tries the
+call once more with twice the limit, and then sets that file aside for the run
+while the other files go on; the next run tries it after the other files (in its
+place when another file waits on it).
 Read [every interruption condition and source index](INTERRUPTION-POLICY.md).

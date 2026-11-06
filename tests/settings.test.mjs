@@ -9,7 +9,7 @@ import { install, kitRoot } from '../scripts/install.mjs';
 import { inputContext, done, readJSON, writeJSON, safePath, loadConfig } from '../lib/core.mjs';
 import { translate, runStage, approve } from '../lib/pipeline.mjs';
 import { normalizeModels, setRoleModels } from '../lib/models.mjs';
-import { initSettings, checkSettings, applySettings, settingsState, syncSettings, settingsFile, settingsHelpFile } from '../lib/settings.mjs';
+import { initSettings, checkSettings, applySettings, settingsState, syncSettings, settingsFile, settingsHelpFile, settingsAtStart, settingsNotice, settingsBaseFile } from '../lib/settings.mjs';
 import { migrationStatus, statusMarkdown } from '../lib/status.mjs';
 import { statusSnapshot } from '../lib/status-snapshot.mjs';
 import { humanGate, interactiveDecision } from '../lib/guardrails.mjs';
@@ -764,28 +764,83 @@ test('workerSilenceSeconds (0.44.0) is an entry of the file: shown with its defa
   assert.equal(settingsState(root, readJSON(recordFile)).state, 'applied');
 });
 
-test('workerCallMinutes (0.47.0) is an entry of the file: shown with its default, checked, applied, and it keeps every record', t => {
+test('workerCallBaseMinutes (0.48.0; workerCallMinutes until 0.47.0) is an entry of the file: shown with its default, checked, applied under the record\'s old key, and it keeps every record', t => {
   const root = fresh(t);
   initSettings(root, models);
   const s = filled(root), recordFile = safePath(root, 'migration/state/config.json');
-  assert.equal(s.workerCallMinutes, 30, 'the default is shown');
-  assert.match(helpOf(root), /- `workerCallMinutes`: .*10〜1440.*RULEBOOK・設計文書の大きさ 8 KiB ごとに1分.*0\.47\.0 以降にしてから変える/);
+  assert.equal(s.workerCallBaseMinutes, 30, 'the default is shown');
+  assert.equal(Object.hasOwn(s, 'workerCallMinutes'), false, 'not under the old name');
+  // The help says the real limit is more than the value, where it shows, and what a stop does.
+  assert.match(helpOf(root), /- `workerCallBaseMinutes`: .*0\.47\.0 までの名前は workerCallMinutes.*8 KiB ごとに1分を足した時間で、呼び出しごとの上限は status に出る.*上限を2倍にして1回だけやり直す.*上限の2倍まで書き終わるのを待つ.*0\.48\.0 以降にしてから変える/);
+  assert.doesNotMatch(helpOf(root), /- `workerCallMinutes`/);
   writeSettings(root, s);
   assert.equal(applySettings(root, models).applied, true);
   assert.equal(Object.hasOwn(readJSON(recordFile), 'workerCallMinutes'), false, 'the default written back adds no key to the record');
+  assert.equal(Object.hasOwn(readJSON(recordFile), 'workerCallBaseMinutes'), false, 'the record keeps its name');
   const before = readJSON(recordFile);
   for (const bad of [5, 1441, 12.5]) {
-    writeSettings(root, { ...s, workerCallMinutes: bad });
+    writeSettings(root, { ...s, workerCallBaseMinutes: bad });
     const refused = applySettings(root, models);
     assert.equal(refused.applied, false, String(bad));
-    assert.match(refused.errors.join('\n'), /workerCallMinutes must be 0 \(off\) or a whole number of minutes from 10 to 1440/);
+    assert.match(refused.errors.join('\n'), /workerCallBaseMinutes must be 0 \(off\) or a whole number of minutes from 10 to 1440/);
     assert.deepEqual(readJSON(recordFile), before, 'nothing written');
   }
   for (const value of [0, 90]) {
-    writeSettings(root, { ...s, workerCallMinutes: value });
+    writeSettings(root, { ...s, workerCallBaseMinutes: value });
     const applied = applySettings(root, models);
     assert.equal(applied.applied, true, JSON.stringify(applied.errors));
+    // The record keeps the name 0.47.0 reads, so a host there still uses the limit.
     assert.equal(loadConfig(root).workerCallMinutes, value);
+    assert.equal(Object.hasOwn(loadConfig(root), 'workerCallBaseMinutes'), false);
     assert.equal(settingsState(root, readJSON(recordFile)).state, 'applied');
   }
+});
+
+test('a settings file of 0.47.0 (workerCallMinutes) is read under the new name: the next command renames it, applies an edit made under the old name, and says so; with both names the new one is used', async t => {
+  const root = fresh(t);
+  initSettings(root, models);
+  const s = filled(root), recordFile = safePath(root, 'migration/state/config.json'), baseFile = safePath(root, settingsBaseFile);
+  writeSettings(root, s);
+  assert.equal(applySettings(root, models).applied, true);
+  // As 0.47.0 left it: the file and the base under the old name.
+  const old = value => { const { workerCallBaseMinutes, ...rest } = value; return { ...rest, workerCallMinutes: workerCallBaseMinutes }; };
+  const base = readJSON(baseFile);
+  writeJSON(baseFile, { ...base, values: old(base.values) });
+  writeSettings(root, old(s));
+  const record = readJSON(recordFile);
+  // status: nothing to apply, and the entry is named as one the next command renames.
+  const state = settingsState(root, record);
+  assert.equal(state.state, 'applied', JSON.stringify(state));
+  assert.deepEqual(state.renamedSettings, [{ from: 'workerCallMinutes', to: 'workerCallBaseMinutes' }]);
+  assert.match(statusMarkdown({ ...migrationStatus(root), settings: state }, 'ja'), /migration\/settings\.json workerCallMinutes: 旧名です。次のコマンドで名前を変えます → workerCallBaseMinutes/);
+  let started = await settingsAtStart(root, async () => models);
+  assert.deepEqual(started.renamedSettings, [{ from: 'workerCallMinutes', to: 'workerCallBaseMinutes' }]);
+  assert.match(settingsNotice(started), /renamed workerCallMinutes to workerCallBaseMinutes in migration\/settings\.json/);
+  assert.equal(settingsOf(root).workerCallBaseMinutes, 30);
+  assert.equal(Object.hasOwn(settingsOf(root), 'workerCallMinutes'), false);
+  assert.deepEqual(readJSON(recordFile), record, 'a rename changes no record');
+  assert.equal(Object.hasOwn(readJSON(baseFile).values, 'workerCallMinutes'), false, 'the base is written under the new name too');
+  // Nothing left to do: the next start is idle.
+  assert.equal((await settingsAtStart(root, async () => models)).renamedSettings, undefined);
+  // An edit made under the old name (a 0.47.0 host's file) is applied as the new one.
+  writeSettings(root, old({ ...settingsOf(root), workerCallBaseMinutes: 90 }));
+  started = await settingsAtStart(root, async () => models);
+  assert.deepEqual(started.applied, ['workerCallBaseMinutes']);
+  assert.equal(loadConfig(root).workerCallMinutes, 90);
+  assert.equal(settingsOf(root).workerCallBaseMinutes, 90);
+  // Both names: the new one is used and the old one removed, and said so.
+  writeSettings(root, { ...settingsOf(root), workerCallMinutes: 45 });
+  const both = settingsState(root, readJSON(recordFile));
+  assert.deepEqual(both.renamedSettings, [{ from: 'workerCallMinutes', to: 'workerCallBaseMinutes', both: true }]);
+  started = await settingsAtStart(root, async () => models);
+  assert.match(settingsNotice(started), /removed workerCallMinutes from migration\/settings\.json \(the old name of workerCallBaseMinutes, which the file also has; workerCallBaseMinutes is used\)/);
+  assert.equal(loadConfig(root).workerCallMinutes, 90);
+  assert.equal(Object.hasOwn(settingsOf(root), 'workerCallMinutes'), false);
+  // A check of a value under the old name names the new one.
+  assert.match(checkSettings(root, old({ ...settingsOf(root), workerCallBaseMinutes: 5 }), models).errors.join('\n'), /workerCallBaseMinutes must be 0 \(off\)/);
+  // A write from chat (models set, preferences) writes the new name too.
+  writeSettings(root, old(settingsOf(root)));
+  syncSettings(root, { keys: ['reportLanguage'] });
+  assert.equal(settingsOf(root).workerCallBaseMinutes, 90);
+  assert.equal(Object.hasOwn(settingsOf(root), 'workerCallMinutes'), false);
 });

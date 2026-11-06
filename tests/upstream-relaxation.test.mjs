@@ -68,7 +68,7 @@ test('approve translation --complete-phase 03 records the 03 review and the appr
   await runStage(f.root, f.config, 'judge');
   const script = safePath(f.root, 'migration-kit/scripts/run_migration.mjs');
   const wrong = await runProcess(process.execPath, [script, 'approve', 'build', '--complete-phase', '03', '--note', 'x'], { cwd: f.root });
-  assert.equal(wrong.code, 1); assert.match(wrong.stderr, /--complete-phase applies only/);
+  assert.equal(wrong.code, 1); assert.match(wrong.stderr, /Option --complete-phase does not apply to approve \S+ --complete-phase \S+: it applies only as approve translation --complete-phase 03/);
   assert.equal(currentPhase(f.root, f.config, '03'), false);
   const run = await runProcess(process.execPath, [script, 'approve', 'translation', '--complete-phase', '03', '--note', 'Reviewed the stress-test report and pilot'], { cwd: f.root });
   assert.equal(run.code, 0, run.stderr);

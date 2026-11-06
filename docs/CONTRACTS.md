@@ -242,7 +242,9 @@ happened, `markerRewrites` and `reviewsKept`).
 
 Since 0.47.0 each worker call of the translation loop (implementer,
 reviewers, arbiter, fixer) has a call limit, in both execution modes:
-`workerCallMinutes` (30 by default, 0 for none, otherwise 10 to 1440) plus one
+`workerCallBaseMinutes` in the settings file (`workerCallMinutes` until 0.47.0
+and in the record `migration/state/config.json`; 30 by default, 0 for none,
+otherwise 10 to 1440) plus one
 minute for every 8 KiB of the files the call reads whole: the unit's source
 and current target, `migration/RULEBOOK.md` and the design inputs
 (`callLimitMinutes` in `lib/execution-policy.mjs`). Bounded `timeoutSeconds`
@@ -251,14 +253,29 @@ call's time, a step delayed by sleep as two at most (`workWatch`). While the
 silence check is on, a call at its limit that has written nothing for
 `callIdleMs` (2 minutes) is stopped at its next output instead, or by the
 silence check first (`callLimiter`, `runProcess` `idleMs`), so a silent call
-stays a silent call. A call
+stays a silent call; not a call that finished its answer (below). A call
 still at work at its limit is stopped with its child processes ("Process ran
-past its call limit") and tried once more in a new session, with
+past its call limit"). Since 0.48.0 a call writing its final answer without
+tools at its limit may finish, up to twice the limit (`callLimiter` `writing`:
+the adapter's `answerWatch` reads the CLI's stream events; `writingAtLimit`
+on the error when it was stopped there), and one that finished its answer
+(`finished`: its last reply without tools, or the CLI's result) has
+`finishWaitMs` (a minute, or the limit when shorter) after the tick that saw
+it for its CLI to exit; a CLI that does not exit is stopped at its limit or
+when that wait is over, whichever is later, with "had not exited Ns after it
+finished its answer" and `finishedAtLimit` (its retry's
+`extra.previousAttempt` says the answer was lost because the CLI did not
+exit), however long it has been silent since its answer: silence after an
+answer is no lost connection. A CLI silent for the silence check's wait
+after its answer before then is stopped by the silence check first, as a
+silent call. The call is tried once more in a new
+session, since 0.48.0 with twice the limit (`tryLimitMinutes`), with
 `extra.previousAttempt`: a sentence after the task data that says what the
 stopped call did and, when it had used tools, to search a dependency rather
 than read it whole. The answer contract is unchanged. A second stop at the
-limit blocks the unit with "Copilot <role> ran past its call limit of N min
-(workerCallMinutes) on 2 attempts; this file is set aside for this run ...",
+limit blocks the unit with "Copilot <role> ran past its call limit on 2
+attempts (N min, then 2N min on the retry; from workerCallBaseMinutes and the
+files the call reads); this file is set aside for this run ...",
 which names no file (the attempt record does), and the unit gets no last pass
 in that run. A stop that comes as the run is interrupted is recorded as
 interrupted ("Interrupted; ..."), without a retry. A translate run (not a
@@ -391,6 +408,47 @@ scheduler failures stop new calls and cancel active adapters, but retain the loc
 until every started worker settles and the failure summary is written.
 `agentCalls` in summaries and `calls` in progress count actual adapter invocations,
 including failed invocations; unused budget reservations do not count.
+Since 0.48.0 a translate or repair run writes `migration/runs/RUN/progress.json`
+when one of its numbers changes: `schemaVersion` 1, `runId`, `concurrency`,
+`callsActive` (AI calls holding a slot), `callsWaiting` (calls waiting for one),
+`unitsAtWork`, `unitsWaitingOnDependencies` (pending units whose dependency is
+not done), `unitsReady` and `updatedAt`. A failed write never stops the run.
+`status` (full and `--fast`) shows it as `runProgress` while the run's lock is
+held and the record names that run; it is not part of `status --wait`'s key,
+so a new count does not end a wait.
+
+In auto mode (since 0.48.0) a translate run (production, not a repair) whose
+translation approval is missing, out of date, for another purpose, of a scope
+the manifest no longer has or in a file that is not JSON (`translationApprovalOnly`),
+or names a batch auto mode approved, or a batch the person chose whose every
+file is done, records the approval of every file left itself before it starts:
+the same function as `approve translation` with the run's context and lock,
+its checks included (phase 03, the reports, a current judge), and the gate
+carries `auto: true` and `recordedBy: "translate"`. The run summary then has
+`autoApproval` (why). A failed check stops the run with "Auto mode could not
+record the translation approval itself: " and the check's own message; any
+other failure of the gate (phase 03 out of date, a file another program holds)
+stops it as before. A current approval of every file, or a batch the person
+chose with a file still to do, is kept. A batch the person chose is one
+approved outside auto mode (no `auto`) or with `--stop-at-end` (the gate's
+`stopAtEnd: true`, only with `--batch` or `--targets`; refused without one, or
+on another approval, as a command-line error before anything is written,
+including the phase 03 record of `--complete-phase 03`; a batch approved in auto mode without it gets a NOTE on
+stderr that auto mode goes on past its end). When its approval is
+out of date or names a file the manifest no longer has (`personsStaleBatch`),
+translate approves that batch again while a file of it is left: its files in
+the manifest with each prerequisite of them that is no longer done (as the
+scope check counts prerequisites: without a unit typecheck, of two files that
+use each other only the second waits for the first), as
+`targets` with `stopAtEnd: true`, so the run still stops at its end (a scope
+the check refuses becomes every file left); with none left, status shows the
+end of their batch, and the next run records every file left. While translate
+is to record the approval, status shows no approval of a later stage (each
+needs a current translation approval), and the guidance of a translation
+approval that is out of date, for another purpose (the gate's own message
+names its stage since 0.48.0) or of an invalid scope names translate with
+nothing to decide (a RULEBOOK change keeps `rulebook accept`). A pilot never
+records one: its runner approves its own translation.
 With unit typecheck deferred, cycle membership is computed across the full
 manifest even for single-target repair; incomplete prerequisites outside that
 cycle still block the repair.
@@ -485,8 +543,9 @@ configuration. Saved 600-second, call, fix-round, input, credit and retry-count
 limits do not interrupt normal work. CPU usage and a command's silence are
 never kill conditions. Two checks stop one worker call, never the run: a call
 that writes nothing for `workerSilenceSeconds` (since 0.44.0) and a call of
-the translation loop still at work past its call limit (`workerCallMinutes`,
-since 0.47.0, Receipts above); each is tried again. status --wait is a
+the translation loop still at work past its call limit (`workerCallBaseMinutes`,
+`workerCallMinutes` until 0.47.0, since 0.47.0, Receipts above); each is tried
+again. status --wait is a
 reporting wait only. See
 [all interruption conditions and source index](INTERRUPTION-POLICY.md).
 

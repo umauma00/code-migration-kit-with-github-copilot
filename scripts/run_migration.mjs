@@ -8,7 +8,7 @@ import { lockRun, readLock, loadConfig, unsetModels, readManifest, unitState, do
 import { strictPhases, phaseRecorded } from '../lib/phases.mjs';
 import { validateWorkerProfile, assistedReviewerRoles } from '../lib/review.mjs';
 import { runProcess } from '../lib/process.mjs';
-import { approve, runStage, translate, runPilot, runJudgePreparation } from '../lib/pipeline.mjs';
+import { approve, runStage, translate, runPilot, runJudgePreparation, checkStopAtEnd, autoBatchNotice } from '../lib/pipeline.mjs';
 import { preparePilot, planPilot } from '../lib/pilot.mjs';
 import { createCopilotAdapter, requiredCopilotFlags, copilotEnv, copilotArgs, probeWorkerAgents, probeReviewerHook, probeModelTools, stressBTools, stressBCommand, fileReadTools, fileLimits, fileLimitMinimum } from './copilot_adapter.mjs';
 import { runtimeLayout, pluginRoot } from '../lib/runtime.mjs';
@@ -81,7 +81,8 @@ export const usage = `Usage: node migration-kit/scripts/run_migration.mjs COMMAN
                               Keep phases, approvals and finished units under the changed RULEBOOK and send back
                               only the chosen units (host-confirmed human gate)
   approve STAGE --note TEXT   Review/approve translation, build, smoke, parity, post-parity, handoff
-                              translation may use --batch N or --targets PATH,PATH, and --complete-phase 03
+                              translation may use --batch N or --targets PATH,PATH (with --stop-at-end, auto
+                              mode too stops at that batch's end for the person's word), and --complete-phase 03
                               to record the reviewed phase 03 in the same confirmation
   translate [--max-calls N]  Run/resume translation with Copilot CLI workers; --max-calls is this run's
                               explicit AI call budget, agreed with the person (normal default: continuous)
@@ -493,7 +494,13 @@ export async function main(argv = process.argv.slice(2)) {
   if (cmd === 'guidance') {
     if (typeof args.message !== 'string' || !args.message.trim()) throw new Error('guidance requires --message TEXT (the error to explain)');
     const g = failureGuidance(args.message, { root, language, explain: true });
-    console.log(args.format === 'json' ? JSON.stringify(g, null, 2) : guidanceMarkdown(g, language));
+    // A run's summary ("Translation stopped: FILE: …; FILE: …") can hold more
+    // than one cause: each gets its own guidance, as the run prints them
+    // (0.48.0). The JSON has the first cause's fields, as the markdown shows
+    // it first, with the whole message and every cause in groups.
+    const list = /^(?:Translation|Survey) stopped: /.test(args.message) ? failureGuidanceList(args.message, { root, language, explain: true }) : [];
+    const groups = list.length > 1 ? list : null;
+    console.log(args.format === 'json' ? JSON.stringify(groups ? { ...groups[0].guidance, message: g.message, groups } : g, null, 2) : groups ? guidanceListMarkdown(groups, language) : guidanceMarkdown(g, language));
     return;
   }
   // An edit of the settings file is applied (and the kit's records leave
@@ -595,14 +602,18 @@ export async function main(argv = process.argv.slice(2)) {
       }
     }
     else if (cmd === 'approve') {
-      const scope = { batch: args.batch, targets: args.targets?.split(',') };
+      const scope = { batch: args.batch, targets: args.targets?.split(','), ...(args['stop-at-end'] ? { stopAtEnd: true } : {}) };
       if (args['complete-phase'] === undefined) result = approve(root, config, args._[1], args.note, scope);
       else {
         // The 03 review and the translation approval are one human decision: record both under one confirmation.
-        if (args._[1] !== 'translation' || args['complete-phase'] !== '03') throw new Error('--complete-phase applies only as approve translation --complete-phase 03');
+        // A command line's error (lib/guidance.mjs command-line), not an approval's.
+        if (args._[1] !== 'translation' || args['complete-phase'] !== '03') throw new Error(`Option --complete-phase does not apply to approve ${args._[1]} --complete-phase ${args['complete-phase']}: it applies only as approve translation --complete-phase 03. Add --help for usage.`);
+        checkStopAtEnd('translation', scope);
         const phase = phaseCommand(root, config, 'complete', '03', { note: args.note });
         result = { phase, approval: approve(root, config, 'translation', args.note, scope) };
       }
+      const notice = autoBatchNotice(result?.approval ?? result);
+      if (notice) console.error(`NOTE: ${notice}`);
     }
     else if (['judge', 'build', 'smoke', 'parity', 'handoff'].includes(cmd)) result = await runStage(root, config, cmd, { signal: controller.signal });
     else if (['translate', 'repair'].includes(cmd)) {

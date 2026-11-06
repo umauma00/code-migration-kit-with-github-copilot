@@ -13,13 +13,23 @@ Run `doctor` and confirm `repository hooks load in Copilot CLI` is not failing.
 
 Prerequisites: reviewed feasibility/stress reports, RULEBOOK, inventory,
 manifest, audited review dependency map, validated judge, installed profiles and
-explicit translation approval.
+explicit translation approval. In auto mode run `translate` without approving:
+translate records a missing, out-of-date or used-up translation approval itself
+with the checks of `approve translation`, marked auto, and covers every file
+left.
 
 Use [bounded translation batches](../docs/EXECUTION-SCOPES.md) where the human
 wants intermediate gates: approve translation --batch N or --targets CSV binds
 concrete units, separate from maxAgentCalls. Stop after that approved scope,
 report burndown/unknown timing and wait for the next batch instruction. Never
 convert a completed batch into permission for build or remaining translation.
+Auto mode does not stop at the end of a batch it approved itself: translate
+records the approval of every file left and goes on, so never cut a batch on
+your own in auto mode. When the person asks for some files first, approve that
+batch alone with `approve translation --batch N --stop-at-end --note '…'`. A
+batch the person chose (approved outside auto mode, or with `--stop-at-end`)
+stops at its end: report it and wait for the person's word; when they say to go
+on, run `translate` again.
 When markerPolicy is configured, both reviews receive measured TODO line counts;
 the coordinator rejects a mismatched final trailer before recording done.
 
@@ -32,9 +42,13 @@ Run `translate` in a background or continuing terminal and check it with
 `status --fast --wait 600 --format markdown`. This waits for status only; keep
 polling the same job after it returns. Never kill/cancel/relaunch work for CPU
 at 100% or low CPU, silence, elapsed time or output volume. The runner itself
-stops a call still at work past `workerCallMinutes`, tries it once more, and
-then sets its file aside for that run and goes on (status shows each call's
-minutes and limit); the next `translate` tries it after the other files (in its place when another file waits on it). Normal execution is
+stops a call still at work past its call limit (`workerCallBaseMinutes` plus a
+minute for every 8 KiB it reads; `workerCallMinutes` until 0.47.0), unless it is
+writing its final answer, which may finish up to twice the limit. It tries the
+call once more with twice the limit, then sets its file aside for that run and
+goes on (status shows each call's minutes and limit, the AI calls at work of
+`concurrency`, and the files waiting on a dependency); the next `translate`
+tries it after the other files (in its place when another file waits on it). Normal execution is
 continuous even with old 600-second/maxAgentCalls settings. Finite time/call/round
 limits require the person's explicit choice (executionMode bounded or a command
 budget). Execution-policy changes retain reviewed work and approvals.
