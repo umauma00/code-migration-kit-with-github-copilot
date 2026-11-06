@@ -242,7 +242,9 @@ happened, `markerRewrites` and `reviewsKept`).
 
 Since 0.47.0 each worker call of the translation loop (implementer,
 reviewers, arbiter, fixer) has a call limit, in both execution modes:
-`workerCallMinutes` (30 by default, 0 for none, otherwise 10 to 1440) plus one
+`workerCallBaseMinutes` in the settings file (`workerCallMinutes` until 0.47.0
+and in the record `migration/state/config.json`; 30 by default, 0 for none,
+otherwise 10 to 1440) plus one
 minute for every 8 KiB of the files the call reads whole: the unit's source
 and current target, `migration/RULEBOOK.md` and the design inputs
 (`callLimitMinutes` in `lib/execution-policy.mjs`). Bounded `timeoutSeconds`
@@ -253,12 +255,17 @@ silence check is on, a call at its limit that has written nothing for
 silence check first (`callLimiter`, `runProcess` `idleMs`), so a silent call
 stays a silent call. A call
 still at work at its limit is stopped with its child processes ("Process ran
-past its call limit") and tried once more in a new session, with
+past its call limit"). Since 0.48.0 a call writing its final answer without
+tools at its limit may finish, up to twice the limit (`callLimiter` `writing`:
+the adapter's `answerWatch` reads the CLI's stream events; `writingAtLimit`
+on the error when it was stopped there). The call is tried once more in a new
+session, since 0.48.0 with twice the limit (`tryLimitMinutes`), with
 `extra.previousAttempt`: a sentence after the task data that says what the
 stopped call did and, when it had used tools, to search a dependency rather
 than read it whole. The answer contract is unchanged. A second stop at the
-limit blocks the unit with "Copilot <role> ran past its call limit of N min
-(workerCallMinutes) on 2 attempts; this file is set aside for this run ...",
+limit blocks the unit with "Copilot <role> ran past its call limit on 2
+attempts (N min, then 2N min on the retry; workerCallBaseMinutes); this file is
+set aside for this run ...",
 which names no file (the attempt record does), and the unit gets no last pass
 in that run. A stop that comes as the run is interrupted is recorded as
 interrupted ("Interrupted; ..."), without a retry. A translate run (not a
@@ -391,6 +398,25 @@ scheduler failures stop new calls and cancel active adapters, but retain the loc
 until every started worker settles and the failure summary is written.
 `agentCalls` in summaries and `calls` in progress count actual adapter invocations,
 including failed invocations; unused budget reservations do not count.
+Since 0.48.0 a translate or repair run writes `migration/runs/RUN/progress.json`
+when one of its numbers changes: `schemaVersion` 1, `runId`, `concurrency`,
+`callsActive` (AI calls holding a slot), `callsWaiting` (calls waiting for one),
+`unitsAtWork`, `unitsWaitingOnDependencies` (pending units whose dependency is
+not done), `unitsReady` and `updatedAt`. A failed write never stops the run.
+`status` (full and `--fast`) shows it as `runProgress` while the run's lock is
+held and the record names that run; it is not part of `status --wait`'s key,
+so a new count does not end a wait.
+
+In auto mode (since 0.48.0) a translate run (production, not a repair) whose
+translation approval is missing, out of date or invalid, or names a batch auto
+mode approved, or a batch the person approved whose every file is done, records
+the approval of every file left itself before it starts: the same function as
+`approve translation` with the run's context and lock, its checks included
+(phase 03, the reports, a current judge), and the gate carries `auto: true`
+and `recordedBy: "translate"`. The run summary then has `autoApproval` (why). A
+failed check stops the run with "Auto mode could not record the translation
+approval itself: " and the check's own message. A current approval of every
+file, or a batch the person approved with a file still to do, is kept.
 With unit typecheck deferred, cycle membership is computed across the full
 manifest even for single-target repair; incomplete prerequisites outside that
 cycle still block the repair.
@@ -485,8 +511,9 @@ configuration. Saved 600-second, call, fix-round, input, credit and retry-count
 limits do not interrupt normal work. CPU usage and a command's silence are
 never kill conditions. Two checks stop one worker call, never the run: a call
 that writes nothing for `workerSilenceSeconds` (since 0.44.0) and a call of
-the translation loop still at work past its call limit (`workerCallMinutes`,
-since 0.47.0, Receipts above); each is tried again. status --wait is a
+the translation loop still at work past its call limit (`workerCallBaseMinutes`,
+`workerCallMinutes` until 0.47.0, since 0.47.0, Receipts above); each is tried
+again. status --wait is a
 reporting wait only. See
 [all interruption conditions and source index](INTERRUPTION-POLICY.md).
 

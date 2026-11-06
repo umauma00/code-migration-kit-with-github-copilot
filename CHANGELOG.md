@@ -1,3 +1,83 @@
+# 0.48.0 — 2026-11-06
+
+Four reports from phase 04 on Windows (kit 0.47.0, four workers, 117 then 375
+of 554 files) on 2026-11-05 and 2026-11-06. Four calls at work looked like one
+file at a time; auto mode under Copilot CLI autopilot stopped at the end of each
+approved batch (about 4 of 18 hours lost) and when translate found no approval;
+`workerCallMinutes` read as a fixed number of minutes; and a call stopped at its
+limit was tried again with the same limit, so a call that only needed more
+time was stopped again.
+
+- What a run is doing (`lib/pipeline.mjs`, `lib/status-snapshot.mjs`,
+  `lib/status.mjs`): translate and repair write
+  `migration/runs/RUN/progress.json` when a number changes: the AI calls holding
+  one of the `concurrency` slots, those waiting for one, and the files at work,
+  waiting on a dependency or ready to start. `status` (full and `--fast`) shows
+  it as `runProgress` and in one line ("AI calls: 4 running (up to 4 at once).
+  Files: 4 at work, 2 waiting on dependencies, 10 ready to start."), saying so
+  when fewer files are at work than the limit because the rest wait on their
+  dependencies. A failed write never stops the run, and the count does not end
+  a `status --wait`.
+- Auto mode records the translation approval itself (`lib/pipeline.mjs`): a
+  translate run (production, not a repair) whose approval is missing, out of
+  date or invalid, or names a batch auto mode approved, or a batch the person
+  approved whose every file is done, makes the checks of `approve translation`
+  (the same function, with the run's context and lock: phase 03 complete, its
+  reports, a judge run that succeeded for the current inputs) and records the
+  approval of every file left, marked `auto: true` and `recordedBy:
+  "translate"`, listed by status among the records made without the person.
+  The run summary carries `autoApproval` (why). A failed check approves nothing
+  and stops with "Auto mode could not record the translation approval itself:"
+  and the check's own message, which keeps its own guidance. So auto mode never
+  stops at the end of a batch; only a batch approved outside auto mode stops
+  at its end, and status says to wait for the person's word (the next
+  translate then records the rest). An approval made in auto mode is always
+  marked auto, so batches to review one by one are approved in normal or
+  relaxed mode. Normal and relaxed mode are unchanged.
+- Approval guidance and status (`lib/guidance.mjs`, `lib/status.mjs`): in
+  auto mode a missing or out-of-date approval asks nothing: the guidance names
+  translate for the translation approval and `approve STAGE --note '…'` as a
+  command of its own for the others, says no decision is needed and, in
+  markdown, now shows that step's command. Without a judge run that succeeded
+  for the current inputs it names judge first (in every mode). In auto mode
+  status lists a translation approval translate records itself as no blocker
+  ("Implementation start: translate records the approval itself"; phase 04
+  ready, not awaiting approval) and says to run translate; past a batch auto
+  mode approved, it says to run translate too. Outside auto mode the guidance
+  and status add that Copilot CLI autopilot refuses the approval question by
+  itself: approve interactively without autopilot, or choose auto mode. The
+  operating manual's rule 3, the skill, the 04 prompt, the phase handoff and
+  the execution scopes say the same.
+- `workerCallBaseMinutes` (`lib/settings.mjs`, `lib/core.mjs`): the new name of
+  `workerCallMinutes`, whose minutes are only where the limit starts. 0.48.0
+  reads the old name too; the next command renames it in
+  `migration/settings.json` and says so, and with both names it uses the new
+  one and removes the old one. The record `migration/state/config.json` keeps
+  the key `workerCallMinutes`, so approvals and finished files hold, and a
+  0.47.0 host reads the same limit. The help says the actual limit adds a
+  minute for every 8 KiB of the files the call reads whole, and that status
+  shows each call's limit.
+- Longer for a call that needs it (`lib/process.mjs`,
+  `scripts/copilot_adapter.mjs`, `lib/pipeline.mjs`): a call stopped at its
+  limit is tried once more with twice the limit (`tryLimitMinutes`), and the
+  attempt record and status show that limit. A call writing its final answer
+  without tools when its limit comes may finish, up to twice the limit: the
+  adapter reads the CLI's stream events (`answerWatch`: the main agent's
+  `assistant.message_delta` text, or an `assistant.message` without tool
+  requests; a tool call or a new turn ends it), only with `--stream on`. A
+  call stopped there says so ("past twice that ... while still writing its
+  answer", `writingAtLimit`), and so does the reason of a file set aside.
+- Tests: `tests/auto-batch-call-limit-2026-11-06.test.mjs`; the call limit and
+  settings tests follow the new name and the doubled retry.
+
+Upgrading: see [docs/UPGRADING.md](docs/UPGRADING.md) (0.48.0). The records keep
+their format (a run gains `progress.json`, its summary `autoApproval`, a gate
+`recordedBy`); from 0.47.0 no approval, completion or phase record is
+invalidated. Put every host that opens the project on 0.48.0: a 0.47.0 host
+reports `workerCallBaseMinutes` as an unknown setting and applies no edit of
+the file, and a host on 0.46.1 or earlier takes a call limit other than 30 for
+a setting of what the migration produces.
+
 # 0.47.0 — 2026-11-05
 
 A translation call with a large input no longer reads its dependencies whole,

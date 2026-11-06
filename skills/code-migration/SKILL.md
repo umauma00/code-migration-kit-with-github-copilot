@@ -434,11 +434,14 @@ Respect explicit user cancellation and actual input/permission failures.
 A worker call that writes nothing for `workerSilenceSeconds` (600 s by default)
 is stopped and retried by the runner itself, with a longer wait each time
 (status shows it as retrying): it is never a reason to stop or relaunch anything.
-A translation call still at work past `workerCallMinutes` (30 minutes by
-default, a minute more for every 8 KiB of the files it reads whole) is stopped
-by the runner too, tried once more with a note on what it did, and then its
-file is set aside for that run while the other files go on: status shows each
-call's minutes and limit, and the reason of a file set aside. A long call is
+A translation call still at work past its call limit (`workerCallBaseMinutes`,
+30 minutes by default, plus a minute for every 8 KiB of the files it reads
+whole; `workerCallMinutes` until 0.47.0) is stopped by the runner too, unless it
+is writing its final answer without tools, which may finish up to twice the
+limit. It is tried once more with twice the limit and a note on what it did,
+and then its file is set aside for that run while the other files go on: status
+shows each call's minutes and limit, the AI calls at work (of `concurrency`),
+the files waiting on a dependency, and the reason of a file set aside. A long call is
 never a reason to stop the run; the next `translate` tries a file set aside
 after the other files (in its place when another file waits on it).
 A phase recorded earlier can go out of date when a file it recorded changes
@@ -466,8 +469,8 @@ those options. Never write the file any other way (the hook denies it). Outside
 auto mode the host asks the person to confirm every `approve` / `phase complete` /
 `phase waive` / `build-loop` / `pilot prepare` / `source-spec init --apply` /
 `guardrails install` command; if it cannot ask (autopilot denies the request),
-tell the person to leave autopilot and retry instead of working around it. In
-auto mode these run unasked (see the auto mode paragraph below) only as one
+tell the person to leave autopilot and retry, or to choose auto mode, instead
+of working around it. In auto mode these run unasked (see the auto mode paragraph below) only as one
 command per call, run from the target repository: no `cd`, pipe or other
 command with it, and a `--note` in single quotes when it contains `$` or
 backticks; anything else still asks, and autopilot then stops. Outside auto mode, run gate commands only in an
@@ -499,7 +502,14 @@ In auto mode (`phaseMode: auto`, for Copilot CLI autopilot) the person chose
 beforehand to let the gates run unasked. At each phase boundary, publish the
 phase report as usual but ask no question: do the phase's work, record it
 (`phase complete`, `approve`, `build-loop`; the hook does not ask) and continue
-with the next phase. A gate failure ending `Relaxed mode (auto): ...` means: if
+with the next phase. In 04, run `translate` without `approve translation`:
+when the translation approval is missing, out of date or its batch (one auto
+mode approved) is used up, translate makes the checks of approve translation
+itself, records the approval of every file left (marked auto) and goes on, so
+auto mode never stops at the end of a batch. Only a batch approved outside auto
+mode stops at its end: report it and wait for the person's word; when they say
+to go on, run `translate`. A failure guidance that needs no decision says so
+("No decision is needed" / 「判断は不要です」): run its command and continue without asking. A gate failure ending `Relaxed mode (auto): ...` means: if
 the phase's own work can supply what is missing, do that work; only otherwise
 run `phase waive ID --note "<why>"` and retry. Never waive phases ahead of the
 one that blocked. Questions inside a phase are not asked either: an audit or

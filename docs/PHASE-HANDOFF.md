@@ -3,6 +3,9 @@
 For intermediate translation batches, show the exact approved targets and
 reviewed scope completion, then await the next batch instruction. maxAgentCalls
 is a budget, not batch size. See [execution scopes](EXECUTION-SCOPES.md).
+In auto mode there is no such wait for a batch auto mode approved itself:
+`translate` records the approval of every file left (marked auto) and goes on.
+Only a batch approved outside auto mode waits for the person's word.
 Pilot reports explicitly identify disposable purpose and grant; they cannot
 authorize production. Map the ten internal IDs to the six macro stages without
 removing preparation or cleanup evidence.
@@ -248,7 +251,8 @@ instruction. Do not create a question merely to end the conversation.
 First apply bounded recovery already authorized by the current phase: the
 runner's transient retry (also of a worker call it stopped itself for writing
 nothing for `workerSilenceSeconds`, or of a translation call still at work past
-`workerCallMinutes`, whose file it sets aside after a second stop and tries
+its call limit (`workerCallBaseMinutes`, `workerCallMinutes` until 0.47.0), retried
+with twice the limit, whose file it sets aside after a second stop and tries
 again on the next run) and single survey correction, preserving validated
 rows, read-only diagnostics and resuming the same authorized process. Report
 what is happening; these operations do not need a new decision after each

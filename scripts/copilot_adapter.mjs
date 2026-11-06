@@ -420,6 +420,36 @@ export const isStreamedDelta = line => {
   if (line.length > 65536 || !line.includes('_delta"')) return false;
   try { return deltaTypes.has(JSON.parse(String(line))?.type); } catch { return false; }
 };
+// Whether the main agent is writing its answer now (0.48.0), from the CLI's
+// events as they come (runProcess watchLine): its turn streamed text
+// (assistant.message_delta) and has not turned to a tool, or it ended with a
+// reply without tools (the CLI's result is next). A tool call, or a new turn,
+// ends it; reasoning and a subagent's events are not its answer. The runner
+// gives a call writing its answer at its call limit up to twice the limit to
+// finish it (lib/process.mjs callLimiter). A line over 64 KiB is not seen (a
+// long final reply): what came before it decides.
+const answerEvents = /"type"\s*:\s*"(?:assistant\.(?:turn_start|message_delta|message)|tool\.execution_start)"/;
+export function answerWatch() {
+  let writing = false;
+  const main = event => !event.agentId && !event.data?.parentToolCallId;
+  return {
+    line(line) {
+      const text = String(line);
+      if (!answerEvents.test(text)) return;
+      let event;
+      try { event = JSON.parse(text); } catch { return; }
+      if (!event || typeof event !== 'object') return;
+      if (event.type === 'tool.execution_start') writing = false;
+      else if (!main(event)) return;
+      else if (event.type === 'assistant.turn_start') writing = false;
+      else if (event.type === 'assistant.message_delta') { if (typeof event.data?.deltaContent === 'string' && event.data.deltaContent) writing = true; }
+      else if (event.type === 'assistant.message') writing = !event.data?.toolRequests?.length && typeof event.data?.content === 'string' && Boolean(event.data.content.trim());
+    },
+    writing: () => writing
+  };
+}
+// The options that read the stream (--stream on): a fresh answer watch for each CLI process.
+const streamOptions = () => { const answer = answerWatch(); return { dropLine: isStreamedDelta, watchLine: answer.line, writing: answer.writing }; };
 const withStreamCount = ({ droppedLines, ...result }) => droppedLines ? { ...result, streamedDeltas: droppedLines } : result;
 const recordedOutput = (result, root) => relativeProcessOutput(withStreamCount(result), root);
 // The model the CLI reported for the call, for the usage log's by-model
@@ -462,7 +492,8 @@ export function createCopilotAdapter({ command = 'copilot', prefixArgs = [], ver
   // silentAttempts: how many earlier attempts of this same call were stopped
   // for showing no sign of progress; each one doubles the wait (up to 4x).
   // callLimitMs: how long this call may run before the runner stops it (the
-  // translation loop's workerCallMinutes; 0, the default, for no limit).
+  // translation loop's call limit, from workerCallBaseMinutes; 0, the default, for no
+  // limit). A call writing its answer at that limit gets up to twice it to finish.
   return async ({ root, config, role, unit, extra, signal, reviewInput, reviewMode = 'frozen', workInput, workMode, runId, sessionId, model: modelOverride, silentAttempts = 0, callLimitMs = 0 }) => {
     // Oversized reviews run on the read-only twin profile of the same reviewer.
     const worker = isReviewer(role) && reviewMode === 'tool-assisted' ? toolAssistedRole(role) : role;
@@ -508,7 +539,7 @@ export function createCopilotAdapter({ command = 'copilot', prefixArgs = [], ver
     try {
       const silenceMs = baseSilenceMs === undefined ? workerSilenceMs(config, silentAttempts) : silenceWait(baseSilenceMs, silentAttempts);
       argv = [...prefixArgs, ...copilotArgs(worker, model, undefined, layout, session, { usageFile, maxAiCredits: executionLimits(config).aiCredits, effort, context, toolFree: isToolFree(worker) || (usesWorkInput(role, workMode) && workMode === 'frozen' && typeof workInput === 'string'), stream: silenceMs > 0 })];
-      options = { cwd: root, signal, input: prompt, timeoutMs: processTimeout(config, 'timeoutSeconds'), silenceMs, limitMs: callLimitMs, ...(silenceMs > 0 ? { dropLine: isStreamedDelta } : {}), outputDir: safePath(root, 'migration/runs/process-output'), env: copilotEnv(worker, home) };
+      options = { cwd: root, signal, input: prompt, timeoutMs: processTimeout(config, 'timeoutSeconds'), silenceMs, limitMs: callLimitMs, ...(silenceMs > 0 ? streamOptions() : {}), outputDir: safePath(root, 'migration/runs/process-output'), env: copilotEnv(worker, home) };
     } catch (e) { fs.rmSync(usageDir, { recursive: true, force: true }); throw e; }
     try {
       result = await runProcess(command, argv, options);
@@ -523,7 +554,7 @@ export function createCopilotAdapter({ command = 'copilot', prefixArgs = [], ver
         // stays there. A CLI that fails in both homes stops or fails as it
         // would have in the person's home.
         fs.rmSync(usageFile, { force: true });
-        result = await runProcess(command, argv, { ...options, env: copilotEnv(worker) });
+        result = await runProcess(command, argv, { ...options, ...(options.dropLine ? streamOptions() : {}), env: copilotEnv(worker) });
         home = null;
         if (result.code === 0) {
           if (!sharedHome) {

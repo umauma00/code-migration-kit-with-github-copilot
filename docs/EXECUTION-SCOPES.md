@@ -31,6 +31,18 @@ scope completes; resuming that same exhausted scope does not start another batch
 Status directs the parent to review and request the next batch. Build requires
 all manifest units to have current independent reviews.
 
+In [auto mode](ORDERED-WORKFLOW.en.md#auto-mode) (0.48.0) a batch waits for the
+person only when the person chose it. When the translation approval is missing,
+out of date, or names a batch auto mode approved, `translate` makes the checks
+of `approve translation` itself (phase 03 complete, its reports, a judge run
+that succeeded for the current inputs), records the approval of every file left
+(marked auto, and listed by status among the records made without the person)
+and goes on in the same run; when a check fails it stops and says which. A
+batch approved outside auto mode is the person's gate: the run stops at its end,
+status says to wait for the person's word, and the next `translate` records the
+rest. An approval made in auto mode is always marked auto, so to review the work
+batch by batch, approve the batches in normal or relaxed mode.
+
 A batch count is files/units, not maxAgentCalls. All implementation, review,
 arbitration and fix calls share concurrency; saved call/fix-round budgets apply
 only in executionMode bounded. Normal execution is continuous. Explicit
