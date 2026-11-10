@@ -48,8 +48,10 @@ offers to install one, and without a terminal it exits with 127.
   and the shims' "not found": then it recommends looking first (`cli`);
   after the kit's own lookup failed, installing (`npm install -g
   @github/copilot` alone, as Windows PowerShell 5.1 has no `&&`; the agent
-  then runs `cli` and `cli --login`). A path given with `--copilot` that
-  names no file is reported as such, and installing is not offered for it.
+  then runs `cli` and `cli --login`). With a path given with `--copilot`,
+  `cli` tries only that path: when no working CLI is there (no file, a
+  folder, VS Code's shim, or no answer), it says so, and installing is not
+  offered for it. A bare `copilot.exe` is looked for as `copilot`.
   Pointing to a CLI (`cli --copilot`) remembers it. The sign-in choices run
   `cli --login`.
 - `doctor` names the file and the place in "Copilot executable", and

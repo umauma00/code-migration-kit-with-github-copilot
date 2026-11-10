@@ -75,7 +75,7 @@ node migration-kit/scripts/run_migration.mjs doctor --check-cli
 
 `doctor` は設定、プロファイル、CLIバージョンと必要なオプションに加え、ワーカーと同じ引数・環境変数でCLIを起動し、全担当エージェントを実際に解決できるかを確認します（AI呼び出しなし）。phase 01で作る依存宣言は、phase 01を記録するまでは未作成でも失敗にせず `pending` と表示します（記録後に欠けていれば失敗します）。さらに、ローカルの疑似モデル（loopback、アカウント・通信・AI利用なし）で実CLIを動かし、ツール付きレビューのワーカーがhookにより `migration/runs` を読めないことを実際に確認します。このhookの読み込みは非公開の環境変数 `GITHUB_COPILOT_PROMPT_MODE_REPO_HOOKS` に依存するため、CLIの更新で効かなくなった場合はここで失敗します（CLI 1.0.98・1.0.100-1で確認）。モデルの利用可否や対話セッションでのhookの実動作を保証するものではありません。
 
-Copilot CLI だけを確かめるときは `node migration-kit/scripts/run_migration.mjs cli` を使います（初期化の前にも使えます）。版、見つけたファイルと場所、PowerShell と bash からの実行のしかたを出し、`--login` を付けると、そのファイルで `copilot login` を実行します。キットはコマンド `copilot` を、PATH（VS Code が置く copilot の代役は飛ばします）、前に動いた CLI の場所（`~/.copilot-migration-kit/copilot-cli.json`。`COPILOT_HOME` を絶対パスで変えていればその隣。消すと忘れます）、npm のグローバルフォルダー（Windows）、インストーラーのフォルダー（`%LOCALAPPDATA%\GitHubCopilotCLI`・WinGet の `Links`。Windows 以外は `~/.local/bin`）の順に探し、VS Code の代役はほかに CLI がないときだけ使います（0.49.0）。
+Copilot CLI だけを確かめるときは `node migration-kit/scripts/run_migration.mjs cli` を使います（初期化の前にも使えます）。版、見つけたファイルと場所、PowerShell と bash からの実行のしかたを出し、`--login` を付けると、そのファイルで `copilot login` を実行します（copilot login の出力のあとに JSON が続きます）。`--copilot` でパスを指定したときは、その場所だけを試します。そこに動く CLI がない（ファイルがない、フォルダー、VS Code の代役、版を答えない）ときは、そう伝え、インストールは勧めません。キットはコマンド `copilot` を、PATH（VS Code が置く copilot の代役は飛ばします）、前に動いた CLI の場所（`~/.copilot-migration-kit/copilot-cli.json`。`COPILOT_HOME` を絶対パスで変えていればその隣。消すと忘れます）、npm のグローバルフォルダー（Windows）、インストーラーのフォルダー（`%LOCALAPPDATA%\GitHubCopilotCLI`・WinGet の `Links`。Windows 以外は `~/.local/bin`）の順に探し、VS Code の代役はほかに CLI がないときだけ使います（0.49.0）。
 
 ## 設定の項目
 

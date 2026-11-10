@@ -131,8 +131,11 @@ test('Windows passes over VS Code\'s copilot shims on PATH for the Copilot CLI a
   // A shim is still run when there is nothing else: it may find a CLI of its own.
   assert.deepEqual(windowsLocate('copilot', win({ Path: native })), { launch: { command: path.join(native, 'copilot.exe'), prefixArgs: [] }, file: path.join(native, 'copilot.exe'), via: 'shim' });
   assert.deepEqual(windowsLocate('copilot', win({ Path: legacy })).via, 'shim');
+  // The bare copilot.exe names the CLI too: looked for as copilot.
+  for (const name of ['copilot.exe', 'COPILOT.EXE']) assert.deepEqual(windowsLocate(name, win({ Path: `${native};${npm.dir}` })), real, name);
   // Other commands are not checked for shims, nor looked for anywhere new.
   assert.deepEqual(windowsLocate('npm', win({ Path: tmp() }, { remembered: () => npm.cmd })), { launch: { command: 'npm', prefixArgs: [] }, file: null, via: null });
+  assert.deepEqual(windowsLocate('node.exe', win({ Path: npm.dir }, { remembered: () => npm.cmd })), { launch: { command: 'node.exe', prefixArgs: [] }, file: null, via: null });
 });
 
 test('Windows runs the Copilot CLI it remembered when PATH lost it, before npm\'s folder, the installers\' and a shim', () => {
@@ -294,10 +297,27 @@ test('the guidance for a missing CLI looks for it first unless the kit already d
   for (const message of ['zsh: command not found: copilotx', 'zsh: command not found: copilot-models', 'fish: Unknown command: copilot_x'])
     assert.equal(failureGuidance(message).id, 'unknown', message);
   assert.equal(failureGuidance('Unknown command copilot. Commands: init, status').id, 'command-line');
-  // A path given with --copilot that names no file: look in the usual places or give the right path, never install.
+  // A path given with --copilot that is no working CLI (no file, VS Code's shim, no answer):
+  // the kit tried only there, so look in the usual places or give the right path, never install.
   const typo = failureGuidance('No file at the path given with --copilot: C:\\Users\\me\\AppData\\Roaming\\npm\\copilt.cmd', { language: 'en' });
   assert.deepEqual(typo.options.map(o => o.id), ['find-cli', 'cli-path', 'pause']);
   assert.match(typo.cause, /no file at the path given with --copilot; it may be mistyped/);
+  for (const [message, cause] of [["The path given with --copilot is VS Code's copilot shim, which found no Copilot CLI: C:\\VS Code\\bin\\copilot-shim\\copilot.exe", /VS Code's copilot shim, and it found no Copilot CLI either\. The kit tried only that path/],
+    ['The path given with --copilot did not answer as the Copilot CLI: /x/copilot (Cannot read the Copilot CLI version (exit 1): boom)', /did not answer as the Copilot CLI .*The kit tried only that path/],
+    // The kit's own words inside the path given change nothing.
+    ['No file at the path given with --copilot: C:\\Tools\\spawn copilot\\copilot.exe', /it may be mistyped/]]) {
+    const given = failureGuidance(message, { language: 'en' });
+    assert.equal(given.id, 'copilot-missing', message);
+    assert.deepEqual(given.options.map(o => o.id), ['find-cli', 'cli-path', 'pause'], message);
+    assert.match(given.cause, cause, message);
+  }
+  // A terminal that names the path it could not run.
+  for (const message of ["The term 'C:\\Users\\Taro Yamada\\AppData\\Roaming\\npm\\copilot.cmd' is not recognized as a name of a cmdlet, function, script file, or executable program.",
+    "用語 'C:\\Users\\me\\AppData\\Roaming\\npm\\copilot.cmd' は、コマンドレット、関数、スクリプト ファイル、または操作可能なプログラムの名前として認識されません。",
+    '    + CategoryInfo          : ObjectNotFound: (C:\\Users\\me\\AppData\\Roaming\\npm\\copilot.cmd:String) [], CommandNotFoundException'])
+    assert.deepEqual(ids(message), ['find-cli', 'install-cli', 'cli-path', 'pause'], message);
+  for (const message of ["The term 'C:\\x\\mycopilot.cmd' is not recognized", "'notcopilot' is not recognized as an internal or external command"])
+    assert.equal(failureGuidance(message).id, 'unknown', message);
   const g = failureGuidance("The term 'copilot' is not recognized", { language: 'ja' });
   assert.equal(g.options[0].command, 'node migration-kit/scripts/run_migration.mjs cli');
   assert.match(g.cause, /PATH から外れただけ/);
@@ -321,7 +341,7 @@ test('the skill and the orchestrator check the CLI through the kit, never with c
     assert.match(text, /Check the CLI with `run_migration\.mjs cli` .* never by running `copilot` in your terminal/, file);
     assert.match(text, /never with a PATH change in front/, file);
     assert.match(text, /Only when `cli` reports that no Copilot CLI was found, .* run `npm install -g @github\/copilot` .*\), then `run_migration\.mjs cli` again/, file);
-    assert.match(text, /in its installers' folders and, on Windows, in npm's global folder/, file);
+    assert.match(text, /where the CLI last answered, on Windows in npm's global folder, and in its installers' folders/, file);
     assert.match(text, /run `run_migration\.mjs cli --login` \(copilot login with the CLI the kit finds\) in a background terminal/, file);
     assert.match(text, /start copilot login first with `run_migration\.mjs cli --login`/, file);
   }
@@ -429,18 +449,39 @@ test('run_migration.mjs cli runs a shim given with --copilot but never remembers
   assert.deepEqual({ ok: given.json.ok, shim: given.json.shim, foundIn: given.json.foundIn, updated: given.json.record.updated }, { ok: true, shim: true, foundIn: cliPlaces.given, updated: undefined });
   assert.match(given.json.next, /is VS Code's copilot shim, and it started a Copilot CLI it found itself\. Do not install it\. The kit did not remember it \(VS Code's copilot shim\), so pass --copilot /);
   assert.equal(fs.existsSync(path.join(`${home}-migration-kit`, 'copilot-cli.json')), false);
+  // A shim that finds no CLI, given while PATH has one: the kit tried only the shim, so it offers no install.
+  const failing = executable(tmp(), `#!/bin/sh\nunset NODE_OPTIONS\n# ELECTRON_RUN_AS_NODE=1 copilotCLIShim.js "$@"\necho 'GitHub Copilot CLI was not found. Run copilot in a terminal to install it' >&2\nexit 127\n`);
+  const onPath = terminal(home, { bin: path.dirname(fakeCopilot(tmp())) });
+  assert.equal((await runner(['cli'], { cwd: project, env: onPath })).json.ok, true, 'PATH has a working CLI');
+  const shimGiven = await runner(['cli', '--copilot', failing], { cwd: project, env: onPath });
+  assert.equal(shimGiven.code, 1);
+  assert.deepEqual({ ok: shimGiven.json.ok, shim: shimGiven.json.shim, searched: shimGiven.json.searched }, { ok: false, shim: true, searched: undefined });
+  assert.equal(shimGiven.json.failure, `The path given with --copilot is VS Code's copilot shim, which found no Copilot CLI: ${failing}`);
+  assert.match(shimGiven.json.next, /The kit tried only that path: run .* cli without --copilot to look on PATH.*, and install only if that finds none/);
+  assert.match(shimGiven.stderr, /1\. \*\*Let the AI look for the installed Copilot CLI \(nothing is installed\)\*\* \(recommended\)/);
+  assert.doesNotMatch(shimGiven.stderr, /install the Copilot CLI and start sign-in/);
 });
 
-test('run_migration.mjs cli tells a mistyped --copilot path from a missing CLI', async () => {
-  const home = tmp(), project = tmp(), env = terminal(home);
-  const wrong = path.join(tmp(), 'nope', posix ? 'copilot' : 'copilot.cmd');
-  const typo = await runner(['cli', '--copilot', wrong], { cwd: project, env });
-  assert.equal(typo.code, 1);
-  assert.equal(typo.json.ok, false);
-  assert.equal(typo.json.failure, `No file at the path given with --copilot: ${wrong}`);
-  assert.match(typo.json.next, /Ask the person for the right path, or run .* cli without --copilot to look on PATH.* Do not install the CLI for this/);
-  assert.match(typo.stderr, /1\. \*\*Let the AI look for the installed Copilot CLI \(nothing is installed\)\*\* \(recommended\)/);
-  assert.doesNotMatch(typo.stderr, /install the Copilot CLI and start sign-in/);
+test('run_migration.mjs cli tells a mistyped --copilot path, a folder and a file that is not the CLI from a missing CLI', async () => {
+  const home = tmp(), project = tmp(), env = terminal(home), dir = tmp();
+  const folder = path.join(dir, 'copilot'), other = path.join(dir, 'not-copilot.txt');
+  fs.mkdirSync(folder); fs.writeFileSync(other, 'not a program\n');
+  const cases = [[path.join(dir, 'nope', posix ? 'copilot' : 'copilot.cmd'), 'No file at the path given with --copilot', /^There is no file at .*, the path given with --copilot\. Ask the person for the right path/],
+    [folder, 'No file at the path given with --copilot', /the path given with --copilot \(it is a folder\)\. Ask the person for the right path/],
+    [other, 'The path given with --copilot did not answer as the Copilot CLI', /did not answer --version as the Copilot CLI\. Show the person the error\. The kit tried only that path/]];
+  for (const [given, failure, next] of cases) {
+    const result = await runner(['cli', '--copilot', given], { cwd: project, env });
+    assert.equal(result.code, 1, given);
+    assert.equal(result.json.ok, false, given);
+    assert.ok(result.json.failure.startsWith(`${failure}: ${given}`), result.json.failure);
+    assert.match(result.json.next, next, given);
+    assert.match(result.json.next, /run .* cli without --copilot to look on PATH/, given);
+    // Only that path was tried: no places searched, and a path only for a file that is there.
+    assert.equal(result.json.searched, undefined, given);
+    assert.equal(result.json.path, given === other ? other : undefined, given);
+    assert.match(result.stderr, /1\. \*\*Let the AI look for the installed Copilot CLI \(nothing is installed\)\*\* \(recommended\)/, given);
+    assert.doesNotMatch(result.stderr, /install the Copilot CLI and start sign-in/, given);
+  }
   assert.equal(fs.existsSync(path.join(`${home}-migration-kit`, 'copilot-cli.json')), false);
 });
 
