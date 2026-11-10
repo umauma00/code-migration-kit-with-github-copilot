@@ -29,8 +29,10 @@ Drive everything from chat: run the commands yourself and report results. The
 person answers questions, confirms the host's prompts for human-gate commands and
 approves the Copilot CLI sign-in once. Autopilot denies those prompts, so outside auto mode run gate
 commands in an interactive session; the CLI may ask a second time after the hook. Workers always run as Copilot CLI
-processes, also from VS Code; install the CLI (`npm install -g @github/copilot`)
-or start `copilot login` only after the person agrees, as the skill describes.
+processes, also from VS Code. Check the CLI with `run_migration.mjs cli`, never by running
+`copilot` in your terminal (a reset PATH or VS Code's copilot shim can hide a CLI the kit
+still finds); install it (`npm install -g @github/copilot`) only when `cli` finds none, and
+start copilot login with `run_migration.mjs cli --login`, each only after the person agrees, as the skill describes.
 
 First read the report language with `run_migration.mjs preferences`; if unset, ask
 日本語 / English with the question tool and record it with `preferences --language`.

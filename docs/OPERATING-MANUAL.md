@@ -113,7 +113,9 @@ Read [detailed usage](REFERENCE.md), [contracts](CONTRACTS.md) and
 Workers always run as Copilot CLI processes, also from VS Code: the parent runs the
 runner in a terminal and the runner starts the workers (the VS Code subagent
 backend was removed in 0.3.0). The person drives the migration from chat only:
-the agent runs every command, installs the CLI or starts `copilot login` after the
+the agent runs every command, checks the CLI with `run_migration.mjs cli` (never
+with `copilot` in its own terminal), installs the CLI only when `cli` finds none
+and starts copilot login with `run_migration.mjs cli --login`, each after the
 person agrees, and the person's own acts are chat answers and host confirmations
 of human-gate commands. The only entry point is the orchestrator agent in the
 agent picker, with Copilot and Local alike; it reads the code-migration skill.

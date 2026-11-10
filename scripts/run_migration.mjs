@@ -7,10 +7,10 @@ import { pathToFileURL } from 'node:url';
 import { lockRun, readLock, loadConfig, unsetModels, readManifest, unitState, done, safePath, readJSON, verificationFiles, loadReviewDependencies, reviewSources, reviewDependencyPath, configFile, legacyConfigFile } from '../lib/core.mjs';
 import { strictPhases, phaseRecorded } from '../lib/phases.mjs';
 import { validateWorkerProfile, assistedReviewerRoles } from '../lib/review.mjs';
-import { runProcess } from '../lib/process.mjs';
+import { runProcess, locateCommand, rememberCopilot } from '../lib/process.mjs';
 import { approve, runStage, translate, runPilot, runJudgePreparation } from '../lib/pipeline.mjs';
 import { preparePilot, planPilot } from '../lib/pilot.mjs';
-import { createCopilotAdapter, requiredCopilotFlags, copilotEnv, copilotArgs, probeWorkerAgents, probeReviewerHook, probeModelTools, stressBTools, stressBCommand, fileReadTools, fileLimits, fileLimitMinimum } from './copilot_adapter.mjs';
+import { createCopilotAdapter, requiredCopilotFlags, copilotEnv, copilotArgs, probeWorkerAgents, probeReviewerHook, probeModelTools, stressBTools, stressBCommand, fileReadTools, fileLimits, fileLimitMinimum, copilotCliReport, copilotLogin, cliPlaces } from './copilot_adapter.mjs';
 import { runtimeLayout, pluginRoot } from '../lib/runtime.mjs';
 import { migrationStatus, statusMarkdown, statusTodo, statusChecklist } from '../lib/status.mjs';
 import { statusSnapshot } from '../lib/status-snapshot.mjs';
@@ -36,6 +36,11 @@ import { recordContextUpgrade } from '../lib/context-upgrade.mjs';
 import { localSandboxProbe, sandboxCheck, sandboxQuestion, sandboxNext } from '../lib/sandbox.mjs';
 
 export const usage = `Usage: node migration-kit/scripts/run_migration.mjs COMMAND [options]
+  cli [--login] [--copilot /path/to/copilot]
+                              Where the kit finds the Copilot CLI (PATH, the place it remembered, npm's global folder,
+                              its installers' folders), its version, and how to run it from this terminal; works before
+                              the project is initialized. A CLI that answers is remembered for when PATH loses it.
+                              --login runs copilot login with that CLI, in this terminal
   doctor [--check-cli] [--copilot /path/to/copilot]
   status [--format json|markdown|todo|checklist] [--wait SECONDS] [--fast]
                               --fast shows recorded progress without scanning source files; gates still revalidate
@@ -115,8 +120,10 @@ export async function stressB(root, config, { dir, model, command = 'copilot', s
   model ??= config.phaseModels?.stressB ?? config.models.implementer;
   if (typeof config.targetLanguage !== 'string' || !config.targetLanguage.trim()) throw new Error('stress-b command needs targetLanguage in migration/settings.json');
   const found = await stressBTools(command, model, { signal, timeoutMs: processTimeout(config, 'commandTimeoutSeconds') });
+  // copilot off PATH here (0.49.0): the command names the file the kit runs.
+  const where = locateCommand(command, { cwd: root }), located = ['remembered', 'npm', 'installer'].includes(where.via) ? where.file : undefined;
   return { dir, model, tools: found.tools, verified: found.verified, ...(found.verified ? {} : { note: `The CLI's tools for ${model} could not be read here (${found.detail}); the command lists the file tools of every model family the kit knows.` }),
-    ...stressBCommand({ command, model, dir, targetLanguage: config.targetLanguage, tools: found.tools }),
+    ...stressBCommand({ command, located, model, dir, targetLanguage: config.targetLanguage, tools: found.tools }),
     next: 'Run the command for this shell (bash or powershell) in a terminal as it is, then check that B wrote its files. Do not run B as a subagent of this chat.' };
 }
 // Each tool-assisted reviewer's model must get a reading and a search tool
@@ -260,7 +267,12 @@ export async function doctor(root, config, { checkCLI = false, command = 'copilo
           : 'Workers run in the person\'s Copilot CLI home (~/.copilot or COPILOT_HOME; workerCopilotHome "shared", the default), so their sessions sit beside the person\'s; sessions prune removes the kit\'s. "separate" gives them a home of their own.' });
       const env = copilotEnv('reviewer-rules', home);
       const version = await runProcess(command, ['--version'], { cwd: root, env, signal, timeoutMs });
-      checks.push({ check: 'Copilot executable', ok: version.code === 0, detail: version.stdout.trim() });
+      // Where it was found; a CLI that answered is remembered for when PATH loses it.
+      const found = locateCommand(command, { cwd: root, env }), answered = version.code === 0;
+      if (answered) rememberCopilot(command, { cwd: root, env, version: version.stdout.match(/\d+\.\d+\.\d+(?:[-+][\w.]*\w)?/)?.[0] });
+      checks.push({ check: 'Copilot executable', ok: answered, detail: version.stdout.trim(), ...(found.file ? { path: found.file, foundIn: cliPlaces[found.via] } : {}),
+        ...(answered && found.via === 'shim' ? { note: `copilot here is VS Code's copilot shim (${found.file}), which started a Copilot CLI it found itself; the kit found none of its own. Do not install the CLI again.` }
+          : answered && found.via && !['path', 'given'].includes(found.via) ? { note: `copilot is not on PATH here; the kit runs ${found.file} (${cliPlaces[found.via]}). Do not install the CLI again.` } : {}) });
       stage = 'Copilot CLI --help';
       const help = await runProcess(command, ['--help'], { cwd: root, env, signal, timeoutMs });
       const text = help.stdout + help.stderr;
@@ -400,6 +412,21 @@ export async function main(argv = process.argv.slice(2)) {
   }
   let language = 'en';
   try { language = readPreferences(root).userLanguage ?? 'en'; } catch {}
+  if (cmd === 'cli') {
+    // Before initialization too: no configuration is read. A CLI that is not
+    // found or does not answer exits 1 with its guidance, as doctor does.
+    // --login signs in with the CLI the check found, in this terminal.
+    const command = args.copilot ?? 'copilot', timeoutMs = doctorProbeSeconds * 1000;
+    const report = await copilotCliReport(command, { cwd: root, timeoutMs });
+    const code = args.login && report.ok ? await copilotLogin(command, { cwd: root }) : null;
+    const login = code === null ? null : { exitCode: code, next: code === 0 ? 'copilot login finished; check the sign-in with doctor --check-cli (after initialization) or by going on.' : `copilot login exited ${code}: show the person what it printed, and ask before starting it again.` };
+    console.log(JSON.stringify(login ? { login, ...report } : report, null, 2));
+    if (!report.ok || (login && login.exitCode !== 0)) process.exitCode = 1;
+    // Only VS Code's shim, or nothing: the kit looked everywhere it looks.
+    const found = report.path && report.foundIn !== cliPlaces.shim;
+    if (!report.ok) console.error(guidanceListMarkdown(failureGuidanceList(found ? report.error : `No Copilot CLI was found (${report.error})`, { root, language }), language));
+    return;
+  }
   if (cmd === 'models') {
     // The person picks; the list is their account's, read live from the CLI.
     if (!['list', 'set'].includes(args._[1])) throw new Error('Use models list [--format json|markdown] | models set --assign ROLE=ID[:EFFORT][:long_context],... | models set --role ROLE --model ID [--effort LEVEL|default] [--context default|long_context]');
@@ -620,7 +647,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.ar
   // Every command that hashes inputs or waits on workers says it is alive, so a
   // host does not take a long synchronous check for a hung process.
   const announced = ['status', 'survey', 'models', 'settings', 'doctor', 'translate', 'repair', 'repair-round', 'build-loop', 'pilot', 'judge-prepare', 'judge', 'build', 'smoke', 'parity', 'handoff'].includes(argv[0]) || (argv[0] === 'phase' && argv[1] === 'next');
-  const progress = !argv.includes('--help') && (announced || ['phase', 'approve', 'diagnose', 'source-spec'].includes(argv[0]));
+  const progress = !argv.includes('--help') && (announced || ['phase', 'approve', 'diagnose', 'source-spec', 'cli'].includes(argv[0]));
   (progress ? commandProgress(argv.slice(0, argv[0] === 'phase' ? 2 : 1).join(' '), () => main(), { announce: announced }) : main()).catch(e => {
     console.error(`ERROR: ${e.message}`);
     // Every failure ends with its cause and the user's choices (docs/PHASE-HANDOFF.md).

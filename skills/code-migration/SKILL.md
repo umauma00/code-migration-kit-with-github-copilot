@@ -52,17 +52,25 @@ human-gate commands (`approve`, `phase complete`, `pilot prepare`,
 `source-spec init --apply`, `guardrails install`) and, once, approving the Copilot
 CLI sign-in in the browser. Do not hand them commands to type.
 
-Workers always run as Copilot CLI processes, also from VS Code. Before
-initialization check `copilot --version`; afterwards `run_migration.mjs doctor
---check-cli`. If the CLI is missing, explain why it is required, ask with the
-question tool and, after a yes, run `npm install -g @github/copilot` (Node 22+; on a
-permission error, show the cause and choices from `run_migration.mjs guidance`).
+Workers always run as Copilot CLI processes, also from VS Code. Check the CLI
+with `run_migration.mjs cli` (it works before initialization; afterwards
+`run_migration.mjs doctor --check-cli` too), never by running `copilot` in your
+terminal: a PATH that lost the CLI's folder, or VS Code's copilot shim, can hide
+a CLI the kit still finds and runs. The kit looks on PATH, where the CLI last
+answered, in npm's global folder and in its installers' folders. So run the
+kit's commands as they are, each on its own, never with a PATH change in front.
+Only when `cli` reports that no Copilot CLI was found, explain why it is
+required, ask with the question tool and, after a yes, run
+`npm install -g @github/copilot` (Node 22+; on a permission error, show the
+cause and choices from `run_migration.mjs guidance`); if the person names where
+it is installed, run `run_migration.mjs cli --copilot FILE`, which remembers it.
 If it is not signed in (doctor or a worker reports `session.error
 authentication`, or "To authenticate" without a network error such as
 ETIMEDOUT; with one, the CLI may only have failed to reach GitHub, and guidance
-says `cli-network`), ask, then run `copilot login` in a background
-terminal, show the URL and any one-time code it prints in chat, wait for it to
-finish and run doctor again. Signing in to VS Code does not sign in the CLI.
+says `cli-network`), ask, then run `run_migration.mjs cli --login`
+(copilot login with the CLI the kit finds) in a background terminal, show the
+URL and any one-time code it prints in chat, wait for it to finish and run
+doctor again. Signing in to VS Code does not sign in the CLI.
 
 The GitHub Copilot app is built on the Copilot CLI: its question tool is
 `ask_user`, the agent picker and `/agent` select the orchestrator, and its
@@ -150,8 +158,8 @@ choice for everyone may use `--role all --model ID --effort LEVEL|default`);
 run as a command of its own, the host does not ask again. Every entry is checked before anything is
 written: if one is refused (unlisted model, unsupported effort or context), nothing
 changes, so ask again about that entry only and record the full answer again.
-If `models list` reports that the CLI is not signed in, start `copilot login`
-first. A changed model, effort or context keeps the reviewed units and the
+If `models list` reports that the CLI is not signed in, start copilot login
+first with `run_migration.mjs cli --login`. A changed model, effort or context keeps the reviewed units and the
 approvals: it applies to the work still to do.
 
 ## Settings file (instead of one question per setting)

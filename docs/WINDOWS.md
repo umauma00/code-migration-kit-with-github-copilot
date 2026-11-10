@@ -11,13 +11,13 @@
 | Node.js 22 以上 | `winget install OpenJS.NodeJS.LTS` | `node --version` |
 | Git for Windows | `winget install Git.Git` | `git --version` |
 | Python 3（付属の依存解析・デモ用） | python.org のインストーラー（`py` ランチャーが入ります） | `py -3 --version` |
-| Copilot CLI | `npm install -g @github/copilot`（WinGet などで入れた `copilot.exe` もそのまま使えます） | `node migration-kit/scripts/run_migration.mjs doctor --check-cli` |
+| Copilot CLI | `npm install -g @github/copilot`（WinGet などで入れた `copilot.exe` もそのまま使えます） | `node migration-kit/scripts/run_migration.mjs cli`（初期化の前にも使えます。初期化の後は `doctor --check-cli` も） |
 
 `python3` は、Windows では見つからないか、Microsoft Store を開くだけのことがよくあります。キットが表示するコマンドは、`py` があれば `py -3`、なければ `python` を使います。
 
 ## キットが Windows で自動的に扱うこと
 
-- **Copilot CLI の起動**：npm 版の `copilot.cmd` は、同梱の `copilot.exe`（なければ `node` とローダー）に読み替えます。PATH に npm のフォルダがない端末でも、npm の global prefix を探します。
+- **Copilot CLI の起動**：npm 版の `copilot.cmd` は、同梱の `copilot.exe`（なければ `node` とローダー）に読み替えます。PATH に npm のフォルダがない端末（環境変数が元に戻った会社の PC など）でも、前に動いた CLI の場所（`~/.copilot-migration-kit/copilot-cli.json` に覚えます）、npm の global prefix、インストーラーのフォルダー（`%LOCALAPPDATA%\GitHubCopilotCLI`、WinGet の `Links`）を探します。VS Code が PATH に置く copilot の代役（`bin\copilot-shim\copilot.exe` や古い `copilot.bat`）は飛ばし、ほかに CLI がないときだけ使います（0.49.0）。
 - **`.cmd` / `.bat` のコマンド**：`migration/settings.json` の `commands` に `npm`、`npx`、`mvn`、`gradlew.bat` などをそのまま書けます。プロジェクト直下のバッチは `gradlew.bat` のように拡張子付きで書けば見つかります（拡張子なしの `gradlew` は PATH だけを探します。リポジトリ内のファイルが PATH のツールにすり替わらないようにするためです）。キットは `cmd.exe /d /s /c` を通し、引数を引用・エスケープして渡します（空白、`"`、`%`、`&` などを含んでも、そのまま届きます）。
 - **ガードレール**：`npm.cmd test`、`& "C:\...\npm.cmd" test`、`cmd /c git push`、`Start-Process git -ArgumentList push`、`py -3 -m pytest` も、`npm test`・`git push`・`python -m pytest` と同じ禁止ルールで止めます。PowerShell の `Set-Content`、`Out-File`、`Remove-Item` による `migration/guardrails.json` の書き換えも拒否します。
 - **ファイルの置き換え**：記録ファイルをほかのプロセス（status の確認、エディター、ウイルス対策）が開いていて一時的に置き換えられないときは、約2秒まで再試行します。

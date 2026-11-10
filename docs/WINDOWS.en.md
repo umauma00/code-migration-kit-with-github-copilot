@@ -11,13 +11,13 @@ Windows is a primary platform for this kit. GitHub Actions runs `npm test` and `
 | Node.js 22 or later | `winget install OpenJS.NodeJS.LTS` | `node --version` |
 | Git for Windows | `winget install Git.Git` | `git --version` |
 | Python 3 (bundled dependency parsers, demo) | python.org installer (includes the `py` launcher) | `py -3 --version` |
-| Copilot CLI | `npm install -g @github/copilot` (a `copilot.exe` from WinGet or elsewhere also works) | `node migration-kit/scripts/run_migration.mjs doctor --check-cli` |
+| Copilot CLI | `npm install -g @github/copilot` (a `copilot.exe` from WinGet or elsewhere also works) | `node migration-kit/scripts/run_migration.mjs cli` (also before initialization; afterwards `doctor --check-cli` too) |
 
 On Windows `python3` is often missing or only opens the Microsoft Store. Commands the kit prints use `py -3` when the launcher exists, otherwise `python`.
 
 ## What the kit handles on Windows
 
-- **Starting the Copilot CLI**: npm's `copilot.cmd` shim runs the bundled `copilot.exe` (or `node` with the loader), also from a terminal whose PATH lacks npm's folder.
+- **Starting the Copilot CLI**: npm's `copilot.cmd` shim runs the bundled `copilot.exe` (or `node` with the loader). In a terminal whose PATH lacks npm's folder (a company PC whose environment was reset, for one), the kit looks where the CLI last answered (remembered in `~/.copilot-migration-kit/copilot-cli.json`), in npm's global prefix and in the installers' folders (`%LOCALAPPDATA%\GitHubCopilotCLI`, WinGet's `Links`). It passes over the copilot shim VS Code puts on PATH (`bin\copilot-shim\copilot.exe`, the legacy `copilot.bat`) and runs it only when there is no other CLI (0.49.0).
 - **`.cmd` / `.bat` commands**: `commands` in `migration/settings.json` may name `npm`, `npx`, `mvn`, `gradlew.bat` and the like. A batch file in the project folder is found when named with its extension (`gradlew.bat`); a bare name such as `gradlew` is looked up on PATH only, so a file in the repository cannot stand in for a tool. The kit runs them through `cmd.exe /d /s /c` with each argument quoted and escaped, so spaces, `"`, `%` and `&` arrive unchanged.
 - **Guardrails**: `npm.cmd test`, `& "C:\...\npm.cmd" test`, `cmd /c git push`, `Start-Process git -ArgumentList push` and `py -3 -m pytest` match the same rules as `npm test`, `git push` and `python -m pytest`. PowerShell writes to `migration/guardrails.json` (`Set-Content`, `Out-File`, `Remove-Item`) are denied.
 - **File replacement**: when another process (status polling, an editor, antivirus) briefly holds a record open, the replacement is retried for about two seconds.

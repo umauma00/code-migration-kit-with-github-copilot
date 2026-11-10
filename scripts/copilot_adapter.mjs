@@ -4,12 +4,14 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import http from 'node:http';
-import { runProcess, processOutputLines, relativeProcessOutput } from '../lib/process.mjs';
+import { spawn } from 'node:child_process';
+import { runProcess, processOutputLines, relativeProcessOutput, locateCommand, commandLaunch, batchCommandLine, rememberCopilot, copilotSearchPlaces } from '../lib/process.mjs';
+import { copilotRecordFile, readCopilotRecord, terminalCommands } from '../lib/copilot-location.mjs';
 import { roles, workerModel, workerEffort, workerContext, safePath } from '../lib/core.mjs';
 import { executionLimits, processTimeout, workerSilenceMs, silenceWait } from '../lib/execution-policy.mjs';
 import { parseResult, validateResult } from '../lib/results.mjs';
 import { isReviewer, isToolFree, toolAssistedRole, assistedReviewerRoles, validateWorkerProfile } from '../lib/review.mjs';
-import { runtimeLayout } from '../lib/runtime.mjs';
+import { runtimeLayout, kitScript, shellWord } from '../lib/runtime.mjs';
 import { sessionIdPattern } from '../lib/sessions.mjs';
 import { recordCallUsage } from '../lib/usage.mjs';
 import { trailerClosers, commentlessExtensions } from '../lib/markers.mjs';
@@ -83,11 +85,57 @@ export function copilotEnv(role, home) {
 }
 // silenceMs: a worker's check stops a CLI that hangs before printing its
 // version, as a worker call would be stopped; every call waits on it.
-export async function copilotVersion(command = 'copilot', prefixArgs = [], { cwd, signal, timeoutMs = 0, silenceMs = 0, home } = {}) {
-  const result = await runProcess(command, [...prefixArgs, '--version'], { cwd, signal, timeoutMs, silenceMs, env: copilotEnv('reviewer-rules', home) });
+// A CLI that answered is remembered (lib/copilot-location.mjs), so a later
+// command finds it when PATH has lost it; remember: false leaves that to the caller.
+export async function copilotVersion(command = 'copilot', prefixArgs = [], { cwd, signal, timeoutMs = 0, silenceMs = 0, home, remember = true } = {}) {
+  const env = copilotEnv('reviewer-rules', home);
+  const result = await runProcess(command, [...prefixArgs, '--version'], { cwd, signal, timeoutMs, silenceMs, env });
   const version = result.stdout.match(/\d+\.\d+\.\d+(?:[-+][\w.]*\w)?/)?.[0];
   if (result.code !== 0 || !version) throw new Error(`Cannot read the Copilot CLI version (exit ${result.code}): ${(result.stderr || result.stdout).slice(-500)}`);
+  if (remember && !prefixArgs.length) rememberCopilot(command, { cwd, env, version });
   return version;
+}
+// run_migration.mjs cli: where the kit finds the Copilot CLI, whether it
+// answers, and how to run it from this terminal. It works before the project
+// is initialized, so the agent checks the CLI with it instead of running
+// copilot itself: on 2026-11-09 a reset PATH made `copilot` fail in the
+// agent's PowerShell, and the agent offered to install the CLI again,
+// although the kit could still find and run it.
+export const cliPlaces = { given: 'the path given with --copilot', path: 'PATH', remembered: 'the place the kit remembered', npm: "npm's global folder", installer: 'the folder its installer uses', shim: "VS Code's copilot shim" };
+export async function copilotCliReport(command = 'copilot', { cwd, signal, timeoutMs = 0, recordFile = copilotRecordFile() } = {}) {
+  const env = copilotEnv('reviewer-rules'), found = locateCommand(command, { cwd, env }), before = readCopilotRecord(recordFile);
+  const cli = `node ${kitScript(cwd, 'scripts/run_migration.mjs')} cli`;
+  let version, error;
+  try { version = await copilotVersion(command, [], { cwd, signal, timeoutMs, remember: false }); }
+  catch (e) { if (signal?.aborted) throw e; error = e.message; }
+  const record = { file: recordFile, path: before?.path ?? null };
+  const real = found.file && found.via !== 'shim';
+  if (!version) return { ok: false, command, error, ...(found.file ? { path: found.file, foundIn: cliPlaces[found.via] } : {}), searched: copilotSearchPlaces({ env, recordFile }), record,
+    next: real
+      ? `The Copilot CLI at ${found.file} (found in ${cliPlaces[found.via]}) did not answer --version. Show the person the error. Installing it again is one of the choices, asked with the question tool; install only after a yes.`
+      : `No Copilot CLI was found${found.file ? ` (only VS Code's copilot shim, ${found.file}, which found none either)` : ''}: the kit looked on PATH, at the place it remembered, in npm's global folder and in the folders the CLI's installers use (searched). Explain that workers always run as Copilot CLI processes, then ask the person with the question tool: install it (npm install -g @github/copilot, Node 22+; then run ${cli} again), or, if it is installed somewhere else, where (then run ${cli} --copilot FILE, which checks it and remembers it). Install only after a yes.` };
+  const remembered = rememberCopilot(command, { cwd, env, version, recordFile });
+  if (remembered.recorded || remembered.unchanged) record.path = remembered.path;
+  if (remembered.recorded) record.updated = true;
+  if (remembered.error) record.error = remembered.error;
+  const file = found.file ?? command, kept = Boolean(found.file) && (remembered.recorded || remembered.unchanged), given = shellWord(file);
+  const onPath = !found.via || found.via === 'path';
+  return { ok: true, version, path: file, foundIn: cliPlaces[found.via] ?? cliPlaces.path, onPath, record, run: terminalCommands(file),
+    next: onPath ? 'The Copilot CLI answers on PATH. Do not install it.'
+      : found.via === 'given' ? `The Copilot CLI at ${file} answers. Do not install it. ${kept ? 'The kit remembered it, so its commands find it when copilot is not on PATH: run them as they are, without --copilot.' : `The kit could not remember it (${remembered.reason ?? remembered.error ?? 'no record'}), so pass --copilot ${given} to its commands.`} For sign-in run ${cli} --login${kept ? '' : ` --copilot ${given}`}.`
+      : found.via === 'shim' ? `copilot is VS Code's copilot shim here (${file}), and it started a Copilot CLI it found itself; the kit found none of its own. Do not install it. Run the kit's commands as they are; for sign-in run ${cli} --login.`
+      : `The Copilot CLI is installed (${file}, found in ${cliPlaces[found.via]}), but copilot is not on PATH in this terminal. Do not install it. Run the kit's commands as they are, each on its own: the kit finds the CLI itself, so never put a PATH change in front of them. For sign-in run ${cli} --login; to run the CLI yourself, use run.powershell or run.bash.` };
+}
+// run_migration.mjs cli --login: copilot login with the CLI the kit finds, in
+// this terminal (the URL and the one-time code appear here). Resolves with its exit code.
+export function copilotLogin(command = 'copilot', { cwd, env = process.env } = {}) {
+  const launch = commandLaunch(command, { cwd, env });
+  const argv = launch.batch ? batchCommandLine(launch.batch, ['login']) : [...launch.prefixArgs, 'login'];
+  return new Promise((resolve, reject) => {
+    const child = spawn(launch.command, argv, { cwd, env, stdio: 'inherit', shell: false, windowsVerbatimArguments: Boolean(launch.batch) });
+    child.once('error', e => reject(new Error(`Cannot start the Copilot CLI (${command}) for copilot login: ${e.message}`)));
+    child.once('close', (code, signal) => resolve(code ?? (signal ? 1 : 0)));
+  });
 }
 // Parallel CLI workers each open many files. Node, and so the Copilot CLI,
 // raises its own soft descriptor limit to the hard limit at startup (observed on
@@ -239,14 +287,17 @@ export async function stressBTools(command = 'copilot', model, { signal, timeout
   } finally { fs.rmSync(cwd, { recursive: true, force: true }); }
 }
 // The exact B command for bash and PowerShell, with the model's own tools.
-export function stressBCommand({ command = 'copilot', model, dir, targetLanguage, tools }) {
+// located: the file the kit runs when copilot is not on PATH (0.49.0), named
+// in each shell's form (lib/copilot-location.mjs terminalCommands).
+export function stressBCommand({ command = 'copilot', located, model, dir, targetLanguage, tools }) {
   const prompt = `Port these files to ${targetLanguage} the way a fluent ${targetLanguage} engineer would write them natively. Write each translation next to its source.`;
   const argv = ['-p', prompt, '--model', model, ...stressBFlags, '--available-tools', tools.join(','), '--allow-tool', 'write'];
   const sh = v => /^[\w@%+=:,./-]+$/.test(v) ? v : `'${v.replace(/'/g, `'\\''`)}'`;
   // PowerShell: a bare comma builds an array, and curly single quotes end a
   // quoted string like ' does.
   const ps = v => /^[\w@%+=:./\\-]+$/.test(v) ? v : `'${v.replace(/['\u2018\u2019\u201A\u201B]/g, q => q + q)}'`;
-  return { argv, bash: `cd ${sh(dir)} && ${[command, ...argv].map(sh).join(' ')}`, powershell: `Set-Location ${ps(dir)}; & ${[command, ...argv].map(ps).join(' ')}` };
+  const run = located ? terminalCommands(located) : { bash: sh(command), powershell: `& ${ps(command)}` };
+  return { argv, bash: `cd ${sh(dir)} && ${[run.bash, ...argv.map(sh)].join(' ')}`, powershell: `Set-Location ${ps(dir)}; ${[run.powershell, ...argv.map(ps)].join(' ')}` };
 }
 // In JSON mode the CLI reports model and session failures (rate limits, 5xx,
 // authentication, quota) only as session.error events on stdout; stderr stays

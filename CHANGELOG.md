@@ -1,3 +1,54 @@
+# 0.49.0 — 2026-11-10
+
+The kit remembers where a Copilot CLI answered and runs it from there when
+PATH loses it, passes over VS Code's copilot shims, and gives the agent a
+check of the CLI that works before initialization. On 2026-11-09 a company
+PC reset the user's environment from time to time: PowerShell's PATH lost
+npm's folder, `copilot` was not found there, and the agent offered to
+install the CLI again. The skill had the agent run `copilot --version` and
+`copilot login` in its own terminal, which rely on that PATH, and the
+guidance for a missing CLI offered an install. The kit's own lookup already
+found npm's default folder on Windows, but not a CLI anywhere else (another
+npm prefix, GitHub's per-user installer, WinGet), and a VS Code shim found
+first on PATH (VS Code 1.143's `bin\copilot-shim\copilot.exe`, the
+extension's legacy `copilot.bat`) stood in for the CLI: in a terminal it
+offers to install one, and without a terminal it exits with 127.
+
+- The place of a CLI that answered (`lib/copilot-location.mjs`): when a
+  Copilot CLI answers `--version` (`run_migration.mjs cli`, `doctor
+  --check-cli`, a worker's version check), the file it was found as is
+  written to `copilot-cli.json` in `~/.copilot-migration-kit`, beside the
+  person's Copilot home (an absolute `COPILOT_HOME` moves it), and only when
+  it changed. Only the command `copilot` (or a path to copilot, copilot.exe,
+  .cmd or .bat) is remembered, never a shim and never a file inside the
+  project. Deleting the file forgets it.
+- The lookup of the bare `copilot` (`lib/process.mjs`): PATH, passing over
+  VS Code's shims; the remembered place; npm's global prefix (Windows); the
+  folders the CLI's installers use (`%LOCALAPPDATA%\GitHubCopilotCLI` and
+  WinGet's `Links`; elsewhere `~/.local/bin`). A shim runs only when none of
+  them holds a CLI. A shim is told by its content, as VS Code tells its own
+  (its REQUIREMENTS.md, checked 2026-11-10): the marker every native shim
+  build holds, or every line of a legacy wrapper's signature. Other commands
+  are looked up as before.
+- `run_migration.mjs cli [--login] [--copilot FILE]` (`scripts/copilot_adapter.mjs`):
+  works before initialization. It reports the version, the file and where it
+  was found, the record, how to run it from PowerShell and bash, and the next
+  step (a CLI that answers is never installed again; the kit's commands run
+  on their own, never after a PATH change). `--login` runs `copilot login`
+  with that CLI in the terminal. A CLI not found exits with 1, the places
+  searched and the guidance.
+- The skill and the orchestrator check the CLI with `run_migration.mjs cli`,
+  never with `copilot` in the agent's terminal, install it only when `cli`
+  finds none, and sign in with `cli --login`.
+- The guidance `copilot-missing` also reads PowerShell's and cmd.exe's "is
+  not recognized" and the shims' "not found": then it recommends looking
+  first (`cli`); after the kit's own lookup failed, installing (`npm install
+  -g @github/copilot`, then `cli --login`). Pointing to a CLI (`cli
+  --copilot`) remembers it. The sign-in choices run `cli --login`.
+- `doctor` names the file and the place in "Copilot executable", and
+  comparison B's command names the file when copilot is not on PATH.
+- Unverified on a real Windows machine and with a real VS Code shim.
+
 # 0.47.0 — 2026-11-05
 
 A translation call with a large input no longer reads its dependencies whole,
