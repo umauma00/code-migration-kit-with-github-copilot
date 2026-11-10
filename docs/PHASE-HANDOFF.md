@@ -225,7 +225,9 @@ Outside auto mode the kit's hook makes the host ask the person to confirm every
 asks only for `sessions prune`, switching auto on and guardrails changes;
 `models set` and `settings apply` for this project, run on their own, record the
 person's choice and do not ask), and it refuses any other agent write of
-`migration/guardrails.json`. That host confirmation is the person's act; never ask
+`migration/guardrails.json`. A gate that runs unasked alone but came chained
+with another command (`$env:PATH = ...;` or `cd` in front, `&&`, `;`, a pipe)
+is refused with the reason instead of asking: run it again alone. That host confirmation is the person's act; never ask
 them to switch it off. The person works from chat only: run every command
 yourself. When the session cannot ask (autopilot or a non-interactive run reports
 "unable to ask user for confirmation"), stop and ask them to continue in an

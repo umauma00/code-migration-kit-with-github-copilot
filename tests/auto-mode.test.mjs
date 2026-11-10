@@ -41,7 +41,11 @@ const gateCommands = [`${kit} approve translation --note "Reviewed"`, `${kit} ap
 // Recording settings the person chose runs unasked in every mode, as its own command.
 const settingsCommands = [`${kit} models set --role all --model gpt-5`, `${kit} settings apply`];
 const stillAsked = [`${kit} sessions prune`, 'node -e "import(\'./migration-kit/scripts/run_migration.mjs\')" approve', `${kit} guardrails install`,
-  `${kit} preferences --phase-mode auto`, `${kit} settings apply && ${kit} approve translation --note x`, `${kit} models set --role all --model gpt-5; ${kit} sessions prune`];
+  `${kit} preferences --phase-mode auto`];
+// A gate that runs unasked alone, chained with another command, is sent back to
+// the agent to run alone: neither let through nor asked (2026-11-09).
+const sentBack = [`${kit} settings apply && ${kit} approve translation --note x`, `${kit} models set --role all --model gpt-5; ${kit} sessions prune`];
+const sentBackReason = /run the kit command again alone, with nothing before or after it/;
 
 test('normal and relaxed mode keep the gates asking (settings apply unasked); auto mode is never recorded for them', t => {
   for (const mode of [undefined, 'normal', 'relaxed']) {
@@ -49,6 +53,7 @@ test('normal and relaxed mode keep the gates asking (settings apply unasked); au
     fs.rmSync(safePath(f.root, 'migration/guardrails.json'));
     for (const command of [...gateCommands, ...stillAsked]) assert.equal(decide(f, command)?.decision, 'ask', `${mode}: ${command}`);
     for (const command of settingsCommands) assert.equal(decide(f, command), null, `${mode}: ${command}`);
+    for (const command of sentBack) { const d = decide(f, command); assert.equal(d?.decision, 'deny', `${mode}: ${command}`); assert.match(d.reason, sentBackReason); }
     assert.equal(fs.existsSync(safePath(f.root, autoModeFile)), false);
     complete(f, '00');
     assert.equal(readJSON(safePath(f.root, 'migration/phases/00.json')).auto, undefined);
@@ -68,6 +73,7 @@ test('auto mode lets the gate commands run unasked and keeps the rest asking', t
   const f = fixture(t, { mode: 'auto' });
   for (const command of [...gateCommands, ...settingsCommands]) assert.equal(decide(f, command), null, command);
   for (const command of stillAsked) assert.equal(decide(f, command)?.decision, 'ask', command);
+  for (const command of sentBack) assert.equal(decide(f, command)?.decision, 'deny', command);
   // guardrails install runs unasked only as the plain template install while no file exists.
   fs.rmSync(safePath(f.root, 'migration/guardrails.json'));
   assert.equal(decide(f, `${kit} guardrails install`), null);
@@ -284,12 +290,18 @@ test('review of 0c2a8c5: a failed retire leaves auto chosen, an invalid preferen
 
 test('review (Sonnet): a gate runs unasked only on its own; switching auto on outside the runner asks; a stale record never revives', t => {
   const f = fixture(t, { mode: 'auto' });
-  // Anything chained after an auto gate keeps its ask.
+  // Nothing chained with an auto gate runs unasked: the agent is sent back to
+  // run the gate alone (then each other gate asks on its own), and a gate the
+  // runner reaches only inside a quoted command line keeps its ask.
   for (const command of [`${kit} approve translation --note x && ${kit} models set --role all --model gpt-5`, `${kit} phase complete 02 --note x; ${kit} sessions prune`,
     `${kit} phase complete 02 --note x; ${kit} preferences --phase-mode auto`, `${kit} build-loop --note x && ${kit} settings apply`,
     `${kit} approve build --note x | ${kit} guardrails install --deny foo`, `${kit} approve build --note x\n${kit} pilot prepare --note y`,
-    `$(${kit} approve build --note x) ${kit} models set --role all --model m`, `bash -c "${kit} approve build --note x; ${kit} sessions prune"`])
-    assert.equal(decide(f, command)?.decision, 'ask', command);
+    `$(${kit} approve build --note x) ${kit} models set --role all --model m`]) {
+    const d = decide(f, command);
+    assert.equal(d?.decision, 'deny', command);
+    assert.match(d.reason, sentBackReason, command);
+  }
+  assert.equal(decide(f, `bash -c "${kit} approve build --note x; ${kit} sessions prune"`)?.decision, 'ask');
   // A note with separators inside quotes is still one gate.
   assert.equal(decide(f, `${kit} phase complete 02 --note "a; b && c | d"`), null);
   // The kit's preference modules reached in a form the hook cannot read ask.
@@ -330,8 +342,8 @@ test('review of 6e26d89: guardrails.json matching is unchanged in every mode; th
   // In auto mode, notes with literal $ or backticks in single quotes and notes naming the runner are one gate.
   setPreferences(f.root, { phaseMode: 'auto' });
   for (const note of ["'Reviewed `RULEBOOK.md` and costs $5'", '"ran run_migration.mjs status first"']) assert.equal(decide(f, `${kit} phase complete 02 --note ${note}`), null, note);
-  // Double quotes still expand, so they ask.
-  assert.equal(decide(f, `${kit} phase complete 02 --note "costs \`id\`"`)?.decision, 'ask');
+  // Double quotes still expand, so the agent is sent back to quote the note with '...'.
+  assert.match(decide(f, `${kit} phase complete 02 --note "costs \`id\`"`)?.reason ?? '', /Quote --note with '\.\.\.'/);
   // A record retired by another reader first never makes reading fail.
   setPreferences(f.root, { phaseMode: 'auto' });
   writeJSON(safePath(f.root, 'migration/state/preferences.json'), { ...readPreferences(f.root), phaseMode: 'normal' });
@@ -346,7 +358,7 @@ test('review of 6e26d89: guardrails.json matching is unchanged in every mode; th
 
 test('review of 5d5d992: quotes are tracked as the shell does, and an in-place edit to auto asks', t => {
   const f = fixture(t, { mode: 'auto' });
-  assert.equal(decide(f, `${kit} approve build --note "a'" --note "$(touch /tmp/evil)'"`)?.decision, 'ask');
+  assert.equal(decide(f, `${kit} approve build --note "a'" --note "$(touch /tmp/evil)'"`)?.decision, 'deny');
   assert.equal(decide(f, `${kit} approve build --note 'it'"'"'s $5'`), null);
   assert.equal(decide(f, `${kit} approve build --note "a \\$5"`), null, 'an escaped $ in double quotes is literal');
   for (const command of ["sed -i 's/normal/auto/' migration/state/preferences.json", "perl -pi -e 's/relaxed/auto/' migration/state/preferences.json"])
@@ -399,8 +411,9 @@ test('review of 0.20.0: a note quoting a settings command keeps its gate; settin
     for (const inner of ['approve translation --note ok', 'phase complete 03 --note ok', 'sessions prune'])
       for (const command of [`${kit} status --note "$(node migration-kit/scripts/run_migration.mjs ${inner})"`, `${kit} models list --note "\`node migration-kit/scripts/run_migration.mjs ${inner}\`"`])
         assert.equal(decide(f, command)?.decision, 'ask', `${mode}: ${command}`);
-    // In auto mode, the two newly unasked gates still ask when chained.
+    // Chained, the two newly unasked gates never run unasked: in auto mode the
+    // agent is sent back to run them alone; elsewhere they ask as before.
     for (const command of [`${kit} pilot prepare --note x && ${kit} sessions prune`, `cd src && ${kit} source-spec init --apply`])
-      assert.equal(decide(f, command)?.decision, 'ask', `${mode}: ${command}`);
+      assert.equal(decide(f, command)?.decision, mode === 'auto' ? 'deny' : 'ask', `${mode}: ${command}`);
   }
 });

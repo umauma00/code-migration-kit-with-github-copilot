@@ -200,7 +200,7 @@ test('changing only the report language through the file keeps reviewed work', a
   assert.equal(migrationStatus(f.root).settings.state, 'applied');
 });
 
-test('applying run settings runs unasked on its own and asks when chained; writing and checking the file do not', t => {
+test('applying run settings runs unasked on its own and is sent back to run alone when chained; writing and checking the file do not', t => {
   const runner = 'node migration-kit/scripts/run_migration.mjs';
   assert.equal(humanGate(`${runner} settings apply`), 'settings apply');
   assert.equal(humanGate(`${runner} settings init`), null);
@@ -208,8 +208,8 @@ test('applying run settings runs unasked on its own and asks when chained; writi
   const root = fresh(t);
   assert.equal(interactiveDecision({ toolName: 'bash', toolArgs: { command: `${runner} settings apply` }, cwd: root }), null);
   const decision = interactiveDecision({ toolName: 'bash', toolArgs: { command: `${runner} settings apply && ${runner} status` }, cwd: root });
-  assert.equal(decision.decision, 'ask');
-  assert.match(decision.reason, /利用者が記入した内容/);
+  assert.equal(decision.decision, 'deny');
+  assert.match(decision.reason, /単独で実行すれば、どのモードでも確認なしで記録されます.*前後に何も付けずに実行し直してください/);
 });
 
 test('the runner writes, checks and applies run settings with the CLI\'s model list', t => {

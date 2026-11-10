@@ -243,8 +243,9 @@ they have a question? Offer two choices, "filled in" and "I have a question"
   in the kit's records (migration/state/config.json and preferences.json, never
   edited by hand). Run it as a command of
   its own: the person's answer is the approval, so the host does not ask again
-  (it asks only when the file switches auto mode on, or when the command is
-  chained with another). If it returns `errors`, show every error and ask the
+  (it asks only when the file switches auto mode on). Chained with another
+  command (`$env:PATH = ...;` or `cd ...;` in front, `&&`, `;`, a pipe) it is
+  refused with the reason: run it again alone, without asking the person. If it returns `errors`, show every error and ask the
   same question again. Batch setting changes into the file and apply them once.
 - A question: answer it, then ask the same question again. Edit the file only
   when the person asks you to; never choose a value for them. You may explain
@@ -501,9 +502,9 @@ translated output (upstream rule 8). List each as decided without the person. Mi
 automatically. Everything else still stops: safety checks, sign-in and credits,
 unfilled settings, and the commands the hook still asks about (sessions
 prune, switching auto mode on, guardrails install with options or over an
-existing file, kit calls it cannot read, and any gate chained with another
-command); report them and stop. `models set`, `settings apply`, `pilot
-prepare` and `source-spec init --apply` run unasked as commands of their own. If phase 00 finds that a setup answer was wrong (the original does
+existing file, kit calls it cannot read, and a gate chained with another
+command that would ask even alone); report them and stop. `models set`, `settings apply`, `pilot
+prepare` and `source-spec init --apply` run unasked as commands of their own. A gate that runs unasked alone but came chained (`$env:PATH = ...;` or `cd` in front, `&&`, `;`, a pipe, `$` in a double-quoted note) is refused with the reason: run it again alone, without asking the person. If phase 00 finds that a setup answer was wrong (the original does
 not run after all, or a specification turns up), say which answer and why, and
 ask the person to leave autopilot and decide in chat; never switch the profile
 yourself. Never switch auto mode on yourself, neither with `preferences --phase-mode

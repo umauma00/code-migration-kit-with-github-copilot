@@ -122,17 +122,21 @@ test('--context reaches only the workers that chose long_context', async t => {
   assert.equal(second.includes('--context'), false);
 });
 
-test('recording a context tier follows the model gate: unasked alone, asked when chained', () => {
+test('recording a context tier follows the model gate: unasked alone, sent back to run alone when chained', () => {
   assert.equal(humanGate('node migration-kit/scripts/run_migration.mjs models set --assign "all=tiered:high:long_context"'), 'models set');
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'context-gate-'));
   try {
     fs.mkdirSync(path.join(root, 'migration/state'), { recursive: true });
     fs.writeFileSync(path.join(root, 'migration/state/config.json'), '{}');
     assert.equal(interactiveDecision({ toolName: 'bash', toolArgs: { command: 'node migration-kit/scripts/run_migration.mjs models set --role fixer --model tiered --context long_context' }, cwd: root }), null);
-    // Chained with another command it still asks, and the message names the cost.
+    // Chained with another command it never runs unasked: the agent is sent back to run it alone.
     const decision = interactiveDecision({ toolName: 'bash', toolArgs: { command: 'node migration-kit/scripts/run_migration.mjs models set --role fixer --model tiered --context long_context && echo done' }, cwd: root });
-    assert.equal(decision.decision, 'ask');
-    assert.match(decision.reason, /context \(long_context costs more\)/);
+    assert.equal(decision.decision, 'deny');
+    assert.match(decision.reason, /"models set" for this project records without asking in every mode.*run the kit command again alone/s);
+    // With a CLI of the agent's choosing it would ask alone, so chained it asks too, naming the cost.
+    const asked = interactiveDecision({ toolName: 'bash', toolArgs: { command: 'node migration-kit/scripts/run_migration.mjs models set --role fixer --model tiered --context long_context --copilot ./fake && echo done' }, cwd: root });
+    assert.equal(asked.decision, 'ask');
+    assert.match(asked.reason, /context \(long_context costs more\)/);
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
 

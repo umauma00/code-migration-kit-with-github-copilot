@@ -131,7 +131,7 @@ test('reasoning effort reaches the worker command line and is validated in confi
   validateEfforts({ reasoningEfforts: { surveyor: 'low', 'reviewer-rules': 'max' } });
 });
 
-test('recording a model choice runs unasked on its own and asks when chained; listing does not', () => {
+test('recording a model choice runs unasked on its own and is sent back to run alone when chained; listing does not', () => {
   assert.equal(humanGate('node migration-kit/scripts/run_migration.mjs models set --role all --model big-model --effort high'), 'models set');
   assert.equal(humanGate('node migration-kit/scripts/run_migration.mjs models list --format markdown'), null);
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'models-gate-'));
@@ -140,8 +140,11 @@ test('recording a model choice runs unasked on its own and asks when chained; li
     fs.writeFileSync(path.join(root, 'migration/state/config.json'), '{}');
     assert.equal(interactiveDecision({ toolName: 'bash', toolArgs: { command: 'node migration-kit/scripts/run_migration.mjs models set --role fixer --model big-model' }, cwd: root }), null);
     const decision = interactiveDecision({ toolName: 'bash', toolArgs: { command: 'node migration-kit/scripts/run_migration.mjs models set --role fixer --model big-model && echo done' }, cwd: root });
-    assert.equal(decision.decision, 'ask');
-    assert.match(decision.reason, /person's choice/);
+    assert.equal(decision.decision, 'deny');
+    assert.match(decision.reason, /run the kit command again alone/);
+    const asked = interactiveDecision({ toolName: 'bash', toolArgs: { command: 'node migration-kit/scripts/run_migration.mjs models set --role fixer --model big-model --copilot ./fake && echo done' }, cwd: root });
+    assert.equal(asked.decision, 'ask');
+    assert.match(asked.reason, /person's choice/);
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
 

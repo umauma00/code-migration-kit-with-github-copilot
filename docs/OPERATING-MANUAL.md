@@ -38,7 +38,9 @@ does not apply to automated workers, which keep their JSON-only contracts.
    mode lets the gates through, except `sessions prune`, the switch and
    guardrails changes; `models set` and `settings apply` record the person's
    choice and do not ask) and denies any other agent write of
-   `migration/guardrails.json`.
+   `migration/guardrails.json`. Run each kit command alone: a gate that runs
+   unasked alone but came chained with another command is refused with the
+   reason, so run it again alone without asking the person.
 4. 00 reads and samples the source directly, as upstream does. 00b (source-as-spec)
    and 02 must cover every file: delegate that reading by scope with `survey` (fresh
    tool-free surveyors, results as files under `migration/surveys/`); see [surveys](SURVEYS.md).
