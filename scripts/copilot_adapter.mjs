@@ -6,7 +6,7 @@ import path from 'node:path';
 import http from 'node:http';
 import { spawn } from 'node:child_process';
 import { runProcess, processOutputLines, relativeProcessOutput, locateCommand, commandLaunch, batchCommandLine, rememberCopilot, copilotSearchPlaces } from '../lib/process.mjs';
-import { copilotRecordFile, readCopilotRecord, terminalCommands } from '../lib/copilot-location.mjs';
+import { copilotRecordFile, readCopilotRecord, terminalCommands, isVSCodeShim } from '../lib/copilot-location.mjs';
 import { roles, workerModel, workerEffort, workerContext, safePath } from '../lib/core.mjs';
 import { executionLimits, processTimeout, workerSilenceMs, silenceWait } from '../lib/execution-policy.mjs';
 import { parseResult, validateResult } from '../lib/results.mjs';
@@ -102,27 +102,34 @@ export async function copilotVersion(command = 'copilot', prefixArgs = [], { cwd
 // agent's PowerShell, and the agent offered to install the CLI again,
 // although the kit could still find and run it.
 export const cliPlaces = { given: 'the path given with --copilot', path: 'PATH', remembered: 'the place the kit remembered', npm: "npm's global folder", installer: 'the folder its installer uses', shim: "VS Code's copilot shim" };
-export async function copilotCliReport(command = 'copilot', { cwd, signal, timeoutMs = 0, recordFile = copilotRecordFile() } = {}) {
+// failure: the message the guidance reads (lib/guidance.mjs copilot-missing).
+export async function copilotCliReport(command = 'copilot', { cwd, signal, timeoutMs = 0, recordFile = copilotRecordFile(), platform = process.platform } = {}) {
   const env = copilotEnv('reviewer-rules'), found = locateCommand(command, { cwd, env }), before = readCopilotRecord(recordFile);
   const cli = `node ${kitScript(cwd, 'scripts/run_migration.mjs')} cli`;
+  // Where the bare copilot is looked for here (npm's global folder on Windows only).
+  const places = platform === 'win32' ? "on PATH, at the place it remembered, in npm's global folder and in the folders the CLI's installers use" : "on PATH, at the place it remembered and in the folder the CLI's install script uses";
   let version, error;
   try { version = await copilotVersion(command, [], { cwd, signal, timeoutMs, remember: false }); }
   catch (e) { if (signal?.aborted) throw e; error = e.message; }
   const record = { file: recordFile, path: before?.path ?? null };
-  const real = found.file && found.via !== 'shim';
-  if (!version) return { ok: false, command, error, ...(found.file ? { path: found.file, foundIn: cliPlaces[found.via] } : {}), searched: copilotSearchPlaces({ env, recordFile }), record,
-    next: real
-      ? `The Copilot CLI at ${found.file} (found in ${cliPlaces[found.via]}) did not answer --version. Show the person the error. Installing it again is one of the choices, asked with the question tool; install only after a yes.`
-      : `No Copilot CLI was found${found.file ? ` (only VS Code's copilot shim, ${found.file}, which found none either)` : ''}: the kit looked on PATH, at the place it remembered, in npm's global folder and in the folders the CLI's installers use (searched). Explain that workers always run as Copilot CLI processes, then ask the person with the question tool: install it (npm install -g @github/copilot, Node 22+; then run ${cli} again), or, if it is installed somewhere else, where (then run ${cli} --copilot FILE, which checks it and remembers it). Install only after a yes.` };
+  const shim = Boolean(found.file) && (found.via === 'shim' || (found.via === 'given' && isVSCodeShim(found.file)));
+  // A path given with --copilot that names no file: a typing error, not a missing CLI.
+  const typo = /[\\/]/.test(command) && (!found.file || !fs.existsSync(found.file));
+  if (!version) return { ok: false, command, error, ...(found.file ? { path: found.file, foundIn: cliPlaces[found.via] } : {}), ...(shim ? { shim: true } : {}), searched: copilotSearchPlaces({ env, recordFile }), record,
+    failure: typo ? `No file at the path given with --copilot: ${command}` : found.file && !shim ? error : `No Copilot CLI was found (${error})`,
+    next: typo ? `There is no file at ${command}, the path given with --copilot. Ask the person for the right path, or run ${cli} without --copilot to look ${places}. Do not install the CLI for this.`
+      : found.file && !shim ? `The Copilot CLI at ${found.file} (found in ${cliPlaces[found.via]}) did not answer --version. Show the person the error. Installing it again is one of the choices, asked with the question tool; install only after a yes.`
+      : `No Copilot CLI was found${found.file ? ` (only VS Code's copilot shim, ${found.file}, which found none either)` : ''}: the kit looked ${places} (searched). Explain that workers always run as Copilot CLI processes, then ask the person with the question tool: install it (npm install -g @github/copilot, Node 22+; then run ${cli} again), or, if it is installed somewhere else, where (then run ${cli} --copilot FILE, which checks it and remembers it). Install only after a yes.` };
   const remembered = rememberCopilot(command, { cwd, env, version, recordFile });
   if (remembered.recorded || remembered.unchanged) record.path = remembered.path;
   if (remembered.recorded) record.updated = true;
   if (remembered.error) record.error = remembered.error;
   const file = found.file ?? command, kept = Boolean(found.file) && (remembered.recorded || remembered.unchanged), given = shellWord(file);
   const onPath = !found.via || found.via === 'path';
-  return { ok: true, version, path: file, foundIn: cliPlaces[found.via] ?? cliPlaces.path, onPath, record, run: terminalCommands(file),
+  const answers = shim ? `${file} is VS Code's copilot shim, and it started a Copilot CLI it found itself.` : `The Copilot CLI at ${file} answers.`;
+  return { ok: true, version, path: file, foundIn: cliPlaces[found.via] ?? cliPlaces.path, onPath, ...(shim ? { shim: true } : {}), record, run: terminalCommands(file),
     next: onPath ? 'The Copilot CLI answers on PATH. Do not install it.'
-      : found.via === 'given' ? `The Copilot CLI at ${file} answers. Do not install it. ${kept ? 'The kit remembered it, so its commands find it when copilot is not on PATH: run them as they are, without --copilot.' : `The kit could not remember it (${remembered.reason ?? remembered.error ?? 'no record'}), so pass --copilot ${given} to its commands.`} For sign-in run ${cli} --login${kept ? '' : ` --copilot ${given}`}.`
+      : found.via === 'given' ? `${answers} Do not install it. ${kept ? 'The kit remembered it, so its commands find it when copilot is not on PATH: run them as they are, without --copilot.' : `The kit did not remember it (${remembered.reason ?? remembered.error ?? 'no record'}), so pass --copilot ${given} to its commands.`} For sign-in run ${cli} --login${kept ? '' : ` --copilot ${given}`}.`
       : found.via === 'shim' ? `copilot is VS Code's copilot shim here (${file}), and it started a Copilot CLI it found itself; the kit found none of its own. Do not install it. Run the kit's commands as they are; for sign-in run ${cli} --login.`
       : `The Copilot CLI is installed (${file}, found in ${cliPlaces[found.via]}), but copilot is not on PATH in this terminal. Do not install it. Run the kit's commands as they are, each on its own: the kit finds the CLI itself, so never put a PATH change in front of them. For sign-in run ${cli} --login; to run the CLI yourself, use run.powershell or run.bash.` };
 }

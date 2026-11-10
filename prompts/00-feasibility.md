@@ -26,8 +26,10 @@ handoff. See [source-only requirements](../docs/SOURCE-ONLY.md).
    organization policy. Runtime also requires the source toolchain; source-only
    records its absence as an equivalence limitation, not an implementation blocker.
    Workers always run on the Copilot CLI, also from VS Code: check it with
-   `doctor --check-cli` (install it or start `copilot login` only after the
-   person agrees). This check does not authenticate or make a model call.
+   `doctor --check-cli` (or `run_migration.mjs cli`), never by running `copilot`
+   in your terminal; install it only when the kit finds none, and start sign-in
+   with `run_migration.mjs cli --login`, each only after the person agrees. This
+   check does not authenticate or make a model call.
 7. Choose explicit model IDs per worker role in config. Estimate work as a visible
    multiplication — units × per-unit calls × referee price — in bands only (see
    the report contract below), or the word unknown. Keep unknowns explicit.

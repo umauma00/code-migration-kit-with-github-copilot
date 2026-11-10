@@ -57,13 +57,14 @@ with `run_migration.mjs cli` (it works before initialization; afterwards
 `run_migration.mjs doctor --check-cli` too), never by running `copilot` in your
 terminal: a PATH that lost the CLI's folder, or VS Code's copilot shim, can hide
 a CLI the kit still finds and runs. The kit looks on PATH, where the CLI last
-answered, in npm's global folder and in its installers' folders. So run the
-kit's commands as they are, each on its own, never with a PATH change in front.
-Only when `cli` reports that no Copilot CLI was found, explain why it is
-required, ask with the question tool and, after a yes, run
+answered, in its installers' folders and, on Windows, in npm's global folder.
+So run the kit's commands as they are, each on its own, never with a PATH change
+in front. Only when `cli` reports that no Copilot CLI was found, explain why it
+is required, ask with the question tool and, after a yes, run
 `npm install -g @github/copilot` (Node 22+; on a permission error, show the
-cause and choices from `run_migration.mjs guidance`); if the person names where
-it is installed, run `run_migration.mjs cli --copilot FILE`, which remembers it.
+cause and choices from `run_migration.mjs guidance`), then `run_migration.mjs cli`
+again; if the person names where it is installed, run
+`run_migration.mjs cli --copilot FILE`, which checks it and remembers it.
 If it is not signed in (doctor or a worker reports `session.error
 authentication`, or "To authenticate" without a network error such as
 ETIMEDOUT; with one, the CLI may only have failed to reach GitHub, and guidance

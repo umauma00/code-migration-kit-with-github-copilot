@@ -20,16 +20,18 @@ offers to install one, and without a terminal it exits with 127.
   written to `copilot-cli.json` in `~/.copilot-migration-kit`, beside the
   person's Copilot home (an absolute `COPILOT_HOME` moves it), and only when
   it changed. Only the command `copilot` (or a path to copilot, copilot.exe,
-  .cmd or .bat) is remembered, never a shim and never a file inside the
-  project. Deleting the file forgets it.
+  .cmd or .bat) is remembered, never a shim (also not one given with
+  `--copilot`) and never a file inside the project, also through a link to
+  it. Deleting the file forgets it.
 - The lookup of the bare `copilot` (`lib/process.mjs`): PATH, passing over
   VS Code's shims; the remembered place; npm's global prefix (Windows); the
   folders the CLI's installers use (`%LOCALAPPDATA%\GitHubCopilotCLI` and
   WinGet's `Links`; elsewhere `~/.local/bin`). A shim runs only when none of
   them holds a CLI. A shim is told by its content, as VS Code tells its own
   (its REQUIREMENTS.md, checked 2026-11-10): the marker every native shim
-  build holds, or every line of a legacy wrapper's signature. Other commands
-  are looked up as before.
+  build holds, the marker near the top of its launcher for POSIX shells
+  (what WSL finds), or every line of a legacy wrapper's signature. Other
+  commands are looked up as before.
 - `run_migration.mjs cli [--login] [--copilot FILE]` (`scripts/copilot_adapter.mjs`):
   works before initialization. It reports the version, the file and where it
   was found, the record, how to run it from PowerShell and bash, and the next
@@ -40,11 +42,16 @@ offers to install one, and without a terminal it exits with 127.
 - The skill and the orchestrator check the CLI with `run_migration.mjs cli`,
   never with `copilot` in the agent's terminal, install it only when `cli`
   finds none, and sign in with `cli --login`.
-- The guidance `copilot-missing` also reads PowerShell's and cmd.exe's "is
-  not recognized" and the shims' "not found": then it recommends looking
-  first (`cli`); after the kit's own lookup failed, installing (`npm install
-  -g @github/copilot`, then `cli --login`). Pointing to a CLI (`cli
-  --copilot`) remembers it. The sign-in choices run `cli --login`.
+- The guidance `copilot-missing` also reads how terminals say it
+  (PowerShell's and cmd.exe's "is not recognized" in English and Japanese,
+  PowerShell's `ObjectNotFound: (copilot:String)`, bash, sh, zsh and fish)
+  and the shims' "not found": then it recommends looking first (`cli`);
+  after the kit's own lookup failed, installing (`npm install -g
+  @github/copilot` alone, as Windows PowerShell 5.1 has no `&&`; the agent
+  then runs `cli` and `cli --login`). A path given with `--copilot` that
+  names no file is reported as such, and installing is not offered for it.
+  Pointing to a CLI (`cli --copilot`) remembers it. The sign-in choices run
+  `cli --login`.
 - `doctor` names the file and the place in "Copilot executable", and
   comparison B's command names the file when copilot is not on PATH.
 - Unverified on a real Windows machine and with a real VS Code shim.

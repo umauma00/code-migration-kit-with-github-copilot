@@ -422,9 +422,7 @@ export async function main(argv = process.argv.slice(2)) {
     const login = code === null ? null : { exitCode: code, next: code === 0 ? 'copilot login finished; check the sign-in with doctor --check-cli (after initialization) or by going on.' : `copilot login exited ${code}: show the person what it printed, and ask before starting it again.` };
     console.log(JSON.stringify(login ? { login, ...report } : report, null, 2));
     if (!report.ok || (login && login.exitCode !== 0)) process.exitCode = 1;
-    // Only VS Code's shim, or nothing: the kit looked everywhere it looks.
-    const found = report.path && report.foundIn !== cliPlaces.shim;
-    if (!report.ok) console.error(guidanceListMarkdown(failureGuidanceList(found ? report.error : `No Copilot CLI was found (${report.error})`, { root, language }), language));
+    if (!report.ok) console.error(guidanceListMarkdown(failureGuidanceList(report.failure, { root, language }), language));
     return;
   }
   if (cmd === 'models') {
