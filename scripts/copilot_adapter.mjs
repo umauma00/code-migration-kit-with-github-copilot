@@ -102,8 +102,8 @@ export async function copilotVersion(command = 'copilot', prefixArgs = [], { cwd
 // agent's PowerShell, and the agent offered to install the CLI again,
 // although the kit could still find and run it.
 export const cliPlaces = { given: 'the path given with --copilot', path: 'PATH', remembered: 'the place the kit remembered', npm: "npm's global folder", installer: 'the folder its installer uses', shim: "VS Code's copilot shim" };
-// failure: the message the guidance reads (lib/guidance.mjs copilot-missing).
 const isFile = file => { try { return fs.statSync(file).isFile(); } catch { return false; } };
+// failure: the message the guidance reads (lib/guidance.mjs copilot-missing).
 export async function copilotCliReport(command = 'copilot', { cwd, signal, timeoutMs = 0, recordFile = copilotRecordFile() } = {}) {
   const env = copilotEnv('reviewer-rules'), found = locateCommand(command, { cwd, env }), before = readCopilotRecord(recordFile);
   const cli = `node ${kitScript(cwd, 'scripts/run_migration.mjs')} cli`;
@@ -120,10 +120,12 @@ export async function copilotCliReport(command = 'copilot', { cwd, signal, timeo
     const resolved = path.resolve(cwd ?? process.cwd(), command), look = `run ${cli} without --copilot to look ${places}`;
     const file = found.file && isFile(found.file) ? found.file : isFile(resolved) ? resolved : null;
     const folder = !file && (() => { try { return fs.statSync(resolved).isDirectory(); } catch { return false; } })();
-    return { ok: false, command, error, ...(file ? { path: file, foundIn: cliPlaces.given } : {}), ...(shim ? { shim: true } : {}), record,
-      failure: !file ? `No file at the path given with --copilot: ${command}` : shim ? `The path given with --copilot is VS Code's copilot shim, which found no Copilot CLI: ${command}` : `The path given with --copilot did not answer as the Copilot CLI: ${command} (${error})`,
+    // Also a shim the lookup does not run (VS Code's legacy copilot.ps1).
+    const givenShim = shim || (Boolean(file) && isVSCodeShim(file));
+    return { ok: false, command, error, ...(file ? { path: file, foundIn: cliPlaces.given } : {}), ...(givenShim ? { shim: true } : {}), record,
+      failure: !file ? `No file at the path given with --copilot: ${command}` : givenShim ? `The path given with --copilot is VS Code's copilot shim, which found no Copilot CLI: ${command}` : `The path given with --copilot did not answer as the Copilot CLI: ${command} (${error})`,
       next: !file ? `There is no file at ${command}, the path given with --copilot${folder ? ' (it is a folder)' : ''}. Ask the person for the right path, or ${look}. Do not install the CLI for this.`
-        : shim ? `${command}, the path given with --copilot, is VS Code's copilot shim, and it found no Copilot CLI either. The kit tried only that path: ${look}, and install only if that finds none.`
+        : givenShim ? `${command}, the path given with --copilot, is VS Code's copilot shim, and it found no Copilot CLI either. The kit tried only that path: ${look}. Do not install the CLI for this.`
         : `The file at ${command}, given with --copilot, did not answer --version as the Copilot CLI. Show the person the error. The kit tried only that path: ask the person for the right path, or ${look}. Do not install the CLI for this.` };
   }
   if (!version) return { ok: false, command, error, ...(found.file ? { path: found.file, foundIn: cliPlaces[found.via] } : {}), ...(shim ? { shim: true } : {}), searched: copilotSearchPlaces({ env, recordFile }), record,

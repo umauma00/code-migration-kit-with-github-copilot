@@ -104,6 +104,9 @@ test('VS Code\'s copilot shims are told by their content, the way VS Code tells 
   assert.equal(isVSCodeShim(file('launcher', '#!/usr/bin/env sh\n# vscode-copilot-launcher\nexec "$(dirname "$0")/copilot.exe" "$@"\n')), true, 'the launcher for POSIX shells');
   assert.equal(isVSCodeShim(file('late-word', `#!/bin/sh\n#${'-'.repeat(600)}\n# vscode-copilot-launcher\n`)), false, 'that word counts only in the first 512 bytes');
   assert.equal(isVSCodeShim(file('bom.bat', `\uFEFF${legacyBat(dir)}`)), true, 'with a byte order mark');
+  const bootstrapper = '# Windows GitHub Copilot CLI bootstrapper\r\n$PackageName = "@github/copilot"\r\nfunction Find-RealCopilot {\r\n}\r\nfunction Test-AndLaunchCopilot {\r\n}\r\n';
+  assert.equal(isVSCodeShim(file('copilot.ps1', bootstrapper)), true, 'the legacy PowerShell bootstrapper');
+  assert.equal(isVSCodeShim(file('part.ps1', bootstrapper.replace('function Test-AndLaunchCopilot', 'function Other'))), false, 'only with every marker of its row');
   // The real CLI and npm's shim are not; a folder or a missing file is not either.
   for (const [name, content] of [['npm.cmd', npmShim], ['real.exe', 'MZ the real CLI'], ['other.bat', '@echo off\r\necho copilot.ps1\r\n'], ['sh', '#!/bin/sh\nexec copilot "$@"\n']])
     assert.equal(isVSCodeShim(file(name, content)), false, name);
@@ -131,6 +134,9 @@ test('Windows passes over VS Code\'s copilot shims on PATH for the Copilot CLI a
   // A shim is still run when there is nothing else: it may find a CLI of its own.
   assert.deepEqual(windowsLocate('copilot', win({ Path: native })), { launch: { command: path.join(native, 'copilot.exe'), prefixArgs: [] }, file: path.join(native, 'copilot.exe'), via: 'shim' });
   assert.deepEqual(windowsLocate('copilot', win({ Path: legacy })).via, 'shim');
+  // A folder named copilot.exe is not a program.
+  const folderExe = tmp(); fs.mkdirSync(path.join(folderExe, 'copilot.exe'));
+  assert.deepEqual(windowsLocate('copilot', win({ Path: `${folderExe};${npm.dir}` })), real);
   // The bare copilot.exe names the CLI too: looked for as copilot.
   for (const name of ['copilot.exe', 'COPILOT.EXE']) assert.deepEqual(windowsLocate(name, win({ Path: `${native};${npm.dir}` })), real, name);
   // Other commands are not checked for shims, nor looked for anywhere new.
@@ -246,6 +252,10 @@ test('on Windows a CLI found on PATH, in npm\'s folder or in an installer\'s is 
   const kept = fs.readFileSync(recordFile, 'utf8');
   assert.deepEqual(rememberCopilot('copilot', options({ Path: native })), { recorded: false, reason: 'found as shim' });
   assert.deepEqual(rememberCopilot(path.join(native, 'copilot.exe'), options({ Path: empty })), { recorded: false, reason: "VS Code's copilot shim" });
+  // npm's copilot.ps1 without its copilot.cmd runs, but the remembered lookup would not run it again.
+  const psOnly = npmGlobal();
+  fs.rmSync(psOnly.cmd); fs.writeFileSync(path.join(psOnly.dir, 'copilot.ps1'), `& "$basedir/node_modules/@github/copilot/npm-loader.js" $args\n`);
+  assert.deepEqual(rememberCopilot('copilot', options({ Path: psOnly.dir })), { recorded: false, reason: 'not a copilot file the kit runs again' });
   // npm's folder inside the project (a local prefix) is not a CLI for every project.
   const localPrefix = npmGlobal(path.join(project, 'npm-prefix'));
   assert.deepEqual(rememberCopilot('copilot', options({ Path: localPrefix.dir })), { recorded: false, reason: 'inside the project' });
@@ -314,7 +324,8 @@ test('the guidance for a missing CLI looks for it first unless the kit already d
   // A terminal that names the path it could not run.
   for (const message of ["The term 'C:\\Users\\Taro Yamada\\AppData\\Roaming\\npm\\copilot.cmd' is not recognized as a name of a cmdlet, function, script file, or executable program.",
     "用語 'C:\\Users\\me\\AppData\\Roaming\\npm\\copilot.cmd' は、コマンドレット、関数、スクリプト ファイル、または操作可能なプログラムの名前として認識されません。",
-    '    + CategoryInfo          : ObjectNotFound: (C:\\Users\\me\\AppData\\Roaming\\npm\\copilot.cmd:String) [], CommandNotFoundException'])
+    '    + CategoryInfo          : ObjectNotFound: (C:\\Users\\me\\AppData\\Roaming\\npm\\copilot.cmd:String) [], CommandNotFoundException',
+    '    + CategoryInfo          : ObjectNotFound: (C:\\Program Files (x86)\\npm\\copilot.cmd:String) [], CommandNotFoundException'])
     assert.deepEqual(ids(message), ['find-cli', 'install-cli', 'cli-path', 'pause'], message);
   for (const message of ["The term 'C:\\x\\mycopilot.cmd' is not recognized", "'notcopilot' is not recognized as an internal or external command"])
     assert.equal(failureGuidance(message).id, 'unknown', message);
@@ -457,7 +468,7 @@ test('run_migration.mjs cli runs a shim given with --copilot but never remembers
   assert.equal(shimGiven.code, 1);
   assert.deepEqual({ ok: shimGiven.json.ok, shim: shimGiven.json.shim, searched: shimGiven.json.searched }, { ok: false, shim: true, searched: undefined });
   assert.equal(shimGiven.json.failure, `The path given with --copilot is VS Code's copilot shim, which found no Copilot CLI: ${failing}`);
-  assert.match(shimGiven.json.next, /The kit tried only that path: run .* cli without --copilot to look on PATH.*, and install only if that finds none/);
+  assert.match(shimGiven.json.next, /The kit tried only that path: run .* cli without --copilot to look on PATH[^]*\. Do not install the CLI for this\.$/);
   assert.match(shimGiven.stderr, /1\. \*\*Let the AI look for the installed Copilot CLI \(nothing is installed\)\*\* \(recommended\)/);
   assert.doesNotMatch(shimGiven.stderr, /install the Copilot CLI and start sign-in/);
 });
